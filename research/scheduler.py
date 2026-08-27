@@ -18,9 +18,53 @@ Adaptive thresholds:
     δ_color(t) = k · σ_color(t)
     threshold = f(scene_complexity, uncertainty, GPU_budget)
 """
+from enum import Enum
 import torch
-from typing import Dict, Tuple, Optional, List
+from typing import Dict, Tuple, Optional, List, Union
 import time
+
+
+class OptimizationPolicy(str, Enum):
+    """Optimization selection policies for research benchmarking."""
+    FULL = "full"                 # Policy 0: Optimize 100% of Gaussians
+    RANDOM = "random"             # Policy 1: Random ratio r (e.g. 50%)
+    BINARY = "binary"             # Policy 2: Binary stable/unstable (RTG-SLAM threshold)
+    TOP_K = "top_k"               # Policy 3: Continuous importance rank top-K / ratio r
+    BUDGET_AWARE = "budget_aware" # Policy 4: Importance/Cost knapsack optimization
+
+
+def estimate_gaussian_costs(
+    screen_areas: Optional[torch.Tensor] = None,
+    n_gaussians: Optional[int] = None,
+    base_cost_us: float = 0.5,
+    area_cost_factor: float = 0.002,
+    sh_degree: int = 0,
+    device: Optional[torch.device] = None,
+) -> torch.Tensor:
+    """Cost model: Cost_i = a + b · S_i · (1 + 0.1 · SH_degree).
+    
+    A Gaussian covering 800px on screen requires significantly more gradient
+    rasterization work than one covering 20px.
+    
+    Args:
+        screen_areas: (N,) screen-space area/weight of each Gaussian
+        n_gaussians: fallback number of Gaussians if screen_areas is None
+        base_cost_us: base gradient cost per Gaussian in microseconds (a)
+        area_cost_factor: footprint scaling factor (b)
+        sh_degree: spherical harmonics degree
+        device: torch device
+        
+    Returns:
+        costs: (N,) estimated microsecond compute costs
+    """
+    if screen_areas is not None:
+        device = screen_areas.device
+        sh_multiplier = 1.0 + 0.1 * sh_degree
+        return (base_cost_us + area_cost_factor * screen_areas) * sh_multiplier
+    
+    if n_gaussians is None:
+        raise ValueError("Either screen_areas or n_gaussians must be provided")
+    return torch.full((n_gaussians,), base_cost_us, device=device or torch.device('cpu'))
 
 
 class BudgetScheduler:
@@ -150,6 +194,92 @@ class BudgetScheduler:
         
         return optimize_mask
     
+    def select_by_policy(
+        self,
+        policy: Union[str, OptimizationPolicy],
+        importance_scores: torch.Tensor,
+        tiers: Optional[torch.Tensor] = None,
+        confidence: Optional[torch.Tensor] = None,
+        cost_estimates: Optional[torch.Tensor] = None,
+        ratio: float = 0.5,
+        top_k: Optional[int] = None,
+        frame_idx: int = 0,
+        binary_threshold: float = 0.5,
+    ) -> torch.Tensor:
+        """Select Gaussians for optimization according to specified policy.
+        
+        Policies (Milestone R4):
+            - FULL (Policy 0): 100% of Gaussians selected.
+            - RANDOM (Policy 1): Uniform random sample of ratio r (or top_k).
+            - BINARY (Policy 2): Binary stable/unstable (e.g. confidence < threshold or tier in {A, B}).
+            - TOP_K (Policy 3): Top-K highest continuous importance scores.
+            - BUDGET_AWARE (Policy 4): Importance/Cost knapsack selection.
+            
+        Args:
+            policy: policy name or OptimizationPolicy enum
+            importance_scores: (N,) importance scores
+            tiers: (N,) optional tier labels (0=A, 1=B, 2=C, 3=D)
+            confidence: (N,) or (N, 1) optional confidence values
+            cost_estimates: (N,) optional per-Gaussian costs
+            ratio: fraction of Gaussians to select (for random, top_k)
+            top_k: exact count to select (overrides ratio if provided)
+            frame_idx: current frame index
+            binary_threshold: threshold for binary policy
+            
+        Returns:
+            optimize_mask: (N,) boolean mask
+        """
+        N = importance_scores.shape[0]
+        device = importance_scores.device
+        policy_str = str(policy).lower()
+        if hasattr(policy, "value"):
+            policy_str = policy.value
+        
+        if N == 0:
+            return torch.zeros(0, dtype=torch.bool, device=device)
+        
+        # Determine target count K
+        if top_k is not None:
+            K = min(N, max(1, top_k))
+        else:
+            K = min(N, max(1, int(round(N * ratio))))
+            
+        if policy_str in ("full", OptimizationPolicy.FULL.value):
+            return torch.ones(N, dtype=torch.bool, device=device)
+            
+        elif policy_str in ("random", OptimizationPolicy.RANDOM.value):
+            mask = torch.zeros(N, dtype=torch.bool, device=device)
+            perm = torch.randperm(N, device=device)[:K]
+            mask[perm] = True
+            return mask
+            
+        elif policy_str in ("binary", OptimizationPolicy.BINARY.value):
+            if confidence is not None:
+                conf = confidence.squeeze(-1) if confidence.ndim > 1 else confidence
+                return conf < binary_threshold
+            elif tiers is not None:
+                return (tiers == 0) | (tiers == 1)
+            else:
+                return importance_scores >= binary_threshold
+                
+        elif policy_str in ("top_k", OptimizationPolicy.TOP_K.value):
+            mask = torch.zeros(N, dtype=torch.bool, device=device)
+            _, top_indices = torch.topk(importance_scores, K)
+            mask[top_indices] = True
+            return mask
+            
+        elif policy_str in ("budget_aware", OptimizationPolicy.BUDGET_AWARE.value):
+            if tiers is None:
+                tiers = torch.full((N,), 2, dtype=torch.long, device=device)
+                tiers[importance_scores > 0.8] = 0
+                tiers[(importance_scores >= 0.2) & (importance_scores <= 0.8)] = 1
+            return self.select_for_optimization(
+                importance_scores, tiers, cost_estimates=cost_estimates, frame_idx=frame_idx
+            )
+            
+        else:
+            raise ValueError(f"Unknown optimization policy: {policy}")
+    
     def compute_max_new_gaussians(self) -> int:
         """Compute maximum number of new Gaussians allowed this frame.
         
@@ -228,28 +358,104 @@ class BudgetScheduler:
         """
         return screen_areas * photometric_errors * geometric_complexity
     
-    def adjust_budget_from_profiling(self, actual_ms: float):
-        """Feedback loop: adjust cost estimates based on actual timing.
+    def adjust_budget_from_profiling(
+        self,
+        actual_frame_ms: float,
+        actual_opt_ms: Optional[float] = None,
+        n_optimized: Optional[int] = None,
+    ):
+        """Closed-loop feedback controller: adapt cost model and budget allocations.
         
-        If we consistently under/over-estimate costs, adapt.
+        Controls budget compliance by dynamically tuning:
+        1. Effective cost per Gaussian (α · Cost_est)
+        2. Task budget shares (optimize vs densify vs memory)
         
         Args:
-            actual_ms: actual GPU time consumed this frame
+            actual_frame_ms: total measured frame time in ms
+            actual_opt_ms: measured optimization time in ms
+            n_optimized: number of Gaussians optimized this frame
         """
-        self._actual_times.append(actual_ms)
-        if len(self._actual_times) > 10:
-            self._actual_times = self._actual_times[-10:]
+        self._actual_times.append(actual_frame_ms)
+        if len(self._actual_times) > 50:
+            self._actual_times = self._actual_times[-50:]
         
-        avg_actual = sum(self._actual_times) / len(self._actual_times)
-        ratio = avg_actual / self.gpu_budget_ms if self.gpu_budget_ms > 0 else 1.0
+        # Track budget violation
+        if self.gpu_budget_ms > 0:
+            violated = actual_frame_ms > self.gpu_budget_ms
+            if not hasattr(self, '_violation_history'):
+                self._violation_history = []
+            self._violation_history.append(float(violated))
+            if len(self._violation_history) > 50:
+                self._violation_history = self._violation_history[-50:]
         
-        # Adjust cost estimate
-        if ratio > 1.1:  # Consistently over budget
-            self.cost_per_gaussian_us *= 1.05
-        elif ratio < 0.8:  # Under budget, can afford more
-            self.cost_per_gaussian_us *= 0.95
-        
+        # Update empirical per-Gaussian optimization cost if opt timing provided
+        if actual_opt_ms is not None and n_optimized is not None and n_optimized > 0:
+            empirical_cost_us = (actual_opt_ms * 1000.0) / n_optimized
+            # Smoothly update cost estimate with EMA (α = 0.2)
+            self.cost_per_gaussian_us = 0.8 * self.cost_per_gaussian_us + 0.2 * empirical_cost_us
+        else:
+            # Latency ratio feedback
+            recent_times = self._actual_times[-10:]
+            avg_actual = sum(recent_times) / len(recent_times)
+            ratio = avg_actual / self.gpu_budget_ms if self.gpu_budget_ms > 0 else 1.0
+            
+            if ratio > 1.05:  # Over budget -> increase cost estimate to select fewer
+                scale = min(1.25, 1.0 + 0.5 * (ratio - 1.0))
+                self.cost_per_gaussian_us *= scale
+            elif ratio < 0.85:  # Under budget -> decrease cost estimate to select more
+                scale = max(0.80, 1.0 - 0.3 * (1.0 - ratio))
+                self.cost_per_gaussian_us *= scale
+                
+        # Clamp cost estimate to realistic bounds (0.01 μs to 100 μs)
+        self.cost_per_gaussian_us = max(0.01, min(self.cost_per_gaussian_us, 100.0))
         self._frame_count += 1
+        
+    def get_latency_statistics(self) -> Dict[str, float]:
+        """Compute latency distribution and budget violation statistics.
+        
+        Returns:
+            Dict with:
+                'mean_frame_time_ms': mean frame latency
+                'std_frame_time_ms': latency jitter / standard deviation
+                'p95_frame_time_ms': 95th percentile latency
+                'p99_frame_time_ms': 99th percentile latency
+                'budget_violation_rate': fraction of frames over budget
+                'avg_fps': mean throughput
+                'min_fps': 5th percentile throughput
+        """
+        import numpy as np
+        if not self._actual_times:
+            return {
+                'mean_frame_time_ms': 0.0,
+                'std_frame_time_ms': 0.0,
+                'p95_frame_time_ms': 0.0,
+                'p99_frame_time_ms': 0.0,
+                'budget_violation_rate': 0.0,
+                'avg_fps': 0.0,
+                'min_fps': 0.0,
+            }
+            
+        times = np.array(self._actual_times)
+        mean_t = float(np.mean(times))
+        std_t = float(np.std(times)) if len(times) > 1 else 0.0
+        p95_t = float(np.percentile(times, 95)) if len(times) >= 5 else mean_t
+        p99_t = float(np.percentile(times, 99)) if len(times) >= 10 else p95_t
+        
+        violations = getattr(self, '_violation_history', [])
+        violation_rate = float(np.mean(violations)) if violations else 0.0
+        
+        avg_fps = 1000.0 / max(mean_t, 1e-4)
+        min_fps = 1000.0 / max(p95_t, 1e-4)
+        
+        return {
+            'mean_frame_time_ms': mean_t,
+            'std_frame_time_ms': std_t,
+            'p95_frame_time_ms': p95_t,
+            'p99_frame_time_ms': p99_t,
+            'budget_violation_rate': violation_rate,
+            'avg_fps': avg_fps,
+            'min_fps': min_fps,
+        }
 
 
 class RunningStats:

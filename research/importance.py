@@ -171,17 +171,20 @@ class GaussianImportanceEstimator:
         
         # Temporal change: ||μ_t - μ_{t-1}||₂
         if self._prev_positions is not None and self._positions is not None:
-            if self._prev_positions.shape[0] == self._positions.shape[0]:
-                temporal_change = (self._positions - self._prev_positions).norm(dim=-1)
-            else:
-                min_len = min(self._prev_positions.shape[0], self._positions.shape[0])
-                temporal_change = torch.zeros(self._positions.shape[0], device=self._positions.device)
-                temporal_change[:min_len] = (self._positions[:min_len] - self._prev_positions[:min_len]).norm(dim=-1)
+            N_score = score.shape[0]
+            temporal_change = torch.zeros(N_score, device=score.device)
+            min_len = min(self._prev_positions.shape[0], self._positions.shape[0], N_score)
+            temporal_change[:min_len] = (self._positions[:min_len] - self._prev_positions[:min_len]).norm(dim=-1)
             score += w['temporal'] * temporal_change
         
         # Screen-space importance
         if self._screen_areas is not None:
-            score += w['screen_space'] * self._screen_areas
+            N_score = score.shape[0]
+            if self._screen_areas.shape[0] == N_score:
+                score += w['screen_space'] * self._screen_areas
+            else:
+                sa_len = min(self._screen_areas.shape[0], N_score)
+                score[:sa_len] += w['screen_space'] * self._screen_areas[:sa_len]
         
         # Normalize to [0, 1]
         score_min = score.min()
@@ -264,3 +267,6 @@ class GaussianImportanceEstimator:
             self._visibility_count, torch.zeros(n_new, device=device)])
         self._zero_contrib_frames = torch.cat([
             self._zero_contrib_frames, torch.zeros(n_new, dtype=torch.long, device=device)])
+        if hasattr(self, '_screen_areas') and self._screen_areas is not None:
+            self._screen_areas = torch.cat([
+                self._screen_areas, torch.zeros(n_new, device=device)])

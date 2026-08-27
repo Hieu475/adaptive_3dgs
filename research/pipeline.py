@@ -15,7 +15,8 @@ from .rasterizer import render as rasterize_scene
 from .losses import total_loss, color_loss, depth_loss
 from .depth_render import render_depth_surface_aware
 from .importance import GaussianImportanceEstimator, Tier
-from .scheduler import BudgetScheduler
+from .attribution import render_with_attribution, compute_gaussian_statistics
+from .scheduler import BudgetScheduler, OptimizationPolicy, estimate_gaussian_costs
 from .densification import (
     compute_error_masks, sample_candidates,
     create_gaussians_from_candidates, prune_low_value
@@ -84,11 +85,36 @@ class OnlineReconstructionPipeline:
     def _default_config() -> Dict:
         return {
             'gaussian': {'sh_degree': 0, 'initial_opacity': 0.5, 'max_gaussians': 500000},
-            'rendering': {'tile_size': 16, 'image_width': 640, 'image_height': 480},
+            'rendering': {
+                'tile_size': 16,
+                'image_width': 640,
+                'image_height': 480,
+                'use_surface_aware_depth': True,
+                'depth_threshold_opaque': 0.5,
+                'attribution_top_k': 8,
+            },
             'losses': {'weight_color': 1.0, 'weight_depth': 0.5, 'weight_normal': 0.1, 'weight_regularization': 0.01},
             'importance': {'depth_error': 1.0, 'color_error': 1.0, 'normal_error': 0.5, 'visibility': 0.1, 'temporal': 0.5, 'screen_space': 0.2},
-            'scheduler': {'gpu_budget_ms': 16.6, 'tier_thresholds': [0.8, 0.5, 0.2], 'optimize_every_n_frames': 5},
-            'densification': {'max_new_per_frame': 500, 'error_threshold_color': 0.1, 'error_threshold_depth': 0.05, 'transmission_threshold': 0.5},
+            'scheduler': {
+                'gpu_budget_ms': 16.6,
+                'tier_thresholds': [0.8, 0.5, 0.2],
+                'optimize_every_n_frames': 5,
+                'policy': 'budget_aware',
+                'optimize_ratio': 0.5,
+                'cost_per_gaussian_us': 0.5,
+            },
+            'densification': {
+                'max_new_per_frame': 500,
+                'strategy': 'importance',
+                'use_adaptive_thresholds': True,
+                'adaptive_k': 2.0,
+                'error_threshold_color': 0.1,
+                'error_threshold_depth': 0.05,
+                'transmission_threshold': 0.5,
+                'lambda_color': 1.0,
+                'lambda_depth': 1.0,
+                'lambda_transmission': 0.5,
+            },
             'training': {'learning_rate': {'position': 1.6e-4, 'scale': 5e-3, 'rotation': 1e-3, 'opacity': 5e-2, 'sh': 2.5e-3}},
         }
     
@@ -199,10 +225,10 @@ class OnlineReconstructionPipeline:
         else:
             self.current_pose = self.tracker.track_frame(rgb, depth, self.gaussian_model)
         
-        # === 2. Render Current Map ===
+        # === 2. Render Current Map (with per-Gaussian attribution) ===
         with torch.no_grad():
             cov3D = self.gaussian_model.build_covariance()
-            render_result = rasterize_scene(
+            render_result = render_with_attribution(
                 means3D=self.gaussian_model.positions,
                 cov3D=cov3D,
                 colors=self.gaussian_model.get_colors(),
@@ -212,31 +238,53 @@ class OnlineReconstructionPipeline:
                 image_width=W,
                 image_height=H,
                 tile_size=self.config['rendering']['tile_size'],
+                top_k=self.config['rendering'].get('attribution_top_k', 8),
             )
+            
+            rendered_color = render_result['color']  # (H, W, 3)
+            transmission = render_result['transmission']  # (H, W)
+            
+            if self.config['rendering'].get('use_surface_aware_depth', True):
+                depth_result = render_depth_surface_aware(
+                    means3D=self.gaussian_model.positions,
+                    normals=self.gaussian_model._normals,
+                    opacities=self.gaussian_model.opacities.squeeze(-1),
+                    cov3D=cov3D,
+                    extrinsics=self.current_pose,
+                    intrinsics=self.intrinsics,
+                    image_width=W,
+                    image_height=H,
+                    opacity_threshold=self.config['rendering'].get('depth_threshold_opaque', 0.5),
+                    tile_size=self.config['rendering']['tile_size'],
+                )
+                rendered_depth = depth_result['depth']  # (H, W)
+            else:
+                rendered_depth = render_result['depth']  # (H, W)
         
-        rendered_color = render_result['color']  # (H, W, 3)
-        rendered_depth = render_result['depth']  # (H, W)
-        transmission = render_result['transmission']  # (H, W)
+        # === 3. Per-Gaussian Error Attribution ===
+        # Compute true per-Gaussian statistics from pixel-level contributions
+        N = self.gaussian_model.num_gaussians
         
-        # === 3. Compute Errors ===
+        gaussian_stats = compute_gaussian_statistics(
+            rendered_color=rendered_color,
+            rendered_depth=rendered_depth,
+            gt_color=rgb,
+            gt_depth=depth,
+            contrib_weights=render_result['contrib_weights'],
+            contrib_indices=render_result['contrib_indices'],
+            n_gaussians=N,
+        )
+        
+        per_gaussian_color_err = gaussian_stats['color_error']      # (N,)
+        per_gaussian_depth_err = gaussian_stats['depth_error']      # (N,)
+        visibility_mask = gaussian_stats['visibility_mask']          # (N,) bool
+        per_gaussian_screen_area = gaussian_stats['screen_area']    # (N,)
+        
+        # Pixel-level errors for densification masks
         color_err = (rendered_color - rgb).abs().mean(dim=-1)  # (H, W)
         depth_valid = depth > 0
         depth_err = torch.zeros_like(depth)
         depth_err[depth_valid] = (rendered_depth[depth_valid] - depth[depth_valid]).abs()
-        
-        # Per-Gaussian errors (approximate via pixel-to-Gaussian mapping)
-        N = self.gaussian_model.num_gaussians
-        per_gaussian_color_err = torch.zeros(N, device=self.device)
-        per_gaussian_depth_err = torch.zeros(N, device=self.device)
-        visibility_mask = torch.zeros(N, dtype=torch.bool, device=self.device)
-        
-        # Simple approximation: average error in Gaussian's projected region
-        # (Full implementation would use the Gaussian index map)
-        mean_color_err = color_err.mean().item()
-        mean_depth_err = depth_err[depth_valid].mean().item() if depth_valid.any() else 0.0
-        per_gaussian_color_err.fill_(mean_color_err)
-        per_gaussian_depth_err.fill_(mean_depth_err)
-        visibility_mask.fill_(True)  # Simplified: assume all visible
         
         # === 4. Importance Estimation ===
         self.importance_estimator.update_statistics(
@@ -245,16 +293,29 @@ class OnlineReconstructionPipeline:
             normal_errors=None,
             visibility_mask=visibility_mask,
             positions=self.gaussian_model.positions.detach(),
+            screen_areas=per_gaussian_screen_area,
         )
         importance = self.importance_estimator.compute_importance()
         tiers = self.importance_estimator.classify_tier(importance)
         
         # === 5. Densification ===
         dense_cfg = self.config['densification']
+        
+        # Adaptive thresholds or fixed thresholds
+        if dense_cfg.get('use_adaptive_thresholds', True):
+            color_thresh, depth_thresh = self.scheduler.adaptive_threshold(
+                depth_errors=depth_err[depth_valid] if depth_valid.any() else torch.tensor([0.05], device=self.device),
+                color_errors=color_err,
+                k=dense_cfg.get('adaptive_k', 2.0),
+            )
+        else:
+            color_thresh = dense_cfg['error_threshold_color']
+            depth_thresh = dense_cfg['error_threshold_depth']
+
         error_masks = compute_error_masks(
             color_err, depth_err, transmission,
-            color_threshold=dense_cfg['error_threshold_color'],
-            depth_threshold=dense_cfg['error_threshold_depth'],
+            color_threshold=color_thresh,
+            depth_threshold=depth_thresh,
             transmission_threshold=dense_cfg['transmission_threshold'],
         )
         
@@ -265,7 +326,17 @@ class OnlineReconstructionPipeline:
         )
         
         if max_new > 0 and error_masks['combined_mask'].any():
-            candidates = sample_candidates(error_masks['combined_mask'], max_new)
+            candidates = sample_candidates(
+                error_mask=error_masks['combined_mask'],
+                num_samples=max_new,
+                strategy=dense_cfg.get('strategy', 'importance'),
+                color_err=color_err,
+                depth_err=depth_err,
+                transmission=transmission,
+                lambda_color=dense_cfg.get('lambda_color', 1.0),
+                lambda_depth=dense_cfg.get('lambda_depth', 1.0),
+                lambda_transmission=dense_cfg.get('lambda_transmission', 0.5),
+            )
             if candidates.shape[0] > 0:
                 new_gaussians = create_gaussians_from_candidates(
                     candidates, rgb, depth,
@@ -289,15 +360,35 @@ class OnlineReconstructionPipeline:
             ])
             tiers = self.importance_estimator.classify_tier(importance)
         
-        optimize_mask = self.scheduler.select_for_optimization(
-            importance, tiers, frame_idx=self.frame_count
+        # Estimate per-Gaussian compute costs
+        cost_estimates = estimate_gaussian_costs(
+            screen_areas=getattr(self.importance_estimator, '_screen_areas', None),
+            n_gaussians=N_updated,
+            base_cost_us=self.config['scheduler'].get('cost_per_gaussian_us', 0.5),
+            sh_degree=self.gaussian_model.sh_degree,
+            device=self.device,
+        )
+        
+        policy = self.config['scheduler'].get('policy', 'budget_aware')
+        ratio = self.config['scheduler'].get('optimize_ratio', 0.5)
+        
+        optimize_mask = self.scheduler.select_by_policy(
+            policy=policy,
+            importance_scores=importance,
+            tiers=tiers,
+            confidence=self.gaussian_model._confidence if hasattr(self.gaussian_model, '_confidence') else None,
+            cost_estimates=cost_estimates,
+            ratio=ratio,
+            frame_idx=self.frame_count,
         )
         
         # === 7. Selective Optimization ===
         n_optimized = 0
         opt_loss_val = 0.0
+        opt_time = 0.0
         
         if optimize_mask.any() and self.optimizer is not None:
+            opt_start = time.time()
             self.optimizer.zero_grad()
             
             # Re-render for gradient computation
@@ -314,6 +405,25 @@ class OnlineReconstructionPipeline:
                 tile_size=self.config['rendering']['tile_size'],
             )
             
+            if self.config['rendering'].get('use_surface_aware_depth', True):
+                depth_opt = render_depth_surface_aware(
+                    means3D=self.gaussian_model.positions,
+                    normals=self.gaussian_model._normals,
+                    opacities=self.gaussian_model.opacities.squeeze(-1),
+                    cov3D=cov3D,
+                    extrinsics=self.current_pose,
+                    intrinsics=self.intrinsics,
+                    image_width=W,
+                    image_height=H,
+                    opacity_threshold=self.config['rendering'].get('depth_threshold_opaque', 0.5),
+                    tile_size=self.config['rendering']['tile_size'],
+                )
+                rendered_opt_depth = depth_opt['depth']
+                depth_valid_mask = depth_opt['hit_mask'] & (depth > 0)
+            else:
+                rendered_opt_depth = render_opt['depth']
+                depth_valid_mask = depth > 0
+            
             # Compute loss
             weights = {
                 'color': self.config['losses']['weight_color'],
@@ -321,8 +431,9 @@ class OnlineReconstructionPipeline:
             }
             losses = total_loss(
                 render_opt['color'], rgb,
-                render_opt['depth'], depth,
+                rendered_opt_depth, depth,
                 weights,
+                depth_valid_mask=depth_valid_mask,
             )
             
             losses['total'].backward()
@@ -338,10 +449,17 @@ class OnlineReconstructionPipeline:
                     self.gaussian_model._rotation.grad[non_optimize] = 0
                 if self.gaussian_model._opacity.grad is not None:
                     self.gaussian_model._opacity.grad[non_optimize] = 0
+                if self.gaussian_model._features_dc.grad is not None:
+                    self.gaussian_model._features_dc.grad[non_optimize] = 0
+                if self.gaussian_model._features_rest.grad is not None:
+                    self.gaussian_model._features_rest.grad[non_optimize] = 0
+                if self.gaussian_model._normals.grad is not None:
+                    self.gaussian_model._normals.grad[non_optimize] = 0
             
             self.optimizer.step()
             n_optimized = optimize_mask.sum().item()
             opt_loss_val = losses['total'].item()
+            opt_time = time.time() - opt_start
         
         # === 8. Pruning ===
         prune_low_value(
@@ -355,8 +473,15 @@ class OnlineReconstructionPipeline:
             self.gaussian_model.compact()
             self._setup_optimizer()
         
-        # === Collect Metrics ===
+        # === Collect Metrics & Feedback ===
         frame_time = time.time() - frame_start
+        
+        # Closed-loop profiling feedback to scheduler
+        self.scheduler.adjust_budget_from_profiling(
+            actual_frame_ms=frame_time * 1000.0,
+            actual_opt_ms=opt_time * 1000.0,
+            n_optimized=n_optimized,
+        )
         
         # Compute quality metrics
         with torch.no_grad():
@@ -365,20 +490,35 @@ class OnlineReconstructionPipeline:
             ).item()
             depth_l1 = depth_err[depth_valid].mean().item() if depth_valid.any() else 0.0
         
+        budget_ms = self.config['scheduler'].get('gpu_budget_ms', 16.6)
+        budget_violated = (frame_time * 1000.0) > budget_ms if budget_ms > 0 else False
+        overshoot_ms = max(0.0, (frame_time * 1000.0) - budget_ms) if budget_ms > 0 else 0.0
+
         metrics = {
             'frame': self.frame_count,
             'psnr': psnr,
             'depth_l1': depth_l1,
-            'color_loss': mean_color_err,
+            'color_loss': per_gaussian_color_err.mean().item(),
             'n_gaussians': self.gaussian_model.num_gaussians,
             'n_optimized': n_optimized,
             'n_tier_a': (tiers == Tier.A).sum().item(),
             'n_tier_b': (tiers == Tier.B).sum().item(),
             'n_tier_c': (tiers == Tier.C).sum().item(),
             'n_tier_d': (tiers == Tier.D).sum().item(),
-            'frame_time_ms': frame_time * 1000,
+            'frame_time_ms': frame_time * 1000.0,
+            'opt_time_ms': opt_time * 1000.0,
             'fps': 1.0 / max(frame_time, 1e-8),
             'loss': opt_loss_val,
+            # Budget metrics
+            'budget_ms': budget_ms,
+            'budget_violated': budget_violated,
+            'overshoot_ms': overshoot_ms,
+            # Attribution metrics
+            'n_visible': visibility_mask.sum().item(),
+            'importance_std': importance.std().item() if importance.numel() > 0 else 0.0,
+            'importance_min': importance.min().item() if importance.numel() > 0 else 0.0,
+            'importance_max': importance.max().item() if importance.numel() > 0 else 0.0,
+            'avg_screen_area': per_gaussian_screen_area.mean().item(),
         }
         self.metrics_history.append(metrics)
         self.frame_count += 1
@@ -398,12 +538,17 @@ class OnlineReconstructionPipeline:
         psnrs = [m['psnr'] for m in self.metrics_history]
         depths = [m['depth_l1'] for m in self.metrics_history]
         fps_list = [m['fps'] for m in self.metrics_history]
+        violations = [m.get('budget_violated', False) for m in self.metrics_history]
+        
+        latency_stats = self.scheduler.get_latency_statistics()
         
         return {
             'total_frames': len(self.metrics_history),
-            'avg_psnr': np.mean(psnrs),
-            'avg_depth_l1': np.mean(depths),
-            'avg_fps': np.mean(fps_list),
+            'avg_psnr': float(np.mean(psnrs)),
+            'avg_depth_l1': float(np.mean(depths)),
+            'avg_fps': float(np.mean(fps_list)),
             'final_n_gaussians': self.metrics_history[-1]['n_gaussians'],
-            'avg_frame_time_ms': np.mean([m['frame_time_ms'] for m in self.metrics_history]),
+            'avg_frame_time_ms': float(np.mean([m['frame_time_ms'] for m in self.metrics_history])),
+            'budget_violation_rate': float(np.mean(violations)),
+            'latency_stats': latency_stats,
         }
