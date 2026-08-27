@@ -1,0 +1,8 @@
+{
+  "total_frames": 19,
+  "avg_psnr": 7.859984479452434,
+  "avg_depth_l1": 0.23561403665103411,
+  "avg_fps": 0.36046528113594123,
+  "final_n_gaussians": 23690,
+  "avg_frame_time_ms": 3010.387709266261
+}

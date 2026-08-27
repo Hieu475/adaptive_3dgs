@@ -1,0 +1,14 @@
+{
+  "device": "cuda",
+  "n_frames": 30,
+  "image_size": "160x120",
+  "init_time_ms": 646.6145250001318,
+  "mean_frame_ms": 403.53762836663617,
+  "std_frame_ms": 119.82775985559614,
+  "p50_frame_ms": 399.51561299994864,
+  "p95_frame_ms": 590.0308181999889,
+  "avg_fps": 2.478083652440572,
+  "final_gaussians": 7200,
+  "peak_gaussians": 7200,
+  "gpu_mem_mb": 175.3798828125
+}

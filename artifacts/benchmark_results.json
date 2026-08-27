@@ -1,0 +1,86 @@
+{
+  "python": {
+    "backend": "python",
+    "n_gaussians": 1000,
+    "image_size": "320x240",
+    "mean_ms": 0.641283100048895,
+    "std_ms": 0.0910990062734623,
+    "p50_ms": 0.6050525000773632,
+    "p95_ms": 0.8126696001909293,
+    "fps": 1559.3736992659785
+  },
+  "cuda": {
+    "backend": "cuda",
+    "n_gaussians": 1000,
+    "image_size": "640x480",
+    "mean_ms": 0.053151200045249425,
+    "std_ms": 0.005870503585838796,
+    "p50_ms": 0.05143550015418441,
+    "p95_ms": 0.06305690008048259,
+    "fps": 18814.250650007263,
+    "gpu_mem_allocated_mb": 0.0791015625,
+    "gpu_mem_reserved_mb": 2.0
+  },
+  "scalability": [
+    {
+      "backend": "cuda",
+      "n_gaussians": 100,
+      "image_size": "640x480",
+      "mean_ms": 0.05717940007343714,
+      "std_ms": 0.006707920487009127,
+      "p50_ms": 0.0544355000329233,
+      "p95_ms": 0.06996225004058941,
+      "fps": 17488.81587976914,
+      "gpu_mem_allocated_mb": 0.0107421875,
+      "gpu_mem_reserved_mb": 2.0
+    },
+    {
+      "backend": "cuda",
+      "n_gaussians": 500,
+      "image_size": "640x480",
+      "mean_ms": 0.16334570013896155,
+      "std_ms": 0.047377248320634675,
+      "p50_ms": 0.17532550009491388,
+      "p95_ms": 0.23385810018226033,
+      "fps": 6121.985452627645,
+      "gpu_mem_allocated_mb": 0.0400390625,
+      "gpu_mem_reserved_mb": 2.0
+    },
+    {
+      "backend": "cuda",
+      "n_gaussians": 1000,
+      "image_size": "640x480",
+      "mean_ms": 0.14405949996216805,
+      "std_ms": 0.05680060603535493,
+      "p50_ms": 0.14102799968895852,
+      "p95_ms": 0.22671419994821906,
+      "fps": 6941.57622553607,
+      "gpu_mem_allocated_mb": 0.0791015625,
+      "gpu_mem_reserved_mb": 2.0
+    },
+    {
+      "backend": "cuda",
+      "n_gaussians": 2000,
+      "image_size": "640x480",
+      "mean_ms": 0.05451120009638544,
+      "std_ms": 0.0008187326669336134,
+      "p50_ms": 0.0545950001651363,
+      "p95_ms": 0.05571150009018311,
+      "fps": 18344.853869146584,
+      "gpu_mem_allocated_mb": 0.15478515625,
+      "gpu_mem_reserved_mb": 2.0
+    },
+    {
+      "backend": "cuda",
+      "n_gaussians": 5000,
+      "image_size": "640x480",
+      "mean_ms": 0.05546739989767957,
+      "std_ms": 0.0025115316902509974,
+      "p50_ms": 0.0547100000858336,
+      "p95_ms": 0.06009284995798225,
+      "fps": 18028.607828106145,
+      "gpu_mem_allocated_mb": 0.3857421875,
+      "gpu_mem_reserved_mb": 2.0
+    }
+  ]
+}
