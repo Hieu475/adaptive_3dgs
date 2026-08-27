@@ -51,36 +51,130 @@ def compute_error_masks(
     }
 
 
+def compute_sampling_probability_map(
+    color_err: torch.Tensor,
+    depth_err: torch.Tensor,
+    transmission: torch.Tensor,
+    lambda_color: float = 1.0,
+    lambda_depth: float = 1.0,
+    lambda_transmission: float = 0.5,
+    mask: Optional[torch.Tensor] = None,
+) -> torch.Tensor:
+    """Compute per-pixel candidate creation sampling probability map.
+    
+    P(u) ∝ λ_c · E_c(u) + λ_d · E_d(u) + λ_t · T(u)
+    
+    High color error, high depth discrepancy, and high transmission (see-through/missing
+    geometry) regions receive proportionally higher probability of spawning new Gaussians.
+    
+    Args:
+        color_err: (H, W) per-pixel color error
+        depth_err: (H, W) per-pixel depth error
+        transmission: (H, W) remaining light transmittance
+        lambda_color: weight for color error
+        lambda_depth: weight for depth error
+        lambda_transmission: weight for transmission
+        mask: optional (H, W) boolean mask to restrict valid sampling domain
+        
+    Returns:
+        prob_map: (H, W) normalized probability distribution (sums to 1 over masked region)
+    """
+    weight_map = (
+        lambda_color * color_err
+        + lambda_depth * depth_err
+        + lambda_transmission * transmission
+    ).clamp(min=1e-8)
+    
+    if mask is not None:
+        weight_map = torch.where(mask, weight_map, torch.zeros_like(weight_map))
+        
+    total_w = weight_map.sum()
+    if total_w > 1e-8:
+        return weight_map / total_w
+    else:
+        # Uniform fallback over mask
+        if mask is not None and mask.any():
+            return mask.float() / mask.float().sum()
+        return torch.full_like(weight_map, 1.0 / weight_map.numel())
+
+
 def sample_candidates(
     error_mask: torch.Tensor,
     num_samples: int,
-    strategy: str = 'random',
+    strategy: str = 'importance',
+    color_err: Optional[torch.Tensor] = None,
+    depth_err: Optional[torch.Tensor] = None,
+    transmission: Optional[torch.Tensor] = None,
+    lambda_color: float = 1.0,
+    lambda_depth: float = 1.0,
+    lambda_transmission: float = 0.5,
 ) -> torch.Tensor:
     """Sample pixel locations from error mask for new Gaussian creation.
+    
+    Supported strategies (Milestone R5):
+        - 'uniform' / 'random': uniform random subsampling over error mask
+        - 'error_driven': weighted sampling by E_color(u) + E_depth(u)
+        - 'importance' / 'importance_weighted': weighted sampling by
+            P(u) ∝ λ_c·E_c(u) + λ_d·E_d(u) + λ_t·T(u)
     
     Args:
         error_mask: (H, W) boolean mask of high-error regions
         num_samples: maximum number of samples
-        strategy: 'random' or 'importance' (weight by error magnitude)
+        strategy: 'uniform', 'random', 'error_driven', or 'importance'
+        color_err: (H, W) optional color error map
+        depth_err: (H, W) optional depth error map
+        transmission: (H, W) optional transmission map
+        lambda_color, lambda_depth, lambda_transmission: weights for importance map
     
     Returns:
         candidates_uv: (K, 2) pixel coordinates (u, v) where K <= num_samples
     """
     # Get all valid pixel locations
     ys, xs = torch.where(error_mask)
+    n_valid = len(ys)
     
-    if len(ys) == 0:
+    if n_valid == 0:
         return torch.empty(0, 2, dtype=torch.long, device=error_mask.device)
     
-    # Subsample if too many
-    K = min(num_samples, len(ys))
+    K = min(num_samples, n_valid)
     
-    if strategy == 'random':
-        indices = torch.randperm(len(ys), device=error_mask.device)[:K]
+    strategy_lower = strategy.lower()
+    
+    if strategy_lower in ('uniform', 'random') or color_err is None:
+        # Uniform random sampling
+        indices = torch.randperm(n_valid, device=error_mask.device)[:K]
+        return torch.stack([xs[indices], ys[indices]], dim=-1)
+        
+    elif strategy_lower == 'error_driven':
+        # Weight by raw error magnitude
+        err_w = color_err[ys, xs]
+        if depth_err is not None:
+            err_w = err_w + depth_err[ys, xs]
+        err_w = err_w.clamp(min=1e-6)
+        probs = err_w / err_w.sum()
+        
+        # Multinomial sampling without replacement
+        sample_idx = torch.multinomial(probs, num_samples=K, replacement=False)
+        return torch.stack([xs[sample_idx], ys[sample_idx]], dim=-1)
+        
+    elif strategy_lower in ('importance', 'importance_weighted'):
+        # Composite importance-weighted sampling
+        t_w = transmission[ys, xs] if transmission is not None else torch.zeros_like(color_err[ys, xs])
+        d_w = depth_err[ys, xs] if depth_err is not None else torch.zeros_like(color_err[ys, xs])
+        c_w = color_err[ys, xs]
+        
+        weights = (
+            lambda_color * c_w
+            + lambda_depth * d_w
+            + lambda_transmission * t_w
+        ).clamp(min=1e-6)
+        
+        probs = weights / weights.sum()
+        sample_idx = torch.multinomial(probs, num_samples=K, replacement=False)
+        return torch.stack([xs[sample_idx], ys[sample_idx]], dim=-1)
+        
     else:
-        indices = torch.randperm(len(ys), device=error_mask.device)[:K]
-    
-    return torch.stack([xs[indices], ys[indices]], dim=-1)  # (K, 2) as (u, v)
+        raise ValueError(f"Unknown densification sampling strategy: {strategy}")
 
 
 def unproject_pixels(
