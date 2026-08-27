@@ -1,0 +1,8 @@
+# TUM RGB-D specific overrides
+dataset:
+  type: tum
+  path: data/tum/
+  depth_scale: 5000.0
+rendering:
+  image_width: 640
+  image_height: 480

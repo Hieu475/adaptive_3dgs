@@ -1,0 +1,8 @@
+# Replica dataset specific overrides
+dataset:
+  type: replica
+  path: data/replica/
+  depth_scale: 6553.5
+rendering:
+  image_width: 1200
+  image_height: 680

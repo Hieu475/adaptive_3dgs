@@ -1,0 +1,48 @@
+# Default configuration for Adaptive 3D Gaussian Splatting
+gaussian:
+  initial_opacity: 0.1
+  opacity_threshold: 0.01
+  max_gaussians: 5000000
+  sh_degree: 3
+  confidence_init: 0.5
+rendering:
+  tile_size: 16
+  image_width: 640
+  image_height: 480
+  early_termination_threshold: 0.99
+losses:
+  weight_color: 1.0
+  weight_depth: 0.5
+  weight_normal: 0.1
+  weight_regularization: 0.01
+importance:
+  depth_error: 1.0
+  color_error: 1.0
+  normal_error: 0.5
+  visibility: 0.1
+  temporal: 0.5
+  screen_space: 0.2
+scheduler:
+  gpu_budget_ms: 16.6
+  tier_thresholds: [0.8, 0.5, 0.2]
+  optimize_every_n_frames: 5
+densification:
+  max_new_per_frame: 1000
+  error_threshold_color: 0.1
+  error_threshold_depth: 0.05
+  transmission_threshold: 0.5
+tracking:
+  icp_iterations: 30
+  convergence_threshold: 1e-4
+training:
+  learning_rate:
+    position: 1.6e-4
+    scale: 5.0e-3
+    rotation: 1.0e-3
+    opacity: 5.0e-2
+    sh: 2.5e-3
+  optimizer: Adam
+dataset:
+  type: default
+  path: data/
+  depth_scale: 1000.0
