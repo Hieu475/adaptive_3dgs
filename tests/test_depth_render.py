@@ -123,3 +123,74 @@ class TestRayPlaneIntersection:
         assert p_hit.shape == (N, 3)
         assert depth.shape == (N,)
         assert valid.shape == (N,)
+
+
+class TestRenderDepthSurfaceAware:
+    """Tests for full render_depth_surface_aware pipeline."""
+
+    def _make_scene(self, n=5, device='cpu'):
+        torch.manual_seed(42)
+        means3D = torch.randn(n, 3, device=device, requires_grad=True)
+        with torch.no_grad():
+            means3D[:, 2] = means3D[:, 2].abs() + 2.0  # in front of camera
+        
+        normals = torch.randn(n, 3, device=device, requires_grad=True)
+        with torch.no_grad():
+            normals[:, 2] = -1.0  # facing camera
+            normals.data = normals.data / normals.data.norm(dim=-1, keepdim=True)
+        
+        scales = torch.full((n, 3), 0.2, device=device)
+        S = torch.zeros(n, 3, 3, device=device)
+        S[:, 0, 0] = scales[:, 0]
+        S[:, 1, 1] = scales[:, 1]
+        S[:, 2, 2] = scales[:, 2]
+        cov3D = torch.bmm(S, S.transpose(1, 2))
+        
+        opacities = torch.full((n,), 0.9, device=device)
+        extrinsics = torch.eye(4, device=device)
+        intrinsics = torch.tensor([
+            [100.0, 0, 16.0],
+            [0, 100.0, 16.0],
+            [0, 0, 1.0]
+        ], device=device)
+        
+        return means3D, normals, opacities, cov3D, extrinsics, intrinsics
+
+    def test_output_shapes_and_types(self):
+        from research.depth_render import render_depth_surface_aware
+        means3D, normals, opacities, cov3D, extrinsics, intrinsics = self._make_scene()
+        H, W = 32, 32
+        
+        res = render_depth_surface_aware(
+            means3D, normals, opacities, cov3D,
+            extrinsics, intrinsics, W, H,
+            opacity_threshold=0.3
+        )
+        
+        assert res['depth'].shape == (H, W)
+        assert res['hit_mask'].shape == (H, W)
+        assert res['gaussian_index'].shape == (H, W)
+        assert res['hit_mask'].dtype == torch.bool
+        assert res['gaussian_index'].dtype == torch.long
+
+    def test_gradient_flow_to_positions_and_normals(self):
+        from research.depth_render import render_depth_surface_aware
+        means3D, normals, opacities, cov3D, extrinsics, intrinsics = self._make_scene()
+        H, W = 32, 32
+        
+        res = render_depth_surface_aware(
+            means3D, normals, opacities, cov3D,
+            extrinsics, intrinsics, W, H,
+            opacity_threshold=0.3
+        )
+        
+        hit_mask = res['hit_mask']
+        assert hit_mask.any(), "At least some pixels should hit"
+        
+        loss = res['depth'][hit_mask].mean()
+        loss.backward()
+        
+        assert means3D.grad is not None, "Gradients should flow to positions"
+        assert normals.grad is not None, "Gradients should flow to surface normals"
+        assert means3D.grad.abs().sum() > 0
+        assert normals.grad.abs().sum() > 0
