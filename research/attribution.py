@@ -16,13 +16,14 @@ Key equations:
     Visibility:
         V_i = (1 / N_pixels) · Σ_u 1[w_{u,i} > ε]
 
-    Screen-space area:
-        S_i = Σ_u w_{u,i}
+    Contribution mass:
+        C_i = Σ_u w_{u,i}
 
 This replaces the naive global-mean approach:
     per_gaussian_err.fill_(global_mean)  ← WRONG
 with true per-Gaussian error attribution.
 """
+import math
 import torch
 from typing import Dict, Optional, Tuple
 
@@ -366,8 +367,10 @@ def compute_gaussian_statistics(
     # Visibility: fraction of total pixels
     visibility = pixel_count / (total_pixels + epsilon)
 
-    # Screen area: total contribution weight
-    screen_area = total_weight
+    # Contribution mass: total alpha-weighted contribution Σ_u w_{u,i}
+    # NOTE: This is NOT geometric screen-space area (π·r_x·r_y).
+    # For true projected area, use compute_projected_area() with 2D covariances.
+    contribution_mass = total_weight
 
     # Visibility mask: Gaussian contributed to at least one pixel
     visibility_mask = pixel_count > 0
@@ -376,11 +379,53 @@ def compute_gaussian_statistics(
         'color_error': per_gaussian_color_err,
         'depth_error': per_gaussian_depth_err,
         'visibility': visibility,
-        'screen_area': screen_area,
+        'contribution_mass': contribution_mass,
+        'screen_area': contribution_mass,  # backward compat alias
         'visibility_mask': visibility_mask,
         'pixel_count': pixel_count,
         'total_weight': total_weight,
     }
+
+
+def compute_projected_area(
+    cov2D: torch.Tensor,
+) -> torch.Tensor:
+    """Compute true geometric projected screen-space area of each Gaussian.
+
+    Uses the ellipse area formula:
+        A_i = π · r_x · r_y
+    where r_x, r_y are the semi-axes (square roots of eigenvalues of cov2D).
+
+    For a 2x2 symmetric matrix [[a, b], [b, c]]:
+        λ₁,₂ = (a+c)/2 ± √(((a-c)/2)² + b²)
+        r_x = √λ₁,  r_y = √λ₂
+        A = π · r_x · r_y = π · √(det(cov2D))
+
+    Args:
+        cov2D: (N, 2, 2) projected 2D covariance matrices
+
+    Returns:
+        areas: (N,) projected area in pixels²
+    """
+    import math
+
+    a = cov2D[:, 0, 0]
+    b = cov2D[:, 0, 1]
+    c = cov2D[:, 1, 1]
+
+    trace = a + c
+    det = a * c - b * b
+
+    discriminant = (trace * trace / 4 - det).clamp(min=0)
+    sqrt_disc = torch.sqrt(discriminant)
+
+    lambda1 = trace / 2 + sqrt_disc
+    lambda2 = (trace / 2 - sqrt_disc).clamp(min=0)
+
+    r_x = torch.sqrt(lambda1.clamp(min=1e-8))
+    r_y = torch.sqrt(lambda2.clamp(min=1e-8))
+
+    return math.pi * r_x * r_y
 
 
 def normalize_importance_components(
