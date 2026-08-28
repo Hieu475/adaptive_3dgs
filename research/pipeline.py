@@ -22,6 +22,7 @@ from .densification import (
     create_gaussians_from_candidates, prune_low_value
 )
 from .tracker import ICPTracker
+from .background_cache import FrozenBackgroundCache
 
 
 class OnlineReconstructionPipeline:
@@ -71,6 +72,9 @@ class OnlineReconstructionPipeline:
         
         # Optimizer (initialized after first frame)
         self.optimizer: Optional[optim.Adam] = None
+        
+        # Frozen Background Cache for True Selective Optimization
+        self.bg_cache = FrozenBackgroundCache(device=device)
         
         # State
         self.frame_count = 0
@@ -397,7 +401,7 @@ class OnlineReconstructionPipeline:
             frame_idx=self.frame_count,
         )
         
-        # === 7. Selective Optimization ===
+        # === 7. True Selective Optimization with Frozen Background Cache (R21/R29) ===
         n_optimized = 0
         opt_loss_val = 0.0
         opt_time = 0.0
@@ -406,15 +410,27 @@ class OnlineReconstructionPipeline:
             opt_start = time.time()
             self.optimizer.zero_grad()
             
-            # True Selective Optimization (R21):
-            # Render with detached frozen background and gradient-tracked active subset
-            sel_inputs = self.gaussian_model.get_selective_render_inputs(optimize_mask)
+            # Extract active subset (strictly size M, no O(N) full-size tensors created)
+            active_subset = self.gaussian_model.get_optimization_subset(optimize_mask)
+            frozen_mask = ~optimize_mask[:self.gaussian_model.num_gaussians]
             
-            render_opt = rasterize_scene(
-                means3D=sel_inputs['means3D'],
-                cov3D=sel_inputs['cov3D'],
-                colors=sel_inputs['colors'],
-                opacities=sel_inputs['opacities'],
+            # 1. Build / refresh background cache for frozen Gaussians (detached)
+            if frozen_mask.any():
+                self.bg_cache.build_cache(
+                    model=self.gaussian_model,
+                    frozen_mask=frozen_mask,
+                    extrinsics=self.current_pose,
+                    intrinsics=self.intrinsics,
+                    image_width=W,
+                    image_height=H,
+                    tile_size=self.config['rendering']['tile_size'],
+                )
+            else:
+                self.bg_cache.invalidate()
+                
+            # 2. Composite active Gaussians with cached frozen background
+            composite_opt = self.bg_cache.composite_with_active(
+                active_subset=active_subset,
                 extrinsics=self.current_pose,
                 intrinsics=self.intrinsics,
                 image_width=W,
@@ -422,41 +438,26 @@ class OnlineReconstructionPipeline:
                 tile_size=self.config['rendering']['tile_size'],
             )
             
-            if self.config['rendering'].get('use_surface_aware_depth', True):
-                depth_opt = render_depth_surface_aware(
-                    means3D=sel_inputs['means3D'],
-                    normals=self.gaussian_model._normals,
-                    opacities=sel_inputs['opacities'],
-                    cov3D=sel_inputs['cov3D'],
-                    extrinsics=self.current_pose,
-                    intrinsics=self.intrinsics,
-                    image_width=W,
-                    image_height=H,
-                    opacity_threshold=self.config['rendering'].get('depth_threshold_opaque', 0.5),
-                    tile_size=self.config['rendering']['tile_size'],
-                )
-                rendered_opt_depth = depth_opt['depth']
-                depth_valid_mask = depth_opt['hit_mask'] & (depth > 0)
-            else:
-                rendered_opt_depth = render_opt['depth']
-                depth_valid_mask = depth > 0
+            rendered_opt_color = composite_opt['color']
+            rendered_opt_depth = composite_opt['depth']
+            depth_valid_mask = (rendered_opt_depth > 0) & (depth > 0)
             
-            # Compute loss
+            # 3. Compute loss
             weights = {
                 'color': self.config['losses']['weight_color'],
                 'depth': self.config['losses']['weight_depth'],
             }
             losses = total_loss(
-                render_opt['color'], rgb,
+                rendered_opt_color, rgb,
                 rendered_opt_depth, depth,
                 weights,
                 depth_valid_mask=depth_valid_mask,
             )
             
-            # Backward: only computes gradients for the active subset M <= N
+            # 4. Backward: only computes gradients for the active subset M <= N
             losses['total'].backward()
             
-            # Execute optimizer step
+            # 5. Optimizer update
             self.optimizer.step()
             n_optimized = optimize_mask.sum().item()
             opt_loss_val = losses['total'].item()
