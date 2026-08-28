@@ -23,6 +23,7 @@ from .densification import (
 )
 from .tracker import ICPTracker
 from .background_cache import FrozenBackgroundCache
+from .selective_optimizer import SelectiveAdam
 
 
 class OnlineReconstructionPipeline:
@@ -141,7 +142,7 @@ class OnlineReconstructionPipeline:
             {'params': [self.gaussian_model._features_rest], 'lr': lr.get('sh', 2.5e-3)},
             {'params': [self.gaussian_model._normals], 'lr': lr.get('position', 1.6e-4)},
         ]
-        self.optimizer = optim.Adam(params)
+        self.optimizer = SelectiveAdam(params)
     
     def initialize(
         self,
@@ -358,7 +359,11 @@ class OnlineReconstructionPipeline:
                     self.importance_estimator.expand_buffers(
                         new_gaussians['xyz'].shape[0], self.device
                     )
-                    self._setup_optimizer()  # Re-create optimizer with new params
+                    # Extend optimizer state continuously without destroying historical momentum
+                    if self.optimizer is not None:
+                        self.optimizer.extend_state(new_gaussians['xyz'].shape[0], device=self.device)
+                    else:
+                        self._setup_optimizer()
         
         # === 6. Budget-Aware Scheduling ===
         # Recompute importance for updated Gaussian set
@@ -457,8 +462,8 @@ class OnlineReconstructionPipeline:
             # 4. Backward: only computes gradients for the active subset M <= N
             losses['total'].backward()
             
-            # 5. Optimizer update
-            self.optimizer.step()
+            # 5. Selective Optimizer update (O(M) arithmetic & memory bandwidth)
+            self.optimizer.step(active_idx=active_subset['indices'])
             n_optimized = optimize_mask.sum().item()
             opt_loss_val = losses['total'].item()
             opt_time = time.time() - opt_start
