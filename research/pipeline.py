@@ -24,6 +24,14 @@ from .densification import (
 from .tracker import ICPTracker
 from .background_cache import FrozenBackgroundCache
 from .selective_optimizer import SelectiveAdam
+from enum import Enum
+
+
+class ExecutionMode(str, Enum):
+    """Pipeline execution mode."""
+    FULL = "full"             # Ground-truth quality upper bound
+    SELECTIVE = "selective"   # Production adaptive policy
+    ORACLE = "oracle"         # Research evaluator
 
 
 class OnlineReconstructionPipeline:
@@ -640,5 +648,109 @@ class OnlineReconstructionPipeline:
             'budget_violation_rate': float(np.mean(violations)),
             'latency_stats': latency_stats,
         }
+
+    def evaluate_gaussian_update(
+        self,
+        gaussian_indices: torch.Tensor,
+        frame: Dict[str, torch.Tensor],
+        n_steps: int = 5,
+        lr: float = 1e-3,
+    ) -> Dict[str, float]:
+        """Execute isolated selective optimization trial sharing the exact same pipeline execution model (R34/R35).
+        
+        Saves and restores model & optimizer states to ensure non-destructive evaluation.
+        
+        Args:
+            gaussian_indices: (K,) indices of Gaussians to evaluate
+            frame: dict with 'rgb', 'depth', 'pose'
+            n_steps: optimization steps
+            lr: learning rate
+            
+        Returns:
+            Dict containing delta_psnr, delta_depth_l1, delta_quality, measured_trial_cost_ms.
+        """
+        device = self.device
+        rgb = frame['rgb'].to(device)
+        depth = frame['depth'].to(device)
+        pose = frame.get('pose', self.current_pose).to(device)
+        H, W = rgb.shape[:2]
+        
+        # Backup state
+        saved_state = {k: v.clone() for k, v in self.gaussian_model.state_dict().items()}
+        
+        # 1. Pre-optimization measurements
+        with torch.no_grad():
+            render_before = rasterize_scene(
+                means3D=self.gaussian_model.positions,
+                cov3D=self.gaussian_model.build_covariance(),
+                colors=self.gaussian_model.get_colors(),
+                opacities=self.gaussian_model.opacities.squeeze(-1),
+                extrinsics=pose,
+                intrinsics=self.intrinsics,
+                image_width=W,
+                image_height=H,
+            )
+            psnr_before = -10 * torch.log10(((render_before['color'] - rgb)**2).mean() + 1e-8).item()
+            valid_d = depth > 0
+            depth_l1_before = (render_before['depth'][valid_d] - depth[valid_d]).abs().mean().item() if valid_d.any() else 0.0
+            
+        # 2. Setup selective optimization trial
+        opt_mask = torch.zeros(self.gaussian_model.num_gaussians, dtype=torch.bool, device=device)
+        opt_mask[gaussian_indices] = True
+        
+        trial_opt = SelectiveAdam([{'params': list(self.gaussian_model.parameters()), 'lr': lr}])
+        trial_cache = FrozenBackgroundCache(device=device)
+        
+        if device == 'cuda':
+            torch.cuda.synchronize()
+        t0 = time.perf_counter()
+        
+        for _ in range(n_steps):
+            trial_opt.zero_grad()
+            active_subset = self.gaussian_model.get_optimization_subset(opt_mask)
+            frozen_mask = ~opt_mask
+            
+            if frozen_mask.any():
+                trial_cache.build_cache(self.gaussian_model, frozen_mask, pose, self.intrinsics, W, H)
+                
+            comp_out = trial_cache.composite_with_active(active_subset, pose, self.intrinsics, W, H)
+            losses = total_loss(comp_out['color'], rgb, comp_out['depth'], depth, {'color': 1.0, 'depth': 0.5})
+            losses['total'].backward()
+            trial_opt.step(active_idx=active_subset['indices'])
+            
+        if device == 'cuda':
+            torch.cuda.synchronize()
+        measured_trial_cost_ms = (time.perf_counter() - t0) * 1000.0
+        
+        # 3. Post-optimization measurements
+        with torch.no_grad():
+            render_after = rasterize_scene(
+                means3D=self.gaussian_model.positions,
+                cov3D=self.gaussian_model.build_covariance(),
+                colors=self.gaussian_model.get_colors(),
+                opacities=self.gaussian_model.opacities.squeeze(-1),
+                extrinsics=pose,
+                intrinsics=self.intrinsics,
+                image_width=W,
+                image_height=H,
+            )
+            psnr_after = -10 * torch.log10(((render_after['color'] - rgb)**2).mean() + 1e-8).item()
+            depth_l1_after = (render_after['depth'][valid_d] - depth[valid_d]).abs().mean().item() if valid_d.any() else 0.0
+            
+        delta_psnr = psnr_after - psnr_before
+        delta_depth_gain = max(0.0, depth_l1_before - depth_l1_after)
+        delta_quality = 0.70 * delta_psnr + 0.30 * (10.0 * delta_depth_gain)
+        
+        # Restore state
+        self.gaussian_model.load_state_dict(saved_state)
+        
+        return {
+            'delta_psnr': float(delta_psnr),
+            'delta_depth_gain': float(delta_depth_gain),
+            'delta_quality': float(delta_quality),
+            'measured_trial_cost_ms': float(measured_trial_cost_ms),
+            'oracle_utility': float(delta_quality / (measured_trial_cost_ms + 1e-6)),
+        }
+
 
 
