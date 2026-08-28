@@ -103,8 +103,11 @@ def real_pipeline_factory(config_overrides, device):
 def main():
     parser = argparse.ArgumentParser(description="Run Matched-Budget Benchmark")
     parser.add_argument('--n_frames', type=int, default=12)
+    parser.add_argument('--frames', type=int, default=None, help='Alias for n_frames')
     parser.add_argument('--device', type=str, default='cpu')
     args = parser.parse_args()
+    if args.frames is not None:
+        args.n_frames = args.frames
     
     print("=" * 72)
     print("          MATCHED-BUDGET BENCHMARK ON REAL 3DGS PIPELINE")

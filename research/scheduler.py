@@ -26,13 +26,14 @@ import time
 
 class OptimizationPolicy(str, Enum):
     """Optimization selection policies for research benchmarking."""
-    FULL = "full"                 # Policy 0: Optimize 100% of Gaussians
-    RANDOM = "random"             # Policy 1: Random ratio r (e.g. 50%)
-    ERROR_ONLY = "error_only"     # Policy: Optimize top-K ranked strictly by raw photometric/depth error
-    BINARY = "binary"             # Policy 2: Binary stable/unstable (RTG-SLAM threshold)
-    TOP_K = "top_k"               # Policy 3: Continuous importance rank top-K / ratio r
-    BUDGET_AWARE = "budget_aware" # Policy 4: Importance/Cost knapsack optimization
-    OURS = "ours"                 # Alias for BUDGET_AWARE
+    FULL = "full"                         # Policy 0: Optimize 100% of Gaussians (unconstrained upper bound)
+    RANDOM = "random"                     # Policy 1: Random selection budget-scaled
+    ERROR_ONLY = "error_only"             # Policy: Optimize top-K ranked strictly by raw photometric/depth error
+    ERROR_INFLUENCE = "error_influence"   # Policy: Strong non-learning baseline (Error × Contribution Mass)
+    BINARY = "binary"                     # Policy 2: Binary stable/unstable (RTG-SLAM threshold)
+    TOP_K = "top_k"                       # Policy 3: Continuous importance rank top-K / ratio r
+    BUDGET_AWARE = "budget_aware"         # Policy 4: Importance/Cost knapsack optimization
+    OURS = "ours"                         # Alias for BUDGET_AWARE
 
 
 def estimate_gaussian_costs(
@@ -256,6 +257,12 @@ class BudgetScheduler:
             return mask
             
         elif policy_str in ("error_only", OptimizationPolicy.ERROR_ONLY.value):
+            mask = torch.zeros(N, dtype=torch.bool, device=device)
+            _, top_indices = torch.topk(importance_scores, K)
+            mask[top_indices] = True
+            return mask
+            
+        elif policy_str in ("error_influence", OptimizationPolicy.ERROR_INFLUENCE.value):
             mask = torch.zeros(N, dtype=torch.bool, device=device)
             _, top_indices = torch.topk(importance_scores, K)
             mask[top_indices] = True

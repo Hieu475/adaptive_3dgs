@@ -75,10 +75,10 @@ class MatchedBudgetBenchmark:
     """
     Primary benchmark for comparing policies under identical compute budgets.
     """
-    def __init__(self, budget_levels_ms=[1.0, 2.0, 4.0, 8.0, 16.0], device='cpu'):
+    def __init__(self, budget_levels_ms=[2.0, 5.0, 10.0, 20.0], device='cpu'):
         self.budget_levels_ms = budget_levels_ms
         self.device = device
-        self.policies = ['full', 'random', 'error_only', 'binary', 'top_k', 'ours']
+        self.policies = ['full', 'random', 'error_only', 'error_influence', 'binary', 'top_k', 'ours']
         
     def run_single_budget(self, pipeline_factory: Callable, frames: List, intrinsics: Any, budget_ms: float, policy: str, **kwargs) -> Dict:
         """
@@ -101,13 +101,16 @@ class MatchedBudgetBenchmark:
         # Initialize pipeline with the first frame
         pipeline.initialize(frames[0]['rgb'], frames[0]['depth'], intrinsics, frames[0].get('pose'))
         
+        is_constrained = (policy != 'full')
+        
         for frame in frames[1:]:
             res = pipeline.process_frame(frame['rgb'], frame['depth'], frame.get('pose'))
-            metrics.record_frame(res.get('opt_time_ms', 0), budget_ms)
+            opt_time = res.get('opt_time_ms', 0)
+            metrics.record_frame(opt_time, budget_ms)
             
             psnrs.append(res.get('psnr', 0))
             depth_l1s.append(res.get('depth_l1', 0))
-            opt_times.append(res.get('opt_time_ms', 0))
+            opt_times.append(opt_time)
             
         summary = metrics.get_summary()
         
@@ -120,7 +123,8 @@ class MatchedBudgetBenchmark:
             'budget_violation_rate': summary['violation_rate'],
             'jitter': summary['jitter'],
             'recovery_frames': summary['recovery_time'],
-            'policy_name': policy
+            'policy_name': policy,
+            'budget_constrained': "Yes" if is_constrained else "No (Upper Bound)"
         }
         
     def run_full_matrix(self, pipeline_factory: Callable, frames: List, intrinsics: Any) -> List[Dict]:
@@ -141,8 +145,8 @@ class MatchedBudgetBenchmark:
         ranked_results = {}
         for budget in self.budget_levels_ms:
             budget_res = [r for r in results_matrix if r['budget_ms'] == budget]
-            # Rank by PSNR (higher is better)
-            budget_res.sort(key=lambda x: x['avg_psnr'], reverse=True)
+            # Rank budget-constrained policies by PSNR
+            budget_res.sort(key=lambda x: (x['budget_constrained'] != 'No (Upper Bound)', x['avg_psnr']), reverse=True)
             ranked_results[budget] = budget_res
         return ranked_results
         
@@ -153,13 +157,13 @@ class MatchedBudgetBenchmark:
         ranked = self.compute_quality_at_budget(results_matrix)
         
         lines = []
-        lines.append("| Budget (ms) | Policy | PSNR ↑ | Depth L1 ↓ | Violations ↓ | Jitter ↓ | Compute (ms) |")
-        lines.append("|-------------|--------|--------|------------|--------------|----------|--------------|")
+        lines.append("| Budget (ms) | Policy | Budget Constrained? | PSNR ↑ | Depth L1 ↓ | Violations ↓ | Jitter ↓ | Compute (ms) |")
+        lines.append("|-------------|--------|---------------------|--------|------------|--------------|----------|--------------|")
         
         for budget in self.budget_levels_ms:
             for res in ranked[budget]:
                 lines.append(
-                    f"| {budget:11.1f} | {res['policy_name']:10} | "
+                    f"| {budget:11.1f} | {res['policy_name']:15} | {res['budget_constrained']:19} | "
                     f"{res['avg_psnr']:6.2f} | {res['avg_depth_l1']:10.4f} | "
                     f"{res['budget_violation_rate'] * 100:10.1f}% | "
                     f"{res['jitter']:8.2f} | {res['measured_compute_ms']:12.2f} |"
