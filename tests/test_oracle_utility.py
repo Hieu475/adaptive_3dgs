@@ -44,5 +44,34 @@ def test_oracle_evaluation_and_state_preservation():
     assert torch.equal(pipeline.gaussian_model._xyz, orig_xyz), "Base model state must be preserved after Oracle evaluation"
 
 
+def test_oracle_repeatability():
+    """Test 2 (Item 17): Same Gaussian evaluated twice in identical state produces identical delta Q."""
+    pipeline = OnlineReconstructionPipeline(device='cpu')
+    
+    H, W = 32, 40
+    torch.manual_seed(42)
+    rgb = torch.rand(H, W, 3)
+    depth = torch.ones(H, W) * 2.0
+    fx, fy = 80.0, 80.0
+    intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
+    
+    pipeline.initialize(rgb, depth, intrinsics)
+    
+    eval_indices = torch.tensor([1], dtype=torch.long)
+    frame = {'rgb': rgb, 'depth': depth, 'pose': torch.eye(4)}
+    
+    # Run 1
+    torch.manual_seed(42)
+    res1 = pipeline.evaluate_gaussian_update(eval_indices, frame, n_steps=3)
+    
+    # Run 2
+    torch.manual_seed(42)
+    res2 = pipeline.evaluate_gaussian_update(eval_indices, frame, n_steps=3)
+    
+    # Verify exact repeatability
+    assert abs(res1['delta_quality'] - res2['delta_quality']) < 1e-5, "Oracle evaluation must be strictly repeatable"
+    assert abs(res1['delta_psnr'] - res2['delta_psnr']) < 1e-5, "Delta PSNR must be strictly repeatable"
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

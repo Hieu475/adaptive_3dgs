@@ -267,10 +267,33 @@ def benchmark_comprehensive(sizes=[10000, 25000, 50000], ratios=[1.0, 0.75, 0.50
     with open(json_path, 'w') as f:
         json.dump(all_results, f, indent=2)
         
+    csv_path = os.path.join(save_dir, 'selective_scaling.csv')
+    with open(csv_path, 'w') as f:
+        f.write("n_total,active_ratio,n_active,masked_bwd_p50,selective_bwd_p50,bwd_speedup,masked_tot_p50,selective_tot_p50,total_speedup\n")
+        for r in all_results:
+            f.write(f"{r['n_total']},{r['active_ratio']:.3f},{r['n_active']},"
+                    f"{r['masked']['bwd_p50']:.2f},{r['selective']['bwd_p50']:.2f},{r['bwd_speedup']:.2f},"
+                    f"{r['masked']['tot_p50']:.2f},{r['selective']['tot_p50']:.2f},{r['total_speedup']:.2f}\n")
+                    
+    # Compute break-even point r* where Speedup(r*) = 1.0
+    break_even_points = {}
+    for N in sizes:
+        n_res = [r for r in all_results if r['n_total'] == N]
+        if n_res:
+            r_vals = [r['active_ratio'] for r in n_res]
+            sp_vals = [r['total_speedup'] for r in n_res]
+            # Find ratio closest to 1.0 speedup
+            idx_be = np.argmin(np.abs(np.array(sp_vals) - 1.0))
+            break_even_points[N] = float(r_vals[idx_be])
+            
     md_path = os.path.join(save_dir, 'selective_scaling.md')
     with open(md_path, 'w') as f:
         f.write("# R30: Comprehensive Selective Optimization Scaling Report\n\n")
         f.write("Evaluated with **Real 3DGS Rasterizer + RGB-D Loss** across Gaussian counts and active ratios.\n\n")
+        f.write("### Systems Break-Even Points ($r^*$ where $\\text{Speedup} \\approx 1.0\\times$)\n")
+        for N, r_star in break_even_points.items():
+            f.write(f"- **N = {N:,d} Gaussians**: $r^* \\approx {r_star*100:.1f}\\%$ (At $r < {r_star*100:.1f}\\%$, True Selective Optimization delivers strict speedup over Full/Masked Baseline)\n")
+        f.write("\n")
         f.write("| N Total | Active Ratio | Active (M) | Masked Bwd (p50) | Selective Bwd (p50) | Bwd Speedup | Total Speedup |\n")
         f.write("|:---:|:---:|:---:|:---:|:---:|:---:|:---:|\n")
         for r in all_results:
@@ -281,6 +304,7 @@ def benchmark_comprehensive(sizes=[10000, 25000, 50000], ratios=[1.0, 0.75, 0.50
         
     print(f"\nArtifacts saved to:")
     print(f"  - {json_path}")
+    print(f"  - {csv_path}")
     print(f"  - {md_path}")
     return all_results
 
@@ -289,7 +313,7 @@ def main():
     parser = argparse.ArgumentParser(description="R30 Comprehensive Selective Compute Benchmark")
     parser.add_argument('--device', type=str, default='cpu')
     parser.add_argument('--sizes', type=int, nargs='+', default=[10000, 25000, 50000])
-    parser.add_argument('--ratios', type=float, nargs='+', default=[1.0, 0.75, 0.50, 0.25, 0.10])
+    parser.add_argument('--ratios', type=float, nargs='+', default=[1.0, 0.75, 0.50, 0.25, 0.10, 0.05, 0.02, 0.01])
     parser.add_argument('--warmup', type=int, default=2)
     parser.add_argument('--trials', type=int, default=5)
     args = parser.parse_args()

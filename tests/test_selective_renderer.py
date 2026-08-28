@@ -59,7 +59,7 @@ def test_all_active_matches_full():
 
 
 def test_all_frozen_matches_full():
-    """Test 2: When 100% of Gaussians are frozen, cached render matches full render."""
+    """Test 2 (Test C): When 100% of Gaussians are frozen (M=0), cached render matches full render."""
     model = create_test_model(N=50)
     intrinsics, extrinsics, H, W = get_test_camera()
     
@@ -78,6 +78,31 @@ def test_all_frozen_matches_full():
     
     assert color_diff < 1e-4, f"Color diff too large: {color_diff}"
     assert depth_diff < 1e-4, f"Depth diff too large: {depth_diff}"
+
+
+def test_random_split_matches_full():
+    """Test 3 (Test B): Random active/frozen split (300 active, 700 frozen) matches full render."""
+    model = create_test_model(N=1000)
+    intrinsics, extrinsics, H, W = get_test_camera()
+    
+    full_out = render_full(model, extrinsics, intrinsics, W, H)
+    
+    # 300 active, 700 frozen
+    perm = torch.randperm(1000)
+    active_mask = torch.zeros(1000, dtype=torch.bool)
+    active_mask[perm[:300]] = True
+    
+    active_subset = model.get_optimization_subset(active_mask)
+    cache = FrozenBackgroundCache(device='cpu')
+    cache.build_cache(model, ~active_mask, extrinsics, intrinsics, W, H)
+    comp_out = cache.composite_with_active(active_subset, extrinsics, intrinsics, W, H)
+    
+    color_mae = (full_out['color'] - comp_out['color']).abs().mean().item()
+    depth_mae = (full_out['depth'] - comp_out['depth']).abs().mean().item()
+    
+    # 2-stage frozen cache approximation maintains high fidelity (< 0.5% MAE)
+    assert color_mae < 5e-3, f"Color MAE too large: {color_mae}"
+    assert depth_mae < 5e-2, f"Depth MAE too large: {depth_mae}"
 
 
 def test_gradient_isolation():

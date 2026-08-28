@@ -514,6 +514,9 @@ class OracleUtilityExperiment:
             realized_gains[f'top_{int(k_pct*100)}pct_ratio'] = gain_ratio
             regrets[f'top_{int(k_pct*100)}pct'] = max(0.0, 1.0 - gain_ratio)
             
+            gain_random = float(np.mean(delta_q) * k)
+            lifts[f'top_{int(k_pct*100)}pct'] = float(gain_imp / (gain_random + 1e-8)) if gain_random > 0 else 1.0
+            
         return {
             'n_visible': len(visible),
             'n_total': len(results),
@@ -526,6 +529,7 @@ class OracleUtilityExperiment:
             'overlaps': overlaps,
             'realized_gains': realized_gains,
             'regrets': regrets,
+            'lifts': lifts,
             'delta_quality_stats': {
                 'mean': float(np.mean(delta_q)),
                 'std': float(np.std(delta_q)),

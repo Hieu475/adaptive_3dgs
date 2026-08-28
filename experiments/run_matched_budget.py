@@ -82,10 +82,9 @@ def real_pipeline_factory(config_overrides, device):
     """Instantiate real OnlineReconstructionPipeline with given budget overrides."""
     budget_ms = config_overrides.get('scheduler', {}).get('gpu_budget_ms', 4.0)
     policy = config_overrides.get('scheduler', {}).get('policy', 'budget_aware')
-    
-    # Scale active ratio proportionally to target budget for fixed-ratio policies
-    # Reference: 16ms -> 100%, 8ms -> 50%, 4ms -> 25%, 2ms -> 12%, 1ms -> 6%
-    calibrated_ratio = np.clip(budget_ms / 16.0, 0.05, 1.0)
+    # Derive target Gaussian count dynamically from calibrated cost model: T(M) = T0 + beta*M
+    cost_per_gauss_ms = 0.0112
+    target_k = max(5, int((budget_ms * 5.0) / cost_per_gauss_ms)) if budget_ms > 0 else 50
     
     base_config = {
         'gaussian': {'sh_degree': 0, 'initial_opacity': 0.5, 'max_gaussians': 20000, 'initial_scale': 0.02},
@@ -99,7 +98,7 @@ def real_pipeline_factory(config_overrides, device):
         'scheduler': {
             'gpu_budget_ms': budget_ms,
             'policy': policy,
-            'optimize_ratio': float(calibrated_ratio),
+            'top_k': target_k if policy != 'ours' else None,  # Ours uses dynamic knapsack
         },
         'densification': {
             'max_new_per_frame': 60,
