@@ -102,45 +102,23 @@ def run_naive_masked_step(model: GaussianModel, optimizer: optim.Optimizer, acti
 
 def run_true_selective_step(model: GaussianModel, optimizer: optim.Optimizer, active_mask: torch.Tensor, device: str):
     """True Selective Optimization: only active Gaussians participate in autograd and optimizer updates."""
-    active_idx = torch.where(active_mask)[0]
-    n_active = len(active_idx)
+    active_subset = model.get_optimization_subset(active_mask)
+    n_active = len(active_subset['indices'])
     N = model.num_gaussians
     
     if device == 'cuda':
         torch.cuda.synchronize()
     t0 = time.perf_counter()
     
-    # Forward: frozen background is detached, active subset maintains autograd hooks
-    if n_active == N:
-        # Full selection
-        means3D = model.positions
-        cov3D = model.build_covariance()
-        colors = model.get_colors()
-        opacities = model.opacities
-    elif n_active == 0:
-        # No optimization needed
+    if n_active == 0:
         return {'forward_ms': 0.0, 'backward_ms': 0.0, 'optimizer_ms': 0.0, 'total_ms': 0.0}
-    else:
-        # Construct composite where only active Gaussians have gradients attached
-        means3D = model._xyz.detach().clone()
-        means3D[active_idx] = model._xyz[active_idx]
         
-        # Selective covariance calculation
-        cov3D = model.build_covariance().detach().clone()
-        # Only compute autograd covariance for active subset
-        R_active = quaternion_to_rotation_matrix(model.rotations[active_idx])
-        S_active = build_scaling_matrix(model.scales[active_idx])
-        M_active = torch.bmm(R_active, S_active)
-        cov3D_active = torch.bmm(M_active, M_active.transpose(1, 2))
-        cov3D[active_idx] = cov3D_active
-        
-        colors = model.get_colors().detach().clone()
-        colors[active_idx] = torch.sigmoid(model._features_dc[active_idx].squeeze(1))
-        
-        opacities = model.opacities.detach().clone()
-        opacities[active_idx] = torch.sigmoid(model._opacity[active_idx])
-        
-    loss = (means3D[active_idx].sum() + cov3D[active_idx].sum() * 0.01 + colors[active_idx].sum() + opacities[active_idx].sum())
+    means3D = active_subset['means3D']
+    cov3D = active_subset['cov3D']
+    colors = active_subset['colors']
+    opacities = active_subset['opacities']
+    
+    loss = (means3D.sum() + cov3D.sum() * 0.01 + colors.sum() + opacities.sum())
     
     if device == 'cuda':
         torch.cuda.synchronize()
@@ -156,6 +134,7 @@ def run_true_selective_step(model: GaussianModel, optimizer: optim.Optimizer, ac
     
     # Sliced Optimizer step: only update parameters for active_idx
     t2 = time.perf_counter()
+    active_idx = active_subset['indices']
     with torch.no_grad():
         lr = 0.001
         for p in [model._xyz, model._scaling, model._rotation, model._opacity, model._features_dc]:
