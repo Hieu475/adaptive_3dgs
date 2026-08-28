@@ -1,16 +1,24 @@
 """
-Real Matched-Budget Benchmark Runner.
+Primary Research Experiment — True Matched-Budget Benchmark on Real 3DGS.
 
-Runs all 6 optimization policies under identical GPU compute budget constraints
-using the real OnlineReconstructionPipeline.
+Evaluates 6 Budget-Constrained Policies vs 1 Quality Upper Bound across 5 Budget Levels:
+    Budgets: B ∈ {1.0, 2.0, 4.0, 8.0, 16.0} ms
 
 Policies:
-  1. Full: optimize 100% of Gaussians
-  2. Random: random selection
-  3. Error-only: select strictly by top error
-  4. Binary: threshold stable vs unstable
-  5. Top-K: continuous importance top-K
-  6. Ours (Budget-Aware): value density (importance/cost) knapsack
+    - Full: No (Quality Upper Bound, unconstrained)
+    - Random: Yes (Budget-Constrained)
+    - Error-Only: Yes (Ranked strictly by E_depth + E_color)
+    - Error × Influence: Yes (Strong Non-Learning Baseline: E_i × Influence_i)
+    - Binary: Yes (Threshold-based stable/unstable)
+    - Top-K: Yes (Continuous multi-signal importance Top-K)
+    - Ours: Yes (Proposed Importance/Cost Knapsack Optimization)
+
+Metrics:
+    - PSNR (dB) ↑
+    - Depth L1 (m) ↓
+    - Measured Compute (ms)
+    - Budget Violation Rate (%) ↓
+    - Latency Jitter (ms) ↓
 """
 import sys
 import os
@@ -26,7 +34,7 @@ from research.pipeline import OnlineReconstructionPipeline
 from research.matched_budget_benchmark import MatchedBudgetBenchmark, SchedulerMetrics
 
 
-def create_benchmark_frames(n_frames: int = 15, H: int = 64, W: int = 80):
+def create_benchmark_frames(n_frames: int = 12, H: int = 64, W: int = 80):
     """Generate structured synthetic benchmark frames."""
     fx, fy = 160.0, 160.0
     intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
@@ -57,7 +65,6 @@ def create_benchmark_frames(n_frames: int = 15, H: int = 64, W: int = 80):
         rgb[box_h, box_w] = torch.tensor([0.7, 0.3, 0.5])
         depth[box_h, box_w] = 1.0
         
-        # Add slight noise
         rgb = (rgb + 0.02 * torch.randn_like(rgb)).clamp(0, 1)
         depth = depth + 0.01 * torch.randn_like(depth)
         depth[depth <= 0] = 0.1
@@ -73,6 +80,13 @@ def create_benchmark_frames(n_frames: int = 15, H: int = 64, W: int = 80):
 
 def real_pipeline_factory(config_overrides, device):
     """Instantiate real OnlineReconstructionPipeline with given budget overrides."""
+    budget_ms = config_overrides.get('scheduler', {}).get('gpu_budget_ms', 4.0)
+    policy = config_overrides.get('scheduler', {}).get('policy', 'budget_aware')
+    
+    # Scale active ratio proportionally to target budget for fixed-ratio policies
+    # Reference: 16ms -> 100%, 8ms -> 50%, 4ms -> 25%, 2ms -> 12%, 1ms -> 6%
+    calibrated_ratio = np.clip(budget_ms / 16.0, 0.05, 1.0)
+    
     base_config = {
         'gaussian': {'sh_degree': 0, 'initial_opacity': 0.5, 'max_gaussians': 20000, 'initial_scale': 0.02},
         'rendering': {
@@ -83,9 +97,9 @@ def real_pipeline_factory(config_overrides, device):
             'attribution_top_k': 4
         },
         'scheduler': {
-            'gpu_budget_ms': config_overrides.get('scheduler', {}).get('gpu_budget_ms', 10.0),
-            'policy': config_overrides.get('scheduler', {}).get('policy', 'budget_aware'),
-            'optimize_ratio': 0.5,
+            'gpu_budget_ms': budget_ms,
+            'policy': policy,
+            'optimize_ratio': float(calibrated_ratio),
         },
         'densification': {
             'max_new_per_frame': 60,
@@ -94,37 +108,36 @@ def real_pipeline_factory(config_overrides, device):
         },
     }
     pipeline = OnlineReconstructionPipeline(config=base_config, device=device)
-    # Enable novelty boost & error prior for importance
     pipeline.importance_estimator.novelty_weight = 0.5
     pipeline.importance_estimator.use_error_prior = True
     return pipeline
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run Matched-Budget Benchmark")
-    parser.add_argument('--n_frames', type=int, default=12)
+    parser = argparse.ArgumentParser(description="Run Matched-Budget Primary Benchmark")
+    parser.add_argument('--n_frames', type=int, default=10)
     parser.add_argument('--frames', type=int, default=None, help='Alias for n_frames')
     parser.add_argument('--device', type=str, default='cpu')
     args = parser.parse_args()
     if args.frames is not None:
         args.n_frames = args.frames
     
-    print("=" * 72)
-    print("          MATCHED-BUDGET BENCHMARK ON REAL 3DGS PIPELINE")
-    print("=" * 72)
+    print("=" * 85)
+    print("      R27 PRIMARY RESEARCH BENCHMARK: TRUE MATCHED-BUDGET COMPARISON")
+    print("=" * 85)
     print(f"Device: {args.device} | Frames: {args.n_frames}")
     
     frames, intrinsics = create_benchmark_frames(n_frames=args.n_frames)
     
-    budget_levels = [2.0, 5.0, 10.0, 20.0]  # in ms
+    budget_levels = [1.0, 2.0, 4.0, 8.0, 16.0]  # in ms
     benchmark = MatchedBudgetBenchmark(budget_levels_ms=budget_levels, device=args.device)
     
-    print(f"Running full matrix: {len(benchmark.policies)} policies x {len(budget_levels)} budget levels...")
+    print(f"Running matrix: {len(benchmark.policies)} policies x {len(budget_levels)} budget levels...")
     start_time = time.time()
     results = benchmark.run_full_matrix(real_pipeline_factory, frames, intrinsics)
     total_time = time.time() - start_time
     
-    print(f"\nMatrix execution completed in {total_time:.1f}s")
+    print(f"\nBenchmark matrix completed in {total_time:.1f}s")
     
     table = benchmark.format_table(results)
     print("\n" + table)
@@ -135,7 +148,7 @@ def main():
     
     save_path = os.path.join(save_dir, 'results_table.md')
     with open(save_path, 'w') as f:
-        f.write("# Matched-Budget Benchmark Results\n\n")
+        f.write("# R27 Primary Benchmark: True Matched-Budget Results\n\n")
         f.write(f"Evaluated on {args.n_frames} frames using measured compute time.\n\n")
         f.write(table)
         f.write("\n")
@@ -144,7 +157,17 @@ def main():
     with open(json_path, 'w') as f:
         json.dump(results, f, indent=2)
         
-    print(f"\nResults saved to:\n- {save_path}\n- {json_path}")
+    # Export Pareto curve data (Quality vs Compute: x = T_opt, y = PSNR)
+    pareto_csv = os.path.join(save_dir, 'pareto_quality_vs_compute.csv')
+    with open(pareto_csv, 'w') as f:
+        f.write("budget_ms,policy,budget_constrained,measured_compute_ms,psnr,depth_l1,jitter\n")
+        for r in results:
+            f.write(f"{r['budget_ms']},{r['policy_name']},{r['budget_constrained']},{r['measured_compute_ms']:.3f},{r['avg_psnr']:.3f},{r['avg_depth_l1']:.4f},{r['jitter']:.3f}\n")
+            
+    print(f"\nArtifacts saved to:")
+    print(f"  - {save_path}")
+    print(f"  - {json_path}")
+    print(f"  - {pareto_csv}")
 
 
 if __name__ == "__main__":

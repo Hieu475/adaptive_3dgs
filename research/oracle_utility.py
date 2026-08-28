@@ -480,6 +480,7 @@ class OracleUtilityExperiment:
         
         overlaps = {}
         realized_gains = {}
+        regrets = {}
         for k_pct in [0.05, 0.10, 0.20]:
             k = max(1, int(n * k_pct))
             top_k_imp = set(imp_ranks[:k].tolist())
@@ -489,7 +490,9 @@ class OracleUtilityExperiment:
             
             gain_imp = delta_q[list(top_k_imp)].sum()
             gain_oracle = delta_q[list(top_k_oracle)].sum()
-            realized_gains[f'top_{int(k_pct*100)}pct_ratio'] = float(gain_imp / (gain_oracle + 1e-8))
+            gain_ratio = float(gain_imp / (gain_oracle + 1e-8))
+            realized_gains[f'top_{int(k_pct*100)}pct_ratio'] = gain_ratio
+            regrets[f'top_{int(k_pct*100)}pct'] = max(0.0, 1.0 - gain_ratio)
             
         return {
             'n_visible': len(visible),
@@ -502,6 +505,7 @@ class OracleUtilityExperiment:
             'spearman_deltaQ_p': float(p_imp_deltaq),
             'overlaps': overlaps,
             'realized_gains': realized_gains,
+            'regrets': regrets,
             'delta_quality_stats': {
                 'mean': float(np.mean(delta_q)),
                 'std': float(np.std(delta_q)),
