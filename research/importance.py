@@ -64,7 +64,7 @@ class GaussianImportanceEstimator:
         self.weights = weights or {
             'depth_error': 1.0,
             'color_error': 1.0,
-            'normal_error': 0.5,
+            'normal_error': 0.0,  # disabled by default to avoid unverified complexity
             'visibility': 0.1,
             'temporal': 0.5,
             'screen_space': 0.2,
@@ -253,6 +253,34 @@ class GaussianImportanceEstimator:
             self._prev_positions = self._positions.clone()
         
         return score
+    
+    def compute_error_influence_score(self) -> torch.Tensor:
+        """Compute strong non-learning baseline score: S_i = Error_i × Influence_i.
+        
+        Combines total photometric and depth error with contribution mass:
+            S_i = (E_{depth,i} + E_{color,i}) · Influence_i
+        
+        Returns:
+            score: (N,) normalized [0, 1] baseline importance scores
+        """
+        if self._running_depth_error is None or self._running_color_error is None:
+            raise RuntimeError("Must call update_statistics before compute_error_influence_score")
+        
+        error = self._running_depth_error + self._running_color_error
+        influence = self._screen_areas if self._screen_areas is not None else self._visibility_count
+        if influence is None:
+            influence = torch.ones_like(error)
+        elif influence.shape[0] != error.shape[0]:
+            min_len = min(influence.shape[0], error.shape[0])
+            inf_pad = torch.zeros_like(error)
+            inf_pad[:min_len] = influence[:min_len]
+            influence = inf_pad
+            
+        score = error * influence
+        s_min, s_max = score.min(), score.max()
+        if s_max - s_min > 1e-8:
+            return (score - s_min) / (s_max - s_min)
+        return torch.zeros_like(score)
     
     def classify_tier_with_hysteresis(self, importance: torch.Tensor) -> torch.Tensor:
         if self._prev_tiers is None or self._prev_tiers.shape[0] != importance.shape[0]:

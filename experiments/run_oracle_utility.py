@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
-"""Oracle Utility Experiment v2 — Local Quality Measurement.
+"""Oracle Utility Comprehensive Research Experiment Runner.
 
-Fixes from v1:
-    - Measures LOCAL PSNR (at Gaussian's influence pixels) instead of global
-    - Uses stratified sampling (high/mid/low importance)
-    - Computes predicted_utility = importance / cost (not just importance)
-    - Reports multiple correlation metrics
-
-Usage:
-    python experiments/run_oracle_utility.py [--synthetic] [--n_samples 100]
-
-Output:
-    results/oracle_utility/oracle_results.json
-    results/oracle_utility/correlation_metrics.json
+Evaluates ground-truth marginal utility U_i^oracle = ΔQ_{local,i} / (Cost_i + ε)
+incorporating:
+  1. Combined RGB-D local quality improvement (w_rgb=0.7, w_depth=0.3)
+  2. Unbiased population comparisons (IMPORTANCE_STRATIFIED, RANDOM_VISIBLE, UNIFORM_VISIBLE)
+  3. Group oracle scaling (group_size = 1, 4)
+  4. Precise trial cost vs modeled marginal cost separation
+  5. Automatic Oracle Dataset export to results/oracle_dataset/ for Learned Utility training
 """
 import os
 import sys
@@ -25,29 +20,17 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from research.pipeline import OnlineReconstructionPipeline
-from research.oracle_utility import OracleUtilityExperiment
+from research.oracle_utility import OracleUtilityExperiment, SamplingPopulation
 
 
-def create_structured_synthetic_frames(
-    n_frames: int = 10, H: int = 64, W: int = 80, device: str = 'cpu'
-):
-    """Create synthetic frames with clear spatial structure.
-    
-    Scene contains:
-    - Textured checkerboard region (high texture, high importance expected)
-    - Smooth gradient region (flat surface, low importance expected)  
-    - Depth discontinuity (object edge, high importance expected)
-    - Invalid depth region (sparse depth)
-    """
-    print(f"[Data] Creating {n_frames} structured synthetic frames ({H}x{W})")
-    
+def create_structured_synthetic_frames(n_frames: int = 10, H: int = 64, W: int = 80, device: str = 'cpu'):
+    """Create synthetic frames with clear spatial structure."""
     fx, fy = 160.0, 160.0
     cx, cy = W / 2.0, H / 2.0
     intrinsics = torch.tensor([[fx, 0, cx], [0, fy, cy], [0, 0, 1]], dtype=torch.float32)
     
     frames = []
     for t in range(n_frames):
-        # Small camera motion
         angle = t * 0.03
         pose = torch.eye(4)
         pose[0, 0] = np.cos(angle); pose[0, 2] = np.sin(angle)
@@ -55,9 +38,9 @@ def create_structured_synthetic_frames(
         pose[0, 3] = 0.02 * t
         
         rgb = torch.zeros(H, W, 3)
-        depth = torch.ones(H, W) * 3.0  # background
+        depth = torch.ones(H, W) * 3.0
         
-        # Region 1: Checkerboard (top-left) — high texture
+        # Region 1: High texture
         for i in range(H // 2):
             for j in range(W // 2):
                 if (i // 8 + j // 8) % 2 == 0:
@@ -66,214 +49,235 @@ def create_structured_synthetic_frames(
                     rgb[i, j] = torch.tensor([0.1, 0.8, 0.2])
         depth[:H//2, :W//2] = 2.0
         
-        # Region 2: Smooth gradient (top-right) — flat
+        # Region 2: Flat surface
         for j in range(W // 2, W):
             rgb[:H//2, j] = torch.tensor([0.4, 0.4, 0.6])
         depth[:H//2, W//2:] = 2.5
         
-        # Region 3: Foreground box (bottom-center) — edge
-        box_h = slice(H//2 + 5, H - 5)
-        box_w = slice(W//4, 3*W//4)
+        # Region 3: Object edge
+        box_h = slice(H // 2 + 5, H - 5)
+        box_w = slice(W // 4, 3 * W // 4)
         rgb[box_h, box_w] = torch.tensor([0.7, 0.3, 0.5])
-        depth[box_h, box_w] = 1.0  # close object → depth discontinuity at edges
+        depth[box_h, box_w] = 1.0
         
-        # Region 4: Invalid depth (bottom-left corner)
-        depth[H-10:, :10] = 0.0
+        # Region 4: Sparse depth
+        depth[H - 10:, :10] = 0.0
         
-        # Add per-frame noise
-        rgb = (rgb + 0.03 * torch.randn_like(rgb)).clamp(0, 1)
+        rgb = (rgb + 0.02 * torch.randn_like(rgb)).clamp(0, 1)
         depth = depth + 0.01 * torch.randn_like(depth)
         depth[depth <= 0] = 0.0
         
         frames.append({'rgb': rgb, 'depth': depth, 'pose': pose, 'intrinsics': intrinsics})
-    
+        
     return frames, intrinsics
 
 
 def run_experiment(args):
-    device = 'cpu'
-    print(f"[Config] Device: {device}")
-    print(f"[Config] Warmup: {args.n_warmup} frames, Samples: {args.n_samples}, "
-          f"Steps: {args.n_opt_steps}, Group: {args.group_size}")
+    device = args.device
+    print("=" * 80)
+    print("       ORACLE UTILITY & MARGINAL VALUE EXPERIMENTAL SUITE")
+    print("=" * 80)
+    print(f"Device: {device} | Warmup: {args.n_warmup} frames | Samples/Pop: {args.n_samples}")
+    print(f"Quality Formulation: ΔQ = {args.w_rgb:.2f} · ΔPSNR + {args.w_depth:.2f} · (10 · ΔDepthGain)")
     
-    # === Load data ===
-    frames, intrinsics = create_structured_synthetic_frames(
-        n_frames=args.n_warmup + 3, H=args.height, W=args.width)
-    
-    # === Pipeline ===
+    # 1. Dataset setup
+    frames, intrinsics = None, None
+    tum_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'datasets', 'TUM', 'rgbd_dataset_freiburg1_desk')
+    if os.path.exists(tum_path) and not args.synthetic:
+        try:
+            from datasets.tum_dataset import TUMDataset
+            dataset = TUMDataset(tum_path, max_frames=args.n_warmup + 4, stride=5)
+            raw_frames = [dataset[i] for i in range(len(dataset))]
+            intrinsics = dataset.intrinsics.clone()
+            
+            # Downsample frames to target resolution for fast CPU execution
+            target_h, target_w = args.height, args.width
+            scale_x = target_w / raw_frames[0]['rgb'].shape[1]
+            scale_y = target_h / raw_frames[0]['rgb'].shape[0]
+            intrinsics[0, :] *= scale_x
+            intrinsics[1, :] *= scale_y
+            
+            frames = []
+            for rf in raw_frames:
+                rgb_t = rf['rgb'].permute(2, 0, 1).unsqueeze(0)  # (1, 3, H, W)
+                depth_t = rf['depth'].unsqueeze(0).unsqueeze(0)   # (1, 1, H, W)
+                rgb_down = torch.nn.functional.interpolate(rgb_t, size=(target_h, target_w), mode='bilinear', align_corners=False)[0].permute(1, 2, 0)
+                depth_down = torch.nn.functional.interpolate(depth_t, size=(target_h, target_w), mode='nearest')[0, 0]
+                frames.append({'rgb': rgb_down, 'depth': depth_down, 'pose': rf.get('pose', torch.eye(4)), 'intrinsics': intrinsics})
+                
+            print(f"[Dataset] Loaded and scaled {len(frames)} frames from TUM RGB-D ({target_w}x{target_h})")
+        except Exception as e:
+            print(f"[Dataset] TUM load fallback: {e}")
+            frames = None
+            
+    if frames is None:
+        print("[Dataset] Initializing synthetic structured stress-test environment")
+        frames, intrinsics = create_structured_synthetic_frames(
+            n_frames=args.n_warmup + 4, H=args.height, W=args.width, device=device)
+            
+    # 2. Pipeline setup
     config = {
-        'gaussian': {'sh_degree': 0, 'initial_opacity': 0.5, 'max_gaussians': 20000,
-                     'initial_scale': 0.02},
+        'gaussian': {'sh_degree': 0, 'initial_opacity': 0.5, 'max_gaussians': 20000, 'initial_scale': 0.02},
         'rendering': {
             'tile_size': 16,
-            'image_width': args.width,
-            'image_height': args.height,
+            'image_width': frames[0]['rgb'].shape[1],
+            'image_height': frames[0]['rgb'].shape[0],
             'use_surface_aware_depth': True,
-            'attribution_top_k': 4,
+            'attribution_top_k': 4
         },
         'scheduler': {
-            'gpu_budget_ms': 100.0,
+            'gpu_budget_ms': 50.0,
             'policy': 'budget_aware',
-            'optimize_ratio': 0.7,
+            'optimize_ratio': 0.6,
         },
         'densification': {
-            'max_new_per_frame': 100,
+            'max_new_per_frame': 80,
             'strategy': 'importance',
             'use_adaptive_thresholds': True,
         },
     }
     
     pipeline = OnlineReconstructionPipeline(config=config, device=device)
+    pipeline.importance_estimator.novelty_weight = 0.5
+    pipeline.importance_estimator.use_error_prior = True
     
-    # === Warmup ===
-    print(f"\n{'='*60}")
-    print(f"  PHASE 1: Warmup ({args.n_warmup} frames)")
-    print(f"{'='*60}")
+    # 3. Pipeline Warmup
+    print("\n" + "-" * 80)
+    print(f"PHASE 1: Pipeline Online Warmup ({args.n_warmup} frames)")
+    print("-" * 80)
     
     f0 = frames[0]
-    pipeline.initialize(f0['rgb'], f0['depth'], intrinsics, f0['pose'])
-    print(f"  [Frame 0] Init: {pipeline.gaussian_model.num_gaussians} Gaussians")
+    pipeline.initialize(f0['rgb'].to(device), f0['depth'].to(device), intrinsics.to(device), f0.get('pose', torch.eye(4)).to(device))
+    print(f"[Init] Initialized model with {pipeline.gaussian_model.num_gaussians} Gaussians")
     
     for i in range(1, min(args.n_warmup + 1, len(frames))):
         f = frames[i]
-        m = pipeline.process_frame(f['rgb'], f['depth'], gt_pose=f['pose'])
+        m = pipeline.process_frame(f['rgb'].to(device), f['depth'].to(device), gt_pose=f.get('pose', torch.eye(4)).to(device))
         if i % 2 == 0 or i == args.n_warmup:
-            print(f"  [Frame {i}] PSNR={m['psnr']:.2f} | N={m['n_gaussians']} | "
-                  f"Opt={m['n_optimized']} | {m['frame_time_ms']:.0f}ms")
+            print(f"  [Frame {i:2d}] PSNR={m['psnr']:5.2f} dB | N_gauss={m['n_gaussians']:4d} | N_opt={m['n_optimized']:3d} | Time={m['frame_time_ms']:5.1f}ms")
+            
+    total_gaussians = pipeline.gaussian_model.num_gaussians
+    print(f"Warmup Complete. Total Active Gaussians: {total_gaussians}")
     
-    N = pipeline.gaussian_model.num_gaussians
-    print(f"\n  Warmup done. {N} Gaussians ready.")
+    # 4. Multi-Population Oracle Experiment
+    print("\n" + "-" * 80)
+    print("PHASE 2: Evaluating Oracle Utility across Sampling Populations")
+    print("-" * 80)
     
-    # === Oracle Experiment ===
-    print(f"\n{'='*60}")
-    print(f"  PHASE 2: Oracle Utility Experiment")
-    print(f"{'='*60}")
+    last_frame = frames[min(args.n_warmup, len(frames) - 1)]
+    eval_rgb = last_frame['rgb'].to(device)
+    eval_depth = last_frame['depth'].to(device)
     
-    last_f = frames[min(args.n_warmup, len(frames)-1)]
-    oracle_rgb = last_f['rgb'].to(device)
-    oracle_depth = last_f['depth'].to(device)
-    
-    actual_samples = min(args.n_samples, N)
     experiment = OracleUtilityExperiment(
         pipeline=pipeline,
-        n_samples=actual_samples,
+        n_samples=args.n_samples,
         n_opt_steps=args.n_opt_steps,
+        w_rgb=args.w_rgb,
+        w_depth=args.w_depth,
         seed=42,
-        contribution_threshold=0.01,
-        group_size=args.group_size,
+        group_size=1
     )
     
-    t0 = time.time()
-    results = experiment.run_oracle_experiment(oracle_rgb, oracle_depth)
-    oracle_time = time.time() - t0
-    print(f"\n  Completed in {oracle_time:.1f}s ({len(results)} evaluations)")
+    all_oracle_rows = []
+    population_metrics = {}
     
-    # === Correlation ===
-    print(f"\n{'='*60}")
-    print(f"  PHASE 3: Correlation Analysis")
-    print(f"{'='*60}")
+    populations_to_test = [
+        SamplingPopulation.IMPORTANCE_STRATIFIED,
+        SamplingPopulation.RANDOM_VISIBLE,
+        SamplingPopulation.UNIFORM_VISIBLE,
+    ]
     
-    corr = experiment.compute_correlation_metrics(results)
-    
-    if 'error' in corr:
-        print(f"\n  ⚠️  {corr['error']}")
-    else:
-        print(f"\n  Visible Gaussians: {corr['n_visible']} / {corr['n_total']}")
-        print(f"\n  Spearman Correlations:")
-        print(f"    ρ(predicted_utility, oracle_utility) = {corr['spearman_utility_vs_oracle']:.4f}  "
-              f"(p={corr['spearman_utility_p']:.4f})")
-        print(f"    ρ(importance, oracle_utility)         = {corr['spearman_importance_vs_oracle']:.4f}  "
-              f"(p={corr['spearman_importance_p']:.4f})")
-        print(f"    ρ(importance, ΔQ_local)               = {corr['spearman_importance_vs_deltaQ']:.4f}  "
-              f"(p={corr['spearman_deltaQ_p']:.4f})")
+    for pop in populations_to_test:
+        pop_name = pop.value
+        print(f"\n>> Evaluating Population: {pop_name.upper()}...")
+        start_t = time.time()
+        results = experiment.run_oracle_experiment(eval_rgb, eval_depth, population_type=pop, frame_idx=args.n_warmup)
+        elapsed = time.time() - start_t
+        all_oracle_rows.extend(results)
         
-        print(f"\n  Top-K Overlap (predicted vs oracle):")
-        for k, v in corr['overlaps'].items():
-            print(f"    {k}: {v:.0%}")
+        corr = experiment.compute_correlation_metrics(results)
+        population_metrics[pop_name] = corr
         
-        print(f"\n  Realized Quality Gain Ratio:")
-        for k, v in corr['realized_gains'].items():
-            print(f"    {k}: {v:.4f}")
-        
-        dq = corr['delta_psnr_stats']
-        print(f"\n  ΔQ_local distribution:")
-        print(f"    mean={dq['mean']:.4f}  std={dq['std']:.4f}  "
-              f"range=[{dq['min']:.4f}, {dq['max']:.4f}]  "
-              f"dynamic_range={dq['range']:.4f}")
-    
-    # === Stats ===
-    print(f"\n{'='*60}")
-    print(f"  PHASE 4: Per-Sample Statistics")
-    print(f"{'='*60}")
-    
-    visible = [r for r in results if r.get('visible', False)]
-    if visible:
-        pred_u = [r['predicted_utility'] for r in visible]
-        oracle_u = [r['oracle_utility'] for r in visible]
-        dpsnr = [r['delta_psnr_local'] for r in visible]
-        pixels = [r['n_influence_pixels'] for r in visible]
-        
-        print(f"\n  Predicted Utility: mean={np.mean(pred_u):.4f} std={np.std(pred_u):.4f}")
-        print(f"  Oracle Utility:   mean={np.mean(oracle_u):.4f} std={np.std(oracle_u):.4f}")
-        print(f"  ΔQ_local (dB):    mean={np.mean(dpsnr):.4f} std={np.std(dpsnr):.4f}")
-        print(f"  Influence pixels: mean={np.mean(pixels):.0f} std={np.std(pixels):.0f}")
-        
-        sorted_r = sorted(visible, key=lambda r: r['oracle_utility'], reverse=True)
-        print(f"\n  Top 5 by Oracle Utility:")
-        print(f"  {'ID':>6}  {'Pred_U':>8}  {'Oracle_U':>8}  {'ΔQ_local':>8}  {'Pixels':>6}")
-        for r in sorted_r[:5]:
-            print(f"  {r['gaussian_id']:>6}  {r['predicted_utility']:>8.4f}  "
-                  f"{r['oracle_utility']:>8.4f}  {r['delta_psnr_local']:>8.4f}  "
-                  f"{r['n_influence_pixels']:>6}")
-        
-        print(f"\n  Bottom 5:")
-        for r in sorted_r[-5:]:
-            print(f"  {r['gaussian_id']:>6}  {r['predicted_utility']:>8.4f}  "
-                  f"{r['oracle_utility']:>8.4f}  {r['delta_psnr_local']:>8.4f}  "
-                  f"{r['n_influence_pixels']:>6}")
-    
-    # === Save ===
-    save_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                            'results', 'oracle_utility')
-    os.makedirs(save_dir, exist_ok=True)
-    
-    experiment.save_results(results, os.path.join(save_dir, 'oracle_results.json'))
-    
-    full_metrics = {
-        'correlation': corr,
-        'config': {
-            'n_warmup': args.n_warmup, 'n_samples': actual_samples,
-            'n_opt_steps': args.n_opt_steps, 'group_size': args.group_size,
-            'n_gaussians': N, 'resolution': f'{args.height}x{args.width}',
-        },
-        'timing': {'warmup_s': None, 'oracle_s': oracle_time},
-    }
-    with open(os.path.join(save_dir, 'correlation_metrics.json'), 'w') as f:
-        json.dump(full_metrics, f, indent=2)
-    
-    print(f"\n  Results saved to {save_dir}/")
-    
-    # === Verdict ===
-    if 'error' not in corr:
-        rho = corr['spearman_importance_vs_oracle']
-        print(f"\n{'='*60}")
-        if rho >= 0.5:
-            print(f"  ✅ GOOD (ρ={rho:.3f} ≥ 0.5): Heuristic tracks oracle well")
-        elif rho >= 0.2:
-            print(f"  ⚠️  MODERATE (ρ={rho:.3f}): Partial signal, needs more features")
+        if 'error' not in corr:
+            print(f"   Done in {elapsed:.1f}s (Visible: {corr['n_visible']}/{corr['n_total']})")
+            print(f"   • Spearman ρ(Predicted Utility, Oracle Utility): {corr['spearman_utility_vs_oracle']:+.4f} (p={corr['spearman_utility_p']:.4f})")
+            print(f"   • Spearman ρ(Importance, Oracle Utility):        {corr['spearman_importance_vs_oracle']:+.4f} (p={corr['spearman_importance_p']:.4f})")
+            print(f"   • Spearman ρ(Importance, ΔQ_local):             {corr['spearman_importance_vs_deltaQ']:+.4f} (p={corr['spearman_deltaQ_p']:.4f})")
+            print(f"   • Top-10% Overlap: {corr['overlaps'].get('top_10pct', 0):.1%} | Top-20% Overlap: {corr['overlaps'].get('top_20pct', 0):.1%}")
+            print(f"   • Realized Gain Ratio @10%: {corr['realized_gains'].get('top_10pct_ratio', 0):.4f} | @20%: {corr['realized_gains'].get('top_20pct_ratio', 0):.4f}")
         else:
-            print(f"  ❌ WEAK (ρ={rho:.3f} < 0.2): Heuristic misses key signal")
-        print(f"{'='*60}")
+            print(f"   ⚠️ {corr['error']}")
+            
+    # 5. Group Oracle Scaling Evaluation (group_size = 4)
+    if args.eval_groups:
+        print("\n" + "-" * 80)
+        print("PHASE 3: Evaluating Group Oracle Interactions (group_size = 4)")
+        print("-" * 80)
+        group_experiment = OracleUtilityExperiment(
+            pipeline=pipeline,
+            n_samples=args.n_samples,
+            n_opt_steps=args.n_opt_steps,
+            w_rgb=args.w_rgb,
+            w_depth=args.w_depth,
+            seed=42,
+            group_size=4
+        )
+        group_results = group_experiment.run_oracle_experiment(
+            eval_rgb, eval_depth, population_type=SamplingPopulation.IMPORTANCE_STRATIFIED, frame_idx=args.n_warmup)
+        all_oracle_rows.extend(group_results)
+        group_corr = group_experiment.compute_correlation_metrics(group_results)
+        population_metrics['group_size_4'] = group_corr
+        print(f"   • Group (K=4) Spearman ρ(Utility, Oracle): {group_corr.get('spearman_utility_vs_oracle', 0.0):+.4f}")
+        print(f"   • Group (K=4) Realized Gain Ratio @20%:    {group_corr.get('realized_gains', {}).get('top_20pct_ratio', 0.0):.4f}")
+        
+    # 6. Save Oracle Dataset Artifact
+    dataset_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'oracle_dataset')
+    os.makedirs(dataset_dir, exist_ok=True)
+    dataset_file = os.path.join(dataset_dir, 'oracle_dataset.json')
+    experiment.export_oracle_dataset(all_oracle_rows, dataset_file)
+    print(f"\n[Artifact] Successfully exported {len(all_oracle_rows)} rows to Oracle Dataset:")
+    print(f"           → {dataset_file}")
+    
+    # 7. Save Summary Metrics
+    results_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'oracle_utility')
+    os.makedirs(results_dir, exist_ok=True)
+    metrics_file = os.path.join(results_dir, 'multi_population_metrics.json')
+    with open(metrics_file, 'w') as f:
+        json.dump(population_metrics, f, indent=2)
+    print(f"[Metrics] Saved multi-population evaluation summary to {metrics_file}")
+    
+    # 8. Print Comparative Table
+    print("\n" + "=" * 80)
+    print("                 MULTI-POPULATION ORACLE EVALUATION SUMMARY")
+    print("=" * 80)
+    print(f"{'Sampling Population':<24} | {'ρ(Util,Oracle)':>14} | {'ρ(Imp,ΔQ)':>10} | {'Ov@10%':>8} | {'Ov@20%':>8} | {'Gain@20%':>9}")
+    print("-" * 80)
+    for pop_name, m in population_metrics.items():
+        if 'error' in m:
+            continue
+        rho_u = m['spearman_utility_vs_oracle']
+        rho_q = m['spearman_importance_vs_deltaQ']
+        ov10 = m.get('overlaps', {}).get('top_10pct', 0)
+        ov20 = m.get('overlaps', {}).get('top_20pct', 0)
+        g20 = m.get('realized_gains', {}).get('top_20pct_ratio', 0)
+        print(f"{pop_name:<24} | {rho_u:>14.4f} | {rho_q:>10.4f} | {ov10:>7.1%} | {ov20:>7.1%} | {g20:>9.4f}")
+    print("=" * 80)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Oracle Utility Experiment v2')
+    parser = argparse.ArgumentParser(description="Oracle Utility Multi-Population Experiment Runner")
+    parser.add_argument('--device', type=str, default='cpu')
+    parser.add_argument('--frames', type=int, default=8, help='Number of warmup frames')
     parser.add_argument('--n_warmup', type=int, default=6)
     parser.add_argument('--n_samples', type=int, default=60)
     parser.add_argument('--n_opt_steps', type=int, default=10)
-    parser.add_argument('--group_size', type=int, default=1)
+    parser.add_argument('--w_rgb', type=float, default=0.7)
+    parser.add_argument('--w_depth', type=float, default=0.3)
+    parser.add_argument('--eval_groups', action='store_true', default=True)
+    parser.add_argument('--synthetic', action='store_true', default=False)
     parser.add_argument('--height', type=int, default=64)
     parser.add_argument('--width', type=int, default=80)
-    parser.add_argument('--synthetic', action='store_true', default=True)
     args = parser.parse_args()
+    if args.frames:
+        args.n_warmup = args.frames
     run_experiment(args)

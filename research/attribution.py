@@ -284,6 +284,7 @@ def compute_gaussian_statistics(
     contrib_weights: torch.Tensor,
     contrib_indices: torch.Tensor,
     n_gaussians: int,
+    cov2D: Optional[torch.Tensor] = None,
     epsilon: float = 1e-7,
 ) -> Dict[str, torch.Tensor]:
     """Compute per-Gaussian statistics from pixel-level attribution.
@@ -295,7 +296,8 @@ def compute_gaussian_statistics(
         E^color_i = Σ_u w_{u,i} · e_c(u) / (Σ_u w_{u,i} + ε)
         E^depth_i = Σ_u w_{u,i} · e_d(u) / (Σ_u w_{u,i} + ε)
         V_i = (1/N_pixels) · Σ_u 1[w_{u,i} > ε]
-        S_i = Σ_u w_{u,i}
+        Influence_i = Σ_u w_{u,i}  (alpha contribution mass)
+        Area_i = π · √(det(cov2D_i))  (geometric projected screen area)
 
     Args:
         rendered_color: (H, W, 3) rendered color image
@@ -305,6 +307,7 @@ def compute_gaussian_statistics(
         contrib_weights: (H, W, top_k) contribution weights
         contrib_indices: (H, W, top_k) Gaussian indices
         n_gaussians: total number of Gaussians
+        cov2D: optional (N, 2, 2) projected 2D covariance matrices
         epsilon: small constant for numerical stability
 
     Returns:
@@ -312,7 +315,10 @@ def compute_gaussian_statistics(
             'color_error': (N,) per-Gaussian weighted color error
             'depth_error': (N,) per-Gaussian weighted depth error
             'visibility': (N,) fraction of pixels each Gaussian contributes to
-            'screen_area': (N,) total contribution weight (proxy for screen area)
+            'influence_mass': (N,) total alpha-weighted contribution weight
+            'projected_area': (N,) true geometric projected area in pixels²
+            'contribution_mass': (N,) alias for influence_mass
+            'screen_area': (N,) backward compatibility alias
             'visibility_mask': (N,) bool, True if Gaussian was visible
     """
     H, W = rendered_depth.shape
@@ -320,30 +326,28 @@ def compute_gaussian_statistics(
     top_k = contrib_weights.shape[-1]
     total_pixels = H * W
 
-    # Pixel-level errors
+    # Compute pixel-level errors
     color_err = (rendered_color - gt_color).abs().mean(dim=-1)  # (H, W)
-    depth_valid = gt_depth > 0
-    depth_err = torch.zeros_like(gt_depth)
-    depth_err[depth_valid] = (rendered_depth[depth_valid] - gt_depth[depth_valid]).abs()
+    depth_err = (rendered_depth - gt_depth).abs()  # (H, W)
+    depth_valid = (gt_depth > 0) & (~torch.isnan(gt_depth))
+    depth_err = depth_err * depth_valid.float()
 
-    # Flatten spatial dimensions for scatter operations
-    # (H, W, top_k) → (H*W*top_k,)
-    flat_weights = contrib_weights.reshape(-1)         # (H*W*top_k,)
-    flat_indices = contrib_indices.reshape(-1)         # (H*W*top_k,)
+    # Flatten for efficient scatter operations
+    flat_indices = contrib_indices.reshape(-1)  # (H*W*top_k,)
+    flat_weights = contrib_weights.reshape(-1)  # (H*W*top_k,)
 
-    # Repeat pixel errors for each top_k slot
-    color_err_expanded = color_err.unsqueeze(-1).expand(-1, -1, top_k).reshape(-1)  # (H*W*top_k,)
-    depth_err_expanded = depth_err.unsqueeze(-1).expand(-1, -1, top_k).reshape(-1)  # (H*W*top_k,)
+    # Expand pixel errors to match flattened indices
+    flat_color_err = color_err.unsqueeze(-1).expand(H, W, top_k).reshape(-1)
+    flat_depth_err = depth_err.unsqueeze(-1).expand(H, W, top_k).reshape(-1)
 
-    # Filter valid entries (index != -1)
-    valid_mask = flat_indices >= 0
-    valid_weights = flat_weights[valid_mask]
+    # Filter out invalid indices (-1 from padding)
+    valid_mask = (flat_indices >= 0) & (flat_indices < n_gaussians)
     valid_indices = flat_indices[valid_mask]
-    valid_color_err = color_err_expanded[valid_mask]
-    valid_depth_err = depth_err_expanded[valid_mask]
+    valid_weights = flat_weights[valid_mask]
+    valid_color_err = flat_color_err[valid_mask]
+    valid_depth_err = flat_depth_err[valid_mask]
 
-    # Accumulate per-Gaussian statistics using scatter_add
-    # Total weight per Gaussian: S_i = Σ_u w_{u,i}
+    # Total contribution weight per Gaussian: W_i = Σ_u w_{u,i}
     total_weight = torch.zeros(n_gaussians, device=device)
     total_weight.scatter_add_(0, valid_indices, valid_weights)
 
@@ -367,10 +371,14 @@ def compute_gaussian_statistics(
     # Visibility: fraction of total pixels
     visibility = pixel_count / (total_pixels + epsilon)
 
-    # Contribution mass: total alpha-weighted contribution Σ_u w_{u,i}
-    # NOTE: This is NOT geometric screen-space area (π·r_x·r_y).
-    # For true projected area, use compute_projected_area() with 2D covariances.
-    contribution_mass = total_weight
+    # Influence mass: total alpha-weighted contribution Σ_u w_{u,i}
+    influence_mass = total_weight
+
+    # Projected Area: True geometric screen-space area
+    if cov2D is not None and cov2D.shape[0] == n_gaussians:
+        projected_area = compute_projected_area(cov2D)
+    else:
+        projected_area = influence_mass
 
     # Visibility mask: Gaussian contributed to at least one pixel
     visibility_mask = pixel_count > 0
@@ -379,8 +387,10 @@ def compute_gaussian_statistics(
         'color_error': per_gaussian_color_err,
         'depth_error': per_gaussian_depth_err,
         'visibility': visibility,
-        'contribution_mass': contribution_mass,
-        'screen_area': contribution_mass,  # backward compat alias
+        'influence_mass': influence_mass,
+        'projected_area': projected_area,
+        'contribution_mass': influence_mass,
+        'screen_area': influence_mass,  # backward compat alias
         'visibility_mask': visibility_mask,
         'pixel_count': pixel_count,
         'total_weight': total_weight,
