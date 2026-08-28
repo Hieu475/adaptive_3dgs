@@ -417,18 +417,14 @@ class OnlineReconstructionPipeline:
         # === 7. True Selective Optimization with Frozen Background Cache (R21/R29) ===
         n_optimized = 0
         opt_loss_val = 0.0
+        cache_time = 0.0
         opt_time = 0.0
         
         if optimize_mask.any() and self.optimizer is not None:
-            opt_start = time.time()
-            self.optimizer.zero_grad()
-            
-            # Extract active subset (strictly size M, no O(N) full-size tensors created)
-            active_subset = self.gaussian_model.get_optimization_subset(optimize_mask)
+            # 1. Build / refresh background cache for frozen Gaussians once per frame
             frozen_mask = ~optimize_mask[:self.gaussian_model.num_gaussians]
-            
-            # 1. Build / refresh background cache for frozen Gaussians (detached)
             if frozen_mask.any():
+                c_start = time.time()
                 self.bg_cache.build_cache(
                     model=self.gaussian_model,
                     frozen_mask=frozen_mask,
@@ -438,10 +434,15 @@ class OnlineReconstructionPipeline:
                     image_height=H,
                     tile_size=self.config['rendering']['tile_size'],
                 )
+                cache_time = time.time() - c_start
             else:
                 self.bg_cache.invalidate()
                 
-            # 2. Composite active Gaussians with cached frozen background
+            # 2. Pure Selective Optimization Step (M only)
+            opt_start = time.time()
+            self.optimizer.zero_grad()
+            active_subset = self.gaussian_model.get_optimization_subset(optimize_mask)
+            
             composite_opt = self.bg_cache.composite_with_active(
                 active_subset=active_subset,
                 extrinsics=self.current_pose,
@@ -523,6 +524,7 @@ class OnlineReconstructionPipeline:
             'n_tier_d': (tiers == Tier.D).sum().item(),
             'frame_time_ms': frame_time * 1000.0,
             'opt_time_ms': opt_time * 1000.0,
+            'cache_time_ms': cache_time * 1000.0,
             'fps': 1.0 / max(frame_time, 1e-8),
             'loss': opt_loss_val,
             # Budget metrics

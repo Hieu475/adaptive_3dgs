@@ -167,7 +167,10 @@ def run_variant(variant_name, weights, use_uncertainty, use_hysteresis, use_prio
     
     print(f"Result for {variant_name}:")
     print(f"  • ρ(Utility, Oracle): {corr.get('spearman_utility_vs_oracle', 0.0):+.4f}")
+    print(f"  • Top-10% Overlap:   {corr.get('overlaps', {}).get('top_10pct', 0.0):.1%}")
     print(f"  • Top-20% Overlap:   {corr.get('overlaps', {}).get('top_20pct', 0.0):.1%}")
+    print(f"  • Coverage@10%:      {corr.get('coverages', {}).get('top_10pct', 0.0):.4f}")
+    print(f"  • Regret@10%:        {corr.get('regrets', {}).get('top_10pct', 0.0):.4f}")
     print(f"  • Realized Gain@20%: {corr.get('realized_gains', {}).get('top_20pct_ratio', 0.0):.4f}")
     print(f"  • Switch Rate:       {switch_rate:.2f} switches/frame")
     print(f"  • Latency Jitter:    {jitter:.2f} ms")
@@ -178,6 +181,8 @@ def run_variant(variant_name, weights, use_uncertainty, use_hysteresis, use_prio
         'spearman_p': corr.get('spearman_utility_p', 1.0),
         'overlap_10pct': corr.get('overlaps', {}).get('top_10pct', 0.0),
         'overlap_20pct': corr.get('overlaps', {}).get('top_20pct', 0.0),
+        'coverage_10pct': corr.get('coverages', {}).get('top_10pct', 0.0),
+        'regret_10pct': corr.get('regrets', {}).get('top_10pct', 0.0),
         'realized_gain_20pct': corr.get('realized_gains', {}).get('top_20pct_ratio', 0.0),
         'switch_rate': switch_rate,
         'jitter_ms': jitter,
@@ -189,33 +194,42 @@ def run_variant(variant_name, weights, use_uncertainty, use_hysteresis, use_prio
 def main():
     parser = argparse.ArgumentParser(description="Run Systematic Importance Ablation Suite")
     parser.add_argument('--device', type=str, default='cpu')
-    parser.add_argument('--frames', type=int, default=8)
-    parser.add_argument('--n_warmup', type=int, default=6)
-    parser.add_argument('--n_samples', type=int, default=60)
-    parser.add_argument('--n_opt_steps', type=int, default=10)
+    parser.add_argument('--frames', type=int, default=6)
+    parser.add_argument('--n_warmup', type=int, default=5)
+    parser.add_argument('--n_samples', type=int, default=40)
+    parser.add_argument('--n_opt_steps', type=int, default=5)
     args = parser.parse_args()
     if args.frames:
         args.n_warmup = args.frames
         
-    print("=" * 80)
-    print("      SYSTEMATIC IMPORTANCE ABLATION MATRIX (V0 → V1 → V2 → V3)")
-    print("=" * 80)
+    print("=" * 95)
+    print("      SYSTEMATIC IMPORTANCE ABLATION MATRIX (V0 → V1 → V2 → V3 → V4 → V5 → V6)")
+    print("=" * 95)
     
     frames, intrinsics = create_ablation_frames(n_frames=args.n_warmup + 3)
     
-    # 4 Structured Variants
+    # 7 Progressive Variants
     variants = [
-        ("V0: Error + Influence",
-         {'depth_error': 1.0, 'color_error': 1.0, 'normal_error': 0.0, 'visibility': 0.0, 'temporal': 0.0, 'screen_space': 0.3},
+        ("V0: Error Only",
+         {'depth_error': 1.0, 'color_error': 1.0, 'normal_error': 0.0, 'visibility': 0.0, 'temporal': 0.0, 'screen_space': 0.0},
          False, False, False),
-        ("V1: + Temporal Dynamics",
-         {'depth_error': 1.0, 'color_error': 1.0, 'normal_error': 0.0, 'visibility': 0.1, 'temporal': 0.5, 'screen_space': 0.3},
+        ("V1: Error + Influence",
+         {'depth_error': 1.0, 'color_error': 1.0, 'normal_error': 0.0, 'visibility': 0.1, 'temporal': 0.0, 'screen_space': 0.2},
          False, False, False),
-        ("V2: + Uncertainty",
-         {'depth_error': 1.0, 'color_error': 1.0, 'normal_error': 0.0, 'visibility': 0.1, 'temporal': 0.5, 'screen_space': 0.3},
+        ("V2: + Temporal Dynamics",
+         {'depth_error': 1.0, 'color_error': 1.0, 'normal_error': 0.0, 'visibility': 0.1, 'temporal': 0.5, 'screen_space': 0.2},
+         False, False, False),
+        ("V3: + Uncertainty",
+         {'depth_error': 1.0, 'color_error': 1.0, 'normal_error': 0.0, 'visibility': 0.1, 'temporal': 0.5, 'screen_space': 0.2},
          True, False, False),
-        ("V3: + Hysteresis & Prior (Full)",
-         {'depth_error': 1.0, 'color_error': 1.0, 'normal_error': 0.0, 'visibility': 0.1, 'temporal': 0.5, 'screen_space': 0.3},
+        ("V4: + Projected Area",
+         {'depth_error': 1.0, 'color_error': 1.0, 'normal_error': 0.0, 'visibility': 0.1, 'temporal': 0.5, 'screen_space': 0.5},
+         True, False, False),
+        ("V5: + Hysteresis",
+         {'depth_error': 1.0, 'color_error': 1.0, 'normal_error': 0.0, 'visibility': 0.1, 'temporal': 0.5, 'screen_space': 0.5},
+         True, True, False),
+        ("V6: Full Utility (+ Prior)",
+         {'depth_error': 1.0, 'color_error': 1.0, 'normal_error': 0.0, 'visibility': 0.1, 'temporal': 0.5, 'screen_space': 0.5},
          True, True, True),
     ]
     
@@ -225,14 +239,14 @@ def main():
         results.append(res)
         
     # Print Comparison Table
-    print("\n\n" + "=" * 90)
-    print("                             ABLATION STUDY SUMMARY MATRIX")
-    print("=" * 90)
-    print(f"{'Variant':<30} | {'ρ(Util,Oracle)':>14} | {'Ov@10%':>8} | {'Ov@20%':>8} | {'Gain@20%':>9} | {'Jitter':>8} | {'Switches':>8}")
-    print("-" * 90)
+    print("\n\n" + "=" * 115)
+    print("                                      ABLATION STUDY SUMMARY MATRIX")
+    print("=" * 115)
+    print(f"{'Variant':<25} | {'ρ(Util,Oracle)':>14} | {'Ov@10%':>8} | {'Cov@10%':>8} | {'Regret@10%':>11} | {'Jitter':>8} | {'Switches':>8} | {'PSNR':>8}")
+    print("-" * 115)
     for r in results:
-        print(f"{r['variant']:<30} | {r['spearman_utility_oracle']:>14.4f} | {r['overlap_10pct']:>7.1%} | {r['overlap_20pct']:>7.1%} | {r['realized_gain_20pct']:>9.4f} | {r['jitter_ms']:>6.2f}ms | {r['switch_rate']:>7.2f}")
-    print("=" * 90)
+        print(f"{r['variant']:<25} | {r['spearman_utility_oracle']:>14.4f} | {r['overlap_10pct']:>7.1%} | {r['coverage_10pct']:>8.4f} | {r['regret_10pct']:>11.4f} | {r['jitter_ms']:>6.2f}ms | {r['switch_rate']:>7.2f} | {r['final_psnr']:>6.2f}dB")
+    print("=" * 115)
     
     # Save results
     save_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'importance_ablation')
@@ -240,7 +254,19 @@ def main():
     out_file = os.path.join(save_dir, 'ablation_summary.json')
     with open(out_file, 'w') as f:
         json.dump(results, f, indent=2)
-    print(f"\nAblation summary saved to {out_file}")
+        
+    md_file = os.path.join(save_dir, 'ablation_matrix.md')
+    with open(md_file, 'w') as f:
+        f.write("# R35: Systematic Utility Ablation Matrix (V0 → V6)\n\n")
+        f.write("| Variant | $\\rho(U, U_{oracle})$ | Overlap@10% | Coverage@10% | Regret@10% | Jitter (ms) | Switch Rate | PSNR (dB) |\n")
+        f.write("|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|\n")
+        for r in results:
+            f.write(f"| **{r['variant']}** | {r['spearman_utility_oracle']:.4f} | {r['overlap_10pct']*100:.1f}% | {r['coverage_10pct']:.4f} | {r['regret_10pct']:.4f} | {r['jitter_ms']:.2f} ms | {r['switch_rate']:.2f} | {r['final_psnr']:.2f} dB |\n")
+        f.write("\n")
+        
+    print(f"\nAblation artifacts saved to:")
+    print(f"  - {out_file}")
+    print(f"  - {md_file}")
 
 
 if __name__ == '__main__':

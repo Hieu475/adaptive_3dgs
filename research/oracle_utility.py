@@ -274,14 +274,11 @@ class OracleUtilityExperiment:
             
         delta_psnr_local = psnr_local_after - psnr_local_before
         delta_depth_gain_local = max(0.0, depth_l1_before - depth_l1_after)
-        # Normalized depth gain: scale by local standard deviation or stable factor
-        normalized_depth_gain = delta_depth_gain_local / (depth_l1_before + 1e-4)
-        delta_quality_local = self.w_rgb * delta_psnr_local + self.w_depth * (10.0 * normalized_depth_gain)
         
-        # Combined RGB-D Quality Gain
-        # Normalize depth gain scale: 0.1m reduction ≈ 1.0 dB equivalent
-        depth_gain_scaled = delta_depth_gain_local * 10.0
-        delta_quality_local = self.w_rgb * delta_psnr_local + self.w_depth * depth_gain_scaled
+        # Dimension-free normalized relative gains (Step 10: No magic numbers)
+        norm_delta_psnr = delta_psnr_local / max(1.0, psnr_local_before)
+        norm_delta_depth = delta_depth_gain_local / max(1e-3, depth_l1_before)
+        delta_quality_local = self.w_rgb * norm_delta_psnr + self.w_depth * norm_delta_depth
         
         return {
             'delta_psnr_local': delta_psnr_local,
@@ -501,6 +498,10 @@ class OracleUtilityExperiment:
         overlaps = {}
         realized_gains = {}
         regrets = {}
+        lifts = {}
+        coverages = {}
+        total_positive_gain = float(np.sum(np.maximum(0.0, delta_q)))
+        
         for k_pct in [0.05, 0.10, 0.20]:
             k = max(1, int(n * k_pct))
             top_k_imp = set(imp_ranks[:k].tolist())
@@ -516,6 +517,7 @@ class OracleUtilityExperiment:
             
             gain_random = float(np.mean(delta_q) * k)
             lifts[f'top_{int(k_pct*100)}pct'] = float(gain_imp / (gain_random + 1e-8)) if gain_random > 0 else 1.0
+            coverages[f'top_{int(k_pct*100)}pct'] = float(np.sum(np.maximum(0.0, delta_q[list(top_k_imp)])) / (total_positive_gain + 1e-8))
             
         return {
             'n_visible': len(visible),
@@ -530,6 +532,7 @@ class OracleUtilityExperiment:
             'realized_gains': realized_gains,
             'regrets': regrets,
             'lifts': lifts,
+            'coverages': coverages,
             'delta_quality_stats': {
                 'mean': float(np.mean(delta_q)),
                 'std': float(np.std(delta_q)),

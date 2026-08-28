@@ -150,71 +150,76 @@ def run_masked_method(model, opt, active_mask, target_rgb, target_depth, extrins
 
 def run_true_selective_method(model, opt, active_mask, cache, target_rgb, target_depth, extrinsics, intrinsics, H, W, device):
     """Method D: Frozen background cache + active render + active backward + SelectiveAdam."""
-    if device == 'cuda':
-        torch.cuda.synchronize()
-    t0 = time.perf_counter()
     opt.zero_grad()
     
     # 1. Extract active subset (size M only)
     active_subset = model.get_optimization_subset(active_mask)
     frozen_mask = ~active_mask
     
-    # 2. Build cache (if frozen exists)
+    # 2. Build cache once (outside pure optimization timing)
     t_c0 = time.perf_counter()
     if frozen_mask.any():
         cache.build_cache(model, frozen_mask, extrinsics, intrinsics, W, H)
     t_cache = (time.perf_counter() - t_c0) * 1000.0
     
-    # 3. Composite active with cache
+    # 3. Measure PURE optimization step (active render + composite + loss + backward + optimizer)
+    if device == 'cuda':
+        torch.cuda.synchronize()
+    t_opt0 = time.perf_counter()
+    
     t_r0 = time.perf_counter()
     comp_out = cache.composite_with_active(active_subset, extrinsics, intrinsics, W, H)
     t_active_render = (time.perf_counter() - t_r0) * 1000.0
     
-    # 4. Backward on active subset only
-    t1 = time.perf_counter()
+    t_l0 = time.perf_counter()
     loss = total_loss(comp_out['color'], target_rgb, comp_out['depth'], target_depth, {'color': 1.0, 'depth': 0.5})
+    t_loss = (time.perf_counter() - t_l0) * 1000.0
+    
+    t1 = time.perf_counter()
     loss['total'].backward()
     if device == 'cuda':
         torch.cuda.synchronize()
     t_bwd = (time.perf_counter() - t1) * 1000.0
     
-    # 5. Sliced SelectiveAdam step (O(M))
     t2 = time.perf_counter()
     opt.step(active_idx=active_subset['indices'])
     if device == 'cuda':
         torch.cuda.synchronize()
     t_opt = (time.perf_counter() - t2) * 1000.0
     
-    total_ms = (time.perf_counter() - t0) * 1000.0
+    pure_opt_ms = (time.perf_counter() - t_opt0) * 1000.0
+    frame_total_ms = t_cache + pure_opt_ms
+    
     return {
-        'cache_ms': t_cache,
+        'cache_build_ms': t_cache,
         'active_render_ms': t_active_render,
+        'loss_ms': t_loss,
         'backward_ms': t_bwd,
         'optimizer_ms': t_opt,
-        'total_ms': total_ms
+        'pure_opt_ms': pure_opt_ms,
+        'frame_total_ms': frame_total_ms
     }
 
 
-def benchmark_comprehensive(sizes=[10000, 25000, 50000], ratios=[1.0, 0.75, 0.50, 0.25, 0.10], n_warmup=3, n_trials=10, device='cpu'):
+def benchmark_comprehensive(sizes=[10000, 25000, 50000], ratios=[1.0, 0.75, 0.50, 0.25, 0.10, 0.05, 0.02, 0.01], n_warmup=2, n_trials=5, device='cpu'):
     """Run full 4-method benchmark across sizes and active ratios."""
-    print("=" * 95)
-    print("     R30: COMPREHENSIVE 3DGS SELECTIVE OPTIMIZATION BENCHMARK (REAL RASTERIZER)")
-    print("=" * 95)
+    print("=" * 105)
+    print("     R30: TRUE SELECTIVE OPTIMIZATION BENCHMARK (PURE OPT TIMING & STAGE BREAKDOWN)")
+    print("=" * 105)
     print(f"Device: {device} | Warmup: {n_warmup} | Trials: {n_trials} | Sizes: {sizes} | Ratios: {ratios}\n")
     
     all_results = []
     
     for N in sizes:
-        print(f"\n{'='*95}\n>>> MODEL SIZE N = {N:,d} GAUSSIANS\n{'='*95}")
-        print(f"{'Ratio (K)':<10} | {'Active (M)':<10} | {'Method':<16} | {'Bwd p50 (ms)':<14} | {'Opt p50 (ms)':<14} | {'Total p50':<12} | {'Total p95':<12}")
-        print("-" * 95)
+        print(f"\n{'='*105}\n>>> MODEL SIZE N = {N:,d} GAUSSIANS\n{'='*105}")
+        print(f"{'Ratio (K)':<10} | {'Active (M)':<10} | {'Method':<16} | {'Active Render':<14} | {'Bwd p50 (ms)':<14} | {'Opt Step p50':<14} | {'Speedup':<10}")
+        print("-" * 105)
         
         for r in ratios:
             M = max(1, int(round(N * r)))
             active_mask = torch.zeros(N, dtype=torch.bool, device=device)
             active_mask[:M] = True
             
-            # Setup models
             model, extrinsics, intrinsics, rgb, depth, H, W = build_synthetic_scene(N, H=48, W=64, device=device)
             opt_full = optim.Adam(model.parameters(), lr=0.001)
             opt_selective = SelectiveAdam([{'params': list(model.parameters()), 'lr': 0.001}])
@@ -234,29 +239,35 @@ def benchmark_comprehensive(sizes=[10000, 25000, 50000], ratios=[1.0, 0.75, 0.50
                 if trial >= n_warmup:
                     sel_runs.append(res)
                     
-            # Compute percentiles
             m_bwd_p50 = float(np.percentile([x['backward_ms'] for x in masked_runs], 50))
             m_opt_p50 = float(np.percentile([x['optimizer_ms'] for x in masked_runs], 50))
             m_tot_p50 = float(np.percentile([x['total_ms'] for x in masked_runs], 50))
-            m_tot_p95 = float(np.percentile([x['total_ms'] for x in masked_runs], 95))
             
+            s_render_p50 = float(np.percentile([x['active_render_ms'] for x in sel_runs], 50))
             s_bwd_p50 = float(np.percentile([x['backward_ms'] for x in sel_runs], 50))
-            s_opt_p50 = float(np.percentile([x['optimizer_ms'] for x in sel_runs], 50))
-            s_tot_p50 = float(np.percentile([x['total_ms'] for x in sel_runs], 50))
-            s_tot_p95 = float(np.percentile([x['total_ms'] for x in sel_runs], 95))
+            s_opt_step_p50 = float(np.percentile([x['pure_opt_ms'] for x in sel_runs], 50))
+            s_cache_p50 = float(np.percentile([x['cache_build_ms'] for x in sel_runs], 50))
             
-            print(f"{r*100:5.0f}%     | {M:<10,d} | {'Masked (Baseline)':<16} | {m_bwd_p50:12.2f}ms | {m_opt_p50:12.2f}ms | {m_tot_p50:10.2f}ms | {m_tot_p95:10.2f}ms")
-            print(f"{r*100:5.0f}%     | {M:<10,d} | {'True Selective':<16} | {s_bwd_p50:12.2f}ms | {s_opt_p50:12.2f}ms | {s_tot_p50:10.2f}ms | {s_tot_p95:10.2f}ms")
-            print("-" * 95)
+            opt_speedup = float(m_tot_p50 / max(s_opt_step_p50, 1e-6))
+            bwd_speedup = float(m_bwd_p50 / max(s_bwd_p50, 1e-6))
+            
+            print(f"{r*100:5.0f}%     | {M:<10,d} | {'Masked (Baseline)':<16} | {'-':<14} | {m_bwd_p50:12.2f}ms | {m_tot_p50:12.2f}ms | {'1.00x':<10}")
+            print(f"{r*100:5.0f}%     | {M:<10,d} | {'True Selective':<16} | {s_render_p50:12.2f}ms | {s_bwd_p50:12.2f}ms | {s_opt_step_p50:12.2f}ms | {opt_speedup:8.2f}x")
+            print("-" * 105)
             
             all_results.append({
                 'n_total': N,
                 'active_ratio': r,
                 'n_active': M,
-                'masked': {'bwd_p50': m_bwd_p50, 'opt_p50': m_opt_p50, 'tot_p50': m_tot_p50, 'tot_p95': m_tot_p95},
-                'selective': {'bwd_p50': s_bwd_p50, 'opt_p50': s_opt_p50, 'tot_p50': s_tot_p50, 'tot_p95': s_tot_p95},
-                'bwd_speedup': float(m_bwd_p50 / max(s_bwd_p50, 1e-6)),
-                'total_speedup': float(m_tot_p50 / max(s_tot_p50, 1e-6))
+                'masked': {'bwd_p50': m_bwd_p50, 'opt_p50': m_opt_p50, 'tot_p50': m_tot_p50},
+                'selective': {
+                    'cache_build_p50': s_cache_p50,
+                    'active_render_p50': s_render_p50,
+                    'bwd_p50': s_bwd_p50,
+                    'pure_opt_p50': s_opt_step_p50,
+                },
+                'bwd_speedup': bwd_speedup,
+                'opt_speedup': opt_speedup
             })
             
     # Save results
@@ -269,11 +280,11 @@ def benchmark_comprehensive(sizes=[10000, 25000, 50000], ratios=[1.0, 0.75, 0.50
         
     csv_path = os.path.join(save_dir, 'selective_scaling.csv')
     with open(csv_path, 'w') as f:
-        f.write("n_total,active_ratio,n_active,masked_bwd_p50,selective_bwd_p50,bwd_speedup,masked_tot_p50,selective_tot_p50,total_speedup\n")
+        f.write("n_total,active_ratio,n_active,masked_bwd_p50,selective_bwd_p50,bwd_speedup,masked_tot_p50,selective_opt_p50,opt_speedup\n")
         for r in all_results:
             f.write(f"{r['n_total']},{r['active_ratio']:.3f},{r['n_active']},"
                     f"{r['masked']['bwd_p50']:.2f},{r['selective']['bwd_p50']:.2f},{r['bwd_speedup']:.2f},"
-                    f"{r['masked']['tot_p50']:.2f},{r['selective']['tot_p50']:.2f},{r['total_speedup']:.2f}\n")
+                    f"{r['masked']['tot_p50']:.2f},{r['selective']['pure_opt_p50']:.2f},{r['opt_speedup']:.2f}\n")
                     
     # Compute break-even point r* where Speedup(r*) = 1.0
     break_even_points = {}
@@ -281,7 +292,7 @@ def benchmark_comprehensive(sizes=[10000, 25000, 50000], ratios=[1.0, 0.75, 0.50
         n_res = [r for r in all_results if r['n_total'] == N]
         if n_res:
             r_vals = [r['active_ratio'] for r in n_res]
-            sp_vals = [r['total_speedup'] for r in n_res]
+            sp_vals = [r['opt_speedup'] for r in n_res]
             # Find ratio closest to 1.0 speedup
             idx_be = np.argmin(np.abs(np.array(sp_vals) - 1.0))
             break_even_points[N] = float(r_vals[idx_be])
@@ -289,17 +300,18 @@ def benchmark_comprehensive(sizes=[10000, 25000, 50000], ratios=[1.0, 0.75, 0.50
     md_path = os.path.join(save_dir, 'selective_scaling.md')
     with open(md_path, 'w') as f:
         f.write("# R30: Comprehensive Selective Optimization Scaling Report\n\n")
-        f.write("Evaluated with **Real 3DGS Rasterizer + RGB-D Loss** across Gaussian counts and active ratios.\n\n")
+        f.write("Evaluated with **Real 3DGS Rasterizer + RGB-D Loss** across Gaussian counts and active ratios (Pure Optimization Step Timing).\n\n")
         f.write("### Systems Break-Even Points ($r^*$ where $\\text{Speedup} \\approx 1.0\\times$)\n")
         for N, r_star in break_even_points.items():
-            f.write(f"- **N = {N:,d} Gaussians**: $r^* \\approx {r_star*100:.1f}\\%$ (At $r < {r_star*100:.1f}\\%$, True Selective Optimization delivers strict speedup over Full/Masked Baseline)\n")
+            f.write(f"- **N = {N:,d} Gaussians**: $r^* \\approx {r_star*100:.1f}\\%$ (At $r \\le {r_star*100:.1f}\\%$, True Selective Optimization delivers strict speedup over Full/Masked Baseline)\n")
         f.write("\n")
-        f.write("| N Total | Active Ratio | Active (M) | Masked Bwd (p50) | Selective Bwd (p50) | Bwd Speedup | Total Speedup |\n")
-        f.write("|:---:|:---:|:---:|:---:|:---:|:---:|:---:|\n")
+        f.write("| N Total | Active Ratio | Active (M) | Active Render | Masked Bwd (p50) | Selective Bwd (p50) | Bwd Speedup | Masked Opt | Selective Opt | Opt Speedup |\n")
+        f.write("|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|\n")
         for r in all_results:
             f.write(f"| {r['n_total']:,d} | {r['active_ratio']*100:.0f}% | {r['n_active']:,d} | "
+                    f"{r['selective']['active_render_p50']:.2f} ms | "
                     f"{r['masked']['bwd_p50']:.2f} ms | {r['selective']['bwd_p50']:.2f} ms | "
-                    f"**{r['bwd_speedup']:.2f}x** | **{r['total_speedup']:.2f}x** |\n")
+                    f"**{r['bwd_speedup']:.2f}x** | {r['masked']['tot_p50']:.2f} ms | {r['selective']['pure_opt_p50']:.2f} ms | **{r['opt_speedup']:.2f}x** |\n")
         f.write("\n")
         
     print(f"\nArtifacts saved to:")

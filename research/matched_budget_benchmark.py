@@ -103,6 +103,9 @@ class MatchedBudgetBenchmark:
         
         is_constrained = (policy != 'full')
         
+        n_actives = []
+        n_totals = []
+        
         for frame in frames[1:]:
             res = pipeline.process_frame(frame['rgb'], frame['depth'], frame.get('pose'))
             opt_time = res.get('opt_time_ms', 0)
@@ -111,13 +114,23 @@ class MatchedBudgetBenchmark:
             psnrs.append(res.get('psnr', 0))
             depth_l1s.append(res.get('depth_l1', 0))
             opt_times.append(opt_time)
+            n_actives.append(res.get('n_optimized', 0))
+            n_totals.append(pipeline.gaussian_model.num_gaussians)
             
         summary = metrics.get_summary()
+        p50 = float(np.percentile(opt_times, 50)) if opt_times else 0.0
+        p95 = float(np.percentile(opt_times, 95)) if opt_times else 0.0
+        avg_active = float(np.mean(n_actives)) if n_actives else 0.0
+        avg_total = float(np.mean(n_totals)) if n_totals else 1.0
         
         return {
             'avg_psnr': np.mean(psnrs) if psnrs else 0.0,
             'avg_depth_l1': np.mean(depth_l1s) if depth_l1s else 0.0,
             'measured_compute_ms': np.mean(opt_times) if opt_times else 0.0,
+            'p50_ms': p50,
+            'p95_ms': p95,
+            'active_gaussians': avg_active,
+            'active_ratio': float(avg_active / max(1.0, avg_total)),
             'budget_ms': budget_ms,
             'n_frames': len(frames),
             'budget_violation_rate': summary['violation_rate'],
@@ -157,15 +170,19 @@ class MatchedBudgetBenchmark:
         ranked = self.compute_quality_at_budget(results_matrix)
         
         lines = []
-        lines.append("| Budget (ms) | Policy | Budget Constrained? | PSNR ↑ | Depth L1 ↓ | Violations ↓ | Jitter ↓ | Compute (ms) |")
-        lines.append("|-------------|--------|---------------------|--------|------------|--------------|----------|--------------|")
+        lines.append("| Budget (ms) | Policy | Active (M) | Active (%) | Actual Opt (p50) | p95 (ms) | Jitter | PSNR ↑ | Depth L1 ↓ |")
+        lines.append("|:---:|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|")
         
         for budget in self.budget_levels_ms:
             for res in ranked[budget]:
                 lines.append(
-                    f"| {budget:11.1f} | {res['policy_name']:15} | {res['budget_constrained']:19} | "
-                    f"{res['avg_psnr']:6.2f} | {res['avg_depth_l1']:10.4f} | "
-                    f"{res['budget_violation_rate'] * 100:10.1f}% | "
-                    f"{res['jitter']:8.2f} | {res['measured_compute_ms']:12.2f} |"
+                    f"| {budget:11.1f} | {res['policy_name']:15} | "
+                    f"{res.get('active_gaussians', 0):9.0f} | "
+                    f"{res.get('active_ratio', 0)*100:9.1f}% | "
+                    f"{res.get('p50_ms', res['measured_compute_ms']):14.2f} ms | "
+                    f"{res.get('p95_ms', res['measured_compute_ms']):8.2f} ms | "
+                    f"{res['jitter']:6.2f} | "
+                    f"{res['avg_psnr']:6.2f} dB | "
+                    f"{res['avg_depth_l1']:10.4f} |"
                 )
         return "\n".join(lines)

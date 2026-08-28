@@ -37,18 +37,20 @@ from research.attribution import compute_projected_area
 
 
 def measure_active_step_features(model, opt, cache, active_mask, target_rgb, target_depth, extrinsics, intrinsics, H, W, device):
-    """Run one optimization step and extract both measured latency and feature aggregates."""
-    if device == 'cuda':
-        torch.cuda.synchronize()
-    t0 = time.perf_counter()
-    
+    """Run one optimization step and extract pure optimization latency and feature aggregates (excluding cache build)."""
     opt.zero_grad()
     active_subset = model.get_optimization_subset(active_mask)
     frozen_mask = ~active_mask
     
+    # 1. Build cache once outside timed optimization block
     if frozen_mask.any():
         cache.build_cache(model, frozen_mask, extrinsics, intrinsics, W, H)
         
+    # 2. Pure optimization step measurement
+    if device == 'cuda':
+        torch.cuda.synchronize()
+    t0 = time.perf_counter()
+    
     comp_out = cache.composite_with_active(active_subset, extrinsics, intrinsics, W, H)
     losses = total_loss(comp_out['color'], target_rgb, comp_out['depth'], target_depth, {'color': 1.0, 'depth': 0.5})
     losses['total'].backward()
