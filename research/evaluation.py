@@ -34,10 +34,10 @@ def generate_table_1_main_benchmark(
         - RTG-SLAM (Cai et al., 2024 - Real-time 3DGS SLAM baseline)
         - Ours (Adaptive 3DGS with continuous importance & budget scheduling)
     """
-    psnr_ours = f"{ours_metrics.get('avg_psnr', 31.4):.2f}"
-    depth_ours = f"{ours_metrics.get('avg_depth_l1', 0.014):.4f}"
-    fps_ours = f"{ours_metrics.get('avg_fps', 32.5):.1f}"
-    n_g_ours = f"{ours_metrics.get('final_n_gaussians', 185000):,}"
+    psnr_ours = f"{ours_metrics['avg_psnr']:.2f}" if 'avg_psnr' in ours_metrics else 'N/A'
+    depth_ours = f"{ours_metrics['avg_depth_l1']:.4f}" if 'avg_depth_l1' in ours_metrics else 'N/A'
+    fps_ours = f"{ours_metrics['avg_fps']:.1f}" if 'avg_fps' in ours_metrics else 'N/A'
+    n_g_ours = f"{ours_metrics['final_n_gaussians']:,}" if 'final_n_gaussians' in ours_metrics else 'N/A'
 
     lines = [
         "### Table 1: Main Benchmark on RGB-D Reconstruction vs Baselines",
@@ -196,16 +196,41 @@ def generate_tier_distribution_chart() -> str:
     return "\n".join(lines)
 
 
-def generate_hypothesis_verification_summary() -> str:
-    """Generate hypothesis verification status summary for H1-H4."""
+def generate_hypothesis_verification_summary(
+    results: Optional[Dict[str, Any]] = None,
+) -> str:
+    """Generate hypothesis verification status from actual experiment results.
+    
+    Args:
+        results: dict with keys 'h1_spearman', 'h2_psnr_ratio', 'h2_speedup',
+                 'h3_speedup', 'h4_violation_rate'. If None, all show PENDING.
+    """
+    r = results or {}
+    
+    def _status(key, threshold, higher_is_better=True):
+        val = r.get(key)
+        if val is None:
+            return 'N/A', '**PENDING ⏳**'
+        if higher_is_better:
+            proven = val >= threshold
+        else:
+            proven = val <= threshold
+        status = '**PROVEN ✅**' if proven else '**FAILED ❌**'
+        return f'{val:.3f}', status
+    
+    h1_val, h1_status = _status('h1_spearman', 0.70)
+    h2_val, h2_status = _status('h2_psnr_ratio', 0.95)
+    h3_val, h3_status = _status('h3_speedup', 1.0)
+    h4_val, h4_status = _status('h4_violation_rate', 0.10, higher_is_better=False)
+    
     lines = [
-        "### Hypothesis Verification Summary",
-        "",
-        "| Hypothesis | Formulation | Expected Outcome | Empirical Verification | Status |",
-        "| :--- | :--- | :--- | :--- | :---: |",
-        "| **H1 (Attribution)** | $E_i = \\sum_u w_{u,i} e(u) / (\\sum w + \\epsilon)$ | Per-Gaussian errors differentiate spatial error distribution | Spearman rank correlation $\\rho(I, E) > 0.70$; distinct Gaussian scores | **PROVEN ✅** |",
-        "| **H2 (Quality/Compute)**| Continuous Top-K at $r=0.50$ | Reaches $\\ge 95\\%$ of Full Opt PSNR using $\\le 50\\%$ compute | Reached **$100.0\\%$** PSNR ($+0.00\\,\\text{dB}$) with $1.21\\times$ speedup | **PROVEN ✅** |",
-        "| **H3 (Densification)** | $P(u) \\propto \\lambda_c E_c + \\lambda_d E_d + \\lambda_t T$ | Eliminates voids faster with fewer total Gaussians | $1.54\\times$ faster optimizer convergence vs uniform sampling | **PROVEN ✅** |",
-        "| **H4 (Real-time Budget)**| Closed-loop adaptive budget controller | Maintains steady framerate under latency bound $B$ | Closed-loop feedback dynamically adjusts cost $Cost_i = a + b S_i$ | **PROVEN ✅** |",
+        '### Hypothesis Verification Summary',
+        '',
+        '| Hypothesis | Metric | Value | Threshold | Status |',
+        '| :--- | :--- | :---: | :---: | :---: |',
+        f'| **H1 (Attribution)** | Spearman ρ(I, E) | {h1_val} | ≥ 0.70 | {h1_status} |',
+        f'| **H2 (Quality/Compute)** | PSNR ratio (Top-K 50% / Full) | {h2_val} | ≥ 0.95 | {h2_status} |',
+        f'| **H3 (Densification)** | Convergence speedup | {h3_val} | ≥ 1.0x | {h3_status} |',
+        f'| **H4 (Real-time Budget)** | Budget violation rate | {h4_val} | ≤ 10% | {h4_status} |',
     ]
-    return "\n".join(lines)
+    return '\n'.join(lines)

@@ -54,10 +54,10 @@ class TestResearchEvaluation:
         assert "Figure 2" in f2
         assert "Tier A" in f2
 
-        h_sum = generate_hypothesis_verification_summary()
+        h_sum = generate_hypothesis_verification_summary(results=None)
         assert "Hypothesis" in h_sum
         assert "H1" in h_sum
         assert "H2" in h_sum
         assert "H3" in h_sum
         assert "H4" in h_sum
-        assert "PROVEN" in h_sum
+        assert "PENDING" in h_sum

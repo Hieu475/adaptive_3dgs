@@ -375,18 +375,35 @@ def prune_low_value(
     importance_scores: torch.Tensor,
     opacity_threshold: float = 0.005,
     importance_threshold: float = 0.01,
+    zero_contrib_frames: Optional[torch.Tensor] = None,
+    prune_patience: int = 50,
 ):
     """Remove low-contribution Gaussians.
     
+    Pruning criteria (research design):
+        1. Opacity failure: sigmoid(opacity_raw) < opacity_threshold
+        2. Persistent zero contribution: zero_contrib_frames > prune_patience
+    
+    Low importance alone does NOT trigger pruning — those Gaussians are
+    frozen (Tier C) instead. Only persistent non-contribution warrants removal.
+    
     Args:
         model: GaussianModel instance
-        importance_scores: (N,) per-Gaussian importance
+        importance_scores: (N,) per-Gaussian importance (used for logging only)
         opacity_threshold: prune if opacity below this
-        importance_threshold: prune if importance below this for extended period
+        importance_threshold: unused, kept for API compatibility
+        zero_contrib_frames: (N,) frames of consecutive zero contribution
+        prune_patience: frames threshold for persistent zero-contribution pruning
     """
     opacities = model.opacities.squeeze(-1)  # (N,)
     
-    prune_mask = (opacities < opacity_threshold) | (importance_scores < importance_threshold)
+    # Criterion 1: Opacity too low (Gaussian has become transparent)
+    prune_mask = opacities < opacity_threshold
+    
+    # Criterion 2: Persistent zero contribution (Tier D)
+    if zero_contrib_frames is not None:
+        persistent_zero = zero_contrib_frames[:opacities.shape[0]] > prune_patience
+        prune_mask = prune_mask | persistent_zero
     
     if prune_mask.any():
         model.prune_gaussians(prune_mask)

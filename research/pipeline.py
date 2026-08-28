@@ -296,6 +296,13 @@ class OnlineReconstructionPipeline:
             screen_areas=per_gaussian_screen_area,
         )
         importance = self.importance_estimator.compute_importance()
+        # Update Gaussian confidence from importance feedback
+        if hasattr(self.gaussian_model, '_confidence'):
+            new_confidence = self.importance_estimator.update_confidence(
+                self.gaussian_model._confidence,
+                importance,
+            )
+            self.gaussian_model._confidence.data.copy_(new_confidence)
         tiers = self.importance_estimator.classify_tier(importance)
         
         # === 5. Densification ===
@@ -303,7 +310,7 @@ class OnlineReconstructionPipeline:
         
         # Adaptive thresholds or fixed thresholds
         if dense_cfg.get('use_adaptive_thresholds', True):
-            color_thresh, depth_thresh = self.scheduler.adaptive_threshold(
+            depth_thresh, color_thresh = self.scheduler.adaptive_threshold(
                 depth_errors=depth_err[depth_valid] if depth_valid.any() else torch.tensor([0.05], device=self.device),
                 color_errors=color_err,
                 k=dense_cfg.get('adaptive_k', 2.0),
@@ -465,7 +472,8 @@ class OnlineReconstructionPipeline:
         prune_low_value(
             self.gaussian_model, importance[:self.gaussian_model.num_gaussians],
             opacity_threshold=0.005,
-            importance_threshold=0.01,
+            zero_contrib_frames=self.importance_estimator._zero_contrib_frames,
+            prune_patience=self.importance_estimator.prune_patience,
         )
         
         # Compact every 100 frames
