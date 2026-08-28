@@ -533,6 +533,86 @@ class OnlineReconstructionPipeline:
         
         return metrics
     
+    def get_importance_diagnostics(self) -> Dict[str, torch.Tensor]:
+        """Expose current research state and per-Gaussian diagnostics.
+        
+        Returns:
+            Dict containing:
+                'importance': Tensor[N]
+                'color_error': Tensor[N]
+                'depth_error': Tensor[N]
+                'visibility': Tensor[N]
+                'screen_area': Tensor[N]
+                'temporal_change': Tensor[N]
+                'tiers': Tensor[N]
+                'confidence': Tensor[N]
+                'components': Dict[str, Tensor[N]]
+        """
+        if not self.initialized or self.importance_estimator._running_depth_error is None:
+            raise RuntimeError("Pipeline has not processed any frame or is uninitialized.")
+        
+        N = self.gaussian_model.num_gaussians
+        importance = self.importance_estimator.compute_importance()[:N]
+        tiers = self.importance_estimator.classify_tier(importance)[:N]
+        
+        color_err = (
+            self.importance_estimator._running_color_error[:N] 
+            if self.importance_estimator._running_color_error is not None 
+            else torch.zeros(N, device=self.device)
+        )
+        depth_err = (
+            self.importance_estimator._running_depth_error[:N] 
+            if self.importance_estimator._running_depth_error is not None 
+            else torch.zeros(N, device=self.device)
+        )
+        visibility = (
+            self.importance_estimator._visibility_count[:N] 
+            if self.importance_estimator._visibility_count is not None 
+            else torch.zeros(N, device=self.device)
+        )
+        
+        screen_area = getattr(self.importance_estimator, '_screen_areas', None)
+        if screen_area is not None:
+            screen_area = screen_area[:N]
+        else:
+            screen_area = torch.zeros(N, device=self.device)
+            
+        temporal_change = torch.zeros(N, device=self.device)
+        if self.importance_estimator._prev_positions is not None and self.importance_estimator._positions is not None:
+            min_len = min(
+                self.importance_estimator._prev_positions.shape[0], 
+                self.importance_estimator._positions.shape[0], 
+                N
+            )
+            temporal_change[:min_len] = (
+                self.importance_estimator._positions[:min_len] - self.importance_estimator._prev_positions[:min_len]
+            ).norm(dim=-1)
+            
+        if hasattr(self.gaussian_model, '_confidence') and self.gaussian_model._confidence is not None:
+            confidence = self.gaussian_model._confidence[:N].squeeze(-1)
+        else:
+            confidence = torch.full((N,), 0.5, device=self.device)
+            
+        components = {
+            'color': color_err,
+            'depth': depth_err,
+            'visibility': visibility,
+            'temporal': temporal_change,
+            'screen_area': screen_area,
+        }
+            
+        return {
+            'importance': importance,
+            'color_error': color_err,
+            'depth_error': depth_err,
+            'visibility': visibility,
+            'screen_area': screen_area,
+            'temporal_change': temporal_change,
+            'tiers': tiers,
+            'confidence': confidence,
+            'components': components,
+        }
+    
     def get_gaussian_map(self) -> GaussianModel:
         """Returns the current Gaussian model."""
         return self.gaussian_model
@@ -560,3 +640,5 @@ class OnlineReconstructionPipeline:
             'budget_violation_rate': float(np.mean(violations)),
             'latency_stats': latency_stats,
         }
+
+
