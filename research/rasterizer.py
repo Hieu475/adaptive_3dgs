@@ -308,3 +308,77 @@ def render(
         'depth': depth_image,
         'transmission': trans_image,
     }
+
+
+def render_full(
+    model,
+    extrinsics: torch.Tensor,
+    intrinsics: torch.Tensor,
+    image_width: int,
+    image_height: int,
+    tile_size: int = 16,
+    bg_color: Optional[torch.Tensor] = None,
+) -> Dict[str, torch.Tensor]:
+    """Render full scene representation (for tracking, error attribution, and importance)."""
+    return render(
+        means3D=model.positions,
+        cov3D=model.build_covariance(),
+        colors=model.get_colors(),
+        opacities=model.opacities.squeeze(-1),
+        extrinsics=extrinsics,
+        intrinsics=intrinsics,
+        image_width=image_width,
+        image_height=image_height,
+        bg_color=bg_color,
+        tile_size=tile_size,
+    )
+
+
+def render_frozen(
+    model,
+    frozen_mask: torch.Tensor,
+    extrinsics: torch.Tensor,
+    intrinsics: torch.Tensor,
+    image_width: int,
+    image_height: int,
+    tile_size: int = 16,
+    bg_color: Optional[torch.Tensor] = None,
+) -> Dict[str, torch.Tensor]:
+    """Render detached frozen Gaussians (for background caching)."""
+    from .background_cache import FrozenBackgroundCache
+    cache = FrozenBackgroundCache(device=model.device)
+    return cache.build_cache(
+        model=model,
+        frozen_mask=frozen_mask,
+        extrinsics=extrinsics,
+        intrinsics=intrinsics,
+        image_width=image_width,
+        image_height=image_height,
+        tile_size=tile_size,
+        bg_color=bg_color,
+    )
+
+
+def render_active(
+    active_subset: Dict[str, torch.Tensor],
+    extrinsics: torch.Tensor,
+    intrinsics: torch.Tensor,
+    image_width: int,
+    image_height: int,
+    tile_size: int = 16,
+    bg_color: Optional[torch.Tensor] = None,
+) -> Dict[str, torch.Tensor]:
+    """Render active subset (M Gaussians) with active gradient hooks."""
+    return render(
+        means3D=active_subset['means3D'],
+        cov3D=active_subset['cov3D'],
+        colors=active_subset['colors'],
+        opacities=active_subset['opacities'],
+        extrinsics=extrinsics,
+        intrinsics=intrinsics,
+        image_width=image_width,
+        image_height=image_height,
+        bg_color=bg_color,
+        tile_size=tile_size,
+    )
+
