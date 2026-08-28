@@ -38,28 +38,42 @@ class OptimizationPolicy(str, Enum):
 
 def estimate_gaussian_costs(
     screen_areas: Optional[torch.Tensor] = None,
+    projected_areas: Optional[torch.Tensor] = None,
     n_gaussians: Optional[int] = None,
     base_cost_us: float = 0.5,
     area_cost_factor: float = 0.002,
     sh_degree: int = 0,
+    cost_coeffs: Optional[Tuple[float, float, float, float]] = None,
     device: Optional[torch.device] = None,
 ) -> torch.Tensor:
-    """Cost model: Cost_i = a + b · S_i · (1 + 0.1 · SH_degree).
+    """Cost model: C_i = β₀ + β₁·Area_i + β₂·Influence_i + β₃·SH_degree.
     
-    A Gaussian covering 800px on screen requires significantly more gradient
-    rasterization work than one covering 20px.
+    Calibrated against measured isolated optimization trials from oracle dataset.
     
     Args:
-        screen_areas: (N,) screen-space area/weight of each Gaussian
-        n_gaussians: fallback number of Gaussians if screen_areas is None
-        base_cost_us: base gradient cost per Gaussian in microseconds (a)
-        area_cost_factor: footprint scaling factor (b)
+        screen_areas: (N,) contribution mass or screen areas
+        projected_areas: (N,) true geometric projected screen area in px²
+        n_gaussians: fallback number of Gaussians
+        base_cost_us: base gradient cost per Gaussian in microseconds (β₀)
+        area_cost_factor: footprint scaling factor (β₁)
         sh_degree: spherical harmonics degree
+        cost_coeffs: optional calibrated (beta_0, beta_1, beta_2, beta_3) tuple
         device: torch device
         
     Returns:
         costs: (N,) estimated microsecond compute costs
     """
+    if cost_coeffs is not None and (projected_areas is not None or screen_areas is not None):
+        b0, b1, b2, b3 = cost_coeffs
+        ref = projected_areas if projected_areas is not None else screen_areas
+        dev = ref.device
+        N = ref.shape[0]
+        area = projected_areas if projected_areas is not None else torch.zeros(N, device=dev)
+        inf = screen_areas if screen_areas is not None else torch.zeros(N, device=dev)
+        sh_val = float(sh_degree)
+        costs = b0 + b1 * area + b2 * inf + b3 * sh_val
+        return torch.clamp(costs, min=0.1)
+        
     if screen_areas is not None:
         device = screen_areas.device
         sh_multiplier = 1.0 + 0.1 * sh_degree
@@ -204,6 +218,8 @@ class BudgetScheduler:
         tiers: Optional[torch.Tensor] = None,
         confidence: Optional[torch.Tensor] = None,
         cost_estimates: Optional[torch.Tensor] = None,
+        error_scores: Optional[torch.Tensor] = None,
+        error_influence_scores: Optional[torch.Tensor] = None,
         ratio: float = 0.5,
         top_k: Optional[int] = None,
         frame_idx: int = 0,
@@ -211,26 +227,14 @@ class BudgetScheduler:
     ) -> torch.Tensor:
         """Select Gaussians for optimization according to specified policy.
         
-        Policies (Milestone R4):
+        Policies (Milestone R4, R19, R23):
             - FULL (Policy 0): 100% of Gaussians selected.
             - RANDOM (Policy 1): Uniform random sample of ratio r (or top_k).
+            - ERROR_ONLY: Ranked strictly by raw photometric + depth error (E_i).
+            - ERROR_INFLUENCE: Strong non-learning baseline (E_i × Influence_i).
             - BINARY (Policy 2): Binary stable/unstable (e.g. confidence < threshold or tier in {A, B}).
             - TOP_K (Policy 3): Top-K highest continuous importance scores.
             - BUDGET_AWARE (Policy 4): Importance/Cost knapsack selection.
-            
-        Args:
-            policy: policy name or OptimizationPolicy enum
-            importance_scores: (N,) importance scores
-            tiers: (N,) optional tier labels (0=A, 1=B, 2=C, 3=D)
-            confidence: (N,) or (N, 1) optional confidence values
-            cost_estimates: (N,) optional per-Gaussian costs
-            ratio: fraction of Gaussians to select (for random, top_k)
-            top_k: exact count to select (overrides ratio if provided)
-            frame_idx: current frame index
-            binary_threshold: threshold for binary policy
-            
-        Returns:
-            optimize_mask: (N,) boolean mask
         """
         N = importance_scores.shape[0]
         device = importance_scores.device
@@ -257,14 +261,16 @@ class BudgetScheduler:
             return mask
             
         elif policy_str in ("error_only", OptimizationPolicy.ERROR_ONLY.value):
+            score_tensor = error_scores if error_scores is not None else importance_scores
             mask = torch.zeros(N, dtype=torch.bool, device=device)
-            _, top_indices = torch.topk(importance_scores, K)
+            _, top_indices = torch.topk(score_tensor[:N], min(K, score_tensor.shape[0]))
             mask[top_indices] = True
             return mask
             
         elif policy_str in ("error_influence", OptimizationPolicy.ERROR_INFLUENCE.value):
+            score_tensor = error_influence_scores if error_influence_scores is not None else importance_scores
             mask = torch.zeros(N, dtype=torch.bool, device=device)
-            _, top_indices = torch.topk(importance_scores, K)
+            _, top_indices = torch.topk(score_tensor[:N], min(K, score_tensor.shape[0]))
             mask[top_indices] = True
             return mask
             
