@@ -39,6 +39,8 @@ from copy import deepcopy
 from .rasterizer import render as rasterize_scene
 from .attribution import render_with_attribution, compute_gaussian_statistics, compute_projected_area
 from .scheduler import estimate_gaussian_costs
+from .background_cache import FrozenBackgroundCache
+from .selective_optimizer import SelectiveAdam
 
 
 class SamplingPopulation(str, Enum):
@@ -206,41 +208,56 @@ class OracleUtilityExperiment:
             psnr_local_before = self._compute_local_psnr(before_color, rgb, influence_mask)
             depth_l1_before = self._compute_local_depth_l1(before_depth, depth, influence_mask)
         
-        # === 2. Isolated Optimization ===
+        # === 2. Isolated True Selective Optimization Trial ===
         opt_mask = torch.zeros(model.num_gaussians, dtype=torch.bool, device=device)
         opt_mask[indices] = True
         
+        trial_opt = SelectiveAdam([{'params': list(model.parameters()), 'lr': 0.001}])
+        trial_cache = FrozenBackgroundCache(device=device)
+        frozen_mask = ~opt_mask
+        
+        # Pre-cache frozen background once for the trial
+        if frozen_mask.any():
+            trial_cache.build_cache(
+                model=model,
+                frozen_mask=frozen_mask,
+                extrinsics=self.pipeline.current_pose,
+                intrinsics=self.pipeline.intrinsics,
+                image_width=W,
+                image_height=H,
+            )
+            
         if device.type == 'cuda':
             torch.cuda.synchronize()
         start_time = time.perf_counter()
         
         for step in range(n_steps):
-            opt.zero_grad()
-            out = self._render(H, W)
+            trial_opt.zero_grad()
+            active_subset = model.get_optimization_subset(opt_mask)
+            
+            comp_out = trial_cache.composite_with_active(
+                active_subset=active_subset,
+                extrinsics=self.pipeline.current_pose,
+                intrinsics=self.pipeline.intrinsics,
+                image_width=W,
+                image_height=H,
+            )
             
             # Loss formulation
             if n_influence_pixels > 0 and n_influence_pixels < H * W * 0.8:
-                loss_rgb = ((out['color'][influence_mask] - rgb[influence_mask]) ** 2).mean()
+                loss_rgb = ((comp_out['color'][influence_mask] - rgb[influence_mask]) ** 2).mean()
                 valid_d = influence_mask & (depth > 0)
-                if valid_d.sum() > 0:
-                    loss_depth = (out['depth'][valid_d] - depth[valid_d]).abs().mean()
-                else:
-                    loss_depth = 0.0
+                loss_depth = (comp_out['depth'][valid_d] - depth[valid_d]).abs().mean() if valid_d.any() else 0.0
             else:
-                loss_rgb = ((out['color'] - rgb) ** 2).mean()
+                loss_rgb = ((comp_out['color'] - rgb) ** 2).mean()
                 valid_d = depth > 0
-                loss_depth = (out['depth'][valid_d] - depth[valid_d]).abs().mean() if valid_d.any() else 0.0
+                loss_depth = (comp_out['depth'][valid_d] - depth[valid_d]).abs().mean() if valid_d.any() else 0.0
                 
             total_loss = self.w_rgb * loss_rgb + self.w_depth * loss_depth
             total_loss.backward()
             
-            # Zero gradients for all non-selected Gaussians
-            with torch.no_grad():
-                for param in model.parameters():
-                    if param.grad is not None and param.shape[0] == model.num_gaussians:
-                        param.grad[~opt_mask] = 0.0
-            
-            opt.step()
+            # True Selective Optimizer step (O(M))
+            trial_opt.step(active_idx=active_subset['indices'])
             
         if device.type == 'cuda':
             torch.cuda.synchronize()
@@ -257,6 +274,9 @@ class OracleUtilityExperiment:
             
         delta_psnr_local = psnr_local_after - psnr_local_before
         delta_depth_gain_local = max(0.0, depth_l1_before - depth_l1_after)
+        # Normalized depth gain: scale by local standard deviation or stable factor
+        normalized_depth_gain = delta_depth_gain_local / (depth_l1_before + 1e-4)
+        delta_quality_local = self.w_rgb * delta_psnr_local + self.w_depth * (10.0 * normalized_depth_gain)
         
         # Combined RGB-D Quality Gain
         # Normalize depth gain scale: 0.1m reduction ≈ 1.0 dB equivalent

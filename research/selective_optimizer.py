@@ -170,3 +170,37 @@ class SelectiveAdam:
                     state['step'] = state['step'][k_mask]
                     state['exp_avg'] = state['exp_avg'][k_mask]
                     state['exp_avg_sq'] = state['exp_avg_sq'][k_mask]
+
+    def state_dict(self) -> Dict[str, Any]:
+        """Return state dictionary of the optimizer."""
+        param_states = {}
+        for p, s in self.state.items():
+            param_states[id(p)] = {
+                'step': s['step'].clone(),
+                'exp_avg': s['exp_avg'].clone(),
+                'exp_avg_sq': s['exp_avg_sq'].clone(),
+            }
+        return {
+            'state': param_states,
+            'param_groups': self.param_groups,
+            'betas': self.betas,
+            'eps': self.eps,
+        }
+
+    def load_state_dict(self, state_dict: Dict[str, Any]):
+        """Load optimizer state from dictionary."""
+        self.param_groups = state_dict.get('param_groups', self.param_groups)
+        self.betas = state_dict.get('betas', self.betas)
+        self.eps = state_dict.get('eps', self.eps)
+        
+        saved_states = state_dict.get('state', {})
+        for group in self.param_groups:
+            for p in group['params']:
+                p_id = id(p)
+                if p_id in saved_states:
+                    self.state[p] = {
+                        'step': saved_states[p_id]['step'].clone().to(p.device),
+                        'exp_avg': saved_states[p_id]['exp_avg'].clone().to(p.device),
+                        'exp_avg_sq': saved_states[p_id]['exp_avg_sq'].clone().to(p.device),
+                    }
+
