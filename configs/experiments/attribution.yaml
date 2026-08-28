@@ -1,0 +1,25 @@
+# R8-R10: Attribution and importance validation experiment
+# Tests H1: per-Gaussian attribution correlation with actual error
+_base: 'baseline.yaml'
+
+experiment:
+  name: 'attribution_validation'
+  seed: 42
+  frames: 200
+
+# Ablation: attribution top-K values to sweep
+attribution_sweep:
+  top_k_values: [1, 4, 8, 16]
+
+# Normalization methods to compare
+normalization_sweep:
+  methods: ['raw', 'zscore', 'robust']
+
+# Diagnostics to compute
+diagnostics:
+  spearman: true
+  pearson: true
+  calibration: true
+  component_correlation: true
+  tier_separation: true
+  error_capture_curve: true

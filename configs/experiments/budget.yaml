@@ -1,0 +1,32 @@
+# R13-R14: Budget controller and profiling experiments
+# Tests H4: closed-loop controller maintains framerate under budget
+_base: 'baseline.yaml'
+
+experiment:
+  name: 'budget_sweep'
+  seed: 42
+  frames: 200
+
+# Budget interpretation:
+# Option A: gpu_budget_ms = full frame budget (used for demo)
+# Option B: gpu_budget_ms = mapping compute budget only (for research microbenchmark)
+# This config uses Option A.
+budget_mode: 'full_frame'
+
+budgets:
+  - 2.0
+  - 4.0
+  - 8.0
+  - 16.0
+  - null  # Unconstrained
+
+metrics:
+  - frame_time_ms
+  - opt_time_ms
+  - fps
+  - p50_latency_ms
+  - p95_latency_ms
+  - budget_violation_rate
+  - n_optimized
+  - psnr
+  - depth_l1

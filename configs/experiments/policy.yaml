@@ -1,0 +1,47 @@
+# R11: Optimization policy benchmark
+# Tests H2: continuous importance preserves quality with less compute
+_base: 'baseline.yaml'
+
+experiment:
+  name: 'policy_ablation'
+  seed: 42
+  frames: 200
+
+policies:
+  - name: 'full'
+    policy: 'full'
+    ratio: 1.0
+  - name: 'random_10'
+    policy: 'random'
+    ratio: 0.10
+  - name: 'random_25'
+    policy: 'random'
+    ratio: 0.25
+  - name: 'random_50'
+    policy: 'random'
+    ratio: 0.50
+  - name: 'random_75'
+    policy: 'random'
+    ratio: 0.75
+  - name: 'top_k_10'
+    policy: 'top_k'
+    ratio: 0.10
+  - name: 'top_k_25'
+    policy: 'top_k'
+    ratio: 0.25
+  - name: 'top_k_50'
+    policy: 'top_k'
+    ratio: 0.50
+  - name: 'top_k_75'
+    policy: 'top_k'
+    ratio: 0.75
+  - name: 'binary'
+    policy: 'binary'
+
+metrics:
+  - psnr
+  - depth_l1
+  - frame_time_ms
+  - fps
+  - n_optimized
+  - n_frozen

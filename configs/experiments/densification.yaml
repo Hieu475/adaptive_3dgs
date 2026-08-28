@@ -1,0 +1,26 @@
+# R12: Densification strategy comparison
+# Tests H3: importance-weighted densification converges faster
+_base: 'baseline.yaml'
+
+experiment:
+  name: 'densification_ablation'
+  seed: 42
+  frames: 200
+
+strategies:
+  - name: 'uniform'
+    strategy: 'uniform'
+    use_adaptive_thresholds: false
+  - name: 'error_driven'
+    strategy: 'error_driven'
+    use_adaptive_thresholds: false
+  - name: 'importance_fixed'
+    strategy: 'importance'
+    use_adaptive_thresholds: false
+  - name: 'importance_adaptive'
+    strategy: 'importance'
+    use_adaptive_thresholds: true
+
+convergence:
+  measure_t90: true  # frame to reach 90% target PSNR
+  measure_t95: true  # frame to reach 95% target PSNR
