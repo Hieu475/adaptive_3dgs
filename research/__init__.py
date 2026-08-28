@@ -8,6 +8,7 @@ from .importance import GaussianImportanceEstimator
 from .attribution import (
     render_with_attribution,
     compute_gaussian_statistics,
+    compute_projected_area,
     normalize_importance_components,
 )
 from .importance_diagnostics import (
@@ -36,6 +37,10 @@ from .evaluation import (
     generate_tier_distribution_chart,
     generate_hypothesis_verification_summary,
 )
+from .oracle_utility import OracleUtilityExperiment
+from .uncertainty import GaussianUncertaintyEstimator
+from .matched_budget_benchmark import MatchedBudgetBenchmark, SchedulerMetrics
+from .failure_analysis import FailureCaseAnalyzer, FailureType, format_failure_analysis_report
 
 __all__ = [
     'GaussianModel',
@@ -46,6 +51,7 @@ __all__ = [
     'GaussianImportanceEstimator',
     'render_with_attribution',
     'compute_gaussian_statistics',
+    'compute_projected_area',
     'normalize_importance_components',
     'compute_full_diagnostics',
     'format_diagnostics_report',
@@ -63,4 +69,12 @@ __all__ = [
     'generate_ascii_pareto_curve',
     'generate_tier_distribution_chart',
     'generate_hypothesis_verification_summary',
+    # v3.0 additions
+    'OracleUtilityExperiment',
+    'GaussianUncertaintyEstimator',
+    'MatchedBudgetBenchmark',
+    'SchedulerMetrics',
+    'FailureCaseAnalyzer',
+    'FailureType',
+    'format_failure_analysis_report',
 ]
