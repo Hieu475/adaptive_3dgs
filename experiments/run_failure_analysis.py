@@ -80,8 +80,11 @@ def create_stress_test_frames(n_frames: int = 10, H: int = 64, W: int = 80):
 def main():
     parser = argparse.ArgumentParser(description="Run Failure Analysis Diagnostic Suite")
     parser.add_argument('--n_frames', type=int, default=8)
+    parser.add_argument('--frames', type=int, default=None, help='Alias for n_frames')
     parser.add_argument('--device', type=str, default='cpu')
     args = parser.parse_args()
+    if args.frames is not None:
+        args.n_frames = args.frames
     
     print("=" * 72)
     print("      FAILURE CASE DIAGNOSTIC & EDGE IMPORTANCE ANALYSIS")
@@ -164,6 +167,25 @@ def main():
             print(f"\n[Frame {i}] Diagnostic Output:")
             print(report_str)
             
+    # Aggregate Region-Labeled Summary Table
+    print("\n" + "=" * 80)
+    print("                 MULTI-FRAME REGION-LABELED FAILURE SUMMARY")
+    print("=" * 80)
+    print(f"{'Region / Failure Mode':<22} | {'Mean Pixels':>11} | {'Mean PSNR':>10} | {'Mean Imp':>9} | {'Mean Severity':>13}")
+    print("-" * 80)
+    for category in ['FLAT_SURFACE', 'OBJECT_EDGE', 'HIGH_TEXTURE', 'SPARSE_DEPTH', 'VIEWPOINT_CHANGE']:
+        pix_list = [rep[category]['affected_pixels'] for rep in analysis_reports if category in rep]
+        psnr_list = [rep[category]['quality_in_region'] for rep in analysis_reports if category in rep and rep[category]['affected_pixels'] > 0]
+        imp_list = [rep[category]['importance_in_region'] for rep in analysis_reports if category in rep and rep[category]['affected_pixels'] > 0]
+        sev_list = [rep[category]['failure_severity'] for rep in analysis_reports if category in rep]
+        
+        m_pix = np.mean(pix_list) if pix_list else 0.0
+        m_psnr = f"{np.mean(psnr_list):.2f} dB" if psnr_list else "N/A"
+        m_imp = f"{np.mean(imp_list):.4f}" if imp_list else "0.0000"
+        m_sev = f"{np.mean(sev_list):.2f}" if sev_list else "0.00"
+        print(f"{category:<22} | {m_pix:>11.0f} | {m_psnr:>10} | {m_imp:>9} | {m_sev:>13}")
+    print("=" * 80)
+
     # Save results
     save_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'failure_analysis')
     os.makedirs(save_dir, exist_ok=True)
