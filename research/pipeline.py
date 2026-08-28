@@ -379,12 +379,20 @@ class OnlineReconstructionPipeline:
         policy = self.config['scheduler'].get('policy', 'budget_aware')
         ratio = self.config['scheduler'].get('optimize_ratio', 0.5)
         
+        error_scores = None
+        error_influence_scores = None
+        if self.importance_estimator._running_depth_error is not None and self.importance_estimator._running_color_error is not None:
+            error_scores = self.importance_estimator._running_depth_error + self.importance_estimator._running_color_error
+            error_influence_scores = self.importance_estimator.compute_error_influence_score()
+        
         optimize_mask = self.scheduler.select_by_policy(
             policy=policy,
             importance_scores=importance,
             tiers=tiers,
             confidence=self.gaussian_model._confidence if hasattr(self.gaussian_model, '_confidence') else None,
             cost_estimates=cost_estimates,
+            error_scores=error_scores,
+            error_influence_scores=error_influence_scores,
             ratio=ratio,
             frame_idx=self.frame_count,
         )
@@ -398,13 +406,15 @@ class OnlineReconstructionPipeline:
             opt_start = time.time()
             self.optimizer.zero_grad()
             
-            # Re-render for gradient computation
-            cov3D = self.gaussian_model.build_covariance()
+            # True Selective Optimization (R21):
+            # Render with detached frozen background and gradient-tracked active subset
+            sel_inputs = self.gaussian_model.get_selective_render_inputs(optimize_mask)
+            
             render_opt = rasterize_scene(
-                means3D=self.gaussian_model.positions,
-                cov3D=cov3D,
-                colors=self.gaussian_model.get_colors(),
-                opacities=self.gaussian_model.opacities.squeeze(-1),
+                means3D=sel_inputs['means3D'],
+                cov3D=sel_inputs['cov3D'],
+                colors=sel_inputs['colors'],
+                opacities=sel_inputs['opacities'],
                 extrinsics=self.current_pose,
                 intrinsics=self.intrinsics,
                 image_width=W,
@@ -414,10 +424,10 @@ class OnlineReconstructionPipeline:
             
             if self.config['rendering'].get('use_surface_aware_depth', True):
                 depth_opt = render_depth_surface_aware(
-                    means3D=self.gaussian_model.positions,
+                    means3D=sel_inputs['means3D'],
                     normals=self.gaussian_model._normals,
-                    opacities=self.gaussian_model.opacities.squeeze(-1),
-                    cov3D=cov3D,
+                    opacities=sel_inputs['opacities'],
+                    cov3D=sel_inputs['cov3D'],
                     extrinsics=self.current_pose,
                     intrinsics=self.intrinsics,
                     image_width=W,
@@ -443,26 +453,10 @@ class OnlineReconstructionPipeline:
                 depth_valid_mask=depth_valid_mask,
             )
             
+            # Backward: only computes gradients for the active subset M <= N
             losses['total'].backward()
             
-            # Zero gradients for non-selected Gaussians
-            with torch.no_grad():
-                non_optimize = ~optimize_mask[:self.gaussian_model._xyz.shape[0]]
-                if self.gaussian_model._xyz.grad is not None:
-                    self.gaussian_model._xyz.grad[non_optimize] = 0
-                if self.gaussian_model._scaling.grad is not None:
-                    self.gaussian_model._scaling.grad[non_optimize] = 0
-                if self.gaussian_model._rotation.grad is not None:
-                    self.gaussian_model._rotation.grad[non_optimize] = 0
-                if self.gaussian_model._opacity.grad is not None:
-                    self.gaussian_model._opacity.grad[non_optimize] = 0
-                if self.gaussian_model._features_dc.grad is not None:
-                    self.gaussian_model._features_dc.grad[non_optimize] = 0
-                if self.gaussian_model._features_rest.grad is not None:
-                    self.gaussian_model._features_rest.grad[non_optimize] = 0
-                if self.gaussian_model._normals.grad is not None:
-                    self.gaussian_model._normals.grad[non_optimize] = 0
-            
+            # Execute optimizer step
             self.optimizer.step()
             n_optimized = optimize_mask.sum().item()
             opt_loss_val = losses['total'].item()

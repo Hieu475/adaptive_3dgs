@@ -144,6 +144,67 @@ class GaussianModel(nn.Module):
         cov = torch.bmm(RS, RS.transpose(1, 2))  # (N, 3, 3)
         return cov
     
+    def get_selective_render_inputs(self, optimize_mask: torch.Tensor) -> Dict[str, torch.Tensor]:
+        """Construct render inputs with detached frozen background and gradient-tracked active Gaussians.
+        
+        This enables True Selective Optimization (R21):
+        - Forward pass for frozen Gaussians is detached (no autograd graph tape).
+        - Backward pass computes gradients ONLY for the active subset M <= N.
+        - Scales compute linearly with the active ratio K.
+        
+        Args:
+            optimize_mask: (N,) boolean tensor of Gaussians selected for optimization.
+            
+        Returns:
+            Dict containing means3D, cov3D, colors, opacities.
+        """
+        N = self.num_gaussians
+        active_idx = torch.where(optimize_mask[:N])[0]
+        n_active = len(active_idx)
+        
+        if n_active == N:
+            # Full optimization
+            return {
+                'means3D': self.positions,
+                'cov3D': self.build_covariance(),
+                'colors': self.get_colors(),
+                'opacities': self.opacities.squeeze(-1),
+                'active_indices': active_idx,
+            }
+        elif n_active == 0:
+            # No active optimization
+            return {
+                'means3D': self.positions.detach(),
+                'cov3D': self.build_covariance().detach(),
+                'colors': self.get_colors().detach(),
+                'opacities': self.opacities.squeeze(-1).detach(),
+                'active_indices': active_idx,
+            }
+        else:
+            # Selective optimization composite
+            means3D = self._xyz.detach().clone()
+            means3D[active_idx] = self._xyz[active_idx]
+            
+            cov3D = self.build_covariance().detach().clone()
+            R_act = quaternion_to_rotation_matrix(self.rotations[active_idx])
+            S_act = build_scaling_matrix(self.scales[active_idx])
+            M_act = torch.bmm(R_act, S_act)
+            cov3D[active_idx] = torch.bmm(M_act, M_act.transpose(1, 2))
+            
+            colors = self.get_colors().detach().clone()
+            colors[active_idx] = torch.sigmoid(self._features_dc[active_idx, 0, :])
+            
+            opacities = self.opacities.squeeze(-1).detach().clone()
+            opacities[active_idx] = torch.sigmoid(self._opacity[active_idx].squeeze(-1))
+            
+            return {
+                'means3D': means3D,
+                'cov3D': cov3D,
+                'colors': colors,
+                'opacities': opacities,
+                'active_indices': active_idx,
+            }
+
     def get_active_mask(self) -> torch.Tensor:
         """Returns boolean mask of active (non-pruned) Gaussians."""
         return self._state != GaussianState.PRUNED
