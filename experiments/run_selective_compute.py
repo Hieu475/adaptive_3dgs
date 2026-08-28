@@ -29,6 +29,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from research.gaussian_repr import GaussianModel, quaternion_to_rotation_matrix, build_scaling_matrix
+from research.selective_optimizer import SelectiveAdam
 
 
 def build_synthetic_gaussian_model(N: int, device: str = 'cpu') -> GaussianModel:
@@ -132,14 +133,10 @@ def run_true_selective_step(model: GaussianModel, optimizer: optim.Optimizer, ac
         torch.cuda.synchronize()
     t_bwd = (time.perf_counter() - t1) * 1000.0
     
-    # Sliced Optimizer step: only update parameters for active_idx
+    # SelectiveAdam Optimizer step: only update parameters & moments for active_idx
     t2 = time.perf_counter()
     active_idx = active_subset['indices']
-    with torch.no_grad():
-        lr = 0.001
-        for p in [model._xyz, model._scaling, model._rotation, model._opacity, model._features_dc]:
-            if p.grad is not None and p.shape[0] == N:
-                p.data[active_idx] -= lr * p.grad[active_idx]
+    optimizer.step(active_idx=active_idx)
                 
     if device == 'cuda':
         torch.cuda.synchronize()
@@ -191,7 +188,7 @@ def benchmark_selective_scaling(sizes=[10000, 25000, 50000], ratios=[1.0, 0.75, 
             selective_times = []
             for _ in range(n_trials):
                 model_sel = build_synthetic_gaussian_model(N, device=device)
-                opt_sel = optim.Adam(model_sel.parameters(), lr=0.001)
+                opt_sel = SelectiveAdam([{'params': list(model_sel.parameters()), 'lr': 0.001}])
                 t_s = run_true_selective_step(model_sel, opt_sel, active_mask, device=device)
                 selective_times.append(t_s)
                 
