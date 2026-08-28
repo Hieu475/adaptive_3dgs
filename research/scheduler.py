@@ -28,9 +28,11 @@ class OptimizationPolicy(str, Enum):
     """Optimization selection policies for research benchmarking."""
     FULL = "full"                 # Policy 0: Optimize 100% of Gaussians
     RANDOM = "random"             # Policy 1: Random ratio r (e.g. 50%)
+    ERROR_ONLY = "error_only"     # Policy: Optimize top-K ranked strictly by raw photometric/depth error
     BINARY = "binary"             # Policy 2: Binary stable/unstable (RTG-SLAM threshold)
     TOP_K = "top_k"               # Policy 3: Continuous importance rank top-K / ratio r
     BUDGET_AWARE = "budget_aware" # Policy 4: Importance/Cost knapsack optimization
+    OURS = "ours"                 # Alias for BUDGET_AWARE
 
 
 def estimate_gaussian_costs(
@@ -253,6 +255,12 @@ class BudgetScheduler:
             mask[perm] = True
             return mask
             
+        elif policy_str in ("error_only", OptimizationPolicy.ERROR_ONLY.value):
+            mask = torch.zeros(N, dtype=torch.bool, device=device)
+            _, top_indices = torch.topk(importance_scores, K)
+            mask[top_indices] = True
+            return mask
+            
         elif policy_str in ("binary", OptimizationPolicy.BINARY.value):
             if confidence is not None:
                 conf = confidence.squeeze(-1) if confidence.ndim > 1 else confidence
@@ -268,7 +276,7 @@ class BudgetScheduler:
             mask[top_indices] = True
             return mask
             
-        elif policy_str in ("budget_aware", OptimizationPolicy.BUDGET_AWARE.value):
+        elif policy_str in ("budget_aware", "ours", OptimizationPolicy.BUDGET_AWARE.value, OptimizationPolicy.OURS.value):
             if tiers is None:
                 tiers = torch.full((N,), 2, dtype=torch.long, device=device)
                 tiers[importance_scores > 0.8] = 0
