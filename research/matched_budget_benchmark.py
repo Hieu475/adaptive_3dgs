@@ -123,10 +123,16 @@ class MatchedBudgetBenchmark:
         avg_active = float(np.mean(n_actives)) if n_actives else 0.0
         avg_total = float(np.mean(n_totals)) if n_totals else 1.0
         
+        measured_compute_ms = float(np.mean(opt_times)) if opt_times else 0.0
+        budget_utilization = measured_compute_ms / budget_ms if budget_ms > 0 else 0.0
+        
         return {
             'avg_psnr': np.mean(psnrs) if psnrs else 0.0,
             'avg_depth_l1': np.mean(depth_l1s) if depth_l1s else 0.0,
-            'measured_compute_ms': np.mean(opt_times) if opt_times else 0.0,
+            'measured_compute_ms': measured_compute_ms,
+            'budget_utilization': budget_utilization,
+            'budget_violation': measured_compute_ms > budget_ms,
+            'violation_rate': summary['violation_rate'] * 100.0,
             'p50_ms': p50,
             'p95_ms': p95,
             'active_gaussians': avg_active,
@@ -170,18 +176,23 @@ class MatchedBudgetBenchmark:
         ranked = self.compute_quality_at_budget(results_matrix)
         
         lines = []
-        lines.append("| Budget (ms) | Policy | Active (M) | Active (%) | Actual Opt (p50) | p95 (ms) | Jitter | PSNR ↑ | Depth L1 ↓ |")
-        lines.append("|:---:|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|")
+        lines.append("| Budget (ms) | Policy | Active (M) | Active (%) | Actual Opt (p50) | p95 (ms) | Jitter | Util% | Violation% | PSNR ↑ | Depth L1 ↓ |")
+        lines.append("|:---:|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|")
         
         for budget in self.budget_levels_ms:
             for res in ranked[budget]:
+                if res['policy_name'] == 'full':
+                    res['policy_name'] = 'Upper Bound (unconstrained)'
+                    lines.append("|---|---|---|---|---|---|---|---|---|---|---|")
                 lines.append(
-                    f"| {budget:11.1f} | {res['policy_name']:15} | "
+                    f"| {budget:11.1f} | {res['policy_name']:25} | "
                     f"{res.get('active_gaussians', 0):9.0f} | "
                     f"{res.get('active_ratio', 0)*100:9.1f}% | "
                     f"{res.get('p50_ms', res['measured_compute_ms']):14.2f} ms | "
                     f"{res.get('p95_ms', res['measured_compute_ms']):8.2f} ms | "
                     f"{res['jitter']:6.2f} | "
+                    f"{res.get('budget_utilization', 0)*100:6.1f}% | "
+                    f"{res.get('violation_rate', 0):9.1f}% | "
                     f"{res['avg_psnr']:6.2f} dB | "
                     f"{res['avg_depth_l1']:10.4f} |"
                 )

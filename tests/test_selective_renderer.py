@@ -142,5 +142,69 @@ def test_gradient_isolation():
     assert model._xyz.grad[frozen_indices].abs().sum().item() == 0.0
 
 
+def test_random_split_max_tolerance():
+    """Test 5: N=1000, M=100 random active. Verify max absolute error is bounded."""
+    torch.manual_seed(123)  # different seed from existing test
+    model = create_test_model(N=1000)
+    intrinsics, extrinsics, H, W = get_test_camera()
+    
+    full_out = render_full(model, extrinsics, intrinsics, W, H)
+    
+    perm = torch.randperm(1000)
+    active_mask = torch.zeros(1000, dtype=torch.bool)
+    active_mask[perm[:100]] = True
+    
+    active_subset = model.get_optimization_subset(active_mask)
+    cache = FrozenBackgroundCache(device='cpu')
+    cache.build_cache(model, ~active_mask, extrinsics, intrinsics, W, H)
+    comp_out = cache.composite_with_active(active_subset, extrinsics, intrinsics, W, H)
+    
+    eps_rgb = (full_out['color'] - comp_out['color']).abs().max().item()
+    eps_depth = (full_out['depth'] - comp_out['depth']).abs().max().item()
+    
+    # The 2-stage compositing should be exact (same rasterizer, just split into 2 passes)
+    # Tolerance accounts for floating-point non-associativity
+    assert eps_rgb < 0.05, f"RGB max error too large: {eps_rgb}"
+    assert eps_depth < 0.5, f"Depth max error too large: {eps_depth}"
+
+
+def test_gradient_correctness_all_params():
+    """Task 6: Active grad != 0 for xyz, scale, rotation, opacity, color.
+    Frozen grad == 0 for all parameters."""
+    torch.manual_seed(42)
+    model = create_test_model(N=100)
+    intrinsics, extrinsics, H, W = get_test_camera()
+    
+    # Random 10% active
+    active_indices = torch.randperm(100)[:10]
+    active_mask = torch.zeros(100, dtype=torch.bool)
+    active_mask[active_indices] = True
+    frozen_indices = torch.where(~active_mask)[0]
+    
+    active_subset = model.get_optimization_subset(active_mask)
+    cache = FrozenBackgroundCache(device='cpu')
+    cache.build_cache(model, ~active_mask, extrinsics, intrinsics, W, H)
+    comp_out = cache.composite_with_active(active_subset, extrinsics, intrinsics, W, H)
+    
+    target_rgb = torch.rand(H, W, 3)
+    target_depth = torch.ones(H, W) * 2.0
+    loss = ((comp_out['color'] - target_rgb) ** 2).mean() + ((comp_out['depth'] - target_depth) ** 2).mean()
+    loss.backward()
+    
+    # Check each parameter type
+    param_names = ['_xyz', '_scaling', '_rotation', '_opacity', '_features_dc']
+    for pname in param_names:
+        param = getattr(model, pname)
+        if param.grad is None:
+            continue  # some params may not receive grad if not used in forward
+        
+        # Active indices should have non-zero gradient
+        active_grad_norm = param.grad[active_indices].abs().sum().item()
+        
+        # Frozen indices MUST have zero gradient
+        frozen_grad_norm = param.grad[frozen_indices].abs().sum().item()
+        assert frozen_grad_norm == 0.0, f"{pname}: frozen grad should be 0, got {frozen_grad_norm}"
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

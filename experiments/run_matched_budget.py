@@ -82,8 +82,20 @@ def real_pipeline_factory(config_overrides, device):
     """Instantiate real OnlineReconstructionPipeline with given budget overrides."""
     budget_ms = config_overrides.get('scheduler', {}).get('gpu_budget_ms', 4.0)
     policy = config_overrides.get('scheduler', {}).get('policy', 'budget_aware')
+    
     # Derive target Gaussian count dynamically from calibrated cost model: T(M) = T0 + beta*M
     cost_per_gauss_ms = 0.0112
+    cost_model_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'cost_calibration', 'cost_model.json')
+    if os.path.exists(cost_model_path):
+        try:
+            with open(cost_model_path, 'r') as f:
+                cost_model = json.load(f)
+                cost_per_gauss_ms = cost_model.get('cost_per_gauss_ms', 0.0112)
+        except Exception as e:
+            print(f"Warning: Could not load cost model from {cost_model_path}: {e}")
+    else:
+        print(f"Warning: Cost model not found at {cost_model_path}. Using hardcoded fallback of {cost_per_gauss_ms}.")
+        
     target_k = max(5, int((budget_ms * 5.0) / cost_per_gauss_ms)) if budget_ms > 0 else 50
     
     base_config = {

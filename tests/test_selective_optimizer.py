@@ -95,5 +95,74 @@ def test_prune_state():
     assert torch.equal(optimizer.state[param]['exp_avg'], expected_m)
 
 
+def test_active_params_change_frozen_unchanged():
+    """Task 7: After optimization step, active parameters change and frozen parameters stay unchanged."""
+    N = 200
+    param = nn.Parameter(torch.randn(N, 3))
+    optimizer = SelectiveAdam([{'params': [param], 'lr': 0.01}])
+    
+    active_idx = torch.tensor([10, 25, 50, 75, 100, 150], dtype=torch.long)
+    frozen_mask = torch.ones(N, dtype=torch.bool)
+    frozen_mask[active_idx] = False
+    
+    # Store original values
+    original_active = param.data[active_idx].clone()
+    original_frozen = param.data[frozen_mask].clone()
+    
+    # Simulate gradient from loss
+    param.grad = torch.randn_like(param.data) * 0.1
+    optimizer.step(active_idx=active_idx)
+    
+    # Active params must have changed
+    assert not torch.equal(param.data[active_idx], original_active), "Active params should change after step"
+    
+    # Frozen params must be exactly unchanged
+    assert torch.equal(param.data[frozen_mask], original_frozen), "Frozen params must not change"
+
+
+def test_optimizer_state_preserved_after_densification():
+    """Task 8: After densification (extend_state), old Gaussian m and v are preserved exactly."""
+    N_old = 100
+    N_new = 30
+    
+    param = nn.Parameter(torch.randn(N_old, 3))
+    optimizer = SelectiveAdam([{'params': [param], 'lr': 0.01}])
+    
+    # Run multiple steps with varying active sets to build up non-trivial momentum
+    for step in range(10):
+        param.grad = torch.randn_like(param.data) * (0.1 + 0.05 * step)
+        active = torch.randperm(N_old)[:50]
+        optimizer.step(active_idx=active)
+    
+    # Record momentum and variance for ALL old Gaussians
+    m_old = optimizer.state[param]['exp_avg'].clone()
+    v_old = optimizer.state[param]['exp_avg_sq'].clone()
+    steps_old = optimizer.state[param]['step'].clone()
+    
+    # Simulate densification: expand parameter
+    new_param = nn.Parameter(torch.cat([param.data, torch.randn(N_new, 3)], dim=0))
+    optimizer.param_groups[0]['params'] = [new_param]
+    optimizer.state[new_param] = optimizer.state.pop(param)
+    optimizer.extend_state(N_new)
+    
+    # Verify: old momentum/variance EXACTLY preserved
+    assert torch.equal(optimizer.state[new_param]['exp_avg'][:N_old], m_old), \
+        "m (exp_avg) for old Gaussians must be exactly preserved after densification"
+    assert torch.equal(optimizer.state[new_param]['exp_avg_sq'][:N_old], v_old), \
+        "v (exp_avg_sq) for old Gaussians must be exactly preserved after densification"
+    assert torch.equal(optimizer.state[new_param]['step'][:N_old], steps_old), \
+        "step counts for old Gaussians must be exactly preserved after densification"
+    
+    # Verify: new entries initialized to zero
+    assert optimizer.state[new_param]['exp_avg'][N_old:].abs().max().item() == 0.0
+    assert optimizer.state[new_param]['exp_avg_sq'][N_old:].abs().max().item() == 0.0
+    assert optimizer.state[new_param]['step'][N_old:].max().item() == 0
+    
+    # Verify: total state size matches new parameter size
+    assert optimizer.state[new_param]['exp_avg'].shape[0] == N_old + N_new
+    assert optimizer.state[new_param]['exp_avg_sq'].shape[0] == N_old + N_new
+    assert optimizer.state[new_param]['step'].shape[0] == N_old + N_new
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

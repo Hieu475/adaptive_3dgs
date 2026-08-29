@@ -152,6 +152,32 @@ class OnlineReconstructionPipeline:
         ]
         self.optimizer = SelectiveAdam(params)
     
+    def _reregister_optimizer_params(self):
+        """Re-register model parameters with the optimizer after compaction.
+        
+        After compact() creates new nn.Parameter objects, the optimizer's param_groups
+        reference stale parameter objects. This method updates the references while
+        preserving the accumulated momentum and variance state.
+        """
+        if self.optimizer is None:
+            return
+        
+        new_params = [
+            self.gaussian_model._xyz,
+            self.gaussian_model._scaling,
+            self.gaussian_model._rotation,
+            self.gaussian_model._opacity,
+            self.gaussian_model._features_dc,
+            self.gaussian_model._features_rest,
+            self.gaussian_model._normals,
+        ]
+        
+        for group, new_p in zip(self.optimizer.param_groups, new_params):
+            old_p = group['params'][0]
+            if old_p in self.optimizer.state:
+                self.optimizer.state[new_p] = self.optimizer.state.pop(old_p)
+            group['params'] = [new_p]
+    
     def initialize(
         self,
         rgb: torch.Tensor,
@@ -485,10 +511,16 @@ class OnlineReconstructionPipeline:
             prune_patience=self.importance_estimator.prune_patience,
         )
         
-        # Compact every 100 frames
+        # Compact every 100 frames — preserve optimizer momentum
         if self.frame_count % 100 == 0:
-            self.gaussian_model.compact()
-            self._setup_optimizer()
+            keep_mask = self.gaussian_model.compact()
+            if self.optimizer is not None:
+                # Prune optimizer state to match compacted parameters
+                self.optimizer.prune_state(keep_mask)
+                # Re-register new parameter objects (compact() creates new nn.Parameter)
+                self._reregister_optimizer_params()
+            else:
+                self._setup_optimizer()
         
         # === Collect Metrics & Feedback ===
         frame_time = time.time() - frame_start

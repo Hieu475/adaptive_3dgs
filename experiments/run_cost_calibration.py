@@ -50,15 +50,26 @@ def measure_active_step_features(model, opt, cache, active_mask, target_rgb, tar
     if device == 'cuda':
         torch.cuda.synchronize()
     t0 = time.perf_counter()
-    
     comp_out = cache.composite_with_active(active_subset, extrinsics, intrinsics, W, H)
-    losses = total_loss(comp_out['color'], target_rgb, comp_out['depth'], target_depth, {'color': 1.0, 'depth': 0.5})
-    losses['total'].backward()
-    opt.step(active_idx=active_subset['indices'])
-    
     if device == 'cuda':
         torch.cuda.synchronize()
-    measured_ms = (time.perf_counter() - t0) * 1000.0
+    t1 = time.perf_counter()
+    
+    losses = total_loss(comp_out['color'], target_rgb, comp_out['depth'], target_depth, {'color': 1.0, 'depth': 0.5})
+    losses['total'].backward()
+    if device == 'cuda':
+        torch.cuda.synchronize()
+    t2 = time.perf_counter()
+    
+    opt.step(active_idx=active_subset['indices'])
+    if device == 'cuda':
+        torch.cuda.synchronize()
+    t3 = time.perf_counter()
+    
+    render_ms = (t1 - t0) * 1000.0
+    backward_ms = (t2 - t1) * 1000.0
+    optimizer_ms = (t3 - t2) * 1000.0
+    measured_ms = render_ms + backward_ms + optimizer_ms
     
     # Feature extraction
     M = int(active_mask.sum().item())
@@ -69,6 +80,9 @@ def measure_active_step_features(model, opt, cache, active_mask, target_rgb, tar
         
     return {
         'measured_ms': measured_ms,
+        'render_ms': render_ms,
+        'backward_ms': backward_ms,
+        'optimizer_ms': optimizer_ms,
         'M': M,
         'area': area_agg,
         'influence': opacity_agg,
@@ -142,6 +156,14 @@ def run_rigorous_cost_calibration(N=20000, ratios=[0.01, 0.05, 0.10, 0.20, 0.25,
             
     print(f"Collected {len(all_observations)} randomized multi-seed measurement points.\n")
     
+    save_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'cost_calibration')
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # Save raw observations for figure generation
+    obs_path = os.path.join(save_dir, 'observations.json')
+    with open(obs_path, 'w') as f:
+        json.dump(all_observations, f, indent=2)
+
     # 1. Fit Model A: T(M) = T_0 + beta * M
     y = np.nan_to_num(np.array([o['measured_ms'] for o in all_observations], dtype=np.float64), nan=0.0)
     M_vec = np.nan_to_num(np.array([o['M'] for o in all_observations], dtype=np.float64), nan=0.0)
@@ -167,23 +189,41 @@ def run_rigorous_cost_calibration(N=20000, ratios=[0.01, 0.05, 0.10, 0.20, 0.25,
     mae_B = float(np.mean(np.abs(y - pred_B)))
     mape_B = float(np.mean(np.abs((y - pred_B) / (y + 1e-6)))) * 100.0
     r2_B = float(1.0 - np.sum((y - pred_B)**2) / np.sum((y - np.mean(y))**2))
+    # 3. Fit Model C: Stage-level linear models (T_render, T_backward, T_optimizer)
+    y_r = np.nan_to_num(np.array([o['render_ms'] for o in all_observations], dtype=np.float64), nan=0.0)
+    y_b = np.nan_to_num(np.array([o['backward_ms'] for o in all_observations], dtype=np.float64), nan=0.0)
+    y_o = np.nan_to_num(np.array([o['optimizer_ms'] for o in all_observations], dtype=np.float64), nan=0.0)
     
-    print("=" * 85)
+    coeffs_r = fit_ridge_linear_model(X_A, y_r)
+    coeffs_b = fit_ridge_linear_model(X_A, y_b)
+    coeffs_o = fit_ridge_linear_model(X_A, y_o)
+    
+    pred_r = X_A @ coeffs_r
+    pred_b = X_A @ coeffs_b
+    pred_o = X_A @ coeffs_o
+    
+    pred_C = pred_r + pred_b + pred_o
+    mae_C = float(np.mean(np.abs(y - pred_C)))
+    mape_C = float(np.mean(np.abs((y - pred_C) / (y + 1e-6)))) * 100.0
+    r2_C = float(1.0 - np.sum((y - pred_C)**2) / np.sum((y - np.mean(y))**2))
+    
+    a_r, b_r = float(coeffs_r[0]), float(coeffs_r[1])
+    a_b, b_b = float(coeffs_b[0]), float(coeffs_b[1])
+    a_o, b_o = float(coeffs_o[0]), float(coeffs_o[1])
+
+    print("=" * 110)
     print("                      COST MODEL EVALUATION COMPARISON")
-    print("=" * 85)
-    print(f"{'Metric':<25} | {'Model A (Count)':<25} | {'Model B (Feature-Aware)':<25}")
-    print("-" * 85)
-    print(f"{'Formula':<25} | {'T_0 + β·M':<25} | {'T_0 + β1·M + β2·Area + β3·Inf':<25}")
-    print(f"{'Fixed Overhead (T_0)':<25} | {f'{T_0_A:.3f} ms':<25} | {f'{T_0_B:.3f} ms':<25}")
-    print(f"{'Goodness of Fit (R²)':<25} | {f'{r2_A:.4f}':<25} | {f'{r2_B:.4f}':<25}")
-    print(f"{'MAE (ms)':<25} | {f'{mae_A:.3f} ms':<25} | {f'{mae_B:.3f} ms':<25}")
-    print(f"{'MAPE (%)':<25} | {f'{mape_A:.2f}%':<25} | {f'{mape_B:.2f}%':<25}")
-    print("=" * 85 + "\n")
+    print("=" * 110)
+    print(f"{'Metric':<25} | {'Model A (Count)':<25} | {'Model B (Feature-Aware)':<25} | {'Model C (Stage-level)':<25}")
+    print("-" * 110)
+    print(f"{'Formula':<25} | {'T_0 + β·M':<25} | {'T_0 + β1·M + β2·Area + β3·Inf':<25} | {'T_r(M) + T_b(M) + T_o(M)':<25}")
+    print(f"{'Fixed Overhead (T_0)':<25} | {f'{T_0_A:.3f} ms':<25} | {f'{T_0_B:.3f} ms':<25} | {f'{(a_r + a_b + a_o):.3f} ms':<25}")
+    print(f"{'Goodness of Fit (R²)':<25} | {f'{r2_A:.4f}':<25} | {f'{r2_B:.4f}':<25} | {f'{r2_C:.4f}':<25}")
+    print(f"{'MAE (ms)':<25} | {f'{mae_A:.3f} ms':<25} | {f'{mae_B:.3f} ms':<25} | {f'{mae_C:.3f} ms':<25}")
+    print(f"{'MAPE (%)':<25} | {f'{mape_A:.2f}%':<25} | {f'{mape_B:.2f}%':<25} | {f'{mape_C:.2f}%':<25}")
+    print("=" * 110 + "\n")
     
     # Save results
-    save_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'cost_calibration')
-    os.makedirs(save_dir, exist_ok=True)
-    
     summary = {
         'model_A': {
             'T_0_ms': float(T_0_A),
@@ -200,6 +240,14 @@ def run_rigorous_cost_calibration(N=20000, ratios=[0.01, 0.05, 0.10, 0.20, 0.25,
             'r2': float(r2_B),
             'mae_ms': float(mae_B),
             'mape_pct': float(mape_B)
+        },
+        'model_C': {
+            'render': {'a': a_r, 'b': b_r},
+            'backward': {'a': a_b, 'b': b_b},
+            'optimizer': {'a': a_o, 'b': b_o},
+            'r2': float(r2_C),
+            'mae_ms': float(mae_C),
+            'mape_pct': float(mape_C)
         }
     }
     
@@ -213,13 +261,13 @@ def run_rigorous_cost_calibration(N=20000, ratios=[0.01, 0.05, 0.10, 0.20, 0.25,
     with open(md_path, 'w') as f:
         f.write("# R32 Rigorous Cost Calibration Report\n\n")
         f.write("Evaluated with randomized multi-seed protocol across $N=20,000$ Gaussians.\n\n")
-        f.write("| Metric | Model A (Linear Count) | Model B (Feature-Aware) |\n")
-        f.write("|:---|:---:|:---:|\n")
-        f.write(f"| **Formulation** | $T_0 + \\beta M$ | $T_0 + \\beta_1 M + \\beta_2 A + \\beta_3 \\text{{Inf}}$ |\n")
-        f.write(f"| **Fixed Overhead ($T_0$)** | {T_0_A:.3f} ms | {T_0_B:.3f} ms |\n")
-        f.write(f"| **Goodness of Fit ($R^2$)** | **{r2_A:.4f}** | **{r2_B:.4f}** |\n")
-        f.write(f"| **MAE** | **{mae_A:.3f} ms** | **{mae_B:.3f} ms** |\n")
-        f.write(f"| **MAPE** | **{mape_A:.2f}%** | **{mape_B:.2f}%** |\n\n")
+        f.write("| Metric | Model A (Linear Count) | Model B (Feature-Aware) | Model C (Stage-Level) |\n")
+        f.write("|:---|:---:|:---:|:---:|\n")
+        f.write(f"| **Formulation** | $T_0 + \\beta M$ | $T_0 + \\beta_1 M + \\beta_2 A + \\beta_3 \\text{{Inf}}$ | $\\Sigma_s (a_s + b_s M)$ |\n")
+        f.write(f"| **Fixed Overhead ($T_0$)** | {T_0_A:.3f} ms | {T_0_B:.3f} ms | {a_r + a_b + a_o:.3f} ms |\n")
+        f.write(f"| **Goodness of Fit ($R^2$)** | **{r2_A:.4f}** | **{r2_B:.4f}** | **{r2_C:.4f}** |\n")
+        f.write(f"| **MAE** | **{mae_A:.3f} ms** | **{mae_B:.3f} ms** | **{mae_C:.3f} ms** |\n")
+        f.write(f"| **MAPE** | **{mape_A:.2f}%** | **{mape_B:.2f}%** | **{mape_C:.2f}%** |\n\n")
         
     print(f"Calibration artifacts updated at:")
     print(f"  - {os.path.join(save_dir, 'model_comparison.json')}")

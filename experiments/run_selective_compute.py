@@ -21,6 +21,7 @@ import sys
 import time
 import json
 import argparse
+import random
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -201,7 +202,7 @@ def run_true_selective_method(model, opt, active_mask, cache, target_rgb, target
     }
 
 
-def benchmark_comprehensive(sizes=[10000, 25000, 50000], ratios=[1.0, 0.75, 0.50, 0.25, 0.10, 0.05, 0.02, 0.01], n_warmup=2, n_trials=5, device='cpu'):
+def benchmark_comprehensive(sizes=[10000, 25000, 50000], ratios=[1.0, 0.75, 0.50, 0.25, 0.20, 0.10, 0.05, 0.02, 0.01], n_warmup=10, n_trials=30, device='cpu'):
     """Run full 4-method benchmark across sizes and active ratios."""
     print("=" * 105)
     print("     R30: TRUE SELECTIVE OPTIMIZATION BENCHMARK (PURE OPT TIMING & STAGE BREAKDOWN)")
@@ -209,13 +210,18 @@ def benchmark_comprehensive(sizes=[10000, 25000, 50000], ratios=[1.0, 0.75, 0.50
     print(f"Device: {device} | Warmup: {n_warmup} | Trials: {n_trials} | Sizes: {sizes} | Ratios: {ratios}\n")
     
     all_results = []
+    raw_trials = []
     
     for N in sizes:
         print(f"\n{'='*105}\n>>> MODEL SIZE N = {N:,d} GAUSSIANS\n{'='*105}")
         print(f"{'Ratio (K)':<10} | {'Active (M)':<10} | {'Method':<16} | {'Active Render':<14} | {'Bwd p50 (ms)':<14} | {'Opt Step p50':<14} | {'Speedup':<10}")
         print("-" * 105)
         
-        for r in ratios:
+        random.seed(42)
+        shuffled_ratios = list(ratios)
+        random.shuffle(shuffled_ratios)
+        
+        for r in shuffled_ratios:
             M = max(1, int(round(N * r)))
             active_mask = torch.zeros(N, dtype=torch.bool, device=device)
             active_mask[:M] = True
@@ -231,6 +237,10 @@ def benchmark_comprehensive(sizes=[10000, 25000, 50000], ratios=[1.0, 0.75, 0.50
                 res = run_masked_method(model, opt_full, active_mask, rgb, depth, extrinsics, intrinsics, H, W, device)
                 if trial >= n_warmup:
                     masked_runs.append(res)
+                    raw_trials.append({
+                        'n_total': N, 'active_ratio': r, 'n_active': M, 'trial_idx': trial - n_warmup,
+                        'method': 'masked', **res
+                    })
                     
             # 2. Benchmark True Selective
             sel_runs = []
@@ -238,12 +248,18 @@ def benchmark_comprehensive(sizes=[10000, 25000, 50000], ratios=[1.0, 0.75, 0.50
                 res = run_true_selective_method(model, opt_selective, active_mask, cache, rgb, depth, extrinsics, intrinsics, H, W, device)
                 if trial >= n_warmup:
                     sel_runs.append(res)
+                    raw_trials.append({
+                        'n_total': N, 'active_ratio': r, 'n_active': M, 'trial_idx': trial - n_warmup,
+                        'method': 'selective', **res
+                    })
                     
             m_bwd_p50 = float(np.percentile([x['backward_ms'] for x in masked_runs], 50))
             m_opt_p50 = float(np.percentile([x['optimizer_ms'] for x in masked_runs], 50))
             m_tot_p50 = float(np.percentile([x['total_ms'] for x in masked_runs], 50))
             
             s_render_p50 = float(np.percentile([x['active_render_ms'] for x in sel_runs], 50))
+            s_loss_p50 = float(np.percentile([x['loss_ms'] for x in sel_runs], 50))
+            s_opt_ms_p50 = float(np.percentile([x['optimizer_ms'] for x in sel_runs], 50))
             s_bwd_p50 = float(np.percentile([x['backward_ms'] for x in sel_runs], 50))
             s_opt_step_p50 = float(np.percentile([x['pure_opt_ms'] for x in sel_runs], 50))
             s_cache_p50 = float(np.percentile([x['cache_build_ms'] for x in sel_runs], 50))
@@ -265,6 +281,9 @@ def benchmark_comprehensive(sizes=[10000, 25000, 50000], ratios=[1.0, 0.75, 0.50
                     'active_render_p50': s_render_p50,
                     'bwd_p50': s_bwd_p50,
                     'pure_opt_p50': s_opt_step_p50,
+                    'loss_ms_p50': s_loss_p50,
+                    'optimizer_ms_p50': s_opt_ms_p50,
+                    'render_ms_p50': s_render_p50,
                 },
                 'bwd_speedup': bwd_speedup,
                 'opt_speedup': opt_speedup
@@ -277,6 +296,10 @@ def benchmark_comprehensive(sizes=[10000, 25000, 50000], ratios=[1.0, 0.75, 0.50
     json_path = os.path.join(save_dir, 'selective_scaling.json')
     with open(json_path, 'w') as f:
         json.dump(all_results, f, indent=2)
+
+    raw_path = os.path.join(save_dir, 'raw_trials.json')
+    with open(raw_path, 'w') as f:
+        json.dump(raw_trials, f, indent=2)
         
     csv_path = os.path.join(save_dir, 'selective_scaling.csv')
     with open(csv_path, 'w') as f:
@@ -291,19 +314,27 @@ def benchmark_comprehensive(sizes=[10000, 25000, 50000], ratios=[1.0, 0.75, 0.50
     for N in sizes:
         n_res = [r for r in all_results if r['n_total'] == N]
         if n_res:
-            r_vals = [r['active_ratio'] for r in n_res]
-            sp_vals = [r['opt_speedup'] for r in n_res]
-            # Find ratio closest to 1.0 speedup
-            idx_be = np.argmin(np.abs(np.array(sp_vals) - 1.0))
-            break_even_points[N] = float(r_vals[idx_be])
+            # Sort by active ratio descending to find the largest ratio with speedup >= 1.0
+            sorted_res = sorted(n_res, key=lambda x: x['active_ratio'], reverse=True)
+            r_star = None
+            for res in sorted_res:
+                if res['opt_speedup'] >= 1.0:
+                    r_star = res['active_ratio']
+                    break
+            if r_star is not None:
+                break_even_points[N] = float(r_star)
+            else:
+                # No ratio achieves speedup >= 1.0
+                break_even_points[N] = 0.0
             
     md_path = os.path.join(save_dir, 'selective_scaling.md')
     with open(md_path, 'w') as f:
         f.write("# R30: Comprehensive Selective Optimization Scaling Report\n\n")
         f.write("Evaluated with **Real 3DGS Rasterizer + RGB-D Loss** across Gaussian counts and active ratios (Pure Optimization Step Timing).\n\n")
         f.write("### Systems Break-Even Points ($r^*$ where $\\text{Speedup} \\approx 1.0\\times$)\n")
+        f.write("*Note: r* is defined as the largest active ratio K where selective optimization achieves speedup >= 1.0x over full optimization.*\n\n")
         for N, r_star in break_even_points.items():
-            f.write(f"- **N = {N:,d} Gaussians**: $r^* \\approx {r_star*100:.1f}\\%$ (At $r \\le {r_star*100:.1f}\\%$, True Selective Optimization delivers strict speedup over Full/Masked Baseline)\n")
+            f.write(f"- **N = {N:,d} Gaussians**: $r^* = {r_star*100:.1f}\\%$ (Largest active ratio where True Selective Optimization still delivers $\\ge 1.0\\times$ speedup)\n")
         f.write("\n")
         f.write("| N Total | Active Ratio | Active (M) | Active Render | Masked Bwd (p50) | Selective Bwd (p50) | Bwd Speedup | Masked Opt | Selective Opt | Opt Speedup |\n")
         f.write("|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|\n")
@@ -316,6 +347,7 @@ def benchmark_comprehensive(sizes=[10000, 25000, 50000], ratios=[1.0, 0.75, 0.50
         
     print(f"\nArtifacts saved to:")
     print(f"  - {json_path}")
+    print(f"  - {raw_path}")
     print(f"  - {csv_path}")
     print(f"  - {md_path}")
     return all_results
@@ -325,9 +357,9 @@ def main():
     parser = argparse.ArgumentParser(description="R30 Comprehensive Selective Compute Benchmark")
     parser.add_argument('--device', type=str, default='cpu')
     parser.add_argument('--sizes', type=int, nargs='+', default=[10000, 25000, 50000])
-    parser.add_argument('--ratios', type=float, nargs='+', default=[1.0, 0.75, 0.50, 0.25, 0.10, 0.05, 0.02, 0.01])
-    parser.add_argument('--warmup', type=int, default=2)
-    parser.add_argument('--trials', type=int, default=5)
+    parser.add_argument('--ratios', type=float, nargs='+', default=[1.0, 0.75, 0.50, 0.25, 0.20, 0.10, 0.05, 0.02, 0.01])
+    parser.add_argument('--warmup', type=int, default=10)
+    parser.add_argument('--trials', type=int, default=30)
     args = parser.parse_args()
     
     benchmark_comprehensive(sizes=args.sizes, ratios=args.ratios, n_warmup=args.warmup, n_trials=args.trials, device=args.device)

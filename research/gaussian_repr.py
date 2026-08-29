@@ -327,8 +327,12 @@ class GaussianModel(nn.Module):
         self._state[mask] = GaussianState.PRUNED
     
     @torch.no_grad()
-    def compact(self):
-        """Remove pruned Gaussians from memory (hard delete)."""
+    def compact(self) -> torch.Tensor:
+        """Remove pruned Gaussians from memory (hard delete).
+        
+        Returns:
+            keep_mask: Boolean tensor indicating which Gaussians were kept.
+        """
         keep = self._state != GaussianState.PRUNED
         
         self._xyz = nn.Parameter(self._xyz.data[keep])
@@ -341,3 +345,4 @@ class GaussianModel(nn.Module):
         self._confidence = self._confidence[keep]
         self._state = self._state[keep]
         self._num_gaussians = self._xyz.shape[0]
+        return keep

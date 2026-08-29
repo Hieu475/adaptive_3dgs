@@ -51,29 +51,14 @@ def run_learned_utility_comparison():
                              'results', 'oracle_dataset', 'oracle_dataset.json')
     
     if not os.path.exists(data_path):
-        print(f"Warning: Oracle dataset not found at {data_path}. Generating fallback synthetic dataset...")
-        rows = []
-        for i in range(300):
-            err = np.random.exponential(0.1)
-            inf = np.random.uniform(0.1, 2.0)
-            area = np.random.uniform(1e-5, 1e-3)
-            imp = 0.5 * err + 0.3 * inf + 0.2 * area
-            cost = 0.05 + 0.01 * np.random.uniform(0.5, 1.5)
-            oracle_u = (imp * np.random.uniform(0.8, 1.2)) / cost
-            rows.append({
-                'predicted_importance': imp,
-                'predicted_utility': imp / cost,
-                'delta_quality_local': imp * 0.9,
-                'measured_trial_cost_ms': cost,
-                'oracle_utility': oracle_u,
-                'influence_mass': inf,
-                'projected_area': area,
-                'visible': True,
-                'n_influence_pixels': 100
-            })
-    else:
-        with open(data_path, 'r') as f:
-            rows = json.load(f)
+        raise FileNotFoundError(
+            f"Oracle dataset not found at {data_path}. "
+            "Oracle dataset is required for learned utility evaluation. "
+            "Run 'python experiments/run_oracle_utility.py' first to generate it."
+        )
+    
+    with open(data_path, 'r') as f:
+        rows = json.load(f)
             
     visible = [r for r in rows if r.get('visible', True) and r.get('n_influence_pixels', 0) > 0]
     print(f"Loaded {len(visible)} visible Oracle Gaussian training/eval samples.\n")
