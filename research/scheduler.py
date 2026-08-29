@@ -131,9 +131,15 @@ class BudgetScheduler:
         self._depth_error_stats = RunningStats()
         self._color_error_stats = RunningStats()
         self._frame_count = 0
-        
-        # Performance tracking
         self._actual_times: List[float] = []
+        self._actual_opt_times: List[float] = []
+        self._violation_history: List[float] = []
+        
+        # 2-Phase Adaptive Budget Feedback Controller
+        self.budget_scale_factor: float = 1.0
+        self.feedback_lambda: float = 0.3
+        self.last_budget_state: Dict[str, Any] = {}
+        self.budget_history: List[Dict[str, Any]] = []
     
     def select_for_optimization(
         self,
@@ -163,8 +169,8 @@ class BudgetScheduler:
         N = importance_scores.shape[0]
         device = importance_scores.device
         
-        # Budget for optimization in microseconds
-        budget_us = self.gpu_budget_ms * 1000 * self.budget_allocation['optimize']
+        # Budget for optimization in microseconds (scaled dynamically by 2-phase controller)
+        budget_us = self.gpu_budget_ms * 1000 * self.budget_allocation['optimize'] * self.budget_scale_factor
         
         # Determine which Gaussians are eligible based on tier schedule
         eligible = torch.zeros(N, dtype=torch.bool, device=device)
