@@ -23,9 +23,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from datasets.tum_dataset import TUMDataset
 from research.pipeline import OnlineReconstructionPipeline
 from research.oracle_utility import OracleUtilityExperiment, SamplingPopulation
+from research.protocol import load_protocol, get_seeds, get_resolution
 
 
-def load_tum_sequence(data_path: str, n_frames: int = 25, H: int = 120, W: int = 160, device: str = 'cuda'):
+def load_tum_sequence(data_path: str, n_frames: int = 25, H: int = 240, W: int = 320, device: str = 'cuda'):
     dataset = TUMDataset(data_path, max_frames=n_frames, camera='freiburg1')
     frames = []
     orig_W, orig_H = 640.0, 480.0
@@ -84,16 +85,19 @@ def run_gate1_multi_seed():
     print(f"=== MULTI-SEED GATE 1 & HEADROOM VERIFICATION [Device: {device}] ===")
     
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    data_path = os.path.join(repo_root, 'datasets', 'TUM', 'rgbd_dataset_freiburg1_desk')
+    protocol = load_protocol()
+    dataset_cfg = protocol["datasets"]["tum_fr1_desk"]
+    data_path = os.path.join(repo_root, dataset_cfg["path"])
     if not os.path.exists(data_path):
         raise FileNotFoundError(f"TUM dataset not found at {data_path}")
         
-    H, W = 120, 160
+    H = dataset_cfg["image_height"]
+    W = dataset_cfg["image_width"]
     n_warmup = 15
     frames, intrinsics = load_tum_sequence(data_path, n_frames=n_warmup + 1, H=H, W=W, device=device)
     
-    seeds = [42, 43, 44, 45, 46]
-    print(f">> Executing across {len(seeds)} frozen seeds: {seeds}...")
+    seeds = protocol["reproducibility"]["seeds"]
+    print(f">> Executing across {len(seeds)} frozen seeds: {seeds} at {W}x{H}...")
     
     seed_records = []
     all_visible_interventions = []
@@ -247,6 +251,12 @@ def run_gate1_multi_seed():
             'headroom': h_seed,
             'headroom_psnr_db': h_psnr_seed,
         })
+        # Save per-seed record per Phase 2.2
+        seed_dir = os.path.join(repo_root, 'results', 'seeds', f'seed_{seed}')
+        os.makedirs(seed_dir, exist_ok=True)
+        with open(os.path.join(seed_dir, 'gate1.json'), 'w') as f_seed:
+            json.dump(seed_records[-1], f_seed, indent=2)
+            
         print(f"   Var(U*): {u_var:.8f} | Negative U*: {pct_neg:.1f}% | Headroom H: {h_seed:+.6f} ({h_psnr_seed:+.4f} dB)")
         
     arr_h = np.array(headroom_list)

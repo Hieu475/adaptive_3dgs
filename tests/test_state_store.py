@@ -252,3 +252,42 @@ def test_temporal_features_follow_identity():
     # EMA for ID 2 (at index 0) should be 0.8 * 0.36 + 0.2 * 1.0 = 0.488
     assert abs(model.state_store.ema_rgb[0].item() - 0.488) < 1e-4
 
+
+def test_temporal_state_follows_persistent_id():
+    """Verify Phase 5: position_drift and temporal features follow persistent_id across index compaction.
+
+    Example from Phase 5:
+      frame t:
+        Gaussian persistent_id=512 (e.g. index k) has position_drift=0.03
+      frame t+1:
+        pruning/compaction shifts tensor index
+        persistent_id is still 512
+        position_drift must continue from 0.03, NOT reset to zero.
+    """
+    from research.gaussian_repr import GaussianModel
+    model = GaussianModel(sh_degree=0, device='cpu')
+    points = torch.tensor([[float(i), float(i), float(i)] for i in range(10)])
+    model.initialize_from_points(points)
+
+    target_idx = 4
+    target_id = model.persistent_ids[target_idx].item()
+    
+    # Set temporal signals at frame t
+    model.state_store.temporal_drift[target_idx] = 0.03
+    model.state_store.ages[target_idx] = 10
+    model.state_store.ema_rgb[target_idx] = 0.45
+    model.state_store.ema_depth[target_idx] = 0.25
+
+    # Prune indices 0, 1, 2, 3 so target shifts from index 4 to index 0
+    prune_mask = torch.tensor([True, True, True, True, False, False, False, False, False, False])
+    model.prune_gaussians(prune_mask)
+    model.compact()
+
+    # Target is now at index 0
+    assert model.persistent_ids[0].item() == target_id
+    assert abs(model.state_store.temporal_drift[0].item() - 0.03) < 1e-6, "temporal_drift must NOT reset to zero"
+    assert model.state_store.ages[0].item() == 10
+    assert abs(model.state_store.ema_rgb[0].item() - 0.45) < 1e-6
+    assert abs(model.state_store.ema_depth[0].item() - 0.25) < 1e-6
+
+

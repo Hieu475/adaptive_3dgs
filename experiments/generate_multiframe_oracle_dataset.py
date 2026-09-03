@@ -17,9 +17,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from datasets.tum_dataset import TUMDataset
 from research.pipeline import OnlineReconstructionPipeline
 from research.oracle_utility import OracleUtilityExperiment, SamplingPopulation
+from research.protocol import load_protocol, get_dataset_config, get_resolution
 
 
-def load_tum_sequence(data_path: str, n_frames: int = 35, H: int = 120, W: int = 160, device: str = 'cuda'):
+def load_tum_sequence(data_path: str, n_frames: int = 35, H: int = 240, W: int = 320, device: str = 'cuda'):
     dataset = TUMDataset(data_path, max_frames=n_frames, camera='freiburg1')
     frames = []
     
@@ -59,9 +60,12 @@ def main():
     print(f"=== GENERATING MULTI-FRAME ORACLE DATASET [Device: {device}] ===")
     
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    data_path = os.path.join(repo_root, 'datasets', 'TUM', 'rgbd_dataset_freiburg1_desk')
+    protocol = load_protocol()
+    dataset_cfg = protocol["datasets"]["tum_fr1_desk"]
+    data_path = os.path.join(repo_root, dataset_cfg["path"])
     
-    H, W = 120, 160
+    H = dataset_cfg["image_height"]
+    W = dataset_cfg["image_width"]
     eval_frames_idx = [15, 20, 25, 30, 35, 40, 45, 50, 55, 60]
     max_frames = max(eval_frames_idx) + 1
     
@@ -129,7 +133,9 @@ def main():
                 frame_idx=t
             )
             vis = [r for r in frame_res if r.get('visible', True) and r.get('n_influence_pixels', 0) > 0]
-            print(f"   Collected {len(vis)} visible interventions from frame {t}.")
+            for r in frame_res:
+                r['split'] = 'train' if t <= 40 else 'validation'
+            print(f"   Collected {len(vis)} visible interventions from frame {t} (split: {'train' if t <= 40 else 'val'}).")
             all_rows.extend(frame_res)
             
     # Save dataset

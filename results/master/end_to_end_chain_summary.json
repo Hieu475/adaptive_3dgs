@@ -1,0 +1,50 @@
+{
+  "selection_quality_correlation_mean": 0.9006076799578082,
+  "correlations_by_budget": [
+    {
+      "relative_budget": 0.1,
+      "budget_pct": 10,
+      "pearson_r": 0.9495087852374133,
+      "p_value": 0.013515769261929133,
+      "spearman_rho": 0.8660254037844386,
+      "mean_quality_gain_db": -0.0003593266010284424,
+      "mean_ge": 0.4
+    },
+    {
+      "relative_budget": 0.2,
+      "budget_pct": 20,
+      "pearson_r": 0.974041300187509,
+      "p_value": 0.005001035623422964,
+      "spearman_rho": 0.8660254037844386,
+      "mean_quality_gain_db": -0.0011514127254486084,
+      "mean_ge": 0.4
+    },
+    {
+      "relative_budget": 0.4,
+      "budget_pct": 40,
+      "pearson_r": 1.0,
+      "p_value": 0.0,
+      "spearman_rho": 1.0,
+      "mean_quality_gain_db": -0.028479069471359253,
+      "mean_ge": 0.0
+    },
+    {
+      "relative_budget": 0.6,
+      "budget_pct": 60,
+      "pearson_r": 0.8455249531958199,
+      "p_value": 0.07116938845427029,
+      "spearman_rho": 0.8944271909999159,
+      "mean_quality_gain_db": -0.006198853254318237,
+      "mean_ge": 0.2291496515274048
+    },
+    {
+      "relative_budget": 0.8,
+      "budget_pct": 80,
+      "pearson_r": 0.7339633611682991,
+      "p_value": 0.15798184897668774,
+      "spearman_rho": 0.7071067811865475,
+      "mean_quality_gain_db": 0.01801353693008423,
+      "mean_ge": 0.9075893640518189
+    }
+  ]
+}

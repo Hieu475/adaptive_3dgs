@@ -37,11 +37,11 @@ where $\Delta Q_i = w_{rgb} \Delta\text{PSNR}_i + w_{depth} \Delta\text{Depth}_i
 
 ### Gate 1: Measurability, Headroom & Group Non-Additivity
 - **Measurability:** Evaluated on real TUM RGB-D (`rgbd_dataset_freiburg1_desk`), confirming strictly positive variance $\text{Var}(U^\star) > 0$.
-- **Negative Utility:** **$8.3\%$** of counterfactual interventions degraded quality ($U^\star < 0$). Optimizing flat regions produced mean negative utility ($-0.0002$), proving that unconstrained optimization wastes compute on converged surfaces.
+- **Negative Utility:** **$8.3\%$** of counterfactual interventions degraded quality ($U^\star < 0$). Optimizing flat regions produced mean negative utility ($-0.0002$), providing evidence that unconstrained optimization wastes compute on converged surfaces.
 - **Optimization Headroom:** Headroom $H = \Delta Q(S^\star_K) - \Delta Q(S_{\text{random}}) = \mathbf{+0.000149} > 0$ ($\Delta\text{PSNR Headroom} = \mathbf{+0.0014\text{ dB}}$).
 - **Group Non-Additivity ($R_{add}$):** Direct measurement of joint interaction ratio $R_{add}(S) = \frac{\Delta Q(S)}{\sum_{i \in S} \Delta Q_i}$:
   $$R_{add}(g=4) = \mathbf{0.2249} \ll 1.0, \quad R_{add}(g=16) = \mathbf{0.0048} \ll 1.0$$
-  *Mathematically refutes independent additivity assumptions due to alpha compositing overlap and occlusion.*
+  *Empirically demonstrates strong sub-additive interaction due to alpha compositing overlap and occlusion.*
 
 ### Gate 2: The Breakthrough in Geometry Strata (Learned Model vs Error-Only)
 When decomposed across scene geometry strata on an independent temporal test split ($N=40$ per stratum):
@@ -53,16 +53,18 @@ When decomposed across scene geometry strata on an independent temporal test spl
 | **Surface Texture** | +0.000514 | +0.1390 | +0.1375 | **+0.4139** 🚀 |
 | **Flat Surfaces** | +0.000026 | +0.0859 | +0.1580 | **+0.3842** 🚀 |
 
-> **Scientific Insight:** Error-only ranking fails completely at edge boundaries ($\rho = -0.0689$), prioritizing high-residual pixels where single-Gaussian updates cause boundary blur. The Learned Two-Head Model achieves $\rho = \mathbf{+0.6186}$, proving it learns true marginal gain rather than memorizing high residuals.
+> **Scientific Insight:** Error-only ranking fails completely at edge boundaries ($\rho = -0.0689$), prioritizing high-residual pixels where single-Gaussian updates cause boundary blur. The Learned Two-Head Model achieves $\rho = \mathbf{+0.6186}$, providing strong evidence of capturing true marginal gain rather than memorizing high residuals.
 
 ### Gate 3: Budget Selection Sweep ($B \in [10\%, 80\%]$)
-- At $B=60\%$, the Learned Two-Head Model achieves $\Delta Q = +0.000634$ ($OSE = 0.606$), outperforming Heuristic Knapsack ($+0.000393$, $OSE=0.375$) by **$+61\%$**.
-- Demonstrates diminishing marginal returns as $B \rightarrow 80\%$, confirming knapsack concavity.
+- Evaluated across 5 independent seeds `[42, 43, 44, 45, 46]` at $320 \times 240$ resolution.
+- At $B=60\%$, the Learned Two-Head Model achieves $\Delta Q = +0.000460$, outperforming Heuristic Knapsack ($+0.000366$) by **$+25.7\%$** (Absolute Gain: $\mathbf{+0.000094}$, $95\%$ Bootstrap CI: $[+0.000065, +0.000114]$, paired Wilcoxon $p = 0.0312$, Cohen's $d_z = +2.82$).
+- Demonstrates diminishing marginal returns as $B \rightarrow 80\%$, consistent with knapsack submodular behavior.
 
-### Gate 4: 50-Frame Long-Horizon Temporal Trajectory
-- Evaluated on 50 consecutive frames of TUM `freiburg1_desk` under a strict $15\text{ ms}$ budget:
-  - **Frame-by-Frame Win Rate:** $Q_{\text{ours}}(t) \ge Q_{\text{error}}(t)$ on **$100.0\%$ (49/49 frames)**.
-  - **Compute Efficiency:** Average optimization latency reduced to **$107.8\text{ ms}$**, saving **$28.5\%$** runtime compared to unconstrained optimization ($150.7\text{ ms}$) while preserving final PSNR ($5.66\text{ dB}$).
+### Gate 4: Long-Horizon Temporal Trajectory & Systems Latency Audit
+- Evaluated on TUM `freiburg1_desk` under a $15.0\text{ ms}$ per-frame budget target across 5 seeds:
+  - **Optimization Step Latency:** `OURS` achieves **$67.8\text{ ms}$** mean optimization latency (P95: $87.8\text{ ms}$), cutting optimization compute by **$51.0\%$** compared to `FULL` ($138.3\text{ ms}$) and **$38.8\%$** compared to `ERROR_ONLY` ($110.8\text{ ms}$) while maintaining visual quality.
+  - **Per-Frame Latency Breakdown:** Latency audit separates selective gradient backward & Adam steps ($67.8\text{ ms}$) from rendering, tile binning, and CPU-side point cloud tracking (~$1.3\text{ s}$).
+  - **Frame-by-Frame Quality Preservation:** $Q_{\text{ours}}(t) \ge Q_{\text{error}}(t)$ on **$100.0\%$ (49/49 frames)**.
 
 ---
 

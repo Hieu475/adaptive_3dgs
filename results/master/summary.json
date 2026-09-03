@@ -1,0 +1,79 @@
+{
+  "total_duration_s": 261.82,
+  "device": "cpu",
+  "frames_per_run": 4,
+  "experiments": [
+    {
+      "milestone": "R8/R15 Importance Validation",
+      "script": "experiments/run_importance_validation.py",
+      "status": "PASSED",
+      "duration_s": 2.75
+    },
+    {
+      "milestone": "R9 Component Independence",
+      "script": "experiments/run_component_independence.py",
+      "status": "PASSED",
+      "duration_s": 2.78
+    },
+    {
+      "milestone": "R10 Normalization Ablation",
+      "script": "experiments/run_normalization_ablation.py",
+      "status": "PASSED",
+      "duration_s": 2.87
+    },
+    {
+      "milestone": "R11 Policy Benchmark",
+      "script": "experiments/run_policy_benchmark.py",
+      "status": "PASSED",
+      "duration_s": 23.03
+    },
+    {
+      "milestone": "R12 Densification Convergence",
+      "script": "experiments/run_densification_convergence.py",
+      "status": "PASSED",
+      "duration_s": 3.61
+    },
+    {
+      "milestone": "R13 Budget Controller Sweep",
+      "script": "experiments/run_budget_sweep.py",
+      "status": "PASSED",
+      "duration_s": 4.05
+    },
+    {
+      "milestone": "R14 Pipeline Profiler",
+      "script": "benchmarks/profile_pipeline.py",
+      "status": "PASSED",
+      "duration_s": 2.87
+    },
+    {
+      "milestone": "R16 Top-K Attribution Ablation",
+      "script": "experiments/run_attribution_topk_ablation.py",
+      "status": "PASSED",
+      "duration_s": 4.28
+    },
+    {
+      "milestone": "R17 Oracle Utility Experiment",
+      "script": "experiments/run_oracle_utility.py",
+      "status": "PASSED",
+      "duration_s": 85.67
+    },
+    {
+      "milestone": "R18 Importance Formulation Ablation",
+      "script": "experiments/run_oracle_ablation.py",
+      "status": "PASSED",
+      "duration_s": 111.54
+    },
+    {
+      "milestone": "R19 Matched-Budget Benchmark",
+      "script": "experiments/run_matched_budget.py",
+      "status": "PASSED",
+      "duration_s": 15.83
+    },
+    {
+      "milestone": "R20 Failure Case Diagnostics",
+      "script": "experiments/run_failure_analysis.py",
+      "status": "PASSED",
+      "duration_s": 2.55
+    }
+  ]
+}

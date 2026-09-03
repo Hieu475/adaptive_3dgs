@@ -1,0 +1,62 @@
+[
+  {
+    "stratum": "low_texture_flat",
+    "n_samples": 50,
+    "spearman_rho": 0.6450575045677921,
+    "p_value": 4.2671285689471743e-07,
+    "mean_absolute_error": 0.0054334356704041995,
+    "sign_stability_p_pos": 0.88,
+    "mean_oracle_utility": 0.008899925510573057,
+    "mean_predicted_utility": 0.009042172474316677,
+    "failure_mode": "Flat photometric gradient induces rank noise; low signal-to-noise ratio.",
+    "remedy": "Hysteresis thresholding & spatial clustering with surrounding confident Gaussians."
+  },
+  {
+    "stratum": "texture_edge",
+    "n_samples": 50,
+    "spearman_rho": 0.9172148859543818,
+    "p_value": 8.126722419876742e-21,
+    "mean_absolute_error": 0.03563246768173515,
+    "sign_stability_p_pos": 0.98,
+    "mean_oracle_utility": 0.23872630473719297,
+    "mean_predicted_utility": 0.2032729764359731,
+    "failure_mode": "None (optimal regime); high gradient yields reliable descent direction.",
+    "remedy": "Prioritize for densification and high-frequency refinement."
+  },
+  {
+    "stratum": "depth_discontinuity",
+    "n_samples": 50,
+    "spearman_rho": 0.602689075630252,
+    "p_value": 3.6337807385720577e-06,
+    "mean_absolute_error": 0.046513660212961445,
+    "sign_stability_p_pos": 0.82,
+    "mean_oracle_utility": 0.11098104378975439,
+    "mean_predicted_utility": 0.07302672198673797,
+    "failure_mode": "View-dependent occlusion jumps cause erratic visibility attribution.",
+    "remedy": "Multi-view visibility temporal filtering (EMA visibility > 3 frames)."
+  },
+  {
+    "stratum": "specular_highlight",
+    "n_samples": 50,
+    "spearman_rho": 0.14372493941572262,
+    "p_value": 0.3193638717199851,
+    "mean_absolute_error": 0.18277357509289247,
+    "sign_stability_p_pos": 0.54,
+    "mean_oracle_utility": 0.017759851021146116,
+    "mean_predicted_utility": 0.20053342611403857,
+    "failure_mode": "Capacity saturation: high photometric residual is unoptimizable with low-degree SH.",
+    "remedy": "Penalize persistence of unyielding error via temporal learning rate damping."
+  },
+  {
+    "stratum": "dynamic_temporal_drift",
+    "n_samples": 50,
+    "spearman_rho": 0.1514158370659185,
+    "p_value": 0.29387528846450767,
+    "mean_absolute_error": 0.17598498367460294,
+    "sign_stability_p_pos": 0.48,
+    "mean_oracle_utility": 0.0052220472273869735,
+    "mean_predicted_utility": 0.1812070309019899,
+    "failure_mode": "Static map corruption: fitting dynamic obstacles produces phantom Gaussians.",
+    "remedy": "Temporal drift gating: freeze Gaussians with erratic 3D velocity vectors."
+  }
+]

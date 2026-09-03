@@ -256,7 +256,46 @@ def test_no_oracle_leakage_in_features():
             assert not np.isinf(v), f"Feature {k} contains Inf"
 
 
+def test_oracle_multi_trial_sequential_invariance():
+    """Phase 6.2 Audit: Sequential trials (trial A -> restore -> trial B -> restore -> trial C -> restore).
+    Asserts baseline state hash and parameters before each trial are strictly identical.
+    """
+    pipeline = OnlineReconstructionPipeline(device='cpu')
+    H, W = 32, 40
+    torch.manual_seed(42)
+    rgb = torch.rand(H, W, 3)
+    depth = torch.ones(H, W) * 2.0
+    fx, fy = 80.0, 80.0
+    intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
+
+    pipeline.initialize(rgb, depth, intrinsics)
+    pipeline.process_frame(rgb, depth)
+
+    initial_hash = hash_gaussian_state(pipeline.gaussian_model, pipeline.optimizer)
+    orig_xyz = pipeline.gaussian_model._xyz.clone()
+    frame = {'rgb': rgb, 'depth': depth, 'pose': torch.eye(4)}
+
+    # Trial A
+    pipeline.evaluate_gaussian_update(torch.tensor([0]), frame, n_steps=3)
+    hash_after_a = hash_gaussian_state(pipeline.gaussian_model, pipeline.optimizer)
+    assert hash_after_a == initial_hash, "Baseline state corrupted after Trial A"
+    assert torch.equal(pipeline.gaussian_model._xyz, orig_xyz)
+
+    # Trial B
+    pipeline.evaluate_gaussian_update(torch.tensor([1, 2]), frame, n_steps=5)
+    hash_after_b = hash_gaussian_state(pipeline.gaussian_model, pipeline.optimizer)
+    assert hash_after_b == initial_hash, "Baseline state corrupted after Trial B"
+    assert torch.equal(pipeline.gaussian_model._xyz, orig_xyz)
+
+    # Trial C
+    pipeline.evaluate_gaussian_update(torch.tensor([0, 1, 2]), frame, n_steps=2)
+    hash_after_c = hash_gaussian_state(pipeline.gaussian_model, pipeline.optimizer)
+    assert hash_after_c == initial_hash, "Baseline state corrupted after Trial C"
+    assert torch.equal(pipeline.gaussian_model._xyz, orig_xyz)
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
+
 
 

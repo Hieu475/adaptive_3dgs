@@ -20,6 +20,8 @@ from typing import Dict, List, Tuple, Any
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from research.protocol import load_protocol, get_seeds, get_splits
+
 
 def safe_spearmanr(x: np.ndarray, y: np.ndarray) -> Tuple[float, float]:
     if len(x) < 3 or np.std(x) < 1e-7 or np.std(y) < 1e-7:
@@ -290,25 +292,40 @@ def main():
         sig = "Significant ✅" if p < 0.05 else "Not Significant"
         print(f"   - {name:<20}: ρ = {rho:+.4f} (p={p:.4f}) [{sig}]")
         
-    # --- 2. Independent Temporal Split (Phase 5.1) ---
-    unique_frames = sorted(list(set(frames)))
-    if len(unique_frames) >= 2:
-        split_frame = unique_frames[len(unique_frames) // 2]
-        train_mask = [f <= split_frame for f in frames]
-        test_mask = [f > split_frame for f in frames]
-        train_idx = torch.tensor([i for i, m in enumerate(train_mask) if m], dtype=torch.long)
-        test_idx = torch.tensor([i for i, m in enumerate(test_mask) if m], dtype=torch.long)
-        print(f"\n>> 2. Independent Temporal Split: Train frames <= {split_frame} ({len(train_idx)}), Test frames > {split_frame} ({len(test_idx)})")
-    else:
-        perm = torch.randperm(len(X_mat))
-        n_tr = int(0.70 * len(X_mat))
-        train_idx, test_idx = perm[:n_tr], perm[n_tr:]
-        print(f"\n>> 2. Split: Train ({len(train_idx)}), Test ({len(test_idx)})")
+    # --- 2. Protocol Frozen Split (Phase 3 & Phase 4) ---
+    protocol = load_protocol()
+    splits = get_splits(protocol)
+    train_frames = set(splits['train_frames'])
+    val_frames = set(splits['val_frames'])
+    
+    train_mask = [int(f) in train_frames for f in frames]
+    test_mask = [int(f) in val_frames for f in frames]
+    train_idx = torch.tensor([i for i, m in enumerate(train_mask) if m], dtype=torch.long)
+    test_idx = torch.tensor([i for i, m in enumerate(test_mask) if m], dtype=torch.long)
+    print(f"\n>> 2. Protocol Split: Train frames 0-40 ({len(train_idx)}), Held-out Val/Test frames 41-60 ({len(test_idx)})")
         
-    # Pre-fusion Normalization: Strictly fit on Train Split only
+    # Pre-fusion Normalization: Strictly fit on Train Split only (Phase 4)
     mean = X_mat[train_idx].mean(dim=0, keepdim=True)
     std = X_mat[train_idx].std(dim=0, keepdim=True) + 1e-6
     X_norm = (X_mat - mean) / std
+    
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    stats_dir = os.path.join(repo_root, 'results', 'statistics')
+    os.makedirs(stats_dir, exist_ok=True)
+    norm_log = {
+        "fit_split": "train",
+        "n_train_samples": len(train_idx),
+        "features": {
+            fname: {
+                "mean": float(mean[0, j].item()),
+                "std": float(std[0, j].item())
+            }
+            for j, fname in enumerate(feature_names)
+        }
+    }
+    with open(os.path.join(stats_dir, 'normalization.json'), 'w') as f_norm:
+        json.dump(norm_log, f_norm, indent=2)
+    print(f">> Normalization parameters logged to results/statistics/normalization.json")
     
     # --- 3. V0 to V7 Feature Ablation (Phase 6) ---
     ablation_subsets = {
@@ -423,6 +440,61 @@ def main():
             'realized_delta_q': m['realized_delta_q_20pct'],
         })
         print(f"{name:<25} | {m['spearman_rho']:>+9.4f}  | {m['ndcg_20pct']:>6.4f} | {m['overlap_20pct']:>9.1%}  | {m['regret_20pct_abs']:>9.6f}  | {m['ose_20pct']:>6.3f}")
+        
+    # --- 5.1 Multi-Seed Gate 2 Evaluation (Phase 2 & Phase 15) ---
+    seeds = get_seeds(protocol)
+    print(f"\n>> 5.1 Multi-Seed Gate 2 Independent Verification across {len(seeds)} seeds: {seeds}...")
+    for seed in seeds:
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        seed_model = TwoHeadMLP(in_features=len(feature_names), hidden_dim=64)
+        train_ranking_model(
+            seed_model,
+            X_norm[train_idx],
+            y_ora_vec[train_idx],
+            y_q_vec[train_idx],
+            y_t_vec[train_idx],
+            epochs=200,
+            lr=0.005,
+        )
+        with torch.no_grad():
+            _, _, p_u_seed = seed_model(X_norm[test_idx])
+            s_lrn_seed = p_u_seed.cpu().numpy()
+            
+        rng_seed = np.random.default_rng(seed)
+        s_rnd_seed = rng_seed.random(len(test_idx))
+        
+        candidates_seed = [
+            ('Random', s_rnd_seed),
+            ('RGB Error', s_rgb_err),
+            ('Error × Influence', s_err_inf),
+            ('Binary', s_binary),
+            ('Heuristic Knapsack', s_heuristic),
+            ('Learned Two-Head (Ours)', s_lrn_seed),
+            ('Oracle (Reference)', s_oracle),
+        ]
+        
+        seed_gate2_metrics = {}
+        for c_name, c_sc in candidates_seed:
+            seed_gate2_metrics[c_name] = evaluate_utility_ranking(c_sc, y_o_test, y_q_test)
+            
+        seed_dir = os.path.join(repo_root, 'results', 'seeds', f'seed_{seed}')
+        os.makedirs(seed_dir, exist_ok=True)
+        with open(os.path.join(seed_dir, 'gate2.json'), 'w') as f_g2:
+            json.dump({
+                'seed': seed,
+                'gate': 'gate2',
+                'methods': seed_gate2_metrics,
+                'learned_spearman_rho': seed_gate2_metrics['Learned Two-Head (Ours)']['spearman_rho'],
+                'learned_ndcg_20pct': seed_gate2_metrics['Learned Two-Head (Ours)']['ndcg_20pct'],
+                'learned_ose_20pct': seed_gate2_metrics['Learned Two-Head (Ours)']['ose_20pct'],
+                'learned_realized_delta_q': seed_gate2_metrics['Learned Two-Head (Ours)']['realized_delta_q_20pct'],
+                'heuristic_ose_20pct': seed_gate2_metrics['Heuristic Knapsack']['ose_20pct'],
+                'error_ose_20pct': seed_gate2_metrics['RGB Error']['ose_20pct'],
+                'gain_vs_heuristic_ose': seed_gate2_metrics['Learned Two-Head (Ours)']['ose_20pct'] - seed_gate2_metrics['Heuristic Knapsack']['ose_20pct'],
+            }, f_g2, indent=2)
+        print(f"   [Seed {seed}] Learned ρ = {seed_gate2_metrics['Learned Two-Head (Ours)']['spearman_rho']:+.4f} | OSE@20% = {seed_gate2_metrics['Learned Two-Head (Ours)']['ose_20pct']:.4f} (saved to results/seeds/seed_{seed}/gate2.json)")
+
         
     # --- 6. Geometry Stratum Breakdown on Independent Test Split (Strictly test_idx) ---
     print("\n>> 6. Geometry Stratum Evaluation (Strictly on Independent Test Split):")

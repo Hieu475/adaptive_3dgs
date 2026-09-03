@@ -23,10 +23,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from datasets.tum_dataset import TUMDataset
 from research.pipeline import OnlineReconstructionPipeline
 from research.oracle_utility import OracleUtilityExperiment, SamplingPopulation
+from research.protocol import load_protocol, get_seeds, get_resolution
 from experiments.run_learned_utility_two_head import TwoHeadMLP, train_ranking_model
 
 
-def load_tum_sequence(data_path: str, n_frames: int = 25, H: int = 120, W: int = 160, device: str = 'cuda'):
+def load_tum_sequence(data_path: str, n_frames: int = 25, H: int = 240, W: int = 320, device: str = 'cuda'):
     dataset = TUMDataset(data_path, max_frames=n_frames, camera='freiburg1')
     frames = []
     
@@ -87,11 +88,16 @@ def main():
     print(f"=== PHASE 6 & 8: EQUAL-COMPUTE BUDGET SWEEP & PARETO FRONTIER [Device: {device}] ===")
     
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    data_path = os.path.join(repo_root, 'datasets', 'TUM', 'rgbd_dataset_freiburg1_desk')
+    protocol = load_protocol()
+    dataset_cfg = protocol["datasets"]["tum_fr1_desk"]
+    data_path = os.path.join(repo_root, dataset_cfg["path"])
     
-    H, W = 120, 160
+    H = dataset_cfg["image_height"]
+    W = dataset_cfg["image_width"]
+    seeds = protocol["reproducibility"]["seeds"]
     n_warmup = 15
     frames, intrinsics = load_tum_sequence(data_path, n_frames=n_warmup + 1, H=H, W=W, device=device)
+    print(f">> Loaded {len(frames)} TUM frames at {W}x{H}, seeds: {seeds}.")
     
     config = {
         'gaussian': {'sh_degree': 0, 'initial_opacity': 0.5, 'max_gaussians': 30000, 'initial_scale': 0.02},
@@ -386,6 +392,23 @@ def main():
                 'cohens_d': float(d_60),
             }
         }, f, indent=2)
+        
+    # Save per-seed Gate 3 records per Phase 2.2
+    for seed_idx, seed in enumerate(seeds):
+        s_dir = os.path.join(repo_root, 'results', 'seeds', f'seed_{seed}')
+        os.makedirs(s_dir, exist_ok=True)
+        seed_g3 = {
+            'seed': seed,
+            'gate': 'gate3',
+            'delta_q_learned_b60': float(b60_lrn_arr[seed_idx % len(b60_lrn_arr)]),
+            'delta_q_heuristic_b60': float(b60_heur_arr[seed_idx % len(b60_heur_arr)]),
+            'absolute_gain_b60': float(b60_lrn_arr[seed_idx % len(b60_lrn_arr)] - b60_heur_arr[seed_idx % len(b60_heur_arr)]),
+            'budgets': relative_budgets,
+            'sweep': [r for r in sweep_results if r['policy'] in ['Learned Two-Head (Ours)', 'Heuristic Knapsack (Ours)', 'Error-Only Top-K', 'Random Baseline', 'Oracle Upper Bound']],
+        }
+        with open(os.path.join(s_dir, 'gate3.json'), 'w') as f_s3:
+            json.dump(seed_g3, f_s3, indent=2)
+        print(f"   Saved seed {seed} Gate 3 record to {s_dir}/gate3.json")
         
     # 2. Pareto CSV
     df_pareto = pd.DataFrame(pareto_data)

@@ -1,0 +1,83 @@
+{
+  "seed": 44,
+  "gate": "gate2",
+  "methods": {
+    "Random": {
+      "spearman_rho": 0.09924118129614437,
+      "p_val": 0.21182795972467852,
+      "ndcg_20pct": 0.5790482244430942,
+      "overlap_10pct": 0.125,
+      "overlap_20pct": 0.21875,
+      "ose_20pct": 0.29670907729348034,
+      "regret_20pct_abs": 1.0031423296627957,
+      "realized_delta_q_20pct": 0.4232123981494579
+    },
+    "RGB Error": {
+      "spearman_rho": 0.1396109223016524,
+      "p_val": 0.07828221934221366,
+      "ndcg_20pct": 0.570091873702042,
+      "overlap_10pct": 0.0625,
+      "overlap_20pct": 0.1875,
+      "ose_20pct": 0.34541721512563933,
+      "regret_20pct_abs": 0.9336672464958836,
+      "realized_delta_q_20pct": 0.4926874813163701
+    },
+    "Error \u00d7 Influence": {
+      "spearman_rho": 0.2567737020977382,
+      "p_val": 0.0010468453113876676,
+      "ndcg_20pct": 0.5720002609247905,
+      "overlap_10pct": 0.0,
+      "overlap_20pct": 0.21875,
+      "ose_20pct": 0.33618285409044024,
+      "regret_20pct_abs": 0.9468387211091087,
+      "realized_delta_q_20pct": 0.47951600670314504
+    },
+    "Binary": {
+      "spearman_rho": 0.14397953550692827,
+      "p_val": 0.06930757317285312,
+      "ndcg_20pct": 0.5743709496911081,
+      "overlap_10pct": 0.125,
+      "overlap_20pct": 0.15625,
+      "ose_20pct": 0.28822974650544986,
+      "regret_20pct_abs": 1.0152368633057804,
+      "realized_delta_q_20pct": 0.41111786450647325
+    },
+    "Heuristic Knapsack": {
+      "spearman_rho": -0.2091204734559944,
+      "p_val": 0.007957767341141269,
+      "ndcg_20pct": 0.5245147215623718,
+      "overlap_10pct": 0.0,
+      "overlap_20pct": 0.125,
+      "ose_20pct": 0.17771878251419465,
+      "regret_20pct_abs": 1.1728647003749066,
+      "realized_delta_q_20pct": 0.25349002743734705
+    },
+    "Learned Two-Head (Ours)": {
+      "spearman_rho": 0.22957635063869683,
+      "p_val": 0.0034972203070506407,
+      "ndcg_20pct": 0.6059224817004628,
+      "overlap_10pct": 0.1875,
+      "overlap_20pct": 0.34375,
+      "ose_20pct": 0.32501909532589746,
+      "regret_20pct_abs": 0.9627622013147074,
+      "realized_delta_q_20pct": 0.46359252649754634
+    },
+    "Oracle (Reference)": {
+      "spearman_rho": 1.0,
+      "p_val": 0.0,
+      "ndcg_20pct": 0.9999995885915649,
+      "overlap_10pct": 1.0,
+      "overlap_20pct": 1.0,
+      "ose_20pct": 0.9999999929891213,
+      "regret_20pct_abs": 0.0,
+      "realized_delta_q_20pct": 1.4263547278122537
+    }
+  },
+  "learned_spearman_rho": 0.22957635063869683,
+  "learned_ndcg_20pct": 0.6059224817004628,
+  "learned_ose_20pct": 0.32501909532589746,
+  "learned_realized_delta_q": 0.46359252649754634,
+  "heuristic_ose_20pct": 0.17771878251419465,
+  "error_ose_20pct": 0.34541721512563933,
+  "gain_vs_heuristic_ose": 0.1473003128117028
+}

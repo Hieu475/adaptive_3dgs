@@ -8,3 +8,8 @@
 !online_trajectory/per_frame_deltas.csv
 !online_trajectory/latency_breakdown.csv
 !budget_sweep/pareto_frontier.csv
+!seeds/**/*.json
+!statistics/*.json
+!statistics/*.csv
+!generalization/*.json
+!master/*.json

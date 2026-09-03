@@ -1,0 +1,80 @@
+{
+  "seed": 43,
+  "gate": "gate4",
+  "budget_ms": 15.0,
+  "mean_psnr_ours": 7.051383275111774,
+  "mean_psnr_error": 7.0521672161258,
+  "mean_psnr_random": 7.05149893306038,
+  "delta_q_vs_error_mean": -0.0007839410140254509,
+  "delta_q_vs_error_median": 8.328650288014217e-05,
+  "delta_q_vs_random_mean": -0.00011565794860476533,
+  "latency_breakdown": {
+    "full": {
+      "mean_opt_ms": 138.32490298212792,
+      "median_opt_ms": 136.2285614013672,
+      "p90_opt_ms": 162.7314567565918,
+      "p95_opt_ms": 165.43912887573242,
+      "p99_opt_ms": 182.36042976379386,
+      "max_opt_ms": 191.68496131896973,
+      "mean_frame_ms": 1305.9207955185248,
+      "median_frame_ms": 1316.0943984985352,
+      "p95_frame_ms": 1705.2732944488525,
+      "violation_rate_pct": 0.0
+    },
+    "random": {
+      "mean_opt_ms": 111.1109159430679,
+      "median_opt_ms": 111.54532432556152,
+      "p90_opt_ms": 124.01313781738281,
+      "p95_opt_ms": 126.5242576599121,
+      "p99_opt_ms": 132.98306465148923,
+      "max_opt_ms": 137.0251178741455,
+      "mean_frame_ms": 1344.0527380729209,
+      "median_frame_ms": 1316.8559074401855,
+      "p95_frame_ms": 1742.5691604614258,
+      "violation_rate_pct": 100.0
+    },
+    "error_only": {
+      "mean_opt_ms": 110.79705004789392,
+      "median_opt_ms": 107.8193187713623,
+      "p90_opt_ms": 125.57353973388672,
+      "p95_opt_ms": 129.88743782043454,
+      "p99_opt_ms": 142.5714778900146,
+      "max_opt_ms": 149.60455894470215,
+      "mean_frame_ms": 1387.0461327689034,
+      "median_frame_ms": 1398.6527919769287,
+      "p95_frame_ms": 1791.8047428131101,
+      "violation_rate_pct": 100.0
+    },
+    "ours": {
+      "mean_opt_ms": 67.82226659813706,
+      "median_opt_ms": 68.6483383178711,
+      "p90_opt_ms": 84.57560539245605,
+      "p95_opt_ms": 87.76059150695801,
+      "p99_opt_ms": 92.74015426635741,
+      "max_opt_ms": 93.8267707824707,
+      "mean_frame_ms": 1413.5010096491599,
+      "median_frame_ms": 1456.369161605835,
+      "p95_frame_ms": 1883.6776733398438,
+      "violation_rate_pct": 100.0
+    }
+  },
+  "violation_rate_pct": 100.0,
+  "trajectory_summary": {
+    "full": {
+      "final_psnr": 5.66461980342865,
+      "final_gaussians": 3598
+    },
+    "random": {
+      "final_psnr": 5.476129651069641,
+      "final_gaussians": 3605
+    },
+    "error_only": {
+      "final_psnr": 5.66461980342865,
+      "final_gaussians": 3598
+    },
+    "ours": {
+      "final_psnr": 5.66461980342865,
+      "final_gaussians": 3598
+    }
+  }
+}
