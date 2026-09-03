@@ -7,6 +7,8 @@ Tests:
 """
 import pytest
 import torch
+import numpy as np
+import math
 
 from research.pipeline import OnlineReconstructionPipeline
 
@@ -148,5 +150,113 @@ def test_oracle_group_interaction():
         assert 'additivity_ratio_mean' in group_res['group_size_2']
 
 
+def hash_gaussian_state(model, optimizer=None):
+    """Compute SHA-256 cryptographic hash over all model parameters, buffers, and optimizer states."""
+    import hashlib
+    hasher = hashlib.sha256()
+    for name, param in sorted(model.named_parameters()):
+        hasher.update(name.encode())
+        hasher.update(param.detach().cpu().numpy().tobytes())
+    for name, buf in sorted(model.named_buffers()):
+        hasher.update(name.encode())
+        hasher.update(buf.detach().cpu().numpy().tobytes())
+    if optimizer is not None:
+        state_dict = optimizer.state_dict()
+        for k in sorted(state_dict.keys(), key=lambda x: str(x)):
+            v = state_dict[k]
+            if isinstance(v, torch.Tensor):
+                hasher.update(v.detach().cpu().numpy().tobytes())
+    return hasher.hexdigest()
+
+
+def test_oracle_snapshot_restore_exact_state_hash():
+    """Phase 2.1 Audit: Assert cryptographic equality of positions, scale, rotation, opacity, SH, and optimizer states."""
+    from research.oracle_utility import OracleUtilityExperiment, SamplingPopulation
+    pipeline = OnlineReconstructionPipeline(device='cpu')
+    
+    H, W = 32, 40
+    torch.manual_seed(42)
+    rgb = torch.rand(H, W, 3)
+    depth = torch.ones(H, W) * 2.0
+    fx, fy = 80.0, 80.0
+    intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
+    
+    pipeline.initialize(rgb, depth, intrinsics)
+    pipeline.process_frame(rgb, depth)
+    
+    # Snapshot baseline states
+    state_before_hash = hash_gaussian_state(pipeline.gaussian_model, pipeline.optimizer)
+    orig_xyz = pipeline.gaussian_model._xyz.clone()
+    orig_scaling = pipeline.gaussian_model._scaling.clone()
+    orig_rotation = pipeline.gaussian_model._rotation.clone()
+    orig_opacity = pipeline.gaussian_model._opacity.clone()
+    orig_dc = pipeline.gaussian_model._features_dc.clone()
+    orig_rest = pipeline.gaussian_model._features_rest.clone()
+    orig_normals = pipeline.gaussian_model._normals.clone()
+    
+    # 1. Test isolated trial via evaluate_gaussian_update
+    frame = {'rgb': rgb, 'depth': depth, 'pose': torch.eye(4)}
+    res = pipeline.evaluate_gaussian_update(torch.tensor([2, 3]), frame, n_steps=4)
+    state_after_single = hash_gaussian_state(pipeline.gaussian_model, pipeline.optimizer)
+    
+    assert state_before_hash == state_after_single, "State hash must be identical after evaluate_gaussian_update"
+    assert torch.equal(pipeline.gaussian_model._xyz, orig_xyz)
+    assert torch.equal(pipeline.gaussian_model._scaling, orig_scaling)
+    assert torch.equal(pipeline.gaussian_model._rotation, orig_rotation)
+    assert torch.equal(pipeline.gaussian_model._opacity, orig_opacity)
+    assert torch.equal(pipeline.gaussian_model._features_dc, orig_dc)
+    assert torch.equal(pipeline.gaussian_model._features_rest, orig_rest)
+    assert torch.equal(pipeline.gaussian_model._normals, orig_normals)
+    
+    # 2. Test multi-sample stratified intervention via OracleUtilityExperiment
+    exp = OracleUtilityExperiment(pipeline=pipeline, n_samples=6, n_opt_steps=3, seed=42)
+    exp.run_oracle_experiment(rgb, depth, population_type=SamplingPopulation.GEOMETRY_STRATIFIED)
+    state_after_oracle = hash_gaussian_state(pipeline.gaussian_model, pipeline.optimizer)
+    
+    assert state_before_hash == state_after_oracle, "State hash must be identical after full Oracle experiment"
+    assert torch.equal(pipeline.gaussian_model._xyz, orig_xyz)
+    assert torch.equal(pipeline.gaussian_model._scaling, orig_scaling)
+    assert torch.equal(pipeline.gaussian_model._rotation, orig_rotation)
+    assert torch.equal(pipeline.gaussian_model._opacity, orig_opacity)
+    assert torch.equal(pipeline.gaussian_model._features_dc, orig_dc)
+    assert torch.equal(pipeline.gaussian_model._features_rest, orig_rest)
+    assert torch.equal(pipeline.gaussian_model._normals, orig_normals)
+
+
+def test_no_oracle_leakage_in_features():
+    """Phase 2.2 Audit: Ensure zero data leakage of post-optimization metrics into state feature inputs."""
+    from research.oracle_utility import OracleUtilityExperiment, SamplingPopulation
+    pipeline = OnlineReconstructionPipeline(device='cpu')
+    
+    H, W = 32, 40
+    torch.manual_seed(42)
+    rgb = torch.rand(H, W, 3)
+    depth = torch.ones(H, W) * 2.0
+    fx, fy = 80.0, 80.0
+    intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
+    
+    pipeline.initialize(rgb, depth, intrinsics)
+    pipeline.process_frame(rgb, depth)
+    
+    exp = OracleUtilityExperiment(pipeline=pipeline, n_samples=8, n_opt_steps=2, seed=42)
+    results = exp.run_oracle_experiment(rgb, depth, population_type=SamplingPopulation.GEOMETRY_STRATIFIED)
+    
+    forbidden_tokens = ['oracle', 'delta', 'post_', 'after', 'trial_cost', 'gain']
+    for row in results:
+        feats = row.get('features', {})
+        assert len(feats) > 0, "Features dict must not be empty"
+        for k in feats.keys():
+            k_lower = k.lower()
+            for token in forbidden_tokens:
+                assert token not in k_lower, f"Leakage violation: forbidden token '{token}' in input feature key '{k}'"
+                
+        # Validate that all features are finite numeric values
+        for k, v in feats.items():
+            assert not np.isnan(v), f"Feature {k} contains NaN"
+            assert not np.isinf(v), f"Feature {k} contains Inf"
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
+
+

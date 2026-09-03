@@ -2,3 +2,9 @@
 *.csv
 *.png
 !.gitkeep
+!results_frozen.json
+!figures/*.png
+!gate1_headroom/group_interaction_curve.csv
+!online_trajectory/per_frame_deltas.csv
+!online_trajectory/latency_breakdown.csv
+!budget_sweep/pareto_frontier.csv

@@ -62,7 +62,7 @@ def main():
     data_path = os.path.join(repo_root, 'datasets', 'TUM', 'rgbd_dataset_freiburg1_desk')
     
     H, W = 120, 160
-    eval_frames_idx = [15, 20, 25, 30]
+    eval_frames_idx = [15, 20, 25, 30, 35, 40, 45, 50, 55, 60]
     max_frames = max(eval_frames_idx) + 1
     
     frames, intrinsics = load_tum_sequence(data_path, n_frames=max_frames, H=H, W=W, device=device)

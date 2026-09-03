@@ -254,6 +254,8 @@ class GaussianImportanceEstimator:
         self._zero_contrib_frames[~no_contrib] = 0
         
         self._screen_areas = screen_areas
+        if hasattr(self, '_positions') and self._positions is not None:
+            self._prev_positions = self._positions.clone()
         self._positions = positions.detach().clone()
         self._frame_count += 1
     
@@ -553,4 +555,44 @@ class GaussianImportanceEstimator:
         if hasattr(self, '_state_switch_count') and self._state_switch_count is not None:
             self._state_switch_count = torch.cat([
                 self._state_switch_count, torch.zeros(n_new, dtype=torch.long, device=device)])
+
+    @torch.no_grad()
+    def prune_buffers(self, keep_mask: torch.Tensor):
+        """Prune running buffers according to keep_mask so that surviving Gaussians preserve exact history."""
+        if self._running_depth_error is not None:
+            mask = keep_mask[:self._running_depth_error.shape[0]]
+            self._running_depth_error = self._running_depth_error[mask]
+        if self._running_color_error is not None:
+            mask = keep_mask[:self._running_color_error.shape[0]]
+            self._running_color_error = self._running_color_error[mask]
+        if self._running_normal_error is not None:
+            mask = keep_mask[:self._running_normal_error.shape[0]]
+            self._running_normal_error = self._running_normal_error[mask]
+        if self._running_error_fast is not None:
+            mask = keep_mask[:self._running_error_fast.shape[0]]
+            self._running_error_fast = self._running_error_fast[mask]
+        if self._running_error_slow is not None:
+            mask = keep_mask[:self._running_error_slow.shape[0]]
+            self._running_error_slow = self._running_error_slow[mask]
+        if self._visibility_count is not None:
+            mask = keep_mask[:self._visibility_count.shape[0]]
+            self._visibility_count = self._visibility_count[mask]
+        if self._prev_positions is not None and self._prev_positions.shape[0] == keep_mask.shape[0]:
+            self._prev_positions = self._prev_positions[keep_mask]
+        if self._zero_contrib_frames is not None:
+            mask = keep_mask[:self._zero_contrib_frames.shape[0]]
+            self._zero_contrib_frames = self._zero_contrib_frames[mask]
+        if self._creation_frame is not None:
+            mask = keep_mask[:self._creation_frame.shape[0]]
+            self._creation_frame = self._creation_frame[mask]
+        if hasattr(self, '_screen_areas') and self._screen_areas is not None:
+            mask = keep_mask[:self._screen_areas.shape[0]]
+            self._screen_areas = self._screen_areas[mask]
+        if hasattr(self, '_prev_tiers') and self._prev_tiers is not None:
+            mask = keep_mask[:self._prev_tiers.shape[0]]
+            self._prev_tiers = self._prev_tiers[mask]
+        if hasattr(self, '_state_switch_count') and self._state_switch_count is not None:
+            mask = keep_mask[:self._state_switch_count.shape[0]]
+            self._state_switch_count = self._state_switch_count[mask]
+
 

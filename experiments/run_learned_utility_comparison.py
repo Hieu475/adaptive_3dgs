@@ -78,8 +78,9 @@ def run_learned_utility_comparison():
         inf = r.get('influence_mass', 0.0)
         area = r.get('projected_area', 0.0)
         cost = r.get('modeled_marginal_cost_us', 1.0)
+        rgb_err = float(r.get('features', {}).get('rgb_error', 0.0))
         
-        X.append([imp, inf, area, float(r.get('delta_psnr_local', 0.0)), cost])
+        X.append([imp, inf, area, rgb_err, cost])
         y_oracle.append(r.get('oracle_utility', 0.0))
         y_delta_q.append(r.get('delta_quality_local', 0.0))
         imp_scores.append(imp)

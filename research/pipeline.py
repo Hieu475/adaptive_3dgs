@@ -526,9 +526,10 @@ class OnlineReconstructionPipeline:
             prune_patience=self.importance_estimator.prune_patience,
         )
         
-        # Compact every 100 frames — preserve optimizer momentum
+        # Compact every 100 frames — preserve optimizer momentum and state store identity
         if self.frame_count % 100 == 0:
             keep_mask = self.gaussian_model.compact()
+            self.importance_estimator.prune_buffers(keep_mask)
             if self.optimizer is not None:
                 # Prune optimizer state to match compacted parameters
                 self.optimizer.prune_state(keep_mask)
@@ -644,6 +645,10 @@ class OnlineReconstructionPipeline:
             temporal_change[:min_len] = (
                 self.importance_estimator._positions[:min_len] - self.importance_estimator._prev_positions[:min_len]
             ).norm(dim=-1)
+        if self.importance_estimator._running_error_fast is not None and self.importance_estimator._running_error_slow is not None:
+            res_drift = (self.importance_estimator._running_error_fast[:N] - self.importance_estimator._running_error_slow[:N]).abs()
+            temporal_change = temporal_change + res_drift
+
             
         if hasattr(self.gaussian_model, '_confidence') and self.gaussian_model._confidence is not None:
             confidence = self.gaussian_model._confidence[:N].squeeze(-1)

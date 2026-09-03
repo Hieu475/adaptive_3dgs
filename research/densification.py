@@ -367,7 +367,7 @@ def importance_driven_densification(
         'features_rest': model._features_rest.data[idx],
         'normals': model._normals.data[idx],
     }
-    model.add_gaussians(new_params)
+    model.add_gaussians(new_params, parent_indices=idx)
 
 
 def prune_low_value(

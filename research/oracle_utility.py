@@ -1030,6 +1030,76 @@ class OracleUtilityExperiment:
             
         return group_interaction_results
 
+    def evaluate_diminishing_returns(
+        self,
+        rgb: torch.Tensor,
+        depth: torch.Tensor,
+        candidate_indices: List[int],
+        n_trials: int = 10,
+        size_a: int = 2,
+        size_b: int = 6,
+    ) -> Dict[str, Any]:
+        """Empirically evaluate diminishing marginal returns: Delta_i(A) >= Delta_i(B) for A subset B."""
+        H, W = rgb.shape[:2]
+        full_mask = torch.ones(H, W, dtype=torch.bool, device=rgb.device)
+        
+        candidates = list(candidate_indices)
+        if len(candidates) < size_b + 1:
+            return {'error': 'Insufficient candidates for diminishing returns test'}
+            
+        def _get_joint_gain(indices):
+            snap = self.snapshot_state()
+            try:
+                res = self.optimize_gaussian_group(
+                    indices, self.n_opt_steps, rgb, depth, influence_mask=full_mask
+                )
+                return res['delta_quality_global']
+            finally:
+                self.restore_state(snap)
+                
+        trials = []
+        diminishing_count = 0
+        
+        for t in range(n_trials):
+            perm = np.random.permutation(len(candidates))
+            idx_b = [candidates[p] for p in perm[:size_b]]
+            idx_a = idx_b[:size_a]
+            i_elem = candidates[perm[size_b]]
+            
+            # Gains
+            q_a = _get_joint_gain(idx_a)
+            q_a_plus_i = _get_joint_gain(idx_a + [i_elem])
+            delta_i_a = q_a_plus_i - q_a
+            
+            q_b = _get_joint_gain(idx_b)
+            q_b_plus_i = _get_joint_gain(idx_b + [i_elem])
+            delta_i_b = q_b_plus_i - q_b
+            
+            is_diminishing = bool(delta_i_a >= delta_i_b - 1e-7)
+            if is_diminishing:
+                diminishing_count += 1
+                
+            trials.append({
+                'delta_i_A': float(delta_i_a),
+                'delta_i_B': float(delta_i_b),
+                'diminishing': is_diminishing,
+            })
+            
+        mean_delta_a = float(np.mean([t['delta_i_A'] for t in trials]))
+        mean_delta_b = float(np.mean([t['delta_i_B'] for t in trials]))
+        consistency_rate = float(diminishing_count / len(trials)) if trials else 0.0
+        
+        return {
+            'n_trials': len(trials),
+            'size_A': size_a,
+            'size_B': size_b,
+            'mean_marginal_gain_A': mean_delta_a,
+            'mean_marginal_gain_B': mean_delta_b,
+            'diminishing_rate': consistency_rate,
+            'is_diminishing_consistent': bool(mean_delta_a >= mean_delta_b),
+            'trials': trials,
+        }
+
     def compute_correlation_metrics(self, results: List[Dict]) -> Dict[str, Any]:
         """Compute Spearman rank correlations, Overlap@K, Realized Gain, and Regret."""
         visible = [r for r in results if r.get('visible', True) and r.get('n_influence_pixels', 0) > 0]
