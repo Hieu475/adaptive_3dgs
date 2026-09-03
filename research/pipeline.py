@@ -410,16 +410,25 @@ class OnlineReconstructionPipeline:
             ])
             tiers = self.importance_estimator.classify_tier(importance)
         
-        # Estimate per-Gaussian compute costs
-        cost_estimates = estimate_gaussian_costs(
-            screen_areas=getattr(self.importance_estimator, '_screen_areas', None),
-            n_gaussians=N_updated,
-            base_cost_us=self.config['scheduler'].get('cost_per_gaussian_us', 0.5),
-            sh_degree=self.gaussian_model.sh_degree,
-            device=self.device,
-        )
+        # Estimate per-Gaussian compute costs (A2: Controlled Cost Model)
+        use_cost_model = self.config.get('scheduler', {}).get('use_cost_model', True)
+        use_attribution = self.config.get('importance', {}).get('use_attribution', True)
+        if not use_cost_model:
+            cost_estimates = torch.full((N_updated,), 0.5, device=self.device)
+        else:
+            cost_estimates = estimate_gaussian_costs(
+                screen_areas=getattr(self.importance_estimator, '_screen_areas', None) if use_attribution else None,
+                n_gaussians=N_updated,
+                base_cost_us=self.config['scheduler'].get('cost_per_gaussian_us', 0.5),
+                sh_degree=self.gaussian_model.sh_degree,
+                device=self.device,
+            )
         
         policy = self.config['scheduler'].get('policy', 'budget_aware')
+        use_knapsack = self.config.get('scheduler', {}).get('use_knapsack', True)
+        if not use_knapsack and policy in ['budget_aware', 'ours']:
+            policy = 'top_k'  # Greedy top-k utility ranking
+            
         ratio = self.config['scheduler'].get('optimize_ratio', 0.5)
         
         error_scores = None

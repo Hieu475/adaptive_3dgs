@@ -1,0 +1,92 @@
+{
+  "experiment": {
+    "name": "matched_budget_benchmark",
+    "version": "1.0.0",
+    "git_commit": "d0dc782b304ae090c2d754b7855713bed8b3f12c-dirty",
+    "timestamp": "2026-09-03T10:17:04.920034",
+    "seed": 42,
+    "dataset": "TUM-RGBD",
+    "scene": "freiburg1_desk",
+    "frame_range": [
+      0,
+      8
+    ],
+    "hardware": {
+      "os": "Linux-6.8.0-94-generic-x86_64-with-glibc2.39",
+      "python": "3.12.13",
+      "pytorch": "2.11.0+cu128",
+      "cuda_available": true,
+      "cuda_version": "12.8",
+      "device_name": "NVIDIA GeForce RTX 4050 Laptop GPU",
+      "vram_gb": 5.64,
+      "cpu_count": 20
+    },
+    "config": {
+      "relative_budgets": [
+        0.1,
+        0.2,
+        0.4,
+        0.6,
+        0.8
+      ],
+      "device": "cuda"
+    }
+  },
+  "metrics": {
+    "quality": {
+      "psnr_mean": 5.339714884757996,
+      "psnr_std": 0.054810747902926754,
+      "psnr_ci95": [
+        5.2921,
+        5.3917
+      ],
+      "ssim_mean": 0.0,
+      "ssim_std": 0.0,
+      "ssim_ci95": [
+        0.0,
+        0.0
+      ],
+      "depth_l1_mean": 1.4248728156089783,
+      "depth_l1_std": 0.01910922154298832,
+      "depth_l1_ci95": [
+        0.0,
+        0.0
+      ],
+      "delta_psnr_vs_random": 0.0,
+      "delta_psnr_vs_full": 0.0,
+      "per_frame_psnr": [],
+      "per_frame_depth": []
+    },
+    "latency": {
+      "mean_ms": 24.28591251373291,
+      "p50_ms": 24.223923683166504,
+      "p95_ms": 25.841355323791504,
+      "p99_ms": 0.0,
+      "jitter_ms": 1.2419893447099253,
+      "target_budget_ms": 0.0,
+      "utilization_rate": 0.0,
+      "violation_rate": 100.0,
+      "recovery_time_frames": 0.0,
+      "breakdown_ms": {},
+      "per_frame_opt_ms": []
+    },
+    "memory": {
+      "active_gaussians_mean": 0.0,
+      "active_ratio_mean": 0.0,
+      "total_gaussians_final": 0,
+      "gpu_vram_peak_mb": 0.0,
+      "allocated_mb": 0.0
+    },
+    "selection": {
+      "spearman_rho": 0.0,
+      "p_value": 1.0,
+      "overlap_10pct": 0.0,
+      "overlap_20pct": 0.0,
+      "gain_efficiency": 0.0,
+      "gain_ratio_20pct": 0.0,
+      "regret_20pct": 0.0,
+      "switches_per_frame": 0.0,
+      "interaction_error": 0.0
+    }
+  }
+}

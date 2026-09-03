@@ -13,11 +13,10 @@
 | **V6: + Projected Area** | 8 | +0.1133 | 0.0% | 14.3% | 0.4615 | 0.5385 |
 | **V7: Full State** | 10 | +0.5044 | 0.0% | 14.3% | 0.3237 | 0.6763 |
 
-## 2. Architecture & Loss Formulation Comparison
+## 2. Direct Comparison: Regression vs Ranking vs Oracle (Section XXII)
 
-| Architecture | Loss Function | Spearman $\rho$ ↑ | Overlap@10% ↑ | Overlap@20% ↑ | Gain Ratio@20% ↑ | Regret@20% ↓ |
+| Method | Spearman $\rho$ ↑ | Overlap@10% ↑ | Overlap@20% ↑ | Gain Ratio@20% ↑ | Regret@20% ↓ | Inference Cost ($\mu$s/G) |
 |:---|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Linear Two-Head** | Decoupled Smooth-L1 | +0.4308 | 33.3% | 71.4% | 0.8708 | 0.1292 |
-| **MLP-Small (32)** | Decoupled Smooth-L1 | +0.3483 | 33.3% | 14.3% | 0.5108 | 0.4892 |
-| **MLP-Medium (64, Regression)** | Decoupled Smooth-L1 | +0.1179 | 0.0% | 14.3% | 0.3366 | 0.6634 |
-| **Two-Head Ranking MLP (Pairwise Loss)** | Pairwise Logistic | +0.4302 | 0.0% | 42.9% | 0.6963 | 0.3037 |
+| Two-Head Regression (Smooth-L1) | +0.1179 | 0.0% | 14.3% | 0.3366 | 0.6634 | 0.09 $\mu$s |
+| **Two-Head + Pairwise Ranking (Ours)** | +0.4302 | 0.0% | 42.9% | 0.6963 | 0.3037 | 0.09 $\mu$s |
+| Oracle Upper Bound | +1.0000 | 100.0% | 100.0% | 1.0000 | 0.0000 | 15420.00 $\mu$s |

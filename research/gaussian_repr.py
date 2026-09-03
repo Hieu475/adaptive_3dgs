@@ -10,8 +10,9 @@ Each Gaussian G_i = (μ_i, Σ_i, α_i, SH_i) where:
 """
 import torch
 import torch.nn as nn
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 import math
+from research.state_store import GaussianStateStore
 
 
 class GaussianState:
@@ -87,7 +88,15 @@ class GaussianModel(nn.Module):
         # Non-differentiable state
         self.register_buffer('_confidence', torch.empty(0, 1, device=device))
         self.register_buffer('_state', torch.empty(0, dtype=torch.long, device=device))
-    
+        
+        # Persistent Gaussian State Store (Points III & IV)
+        self.state_store = GaussianStateStore(device=device)
+
+    @property
+    def persistent_ids(self) -> torch.Tensor:
+        """Unique persistent IDs tracking Gaussian identity across lifecycle."""
+        return self.state_store.persistent_ids
+
     @property
     def num_gaussians(self) -> int:
         return self._xyz.shape[0]
@@ -279,15 +288,24 @@ class GaussianModel(nn.Module):
         self._confidence = torch.full((N, 1), initial_confidence, device=device)
         self._state = torch.full((N,), GaussianState.UNSTABLE, dtype=torch.long, device=device)
         self._num_gaussians = N
+        self.state_store = GaussianStateStore(device=device)
+        self.state_store.create(N, frame_idx=0)
     
     @torch.no_grad()
-    def add_gaussians(self, new_params: Dict[str, torch.Tensor]):
-        """Add new Gaussians to the model.
+    def add_gaussians(
+        self,
+        new_params: Dict[str, torch.Tensor],
+        parent_indices: Optional[torch.Tensor] = None,
+        frame_idx: int = 0,
+    ):
+        """Add new Gaussians to the model and register persistent identities.
         
         Args:
             new_params: Dict with keys matching parameter names.
                 Required: 'xyz'. Optional: 'scaling', 'rotation', 'opacity',
                 'features_dc', 'features_rest', 'normals', 'confidence'
+            parent_indices: optional (P,) parent indices for lineage tracking
+            frame_idx: video frame index of creation
         """
         new_xyz = new_params['xyz']
         N_new = new_xyz.shape[0]
@@ -316,6 +334,12 @@ class GaussianModel(nn.Module):
         self._state = torch.cat([
             self._state, torch.full((N_new,), GaussianState.UNSTABLE, dtype=torch.long, device=device)], dim=0)
         self._num_gaussians = self._xyz.shape[0]
+        
+        # Register in persistent state store with lineage (Section IV)
+        if parent_indices is not None and len(parent_indices) > 0:
+            self.state_store.register_densification(parent_indices, n_children_per_parent=1, frame_idx=frame_idx)
+        else:
+            self.state_store.create(N_new, frame_idx=frame_idx)
     
     @torch.no_grad()
     def prune_gaussians(self, mask: torch.Tensor):
@@ -345,4 +369,7 @@ class GaussianModel(nn.Module):
         self._confidence = self._confidence[keep]
         self._state = self._state[keep]
         self._num_gaussians = self._xyz.shape[0]
+        
+        # Remap state store after compaction to preserve persistent identities
+        self.state_store.remap_after_pruning(keep)
         return keep

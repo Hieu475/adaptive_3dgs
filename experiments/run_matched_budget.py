@@ -1,23 +1,19 @@
 #!/usr/bin/env python3
-"""Primary Research Experiment — True Matched-Budget Benchmark on Real 3DGS.
+"""Primary Research Experiment — Rigorous Matched-Budget Benchmark on Real 3DGS.
 
-Evaluates 6 Budget-Constrained Policies vs 1 Quality Upper Bound across 5 Relative Budgets:
-    Budgets: B_{rel} ∈ {10%, 20%, 40%, 60%, 80%} of Full Reference Optimization Cost
-
-Policies:
-    - Full: Reference Upper Bound (unconstrained)
-    - Random: Open-Loop Calibrated
-    - Error-Only: Open-Loop Calibrated (Ranked by E_depth + E_color)
-    - Error × Influence: Open-Loop Calibrated (E_i × Influence_i)
-    - Binary: Open-Loop Calibrated (Threshold-based stable/unstable)
-    - Top-K: Open-Loop Calibrated (Continuous multi-signal importance Top-K)
-    - Ours: Budget-Aware Importance/Cost Knapsack Optimization
+Executes:
+    1. Benchmark A (Open-Loop Calibrated):
+       Relative Budgets: B_{rel} ∈ {10%, 20%, 40%, 60%, 80%} of Full Reference Optimization Cost
+       Evaluation strictly with frozen calibrated K on held-out evaluation frames.
+    2. Benchmark B (Closed-Loop Systems):
+       Real-time deadline adherence under 10, 15, 20, 30 ms budgets.
+    3. Reproducibility & Provenance Bundling (Section XXXII).
 
 Metrics:
-    - PSNR (dB) ↑, SSIM ↑, Depth L1 (m) ↓
-    - Measured Compute: p50, p95, p99, Latency Jitter (ms) ↓
-    - Budget Utilization (T/B) and Budget Violation Rate (%) ↓
-    - Gain Efficiency: GE@B = (Q(B) - Q_{random}(B)) / (Q_{oracle}(B) - Q_{random}(B))
+    - PSNR (dB) [Mean & 95% Bootstrap CI], SSIM, Depth L1 (m) [Mean & 95% CI]
+    - Latency: p50, p95, p99, Latency Jitter (ms)
+    - Budget Utilization (T/B) and Budget Violation Rate (%)
+    - Gain Efficiency: GE@B = (Q(B) - Q_{random}(B)) / (Q_{oracle}(B) - Q_{random}(B) + ε)
 """
 import sys
 import os
@@ -26,14 +22,31 @@ import numpy as np
 import time
 import json
 import argparse
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from research.pipeline import OnlineReconstructionPipeline
 from research.matched_budget_benchmark import MatchedBudgetBenchmark, SchedulerMetrics
+from research.schema import (
+    ExperimentMetadata,
+    QualityMetrics,
+    LatencyMetrics,
+    MemoryMetrics,
+    SelectionMetrics,
+    ExperimentMetrics,
+    ExperimentResult,
+)
+from research.reproducibility import (
+    get_git_commit,
+    get_hardware_info,
+    set_seed,
+    save_experiment_bundle,
+    DatasetManifest,
+)
 
 
-def create_benchmark_frames(n_frames: int = 12, H: int = 64, W: int = 80):
+def create_benchmark_frames(n_frames: int = 15, H: int = 64, W: int = 80):
     """Generate structured synthetic benchmark frames."""
     fx, fy = 160.0, 160.0
     intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
@@ -68,11 +81,7 @@ def create_benchmark_frames(n_frames: int = 12, H: int = 64, W: int = 80):
         depth = depth + 0.01 * torch.randn_like(depth)
         depth[depth <= 0] = 0.1
         
-        frames.append({
-            'rgb': rgb,
-            'depth': depth,
-            'pose': pose
-        })
+        frames.append({'rgb': rgb, 'depth': depth, 'pose': pose})
         
     return frames, intrinsics
 
@@ -114,19 +123,25 @@ def main():
     parser.add_argument('--n_frames', type=int, default=15)
     parser.add_argument('--frames', type=int, default=None, help='Alias for n_frames')
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
+    parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--synthetic', action='store_true', default=False)
     args = parser.parse_args()
     if args.frames is not None:
         args.n_frames = args.frames
+        
+    set_seed(args.seed)
     
     print("=" * 85)
-    print("      R36 PRIMARY RESEARCH BENCHMARK: OPEN-LOOP CALIBRATED MATCHED-BUDGET")
+    print("      FINAL MATCHED-BUDGET SCIENTIFIC BENCHMARK (SECTIONS X–XVIII)")
     print("=" * 85)
-    print(f"Device: {args.device} | Frames: {args.n_frames}")
+    print(f"Device: {args.device} | Total Frames: {args.n_frames} | Seed: {args.seed}")
     
     # Dataset setup
     frames, intrinsics = None, None
     tum_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'datasets', 'TUM', 'rgbd_dataset_freiburg1_desk')
+    dataset_name = "Synthetic"
+    scene_name = "benchmark_box"
+    
     if os.path.exists(tum_path) and not args.synthetic:
         try:
             from datasets.tum_dataset import TUMDataset
@@ -148,6 +163,8 @@ def main():
                 depth_down = torch.nn.functional.interpolate(depth_t, size=(target_h, target_w), mode='nearest')[0, 0]
                 frames.append({'rgb': rgb_down, 'depth': depth_down, 'pose': rf.get('pose', torch.eye(4)), 'intrinsics': intrinsics})
                 
+            dataset_name = "TUM-RGBD"
+            scene_name = "freiburg1_desk"
             print(f"[Dataset] Loaded {len(frames)} frames from TUM RGB-D ({target_w}x{target_h})")
         except Exception as e:
             print(f"[Dataset] TUM load fallback: {e}")
@@ -157,19 +174,41 @@ def main():
         print("[Dataset] Using synthetic structured benchmark frames")
         frames, intrinsics = create_benchmark_frames(n_frames=args.n_frames)
     
+    # 1. Dataset Manifest (Section XXXIII)
+    manifest = DatasetManifest(
+        dataset=dataset_name,
+        sequence=scene_name,
+        frames=list(range(len(frames))),
+        rgb_resolution=(frames[0]['rgb'].shape[0], frames[0]['rgb'].shape[1]),
+        depth_scale=5000.0 if dataset_name == "TUM-RGBD" else 1.0,
+        pose_source="ground_truth",
+    )
+    
     relative_budgets = [0.10, 0.20, 0.40, 0.60, 0.80]
-    benchmark = MatchedBudgetBenchmark(relative_budgets=relative_budgets, device=args.device)
+    benchmark = MatchedBudgetBenchmark(
+        relative_budgets=relative_budgets, device=args.device, seed=args.seed
+    )
     
     start_time = time.time()
-    results, meta = benchmark.run_full_suite(real_pipeline_factory, frames, intrinsics)
+    
+    # Run Benchmark A: Open-Loop Calibrated
+    open_loop_results, meta = benchmark.run_benchmark_a_open_loop(
+        real_pipeline_factory, frames, intrinsics, calib_fraction=0.35
+    )
+    
+    # Run Benchmark B: Closed-Loop Systems
+    eval_frames = frames[meta['n_calib_frames']:]
+    closed_loop_results = benchmark.run_benchmark_b_closed_loop(
+        real_pipeline_factory, eval_frames, intrinsics, target_budgets_ms=[10.0, 15.0, 20.0, 30.0]
+    )
+    
     total_time = time.time() - start_time
+    print(f"\nComplete Matched-Budget Evaluation finished in {total_time:.1f}s")
     
-    print(f"\nBenchmark suite completed in {total_time:.1f}s")
-    
-    table_md = benchmark.format_results_markdown(results, meta)
+    table_md = benchmark.format_markdown_table(open_loop_results, meta)
     print("\n" + table_md)
     
-    # Save artifacts
+    # Save artifacts in results/matched_budget/
     save_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'matched_budget')
     os.makedirs(save_dir, exist_ok=True)
     
@@ -180,25 +219,69 @@ def main():
         
     json_path = os.path.join(save_dir, 'benchmark_results.json')
     with open(json_path, 'w') as f:
-        json.dump(results, f, indent=2)
+        json.dump(open_loop_results, f, indent=2)
         
-    # Export Pareto curve data (Quality vs Compute: x = T_opt, y = PSNR)
+    # Export Pareto curve data
     pareto_csv = os.path.join(save_dir, 'pareto_quality_vs_compute.csv')
     with open(pareto_csv, 'w') as f:
-        f.write("relative_budget,budget_ms,policy,measured_compute_ms,p50_ms,p95_ms,jitter,utilization,violation_rate,psnr,depth_l1,gain_efficiency\n")
-        for r in results:
+        f.write("relative_budget,budget_ms,policy,measured_compute_ms,p50_ms,p95_ms,jitter,utilization,violation_rate,psnr,psnr_ci_low,psnr_ci_high,depth_l1,gain_efficiency\n")
+        for r in open_loop_results:
+            ci = r.get('psnr_ci95', (r['avg_psnr'], r['avg_psnr']))
             f.write(
                 f"{r.get('relative_budget', 1.0)},{r.get('budget_ms', 0.0):.2f},"
                 f"{r['policy_name']},{r['measured_compute_ms']:.3f},{r['p50_ms']:.3f},"
                 f"{r['p95_ms']:.3f},{r['jitter']:.3f},{r.get('budget_utilization', 0.0)*100:.1f}%,"
-                f"{r.get('violation_rate', 0.0):.1f}%,{r['avg_psnr']:.3f},{r['avg_depth_l1']:.4f},"
-                f"{r.get('gain_efficiency', 0.0):.4f}\n"
+                f"{r.get('violation_rate', 0.0):.1f}%,{r['avg_psnr']:.3f},{ci[0]:.3f},{ci[1]:.3f},"
+                f"{r['avg_depth_l1']:.4f},{r.get('gain_efficiency', 0.0):.4f}\n"
             )
             
+    # Save Immutable-ish Run Bundle (Section XXXII)
+    time_tag = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = os.path.join(save_dir, f"run_{time_tag}_seed{args.seed}")
+    
+    ours_eval = next((r for r in open_loop_results if r['policy_name'] == 'ours' and r.get('relative_budget') == 0.40), open_loop_results[0])
+    ci = ours_eval.get('psnr_ci95', (ours_eval['avg_psnr'], ours_eval['avg_psnr']))
+    
+    meta_obj = ExperimentMetadata(
+        name="matched_budget_benchmark",
+        version="1.0.0",
+        git_commit=get_git_commit(),
+        timestamp=datetime.now().isoformat(),
+        seed=args.seed,
+        dataset=dataset_name,
+        scene=scene_name,
+        frame_range=[0, len(frames)],
+        hardware=get_hardware_info(),
+        config={'relative_budgets': relative_budgets, 'device': args.device},
+    )
+    metrics_obj = ExperimentMetrics(
+        quality=QualityMetrics(
+            psnr_mean=ours_eval['avg_psnr'],
+            psnr_std=ours_eval.get('psnr_std', 0.0),
+            psnr_ci95=ci,
+            depth_l1_mean=ours_eval['avg_depth_l1'],
+            depth_l1_std=ours_eval.get('depth_l1_std', 0.0),
+        ),
+        latency=LatencyMetrics(
+            mean_ms=ours_eval['measured_compute_ms'],
+            p50_ms=ours_eval['p50_ms'],
+            p95_ms=ours_eval['p95_ms'],
+            jitter_ms=ours_eval['jitter'],
+            violation_rate=ours_eval['violation_rate'],
+        ),
+        selection=SelectionMetrics(
+            gain_efficiency=ours_eval.get('gain_efficiency', 0.0),
+        ),
+    )
+    bundle_result = ExperimentResult(experiment=meta_obj, metrics=metrics_obj)
+    save_experiment_bundle(bundle_result, run_dir, markdown_report=table_md)
+    manifest.save(os.path.join(run_dir, "dataset_manifest.json"))
+    
     print(f"\n[Artifacts] Successfully updated:")
     print(f"  - {save_path}")
     print(f"  - {json_path}")
     print(f"  - {pareto_csv}")
+    print(f"  - Bundle: {run_dir}")
 
 
 if __name__ == "__main__":

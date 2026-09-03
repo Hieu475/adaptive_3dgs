@@ -1,18 +1,19 @@
 """
-Matched-Budget Benchmark for Adaptive 3DGS.
+Rigorous Matched-Budget Benchmark for Adaptive 3DGS (Sections X–XVIII).
 
-Implements Approach A (Open-Loop Calibrated Matched Budget, Points 9–13):
-1. Measures unconstrained Full-optimization reference cost T_{full} and quality Q_{full}.
-2. Defines relative budgets B_{rel} ∈ {10%, 20%, 40%, 60%, 80%} (and absolute B = B_{rel} · T_{full}).
-3. Performs offline/open-loop per-policy calibration:
-       For each policy P ∈ {Random, Error-Only, Error×Influence, Binary, Top-K, Ours}:
-           Calibrate K_P(B) so that E[T_{opt}(P)] ≈ B (±5% tolerance)
-4. Benchmarks quality under strictly matched compute:
-       - PSNR ↑, SSIM ↑, Depth L1 ↓
-       - Measured Compute: p50, p95, p99, Latency Jitter
-       - Budget Utilization (T/B) and Budget Violation Rate (%)
-       - Gain Efficiency (Point 29):
-             GE@B = (Q(B) - Q_{random}(B)) / (Q_{oracle}(B) - Q_{random}(B))
+Implements:
+1. Calibration independent of Evaluation (Section XI):
+       Frames 0..N_calib  -> Calibrate and freeze K_P(B)
+       Frames N_calib..N  -> Evaluate strictly with frozen K_P(B)
+2. Benchmark A (Open-Loop, Section XIII):
+       Answers: "Under strictly matched compute, which selection policy delivers superior quality?"
+       Budgets: B_r = r · T_{full} for r ∈ {0.10, 0.20, 0.40, 0.60, 0.80}
+       Metrics: PSNR (mean ± 95% CI), Depth L1 (mean ± 95% CI), Gain Efficiency (GE@B ± CI)
+3. Benchmark B (Closed-Loop Systems Benchmark, Section XIII):
+       Answers: "Can the adaptive feedback scheduler strictly maintain hard real-time deadlines?"
+       Metrics: ViolationRate (%), p50/p95/p99 latency (ms), Jitter (ms), Recovery Time (frames)
+4. Paired Sample Hypothesis Testing (Section XVII):
+       ΔQ_t = Q_{ours, t} - Q_{baseline, t} with empirical bootstrap 95% CI.
 """
 import time
 import math
@@ -20,9 +21,26 @@ import numpy as np
 import torch
 from typing import Dict, List, Callable, Any, Optional, Tuple
 
+from research.schema import (
+    ExperimentMetadata,
+    QualityMetrics,
+    LatencyMetrics,
+    MemoryMetrics,
+    SelectionMetrics,
+    ExperimentMetrics,
+    ExperimentResult,
+)
+from research.reproducibility import (
+    get_git_commit,
+    get_hardware_info,
+    set_seed,
+    bootstrap_ci,
+    save_experiment_bundle,
+)
+
 
 class SchedulerMetrics:
-    """Tracks latency, jitter, recovery frames, and budget violations."""
+    """Tracks latency distribution, jitter, recovery frames, and budget violations."""
     def __init__(self):
         self.latencies: List[float] = []
         self.budgets: List[float] = []
@@ -82,15 +100,17 @@ class SchedulerMetrics:
 
 
 class MatchedBudgetBenchmark:
-    """Primary benchmark executing strict Open-Loop Calibrated Matched-Budget evaluations."""
+    """Primary research benchmark executing strict Open-Loop and Closed-Loop evaluations."""
     
     def __init__(
         self,
         relative_budgets: List[float] = [0.10, 0.20, 0.40, 0.60, 0.80],
         device: str = 'cuda' if torch.cuda.is_available() else 'cpu',
+        seed: int = 42,
     ):
         self.relative_budgets = relative_budgets
         self.device = device
+        self.seed = seed
         self.policies = [
             'random',
             'error_only',
@@ -107,16 +127,13 @@ class MatchedBudgetBenchmark:
         intrinsics: Any,
         target_budget_ms: float,
         policy: str,
-        max_gaussians: int = 1000,
     ) -> int:
-        """Calibrate Gaussian count K for a policy so that E[T_opt] ≈ target_budget_ms (Point 11)."""
+        """Calibrate Gaussian count K on calibration frames and freeze it (Section XI)."""
         if policy == 'ours':
             return 0  # Ours uses dynamic knapsack solver internally
             
-        # Initial guess from linear interpolation
-        k_current = max(4, int(max_gaussians * (target_budget_ms / max(target_budget_ms * 2.0, 50.0))))
+        k_current = max(4, int(200 * (target_budget_ms / max(target_budget_ms * 2.0, 50.0))))
         
-        # Fast 2-iteration adjustment loop
         for iteration in range(2):
             config_overrides = {
                 'scheduler': {
@@ -129,7 +146,7 @@ class MatchedBudgetBenchmark:
             p.initialize(calib_frames[0]['rgb'], calib_frames[0]['depth'], intrinsics, calib_frames[0].get('pose'))
             
             latencies = []
-            for f in calib_frames[1:3]:
+            for f in calib_frames[1:min(4, len(calib_frames))]:
                 res = p.process_frame(f['rgb'], f['depth'], f.get('pose'))
                 latencies.append(res.get('opt_time_ms', 1.0))
                 
@@ -145,22 +162,22 @@ class MatchedBudgetBenchmark:
             
         return k_current
 
-    def run_single_budget(
+    def evaluate_policy_on_frames(
         self,
         pipeline_factory: Callable,
-        frames: List[Dict],
+        eval_frames: List[Dict],
         intrinsics: Any,
         budget_ms: float,
         policy: str,
-        calibrated_k: Optional[int] = None,
+        frozen_k: Optional[int] = None,
         relative_budget: float = 0.5,
     ) -> Dict[str, Any]:
-        """Execute evaluation run for a policy under a calibrated compute target."""
+        """Evaluate a policy on held-out evaluation frames using frozen calibrated K."""
         config_overrides = {
             'scheduler': {
                 'policy': policy,
                 'gpu_budget_ms': budget_ms,
-                'top_k': calibrated_k if (calibrated_k is not None and policy != 'ours') else None,
+                'top_k': frozen_k if (frozen_k is not None and policy != 'ours') else None,
             }
         }
         
@@ -174,10 +191,9 @@ class MatchedBudgetBenchmark:
         n_actives = []
         n_totals = []
         
-        # Initialize
-        pipeline.initialize(frames[0]['rgb'], frames[0]['depth'], intrinsics, frames[0].get('pose'))
+        pipeline.initialize(eval_frames[0]['rgb'], eval_frames[0]['depth'], intrinsics, eval_frames[0].get('pose'))
         
-        for frame in frames[1:]:
+        for frame in eval_frames[1:]:
             res = pipeline.process_frame(frame['rgb'], frame['depth'], frame.get('pose'))
             opt_time = res.get('opt_time_ms', 0.0)
             metrics.record_frame(opt_time, budget_ms)
@@ -195,14 +211,22 @@ class MatchedBudgetBenchmark:
         measured_ms = summary['mean_latency']
         utilization = (measured_ms / budget_ms) if budget_ms > 0 else 1.0
         
+        # Bootstrap 95% Confidence Intervals (Section XVIII)
+        psnr_ci = bootstrap_ci(psnrs, stat_fn=np.mean, n_boot=500, ci=0.95, seed=self.seed)
+        depth_ci = bootstrap_ci(depth_l1s, stat_fn=np.mean, n_boot=500, ci=0.95, seed=self.seed)
+        
         return {
             'policy_name': policy,
             'relative_budget': relative_budget,
             'budget_ms': budget_ms,
-            'calibrated_k': calibrated_k,
+            'frozen_k': frozen_k,
             'avg_psnr': float(np.mean(psnrs)) if psnrs else 0.0,
+            'psnr_std': float(np.std(psnrs)) if psnrs else 0.0,
+            'psnr_ci95': psnr_ci,
             'avg_ssim': float(np.mean(ssims)) if ssims else 0.0,
             'avg_depth_l1': float(np.mean(depth_l1s)) if depth_l1s else 0.0,
+            'depth_l1_std': float(np.std(depth_l1s)) if depth_l1s else 0.0,
+            'depth_ci95': depth_ci,
             'measured_compute_ms': measured_ms,
             'p50_ms': summary['p50_latency'],
             'p95_ms': summary['p95_latency'],
@@ -212,64 +236,76 @@ class MatchedBudgetBenchmark:
             'violation_rate': summary['violation_rate'] * 100.0,
             'active_gaussians': avg_active,
             'active_ratio': float(avg_active / max(1.0, avg_total)),
-            'n_frames': len(frames),
-            'budget_constrained': "Yes" if policy != 'full' else "No (Reference)",
+            'n_eval_frames': len(eval_frames),
+            'per_frame_psnr': psnrs,
+            'per_frame_depth': depth_l1s,
+            'per_frame_opt_ms': opt_times,
         }
 
-    def run_full_suite(
+    def run_benchmark_a_open_loop(
         self,
         pipeline_factory: Callable,
-        frames: List[Dict],
+        all_frames: List[Dict],
         intrinsics: Any,
-        warmup_calib_frames: Optional[List[Dict]] = None,
+        calib_fraction: float = 0.35,
     ) -> Tuple[List[Dict], Dict[str, Any]]:
-        """Run complete matched-budget suite with relative budget sweeps."""
-        if warmup_calib_frames is None:
-            warmup_calib_frames = frames[:min(4, len(frames))]
-            
+        """Execute Benchmark A (Open-Loop Calibrated Matched Budget, Sections X–XVI)."""
+        n_tot = len(all_frames)
+        n_calib = max(3, int(n_tot * calib_fraction))
+        calib_frames = all_frames[:n_calib]
+        eval_frames = all_frames[n_calib:]
+        
+        print(f"\n[Benchmark A: Open-Loop] Total Frames: {n_tot} | Calibration: {len(calib_frames)} | Evaluation: {len(eval_frames)}")
+        
         results = []
         
-        # 1. Measure Unconstrained Full Optimization Reference (Point 27)
-        print("\n>> Measuring Full-Optimization Reference...")
-        full_res = self.run_single_budget(
-            pipeline_factory, frames, intrinsics, budget_ms=100.0, policy='full', relative_budget=1.0
+        # 1. Unconstrained Full Optimization Reference
+        print(">> Measuring Full-Optimization Reference...")
+        full_eval = self.evaluate_policy_on_frames(
+            pipeline_factory, eval_frames, intrinsics, budget_ms=100.0, policy='full', relative_budget=1.0
         )
-        full_res['policy_name'] = 'Full Reference (Unconstrained)'
-        t_full = max(5.0, full_res['measured_compute_ms'])
-        q_full = full_res['avg_psnr']
-        results.append(full_res)
+        full_eval['policy_name'] = 'Full Reference (Unconstrained)'
+        t_full = max(5.0, full_eval['measured_compute_ms'])
+        q_full = full_eval['avg_psnr']
+        results.append(full_eval)
         print(f"   Reference Opt Time: {t_full:.2f} ms | Reference PSNR: {q_full:.2f} dB")
         
-        # 2. Run Relative Budgets across Policies
-        calibrated_k_table = {}
-        
+        # 2. Relative Budgets with Frozen K
         for rel_b in self.relative_budgets:
             target_b_ms = rel_b * t_full
-            print(f"\n>> Evaluating Budget Level: {int(rel_b*100)}% ({target_b_ms:.2f} ms)")
+            print(f"\n>> Budget Level: {int(rel_b*100)}% ({target_b_ms:.2f} ms target)")
             
-            # Calibrate K for each baseline first
+            # Step A: Offline Calibration on calib_frames
+            calibrated_ks = {}
             for policy in self.policies:
                 if policy != 'ours':
-                    k_calib = self.calibrate_policy_k(
-                        pipeline_factory, warmup_calib_frames, intrinsics, target_b_ms, policy
+                    k_val = self.calibrate_policy_k(
+                        pipeline_factory, calib_frames, intrinsics, target_b_ms, policy
                     )
                 else:
-                    k_calib = None
-                calibrated_k_table[(rel_b, policy)] = k_calib
+                    k_val = None
+                calibrated_ks[policy] = k_val
                 
-                res = self.run_single_budget(
-                    pipeline_factory, frames, intrinsics,
+            # Step B: Evaluation on eval_frames with frozen K
+            for policy in self.policies:
+                k_frozen = calibrated_ks[policy]
+                eval_res = self.evaluate_policy_on_frames(
+                    pipeline_factory, eval_frames, intrinsics,
                     budget_ms=target_b_ms, policy=policy,
-                    calibrated_k=k_calib, relative_budget=rel_b
+                    frozen_k=k_frozen, relative_budget=rel_b
                 )
-                results.append(res)
-                print(f"   [{policy:<18}] K={str(k_calib):<4} | T_opt={res['p50_ms']:5.1f}ms (Util: {res['budget_utilization']*100:5.1f}%) | PSNR: {res['avg_psnr']:5.2f} dB")
+                results.append(eval_res)
+                print(
+                    f"   [{policy:<18}] Frozen K={str(k_frozen):<4} | "
+                    f"T_opt={eval_res['p50_ms']:5.1f}ms (Util: {eval_res['budget_utilization']*100:5.1f}%) | "
+                    f"PSNR: {eval_res['avg_psnr']:5.2f} ± {eval_res['psnr_std']:.2f} dB"
+                )
                 
-        # 3. Compute Gain Efficiency (Point 29)
-        # GE@B = (Q(B) - Q_random(B)) / (Q_upper(B) - Q_random(B))
+        # 3. Compute Gain Efficiency (GE@B) and Paired Differences (ΔQ)
         for rel_b in self.relative_budgets:
             b_rows = [r for r in results if r.get('relative_budget') == rel_b]
             rand_row = next((r for r in b_rows if r['policy_name'] == 'random'), None)
+            ours_row = next((r for r in b_rows if r['policy_name'] == 'ours'), None)
             q_rand = rand_row['avg_psnr'] if rand_row else 0.0
             
             for r in b_rows:
@@ -278,48 +314,89 @@ class MatchedBudgetBenchmark:
                 ge = (q_val - q_rand) / denom
                 r['gain_efficiency'] = float(np.clip(ge, 0.0, 1.0))
                 
+                # Paired sample differences against Ours (Section XVII)
+                if ours_row and 'per_frame_psnr' in r and 'per_frame_psnr' in ours_row:
+                    paired_deltas = [
+                        q_o - q_p for q_o, q_p in zip(ours_row['per_frame_psnr'], r['per_frame_psnr'])
+                    ]
+                    r['delta_psnr_vs_ours_mean'] = float(np.mean(paired_deltas))
+                    r['delta_psnr_ci95'] = bootstrap_ci(paired_deltas, seed=self.seed)
+                else:
+                    r['delta_psnr_vs_ours_mean'] = 0.0
+                    r['delta_psnr_ci95'] = (0.0, 0.0)
+                    
         meta = {
             't_full': t_full,
             'q_full': q_full,
             'relative_budgets': self.relative_budgets,
             'device': self.device,
+            'n_calib_frames': len(calib_frames),
+            'n_eval_frames': len(eval_frames),
         }
         return results, meta
 
-    def format_results_markdown(self, results: List[Dict], meta: Dict[str, Any]) -> str:
-        """Format clean Markdown table adhering to Points 31 & 40 (Table 1 & Table 3)."""
+    def run_benchmark_b_closed_loop(
+        self,
+        pipeline_factory: Callable,
+        eval_frames: List[Dict],
+        intrinsics: Any,
+        target_budgets_ms: List[float] = [10.0, 15.0, 20.0, 30.0],
+    ) -> List[Dict[str, Any]]:
+        """Execute Benchmark B (Closed-Loop Real-Time Deadline Adherence, Section XIII)."""
+        print(f"\n[Benchmark B: Closed-Loop Systems] Evaluating Deadline Adherence across {target_budgets_ms} ms budgets...")
+        closed_loop_results = []
+        
+        for b_target in target_budgets_ms:
+            res = self.evaluate_policy_on_frames(
+                pipeline_factory, eval_frames, intrinsics,
+                budget_ms=b_target, policy='ours', relative_budget=0.0
+            )
+            closed_loop_results.append(res)
+            print(
+                f"   [Budget {b_target:4.1f}ms] p50: {res['p50_ms']:5.1f}ms | "
+                f"p95: {res['p95_ms']:5.1f}ms | Jitter: {res['jitter']:4.2f}ms | "
+                f"Violation: {res['violation_rate']:4.1f}% | Util: {res['budget_utilization']*100:5.1f}%"
+            )
+            
+        return closed_loop_results
+
+    def format_markdown_table(self, open_loop_results: List[Dict], meta: Dict[str, Any]) -> str:
+        """Format publication-quality Markdown table with 95% Confidence Intervals (Section XV)."""
         lines = []
-        lines.append("# R36 Rigorous Matched-Budget Benchmark Results")
+        lines.append("# Final Matched-Budget Scientific Benchmark (Table 1 & Table 3)")
         lines.append("")
-        lines.append(f"Evaluated with Open-Loop Calibrated Budgets (Reference $T_{{full}} = {meta['t_full']:.2f}$ ms).")
+        lines.append(f"Evaluated with independent calibration/evaluation split (Reference $T_{{full}} = {meta['t_full']:.2f}$ ms).")
+        lines.append(f"Calibration: {meta['n_calib_frames']} frames | Held-Out Evaluation: {meta['n_eval_frames']} frames.")
         lines.append("")
-        lines.append("## Table 1: Reconstruction Quality & Efficiency under Matched Compute")
+        lines.append("## Table 1: Quality@Budget with Bootstrap 95% Confidence Intervals")
         lines.append("")
-        lines.append("| Budget | Policy | Calibrated $K$ | Actual Opt ($p50$) | $p95$ (ms) | Jitter | Util% | Viol% | PSNR ↑ | Depth L1 ↓ | Gain Eff ($GE$) |")
+        lines.append("| Budget | Policy | Frozen $K$ | Opt ($p50$) | $p95$ (ms) | Jitter | Util% | Viol% | PSNR (95% CI) ↑ | Depth L1 (m) ↓ | Gain Eff ($GE$) |")
         lines.append("|:---:|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|")
         
-        for r in results:
+        for r in open_loop_results:
             if 'Full Reference' in r['policy_name']:
+                ci = r.get('psnr_ci95', (r['avg_psnr'], r['avg_psnr']))
                 lines.append(
                     f"| **Reference** | **{r['policy_name']}** | All | "
                     f"{r['p50_ms']:6.2f} ms | {r['p95_ms']:6.2f} ms | {r['jitter']:5.2f} | "
-                    f"— | — | **{r['avg_psnr']:5.2f} dB** | {r['avg_depth_l1']:7.4f} | 1.00 |"
+                    f"— | — | **{r['avg_psnr']:5.2f} [{ci[0]:.2f}, {ci[1]:.2f}]** | {r['avg_depth_l1']:7.4f} | 1.00 |"
                 )
                 lines.append("|---|---|---|---|---|---|---|---|---|---|---|")
                 
         for rel_b in meta['relative_budgets']:
-            b_rows = [r for r in results if r.get('relative_budget') == rel_b]
+            b_rows = [r for r in open_loop_results if r.get('relative_budget') == rel_b]
             b_rows.sort(key=lambda x: x['avg_psnr'], reverse=True)
             for r in b_rows:
-                k_str = str(r['calibrated_k']) if r['calibrated_k'] is not None else "Knapsack"
+                k_str = str(r['frozen_k']) if r['frozen_k'] is not None else "Knapsack"
                 p_name = r['policy_name']
                 is_ours = (p_name == 'ours')
                 bold = "**" if is_ours else ""
+                ci = r.get('psnr_ci95', (r['avg_psnr'], r['avg_psnr']))
                 lines.append(
                     f"| {int(rel_b*100)}% ({r['budget_ms']:.1f}ms) | {bold}{p_name}{bold} | "
                     f"{k_str} | {r['p50_ms']:6.2f} ms | {r['p95_ms']:6.2f} ms | "
                     f"{r['jitter']:5.2f} | {r['budget_utilization']*100:5.1f}% | {r['violation_rate']:4.1f}% | "
-                    f"{bold}{r['avg_psnr']:5.2f} dB{bold} | {r['avg_depth_l1']:7.4f} | {r.get('gain_efficiency', 0.0):.3f} |"
+                    f"{bold}{r['avg_psnr']:5.2f} [{ci[0]:.2f}, {ci[1]:.2f}]{bold} | {r['avg_depth_l1']:7.4f} | {r.get('gain_efficiency', 0.0):.3f} |"
                 )
             lines.append("|---|---|---|---|---|---|---|---|---|---|---|")
             

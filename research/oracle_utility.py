@@ -818,6 +818,8 @@ class OracleUtilityExperiment:
             cv = float(sigma_u / (abs(mu_u) + 1e-6))
             cvs.append(cv)
             
+            p_positive_gain = float(np.mean([1.0 if g > 1e-6 else 0.0 for g in trial_gains])) if trial_gains else 1.0
+
             candidate_stats.append({
                 "gaussian_id": idx,
                 "n_repeats": n_repeats,
@@ -825,6 +827,7 @@ class OracleUtilityExperiment:
                 "std_utility": sigma_u,
                 "coefficient_of_variation": cv,
                 "is_stable": cv <= 0.35,
+                "p_positive_gain": p_positive_gain,
                 "mean_time_ms": float(np.mean(trial_times)),
                 "std_time_ms": float(np.std(trial_times)),
                 "mean_gain": float(np.mean(trial_gains)),
@@ -833,6 +836,7 @@ class OracleUtilityExperiment:
         mean_cv = float(np.mean(cvs)) if cvs else 0.0
         median_cv = float(np.median(cvs)) if cvs else 0.0
         stable_frac = float(np.mean([1.0 if c <= 0.35 else 0.0 for c in cvs])) if cvs else 1.0
+        mean_sign_stability = float(np.mean([c['p_positive_gain'] for c in candidate_stats])) if candidate_stats else 1.0
         
         return {
             "n_candidates": len(candidate_stats),
@@ -840,9 +844,95 @@ class OracleUtilityExperiment:
             "mean_cv": mean_cv,
             "median_cv": median_cv,
             "stable_fraction": stable_frac,
-            "gate1_passed": (mean_cv <= 0.35 or median_cv <= 0.35),
+            "mean_sign_stability": mean_sign_stability,
+            "gate1_passed": (mean_cv <= 0.35 or median_cv <= 0.35) and (mean_sign_stability >= 0.70),
             "candidates": candidate_stats,
         }
+
+    def evaluate_group_interaction(
+        self,
+        rgb: torch.Tensor,
+        depth: torch.Tensor,
+        candidate_indices: List[int],
+        group_sizes: List[int] = [1, 4, 8, 16],
+        n_groups_per_size: int = 4,
+    ) -> Dict[str, Any]:
+        """Evaluate non-additivity and interaction error across group sizes (Point IX).
+        
+        Measures:
+            Interaction Error = |U(S) - Σ_{i in S} U_i| / (|U(S)| + ε)
+            Additivity Ratio = U(S) / (Σ_{i in S} U_i + ε)
+        """
+        H, W = rgb.shape[:2]
+        with torch.no_grad():
+            attr = self._render_with_attribution(H, W)
+            c_idx, c_wt = attr['contrib_indices'], attr['contrib_weights']
+            
+        group_interaction_results = {}
+        
+        # Precompute individual utilities for candidate_indices
+        individual_utilities = {}
+        for idx in candidate_indices:
+            mask = self._get_influence_mask([idx], c_idx, c_wt)
+            if mask.sum() == 0:
+                continue
+            snap = self.snapshot_state()
+            try:
+                m = self.optimize_gaussian_group([idx], self.n_opt_steps, rgb, depth, mask)
+                individual_utilities[idx] = m['oracle_utility_joint']
+            finally:
+                self.restore_state(snap)
+                
+        valid_candidates = list(individual_utilities.keys())
+        if len(valid_candidates) < 4:
+            return {'error': 'Insufficient valid candidates for group interaction test'}
+            
+        for g_size in group_sizes:
+            if g_size == 1:
+                group_interaction_results['group_size_1'] = {
+                    'group_size': 1,
+                    'interaction_error_mean': 0.0,
+                    'interaction_error_median': 0.0,
+                    'additivity_ratio_mean': 1.0,
+                    'n_groups': len(valid_candidates),
+                }
+                continue
+                
+            errors = []
+            ratios = []
+            
+            # Form candidate groups
+            np_cand = np.array(valid_candidates)
+            max_possible_groups = max(1, len(valid_candidates) // g_size)
+            for g_step in range(min(n_groups_per_size, max_possible_groups)):
+                perm = np.random.permutation(len(np_cand))
+                group = np_cand[perm[:g_size]].tolist()
+                
+                sum_indiv = sum(individual_utilities[i] for i in group)
+                
+                # Joint group trial
+                g_mask = self._get_influence_mask(group, c_idx, c_wt)
+                snap = self.snapshot_state()
+                try:
+                    m_group = self.optimize_gaussian_group(group, self.n_opt_steps, rgb, depth, g_mask)
+                    u_joint = m_group['oracle_utility_joint']
+                finally:
+                    self.restore_state(snap)
+                    
+                inter_err = abs(u_joint - sum_indiv) / (abs(u_joint) + 1e-6)
+                add_ratio = u_joint / (sum_indiv + 1e-6)
+                errors.append(float(inter_err))
+                ratios.append(float(add_ratio))
+                
+            group_interaction_results[f'group_size_{g_size}'] = {
+                'group_size': g_size,
+                'interaction_error_mean': float(np.mean(errors)) if errors else 0.0,
+                'interaction_error_median': float(np.median(errors)) if errors else 0.0,
+                'additivity_ratio_mean': float(np.mean(ratios)) if ratios else 1.0,
+                'n_groups': len(errors),
+            }
+            
+        return group_interaction_results
 
     def compute_correlation_metrics(self, results: List[Dict]) -> Dict[str, Any]:
         """Compute Spearman rank correlations, Overlap@K, Realized Gain, and Regret."""

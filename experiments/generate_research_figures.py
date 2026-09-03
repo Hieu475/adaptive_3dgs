@@ -36,9 +36,12 @@ SAVE_DIR = os.path.join(RESULTS_DIR, 'figures')
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 
-def _load_json(path: str) -> dict:
+def _require_json(path: str) -> dict:
     if not os.path.exists(path):
-        return {}
+        raise RuntimeError(
+            f"Required research artifact missing: {path}\n"
+            f"Core evidence figures cannot be generated without complete empirical results."
+        )
     with open(path, 'r') as f:
         return json.load(f)
 
@@ -176,9 +179,7 @@ def plot_fig7_pareto():
 def plot_fig9_geometry_breakdown():
     """Fig 9: Geometry Stratification Breakdown Analysis."""
     metrics_path = os.path.join(RESULTS_DIR, 'oracle_utility', 'multi_population_metrics.json')
-    if not os.path.exists(metrics_path):
-        return
-    data = _load_json(metrics_path)
+    data = _require_json(metrics_path)
     geo_stats = data.get('geometry_stats', {})
     if not geo_stats:
         return

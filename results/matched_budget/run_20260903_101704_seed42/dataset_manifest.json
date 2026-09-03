@@ -1,0 +1,17 @@
+{
+  "dataset": "TUM-RGBD",
+  "sequence": "freiburg1_desk",
+  "frames": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "rgb_resolution": "64x80",
+  "depth_scale": 5000.0,
+  "pose_source": "ground_truth"
+}

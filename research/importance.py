@@ -34,6 +34,33 @@ class Tier(IntEnum):
     D = 3  # Outlier / zero contribution - prune candidate
 
 
+def robust_normalize(
+    tensor: torch.Tensor,
+    p_low: float = 0.05,
+    p_high: float = 0.95,
+    fixed_stats: Optional[Tuple[float, float]] = None,
+    eps: float = 1e-6,
+) -> Tuple[torch.Tensor, float, float]:
+    """Robust percentile normalization (Section V):
+        x' = clip((x - P5) / (P95 - P5), 0, 1)
+        
+    Eliminates outlier sensitivity and supports frozen calibration stats
+    to prevent data leakage during cross-scene evaluations.
+    """
+    if tensor.numel() == 0:
+        return tensor, 0.0, 1.0
+        
+    if fixed_stats is not None:
+        p5, p95 = fixed_stats
+    else:
+        p5 = float(torch.quantile(tensor.float(), p_low).item())
+        p95 = float(torch.quantile(tensor.float(), p_high).item())
+        
+    denom = max(p95 - p5, eps)
+    norm = torch.clamp((tensor - p5) / denom, 0.0, 1.0)
+    return norm, p5, p95
+
+
 class GaussianImportanceEstimator:
     """Estimates per-Gaussian importance scores for adaptive optimization.
     
@@ -105,6 +132,20 @@ class GaussianImportanceEstimator:
         self._zero_contrib_frames: Optional[torch.Tensor] = None
         self._creation_frame: Optional[torch.Tensor] = None  # frame when each Gaussian was created
         self._frame_count = 0
+        
+        # Robust normalization state (Section V)
+        self.use_robust_normalization: bool = True
+        self.fixed_norm_stats: Optional[Tuple[float, float]] = None
+        self.last_p5: float = 0.0
+        self.last_p95: float = 1.0
+
+    def freeze_normalization(self, p5: float, p95: float):
+        """Freeze calibration normalization statistics for zero data-leakage test runs (Section V)."""
+        self.fixed_norm_stats = (p5, p95)
+
+    def unfreeze_normalization(self):
+        """Unfreeze normalization statistics to use dynamic running statistics."""
+        self.fixed_norm_stats = None
     
     def set_uncertainty_estimator(self, estimator):
         """Wire in a GaussianUncertaintyEstimator for uncertainty-boosted importance."""
@@ -240,13 +281,18 @@ class GaussianImportanceEstimator:
                     uq_norm = uq[:uq_len]
                 score[:uq_len] += self.uncertainty_weight * uq_norm
         
-        # Normalize to [0, 1]
-        score_min = score.min()
-        score_max = score.max()
-        if score_max - score_min > 1e-8:
-            score = (score - score_min) / (score_max - score_min)
+        # Robust normalization (Section V)
+        if self.use_robust_normalization and score.numel() > 5:
+            score, self.last_p5, self.last_p95 = robust_normalize(
+                score, fixed_stats=self.fixed_norm_stats
+            )
         else:
-            score = torch.zeros_like(score)
+            score_min = score.min()
+            score_max = score.max()
+            if score_max - score_min > 1e-8:
+                score = (score - score_min) / (score_max - score_min)
+            else:
+                score = torch.zeros_like(score)
         
         # Update prev positions for next frame
         if self._positions is not None:
@@ -277,6 +323,9 @@ class GaussianImportanceEstimator:
             influence = inf_pad
             
         score = error * influence
+        if self.use_robust_normalization and score.numel() > 5:
+            norm_score, _, _ = robust_normalize(score, fixed_stats=self.fixed_norm_stats)
+            return norm_score
         s_min, s_max = score.min(), score.max()
         if s_max - s_min > 1e-8:
             return (score - s_min) / (s_max - s_min)

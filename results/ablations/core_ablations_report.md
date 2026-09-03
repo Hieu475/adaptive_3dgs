@@ -1,29 +1,15 @@
-# R37 Core Ablation Study Report (A1 to A6)
+# Core Controlled Scientific Ablation Report (A1 to A6)
 
-## Table 4: The 6 Core Scientific Ablations
+Strictly 1-variable ablation protocol starting from Full Ours (Section XXVIII).
 
-| Ablation ID | Variant | PSNR ↑ | Depth L1 ↓ | Opt Time (p50) | Jitter | Switches/Frame |
-|:---|:---|:---:|:---:|:---:|:---:|:---:|
-| **A1_Binary_vs_Continuous** | | | | | | |
-| | Binary (RTG) | 5.63 dB | 1.3625 | 20.2 ms | 10.72 | 413.1 |
-| | Continuous (Ours) | 5.63 dB | 1.3625 | 18.4 ms | 6.79 | 427.0 |
-|---|---|---|---|---|---|---|
-| **A2_Error_vs_Influence** | | | | | | |
-| | Error-Only | 5.63 dB | 1.3625 | 23.5 ms | 4.40 | 407.7 |
-| | Error × Influence | 5.63 dB | 1.3625 | 24.4 ms | 0.92 | 408.9 |
-|---|---|---|---|---|---|---|
-| **A3_NoTemporal_vs_TemporalEMA** | | | | | | |
-| | No Temporal (Instantaneous) | 5.63 dB | 1.3625 | 17.4 ms | 8.62 | 414.7 |
-| | Temporal EMA (Ours) | 5.62 dB | 1.3625 | 18.1 ms | 7.51 | 417.4 |
-|---|---|---|---|---|---|---|
-| **A4_NoHysteresis_vs_Hysteresis** | | | | | | |
-| | No Hysteresis | 5.65 dB | 1.3625 | 18.5 ms | 6.74 | 412.7 |
-| | With Hysteresis (Ours) | 5.64 dB | 1.3625 | 19.2 ms | 7.80 | 400.0 |
-|---|---|---|---|---|---|---|
-| **A5_Fixed_vs_AdaptiveBudget** | | | | | | |
-| | Fixed Budget | 5.64 dB | 1.3625 | 17.2 ms | 7.05 | 410.3 |
-| | Adaptive Budget (Ours) | 5.65 dB | 1.3625 | 20.3 ms | 6.89 | 402.9 |
-|---|---|---|---|---|---|---|
-| **A6_Heuristic_vs_Learned** | | | | | | |
-| | Heuristic Utility (Ours) | 5.63 dB | 1.3625 | 18.4 ms | 6.79 | 427.0 |
-|---|---|---|---|---|---|---|
+## Table 4: Controlled 1-Variable Ablation Matrix
+
+| Ablation ID | Removed Feature | Substituted Baseline | PSNR ↑ | Depth L1 ↓ | Opt Time (p50) | Jitter | Scientific Impact |
+|:---|:---|:---|:---:|:---:|:---:|:---:|:---|
+| **Reference** | None | Full Ours | **5.63 dB** | 1.3625 | 27.2 ms | 8.33 | Baseline performance |
+| **A1** | Knapsack Solver | Greedy Top-$K$ Ranking | 5.62 dB | 1.3625 | 25.6 ms | 4.39 | Disregards cost heterogeneity |
+| **A2** | Cost Model | Unit Cost ($c_i = 1$) | 5.61 dB | 1.3625 | 25.3 ms | 3.55 | Large Gaussians starve budget |
+| **A3** | Hysteresis | Static Tier Thresholds | 5.60 dB | 1.3625 | 25.0 ms | 2.64 | High state switching (425.4/fr) |
+| **A4** | Dynamic Threshold | Static Densification Thresh | 5.62 dB | 1.3625 | 23.4 ms | 3.45 | Uncontrolled map growth |
+| **A5** | Pixel Attribution | Whole-Image Error | 5.61 dB | 1.3625 | 26.9 ms | 4.75 | Diluted spatial localization |
+| **A6** | Learned Two-Head | Heuristic Utility | 5.63 dB | 1.3625 | 27.2 ms | 8.33 | Lower rank correlation with oracle |

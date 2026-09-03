@@ -117,7 +117,35 @@ def test_oracle_geometry_stratification_and_raw_metrics():
         stability = exp.run_stability_check(rgb, depth, candidate_indices=visible_candidates, n_repeats=2)
         assert 'mean_cv' in stability
         assert 'stable_fraction' in stability
+        assert 'mean_sign_stability' in stability
         assert stability['n_repeats'] == 2
+
+
+def test_oracle_group_interaction():
+    """Verify group utility evaluation and additivity error measurement (Section IX)."""
+    from research.oracle_utility import OracleUtilityExperiment
+    pipeline = OnlineReconstructionPipeline(device='cpu')
+    
+    H, W = 32, 40
+    torch.manual_seed(42)
+    rgb = torch.rand(H, W, 3)
+    depth = torch.ones(H, W) * 2.0
+    fx, fy = 80.0, 80.0
+    intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
+    
+    pipeline.initialize(rgb, depth, intrinsics)
+    pipeline.process_frame(rgb, depth)
+    
+    exp = OracleUtilityExperiment(pipeline=pipeline, n_samples=10, n_opt_steps=2, seed=42)
+    
+    candidates = list(range(min(8, pipeline.gaussian_model.num_gaussians)))
+    group_res = exp.evaluate_group_interaction(rgb, depth, candidate_indices=candidates, group_sizes=[1, 2], n_groups_per_size=2)
+    
+    assert 'group_size_1' in group_res
+    assert group_res['group_size_1']['interaction_error_mean'] == 0.0
+    if 'group_size_2' in group_res:
+        assert 'interaction_error_mean' in group_res['group_size_2']
+        assert 'additivity_ratio_mean' in group_res['group_size_2']
 
 
 if __name__ == '__main__':
