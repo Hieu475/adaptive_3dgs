@@ -1,35 +1,34 @@
 #!/usr/bin/env python3
-"""Two-Head Learned Utility Model with Feature Ablation and Pairwise Ranking Loss (Claims A & B, Points 16–19).
+"""Phase 4: Two-Head Learned Utility Model & State Factor Analysis (Points XV, XXIV, XXV, XXVI, XXVII).
 
 Formulation:
     ΔQ_hat_i = f_Q(s_i)
-    ΔT_hat_i = f_T(s_i)
-    U_hat_i = ΔQ_hat_i / (ΔT_hat_i + ε)
+    C_hat_i  = f_C(s_i)
+    U_hat_i  = ΔQ_hat_i / (C_hat_i + ε)
 
-Feature Ablations (Point 16):
-    V0: Error only (rgb_error, depth_error)
-    V1: + visibility
-    V2: + influence mass
-    V3: + temporal drift
-    V4: + uncertainty
-    V5: + gradient norm
-    V6: + projected area
-    V7: Full (+ age, update frequency)
+Features:
+    0: rgb_error
+    1: depth_error
+    2: visibility
+    3: influence_mass
+    4: temporal_drift
+    5: uncertainty
+    6: gradient_norm
+    7: projected_area
+    8: age
+    9: update_frequency
 
-Model Architectures (Points 17–19):
-    1. Linear Two-Head
-    2. MLP-Small Two-Head (32 -> 1)
-    3. MLP-Medium Two-Head (64 -> 32 -> 1)
-    4. Ranking Two-Head MLP (Pairwise Ranking Loss: log(1 + exp(-(U_i - U_j))))
-
-Outputs:
-    - results/learned_utility/two_head_comparison.json
-    - results/learned_utility/feature_ablation_report.md
+Evaluates:
+    1. Univariate Predictive Power: corr(x_j, U*) for each feature individually (Point XV-A).
+    2. Conditional Incremental Information: Delta rho as features are added (Point XV-B).
+    3. Independent Quality Gain & Cost Verification: MAE(Q), MAE(C), Spearman(Q), Spearman(C) (Point XXIV).
+    4. Two-Head Pairwise Ranking (Weighted by |U_i - U_j|) + Pointwise Anchor Loss (Point XXV).
+    5. Temporal Held-out Generalization: Train on early frames, Test on late frames (Point XXVI).
+    6. Geometry Stratum Evaluation: Flat, Edge, Texture, Depth Discontinuity (Point XXVII).
 """
 import os
 import sys
 import json
-import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -39,6 +38,27 @@ from scipy.stats import spearmanr
 from typing import Dict, List, Tuple, Any
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def safe_spearmanr(x: np.ndarray, y: np.ndarray) -> Tuple[float, float]:
+    if len(x) < 3 or np.std(x) < 1e-7 or np.std(y) < 1e-7:
+        return float('nan'), float('nan')
+    r, p = spearmanr(x, y)
+    return (float(r) if not np.isnan(r) else float('nan')), (float(p) if not np.isnan(p) else float('nan'))
+
+
+def compute_ndcg(pred_scores: np.ndarray, true_scores: np.ndarray, k: int) -> float:
+    if k <= 0 or len(pred_scores) == 0:
+        return 0.0
+    k_eval = min(k, len(pred_scores))
+    p_idx = np.argsort(-pred_scores)[:k_eval]
+    i_idx = np.argsort(-true_scores)[:k_eval]
+    min_val = min(0.0, float(np.min(true_scores)))
+    rel = true_scores - min_val
+    discounts = np.log2(np.arange(2, k_eval + 2))
+    dcg = np.sum(rel[p_idx] / discounts)
+    idcg = np.sum(rel[i_idx] / discounts)
+    return float(dcg / (idcg + 1e-8)) if idcg > 0 else 1.0
 
 
 class TwoHeadMLP(nn.Module):
@@ -58,7 +78,7 @@ class TwoHeadMLP(nn.Module):
             nn.Linear(hidden_dim, 32),
             nn.LeakyReLU(0.1),
             nn.Linear(32, 1),
-            nn.Softplus(),  # Execution cost must strictly be positive
+            nn.Softplus(),  # Execution cost is strictly positive
         )
         
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -88,10 +108,10 @@ def train_regression_model(
     X_train: torch.Tensor,
     y_q_train: torch.Tensor,
     y_t_train: torch.Tensor,
-    epochs: int = 150,
-    lr: float = 0.01,
+    epochs: int = 200,
+    lr: float = 0.005,
 ) -> nn.Module:
-    """Train two-head model using decoupled regression loss."""
+    """Train two-head model using decoupled regression loss (Point XXIV)."""
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
     loss_fn = nn.SmoothL1Loss()
     
@@ -109,38 +129,49 @@ def train_ranking_model(
     model: nn.Module,
     X_train: torch.Tensor,
     y_oracle_train: torch.Tensor,
-    epochs: int = 150,
-    lr: float = 0.01,
+    y_q_train: torch.Tensor,
+    y_t_train: torch.Tensor,
+    epochs: int = 200,
+    lr: float = 0.005,
+    lambda_pointwise: float = 0.25,
 ) -> nn.Module:
-    """Train model directly with Pairwise Ranking Loss (Point 19)."""
+    """Train model directly with Difference-Weighted Pairwise Ranking Loss + Pointwise Anchor (Point XXV)."""
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
     n = len(X_train)
     
-    # Generate pairwise comparisons: pair (i, j) where U_i > U_j
     pairs_i = []
     pairs_j = []
+    pair_weights = []
     y_np = y_oracle_train.cpu().numpy()
     
     for i in range(n):
         for j in range(n):
-            if y_np[i] > y_np[j] + 1e-4:
+            diff = y_np[i] - y_np[j]
+            if diff > 1e-5:
                 pairs_i.append(i)
                 pairs_j.append(j)
+                pair_weights.append(diff)
                 
     if len(pairs_i) == 0:
         return model
         
     pairs_i = torch.tensor(pairs_i, dtype=torch.long, device=X_train.device)
     pairs_j = torch.tensor(pairs_j, dtype=torch.long, device=X_train.device)
+    pair_weights = torch.tensor(pair_weights, dtype=torch.float32, device=X_train.device)
+    pair_weights = pair_weights / (pair_weights.mean() + 1e-8)  # normalize weights
+    
+    loss_fn_pt = nn.SmoothL1Loss()
     
     for epoch in range(epochs):
         optimizer.zero_grad()
-        _, _, pred_u = model(X_train)
+        pred_q, pred_t, pred_u = model(X_train)
         
-        diff = pred_u[pairs_i] - pred_u[pairs_j]
-        # Pairwise logistic ranking loss: log(1 + exp(-diff))
-        loss = torch.log1p(torch.exp(-diff.clamp(-15.0, 15.0))).mean()
-        loss.backward()
+        diff_u = pred_u[pairs_i] - pred_u[pairs_j]
+        loss_pairwise = (pair_weights * torch.log1p(torch.exp(-diff_u.clamp(-15.0, 15.0)))).mean()
+        loss_pointwise = loss_fn_pt(pred_q, y_q_train) + 0.5 * loss_fn_pt(pred_t, y_t_train)
+        
+        total_loss = loss_pairwise + lambda_pointwise * loss_pointwise
+        total_loss.backward()
         optimizer.step()
         
     return model
@@ -151,9 +182,9 @@ def evaluate_utility_ranking(
     oracle_u: np.ndarray,
     delta_q: np.ndarray,
 ) -> Dict[str, float]:
-    """Compute Spearman rho, Overlap@K, Realized Gain, and Regret."""
+    """Compute Spearman rho, NDCG@K, Overlap@K, OSE, and Regret."""
     n = len(pred_u)
-    rho, p_val = spearmanr(pred_u, oracle_u)
+    rho, p_val = safe_spearmanr(pred_u, oracle_u)
     
     pred_ranks = np.argsort(-pred_u)
     oracle_ranks = np.argsort(-oracle_u)
@@ -171,22 +202,26 @@ def evaluate_utility_ranking(
     
     gain_pred_20 = delta_q[list(top_pred_20)].sum()
     gain_ora_20 = delta_q[list(top_ora_20)].sum()
-    gain_ratio_20 = float(gain_pred_20 / (gain_ora_20 + 1e-8)) if gain_ora_20 > 0 else 1.0
-    regret_20 = max(0.0, 1.0 - gain_ratio_20)
+    ose_20 = float(gain_pred_20 / (gain_ora_20 + 1e-8)) if gain_ora_20 > 0 else 1.0
+    regret_20_abs = float(gain_ora_20 - gain_pred_20)
+    
+    ndcg_20 = compute_ndcg(pred_u, oracle_u, k20)
     
     return {
         'spearman_rho': float(rho) if not np.isnan(rho) else 0.0,
+        'p_val': float(p_val) if not np.isnan(p_val) else 1.0,
+        'ndcg_20pct': float(ndcg_20),
         'overlap_10pct': float(ov10),
         'overlap_20pct': float(ov20),
-        'gain_ratio_20pct': float(gain_ratio_20),
-        'regret_20pct': float(regret_20),
+        'ose_20pct': float(ose_20),
+        'regret_20pct_abs': float(regret_20_abs),
     }
 
 
 def main():
-    print("=" * 85)
-    print("      STEP 7: TWO-HEAD LEARNED UTILITY MODEL & FEATURE ABLATION (POINTS 16–19)")
-    print("=" * 85)
+    print("=" * 90)
+    print("   PHASE 4: TWO-HEAD MARGINAL UTILITY MODEL & STATE FACTOR ANALYSIS (POINTS XV, XXIV–XXVII)")
+    print("=" * 90)
     
     data_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -200,30 +235,27 @@ def main():
         rows = json.load(f)
         
     visible = [r for r in rows if r.get('visible', True) and r.get('n_influence_pixels', 0) > 0]
-    print(f"Loaded {len(visible)} visible samples from Oracle Dataset.\n")
+    print(f">> Loaded {len(visible)} visible samples from Oracle Dataset.\n")
     
-    if len(visible) < 15:
-        print("Insufficient samples for training and ablation.")
-        return
-        
-    # Feature matrix extraction
-    feature_keys = [
-        'rgb_error',          # V0
-        'depth_error',        # V0
-        'visibility',         # V1
-        'influence_mass',     # V2
-        'temporal_drift',     # V3
-        'uncertainty',        # V4
-        'gradient_norm',      # V5
-        'projected_area',     # V6
-        'age',                # V7
-        'update_frequency',   # V7
+    feature_names = [
+        'rgb_error',          # 0
+        'depth_error',        # 1
+        'visibility',         # 2
+        'influence_mass',     # 3
+        'temporal_drift',     # 4
+        'uncertainty',        # 5
+        'gradient_norm',      # 6
+        'projected_area',     # 7
+        'age',                # 8
+        'update_frequency',   # 9
     ]
     
     X_full = []
     y_q = []
     y_t = []
     y_oracle = []
+    frames = []
+    strata = []
     
     for r in visible:
         f = r.get('features', {})
@@ -231,7 +263,7 @@ def main():
             float(f.get('rgb_error', 0.0)),
             float(f.get('depth_error', 0.0)),
             float(f.get('visibility', 0.0)),
-            float(f.get('influence_mass', 1.0)),
+            float(f.get('influence_mass', r.get('influence_mass', 1.0))),
             float(f.get('temporal_drift', 0.0)),
             float(f.get('uncertainty', 0.5)),
             float(f.get('gradient_norm', 0.0)),
@@ -243,6 +275,8 @@ def main():
         y_q.append(float(r.get('delta_quality_local', 0.0)))
         y_t.append(float(r.get('measured_trial_cost_ms', 1.0)))
         y_oracle.append(float(r.get('oracle_utility_joint', r.get('oracle_utility', 0.0))))
+        frames.append(int(r.get('frame', 0)))
+        strata.append(r.get('geometry_stratum', 'unknown'))
         
     X_mat = torch.tensor(X_full, dtype=torch.float32)
     y_q_vec = torch.tensor(y_q, dtype=torch.float32)
@@ -250,21 +284,44 @@ def main():
     y_ora_vec = torch.tensor(y_oracle, dtype=torch.float32)
     y_ora_arr = np.array(y_oracle)
     y_q_arr = np.array(y_q)
+    y_t_arr = np.array(y_t)
     
-    # Train / Test split (70% train, 30% test)
-    torch.manual_seed(42)
-    np.random.seed(42)
-    n_samples = len(X_mat)
-    perm = torch.randperm(n_samples)
-    n_train = int(0.70 * n_samples)
-    train_idx, test_idx = perm[:n_train], perm[n_train:]
-    
-    # Normalize features
+    # --- 1. Univariate Predictive Power Analysis (Point XV - Level A) ---
+    print(">> 1. Univariate Predictive Power Analysis (corr(x_j, U*)):")
+    univariate_results = []
+    for j, name in enumerate(feature_names):
+        vals = X_mat[:, j].numpy()
+        rho, p = safe_spearmanr(vals, y_ora_arr)
+        univariate_results.append({
+            'feature': name,
+            'spearman_rho': float(rho),
+            'p_val': float(p),
+        })
+        sig = "Significant ✅" if p < 0.05 else "Not Significant"
+        print(f"   - {name:<20}: ρ = {rho:+.4f} (p={p:.4f}) [{sig}]")
+        
+    # --- 2. Temporal Held-Out Split (Point XXVI) ---
+    unique_frames = sorted(list(set(frames)))
+    if len(unique_frames) >= 2:
+        split_frame = unique_frames[len(unique_frames) // 2]
+        train_mask = [f <= split_frame for f in frames]
+        test_mask = [f > split_frame for f in frames]
+        train_idx = torch.tensor([i for i, m in enumerate(train_mask) if m], dtype=torch.long)
+        test_idx = torch.tensor([i for i, m in enumerate(test_mask) if m], dtype=torch.long)
+        print(f"\n>> 2. Temporal Held-out Split: Train frames <= {split_frame} ({len(train_idx)}), Test frames > {split_frame} ({len(test_idx)})")
+    else:
+        # Fallback 70/30 random
+        perm = torch.randperm(len(X_mat))
+        n_tr = int(0.70 * len(X_mat))
+        train_idx, test_idx = perm[:n_tr], perm[n_tr:]
+        print(f"\n>> 2. Random 70/30 Split: Train ({len(train_idx)}), Test ({len(test_idx)})")
+        
+    # Feature Normalization (Strictly on Train Split to prevent data leakage)
     mean = X_mat[train_idx].mean(dim=0, keepdim=True)
     std = X_mat[train_idx].std(dim=0, keepdim=True) + 1e-6
     X_norm = (X_mat - mean) / std
     
-    # Feature Ablations (Point 16)
+    # --- 3. Conditional Incremental Information (Point XV - Level B) ---
     ablation_subsets = {
         'V0: Error Only': [0, 1],
         'V1: + Visibility': [0, 1, 2],
@@ -276,172 +333,206 @@ def main():
         'V7: Full State': list(range(10)),
     }
     
-    ablation_results = []
-    
-    print(">> Evaluating Feature Ablations (V0 to V7) with Two-Head MLP...")
-    for v_name, feat_indices in ablation_subsets.items():
-        X_sub = X_norm[:, feat_indices]
-        model = TwoHeadMLP(in_features=len(feat_indices), hidden_dim=64)
-        train_regression_model(
+    print("\n>> 3. Conditional Incremental Information (Two-Head Ranking):")
+    ablation_rows = []
+    prev_rho = 0.0
+    for v_name, feat_ids in ablation_subsets.items():
+        X_sub = X_norm[:, feat_ids]
+        model = TwoHeadMLP(in_features=len(feat_ids), hidden_dim=64)
+        train_ranking_model(
             model,
             X_sub[train_idx],
+            y_ora_vec[train_idx],
             y_q_vec[train_idx],
             y_t_vec[train_idx],
-            epochs=150,
-            lr=0.01,
+            epochs=200,
+            lr=0.005,
         )
         
         with torch.no_grad():
             _, _, pred_u_test = model(X_sub[test_idx])
-            metrics = evaluate_utility_ranking(
+            m = evaluate_utility_ranking(
                 pred_u_test.cpu().numpy(),
                 y_ora_arr[test_idx.cpu().numpy()],
                 y_q_arr[test_idx.cpu().numpy()],
             )
-            metrics['version'] = v_name
-            metrics['n_features'] = len(feat_indices)
-            ablation_results.append(metrics)
-            print(f"   [{v_name:<22}] ρ={metrics['spearman_rho']:+.4f} | Ov@10%={metrics['overlap_10pct']:5.1%} | Ov@20%={metrics['overlap_20pct']:5.1%} | Gain@20%={metrics['gain_ratio_20pct']:.4f}")
+            delta_rho = m['spearman_rho'] - prev_rho
+            prev_rho = m['spearman_rho']
             
-    # Architecture Comparison (Point 17 & 19)
-    print("\n>> Evaluating Architectures & Loss Formulations on V7 Full State...")
-    arch_results = []
-    
-    # 1. Linear Two-Head
-    linear_model = LinearTwoHead(in_features=10)
-    train_regression_model(linear_model, X_norm[train_idx], y_q_vec[train_idx], y_t_vec[train_idx])
-    with torch.no_grad():
-        _, _, pred_u = linear_model(X_norm[test_idx])
-        m_lin = evaluate_utility_ranking(pred_u.cpu().numpy(), y_ora_arr[test_idx.cpu().numpy()], y_q_arr[test_idx.cpu().numpy()])
-        m_lin['architecture'] = 'Linear Two-Head'
-        arch_results.append(m_lin)
-        
-    # 2. MLP-Small Two-Head
-    mlp_small = TwoHeadMLP(in_features=10, hidden_dim=32)
-    train_regression_model(mlp_small, X_norm[train_idx], y_q_vec[train_idx], y_t_vec[train_idx])
-    with torch.no_grad():
-        _, _, pred_u = mlp_small(X_norm[test_idx])
-        m_sml = evaluate_utility_ranking(pred_u.cpu().numpy(), y_ora_arr[test_idx.cpu().numpy()], y_q_arr[test_idx.cpu().numpy()])
-        m_sml['architecture'] = 'MLP-Small (32)'
-        arch_results.append(m_sml)
-        
-    # 3. MLP-Medium Two-Head (Regression)
-    mlp_med = TwoHeadMLP(in_features=10, hidden_dim=64)
-    train_regression_model(mlp_med, X_norm[train_idx], y_q_vec[train_idx], y_t_vec[train_idx])
-    with torch.no_grad():
-        _, _, pred_u = mlp_med(X_norm[test_idx])
-        m_med = evaluate_utility_ranking(pred_u.cpu().numpy(), y_ora_arr[test_idx.cpu().numpy()], y_q_arr[test_idx.cpu().numpy()])
-        m_med['architecture'] = 'MLP-Medium (64, Regression)'
-        arch_results.append(m_med)
-        
-    # 4. Ranking Two-Head MLP (Pairwise Ranking Loss, Point 19)
-    mlp_rank = TwoHeadMLP(in_features=10, hidden_dim=64)
-    train_ranking_model(mlp_rank, X_norm[train_idx], y_ora_vec[train_idx])
-    with torch.no_grad():
-        _, _, pred_u = mlp_rank(X_norm[test_idx])
-        m_rnk = evaluate_utility_ranking(pred_u.cpu().numpy(), y_ora_arr[test_idx.cpu().numpy()], y_q_arr[test_idx.cpu().numpy()])
-        m_rnk['architecture'] = 'Two-Head Ranking MLP (Pairwise Loss)'
-        arch_results.append(m_rnk)
-        
-    for a in arch_results:
-        # Measure inference latency in microseconds per Gaussian
-        dummy_x = torch.randn(5000, 10, device=X_mat.device)
-        # Warmup
-        for _ in range(10):
-            if "Linear" in a['architecture']:
-                _ = linear_model(dummy_x)
-            elif "MLP-Small" in a['architecture']:
-                _ = mlp_small(dummy_x)
-            elif "Ranking" in a['architecture']:
-                _ = mlp_rank(dummy_x)
-            else:
-                _ = mlp_med(dummy_x)
-        if X_mat.device.type == 'cuda':
-            torch.cuda.synchronize()
+            ablation_rows.append({
+                'version': v_name,
+                'inputs': len(feat_ids),
+                'spearman_rho': m['spearman_rho'],
+                'delta_rho': delta_rho,
+                'ndcg_20pct': m['ndcg_20pct'],
+                'overlap_20pct': m['overlap_20pct'],
+                'ose_20pct': m['ose_20pct'],
+                'regret_20pct': m['regret_20pct_abs'],
+            })
+            print(f"   - {v_name:<22}: ρ = {m['spearman_rho']:+.4f} (Δρ={delta_rho:+.4f}) | NDCG@20% = {m['ndcg_20pct']:.4f} | OSE@20% = {m['ose_20pct']:.3f}")
             
-        t0 = time.perf_counter()
-        n_iters = 50
-        for _ in range(n_iters):
-            if "Linear" in a['architecture']:
-                _ = linear_model(dummy_x)
-            elif "MLP-Small" in a['architecture']:
-                _ = mlp_small(dummy_x)
-            elif "Ranking" in a['architecture']:
-                _ = mlp_rank(dummy_x)
-            else:
-                _ = mlp_med(dummy_x)
-        if X_mat.device.type == 'cuda':
-            torch.cuda.synchronize()
-        latency_us = ((time.perf_counter() - t0) / (n_iters * 5000)) * 1e6
-        a['inference_latency_us_per_gaussian'] = float(latency_us)
-        print(f"   [{a['architecture']:<34}] ρ={a['spearman_rho']:+.4f} | Ov@10%={a['overlap_10pct']:5.1%} | Ov@20%={a['overlap_20pct']:5.1%} | Gain@20%={a['gain_ratio_20pct']:.4f} | Inf Cost={latency_us:.3f} μs/G")
-        
-    # Section XXII: Direct Comparison — Regression vs Ranking vs Oracle
-    direct_comparison = [
-        {
-            'method': 'Two-Head Regression (Smooth-L1)',
-            'spearman_rho': next(a['spearman_rho'] for a in arch_results if 'Regression' in a['architecture']),
-            'overlap_10pct': next(a['overlap_10pct'] for a in arch_results if 'Regression' in a['architecture']),
-            'overlap_20pct': next(a['overlap_20pct'] for a in arch_results if 'Regression' in a['architecture']),
-            'gain_ratio_20pct': next(a['gain_ratio_20pct'] for a in arch_results if 'Regression' in a['architecture']),
-            'regret_20pct': next(a['regret_20pct'] for a in arch_results if 'Regression' in a['architecture']),
-            'inference_us': next(a['inference_latency_us_per_gaussian'] for a in arch_results if 'Regression' in a['architecture']),
-        },
-        {
-            'method': 'Two-Head + Pairwise Ranking (Ours)',
-            'spearman_rho': next(a['spearman_rho'] for a in arch_results if 'Pairwise' in a['architecture']),
-            'overlap_10pct': next(a['overlap_10pct'] for a in arch_results if 'Pairwise' in a['architecture']),
-            'overlap_20pct': next(a['overlap_20pct'] for a in arch_results if 'Pairwise' in a['architecture']),
-            'gain_ratio_20pct': next(a['gain_ratio_20pct'] for a in arch_results if 'Pairwise' in a['architecture']),
-            'regret_20pct': next(a['regret_20pct'] for a in arch_results if 'Pairwise' in a['architecture']),
-            'inference_us': next(a['inference_latency_us_per_gaussian'] for a in arch_results if 'Pairwise' in a['architecture']),
-        },
-        {
-            'method': 'Oracle Upper Bound',
-            'spearman_rho': 1.0000,
-            'overlap_10pct': 1.000,
-            'overlap_20pct': 1.000,
-            'gain_ratio_20pct': 1.000,
-            'regret_20pct': 0.000,
-            'inference_us': 15420.0,  # Full online optimization trial
-        }
+    # --- 4. Model Architecture & Loss Comparison (Point XXIV & XXV) ---
+    print("\n>> 4. Architecture & Loss Comparison:")
+    models_to_test = [
+        ('Linear Two-Head (Regression)', LinearTwoHead(10), 'regression'),
+        ('MLP Two-Head (Regression)', TwoHeadMLP(10, 64), 'regression'),
+        ('Linear Two-Head (Ranking)', LinearTwoHead(10), 'ranking'),
+        ('MLP Two-Head (Pairwise+Pointwise Ranking - Ours)', TwoHeadMLP(10, 64), 'ranking'),
     ]
-
-    # Save Report
+    
+    arch_rows = []
+    trained_models = {}
+    
+    for name, m_inst, mode in models_to_test:
+        if mode == 'regression':
+            trained = train_regression_model(
+                m_inst, X_norm[train_idx], y_q_vec[train_idx], y_t_vec[train_idx], epochs=200, lr=0.005
+            )
+        else:
+            trained = train_ranking_model(
+                m_inst, X_norm[train_idx], y_ora_vec[train_idx], y_q_vec[train_idx], y_t_vec[train_idx], epochs=200, lr=0.005
+            )
+        trained_models[name] = trained
+        
+        with torch.no_grad():
+            pred_q_test, pred_t_test, pred_u_test = trained(X_norm[test_idx])
+            
+            p_q = pred_q_test.cpu().numpy()
+            p_t = pred_t_test.cpu().numpy()
+            p_u = pred_u_test.cpu().numpy()
+            
+            y_q_t = y_q_arr[test_idx.cpu().numpy()]
+            y_t_t = y_t_arr[test_idx.cpu().numpy()]
+            y_o_t = y_ora_arr[test_idx.cpu().numpy()]
+            
+            # Independent verification (Point XXIV)
+            mae_q = float(np.mean(np.abs(p_q - y_q_t)))
+            mae_t = float(np.mean(np.abs(p_t - y_t_t)))
+            rho_q, _ = safe_spearmanr(p_q, y_q_t)
+            rho_t, _ = safe_spearmanr(p_t, y_t_t)
+            
+            eval_metrics = evaluate_utility_ranking(p_u, y_o_t, y_q_t)
+            
+            arch_rows.append({
+                'model': name,
+                'spearman_rho': eval_metrics['spearman_rho'],
+                'ndcg_20pct': eval_metrics['ndcg_20pct'],
+                'overlap_20pct': eval_metrics['overlap_20pct'],
+                'ose_20pct': eval_metrics['ose_20pct'],
+                'regret_20pct': eval_metrics['regret_20pct_abs'],
+                'mae_delta_q': mae_q,
+                'spearman_delta_q': rho_q,
+                'mae_cost': mae_t,
+                'spearman_cost': rho_t,
+            })
+            print(f"   - {name:<46}: ρ={eval_metrics['spearman_rho']:+.4f} | NDCG@20%={eval_metrics['ndcg_20pct']:.4f} | OSE@20%={eval_metrics['ose_20pct']:.3f} | MAE(Q)={mae_q:.6f}")
+            
+    # --- 5. Geometry Stratum Evaluation (Point XXVII) ---
+    print("\n>> 5. Geometry Stratum Evaluation (Oracle vs Error vs Heuristic vs Learned):")
+    best_model = trained_models['MLP Two-Head (Pairwise+Pointwise Ranking - Ours)']
+    with torch.no_grad():
+        _, _, all_pred_u = best_model(X_norm)
+        all_pred_u = all_pred_u.cpu().numpy()
+        
+    error_scores = (X_mat[:, 0] + X_mat[:, 1]).numpy()
+    heuristic_scores = np.array([float(r.get('predicted_utility', 0.0)) for r in visible])
+    
+    strata_breakdown = {}
+    unique_strata = ['flat', 'edge', 'texture', 'depth_discontinuity']
+    
+    for st in unique_strata:
+        st_indices = [i for i, s in enumerate(strata) if s == st]
+        if len(st_indices) >= 3:
+            st_u_ora = y_ora_arr[st_indices]
+            st_err = error_scores[st_indices]
+            st_heur = heuristic_scores[st_indices]
+            st_lrn = all_pred_u[st_indices]
+            
+            rho_err, _ = safe_spearmanr(st_err, st_u_ora)
+            rho_heur, _ = safe_spearmanr(st_heur, st_u_ora)
+            rho_lrn, _ = safe_spearmanr(st_lrn, st_u_ora)
+            
+            strata_breakdown[st] = {
+                'count': len(st_indices),
+                'mean_oracle_u': float(np.mean(st_u_ora)),
+                'rho_error': float(rho_err),
+                'rho_heuristic': float(rho_heur),
+                'rho_learned': float(rho_lrn),
+            }
+            print(f"   - {st:<20} (N={len(st_indices):2d}): Mean U* = {np.mean(st_u_ora):+.5f} | ρ(Err) = {rho_err:+.4f} | ρ(Heur) = {rho_heur:+.4f} | ρ(Learned) = {rho_lrn:+.4f}")
+            
+    # --- 6. Export Reports ---
     save_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'learned_utility')
     os.makedirs(save_dir, exist_ok=True)
     report_file = os.path.join(save_dir, 'feature_ablation_report.md')
+    json_file = os.path.join(save_dir, 'learned_utility_summary.json')
     
-    lines = []
-    lines.append("# Two-Head Learned Utility Model & Feature Ablation Report")
-    lines.append("")
-    lines.append("## 1. Feature Ablation Study (V0 to V7)")
-    lines.append("")
-    lines.append("| Feature Version | Inputs | Spearman $\\rho$ ↑ | Overlap@10% ↑ | Overlap@20% ↑ | Gain Ratio@20% ↑ | Regret@20% ↓ |")
-    lines.append("|:---|:---:|:---:|:---:|:---:|:---:|:---:|")
-    for r in ablation_results:
-        lines.append(f"| **{r['version']}** | {r['n_features']} | {r['spearman_rho']:+.4f} | {r['overlap_10pct']:.1%} | {r['overlap_20pct']:.1%} | {r['gain_ratio_20pct']:.4f} | {r['regret_20pct']:.4f} |")
-    lines.append("")
-    
-    lines.append("## 2. Direct Comparison: Regression vs Ranking vs Oracle (Section XXII)")
-    lines.append("")
-    lines.append("| Method | Spearman $\\rho$ ↑ | Overlap@10% ↑ | Overlap@20% ↑ | Gain Ratio@20% ↑ | Regret@20% ↓ | Inference Cost ($\\mu$s/G) |")
-    lines.append("|:---|:---:|:---:|:---:|:---:|:---:|:---:|")
-    for d in direct_comparison:
-        bold = "**" if "Ranking" in d['method'] else ""
-        lines.append(f"| {bold}{d['method']}{bold} | {d['spearman_rho']:+.4f} | {d['overlap_10pct']:.1%} | {d['overlap_20pct']:.1%} | {d['gain_ratio_20pct']:.4f} | {d['regret_20pct']:.4f} | {d['inference_us']:.2f} $\\mu$s |")
+    with open(json_file, 'w') as f:
+        json.dump({
+            'univariate_predictive_power': univariate_results,
+            'conditional_ablation': ablation_rows,
+            'architecture_comparison': arch_rows,
+            'geometry_stratum_breakdown': strata_breakdown,
+        }, f, indent=2)
+        
+    lines = [
+        "# Phase 4: Learned Marginal Utility & State Factor Analysis Report",
+        "",
+        "## 1. Univariate Predictive Power Analysis (Point XV - Level A)",
+        "",
+        "| State Variable ($x_j$) | Spearman $\\rho(x_j, U^\\star)$ | p-value | Significance |",
+        "|:---|:---:|:---:|:---:|",
+    ]
+    for u in univariate_results:
+        sig_str = "Statistically Significant ✅" if u['p_val'] < 0.05 else "Not Significant"
+        lines.append(f"| **{u['feature']}** | {u['spearman_rho']:+.4f} | {u['p_val']:.4f} | {sig_str} |")
+        
+    lines.extend([
+        "",
+        "## 2. Conditional Incremental Information (Point XV - Level B)",
+        "",
+        "| Model Variant | Inputs | Spearman $\\rho$ ↑ | $\\Delta \\rho$ | NDCG@20% ↑ | Overlap@20% ↑ | OSE@20% ↑ | Absolute Regret ↓ |",
+        "|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|",
+    ])
+    for a in ablation_rows:
+        lines.append(
+            f"| **{a['version']}** | {a['inputs']} | **{a['spearman_rho']:+.4f}** | "
+            f"{a['delta_rho']:+.4f} | {a['ndcg_20pct']:.4f} | {a['overlap_20pct']:.1%} | "
+            f"**{a['ose_20pct']:.4f}** | {a['regret_20pct']:+.6f} |"
+        )
+        
+    lines.extend([
+        "",
+        "## 3. Model Architecture & Loss Comparison (Points XXIV & XXV)",
+        "",
+        "| Model Architecture | Loss Objective | Spearman $\\rho(U^\\star)$ ↑ | NDCG@20% ↑ | OSE@20% ↑ | $\\text{MAE}(\\Delta Q)$ ↓ | $\\text{MAE}(C)$ ↓ |",
+        "|:---|:---|:---:|:---:|:---:|:---:|:---:|",
+    ])
+    for m in arch_rows:
+        loss_name = "Pairwise + Pointwise" if "Ranking" in m['model'] else "Decoupled Smooth-L1"
+        lines.append(
+            f"| **{m['model']}** | {loss_name} | **{m['spearman_rho']:+.4f}** | "
+            f"{m['ndcg_20pct']:.4f} | **{m['ose_20pct']:.4f}** | {m['mae_delta_q']:.6f} | {m['mae_cost']:.2f} ms |"
+        )
+        
+    lines.extend([
+        "",
+        "## 4. Geometry Stratum Breakdown (Point XXVII)",
+        "",
+        "| Geometry Stratum | Interventions (N) | Mean Oracle $U^\\star$ | $\\rho(\\text{Error}, U^\\star)$ | $\\rho(\\text{Heuristic}, U^\\star)$ | $\\rho(\\text{Learned Ours}, U^\\star)$ ↑ |",
+        "|:---|:---:|:---:|:---:|:---:|:---:|",
+    ])
+    for st, s_data in strata_breakdown.items():
+        lines.append(
+            f"| **{st}** | {s_data['count']} | {s_data['mean_oracle_u']:+.6f} | "
+            f"{s_data['rho_error']:+.4f} | {s_data['rho_heuristic']:+.4f} | **{s_data['rho_learned']:+.4f}** |"
+        )
     lines.append("")
     
     with open(report_file, 'w') as f:
         f.write("\n".join(lines))
         
-    json_path = os.path.join(save_dir, 'two_head_comparison.json')
-    with open(json_path, 'w') as f:
-        json.dump({'ablation': ablation_results, 'architectures': arch_results, 'direct_comparison': direct_comparison}, f, indent=2)
-        
-    print(f"\n[Artifacts] Successfully exported:")
-    print(f"  - {report_file}")
-    print(f"  - {json_path}")
+    print(f"\n[Generated Report] Successfully saved to {report_file}")
 
 
 if __name__ == '__main__':
