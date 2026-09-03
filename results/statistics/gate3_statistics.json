@@ -1,5 +1,13 @@
 {
+  "protocol_version": "1.0.0",
   "n_seeds": 5,
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
   "b60_analysis": {
     "learned_mean": 0.0004596863555833016,
     "heuristic_mean": 0.0003656728588396917,

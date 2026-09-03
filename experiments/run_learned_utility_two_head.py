@@ -16,11 +16,20 @@ import torch.optim as optim
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr, pearsonr
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.protocol import load_protocol, get_seeds, get_splits
+from research.protocol import (
+    load_protocol,
+    get_seeds,
+    get_splits,
+    get_budget_config,
+    get_statistics_config,
+    get_oracle_config,
+    get_state_factor_config,
+    get_repo_root,
+)
 
 
 def safe_spearmanr(x: np.ndarray, y: np.ndarray) -> Tuple[float, float]:
@@ -162,15 +171,22 @@ def evaluate_utility_ranking(
     pred_u: np.ndarray,
     oracle_u: np.ndarray,
     delta_q: np.ndarray,
+    budget_cfg: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, float]:
+    if budget_cfg is None:
+        budget_cfg = get_budget_config()
+    rel_budgets = budget_cfg.get("optimization_relative", [0.10, 0.20, 0.40, 0.60, 0.80])
+    b0 = float(rel_budgets[0]) if len(rel_budgets) > 0 else 0.10
+    b1 = float(rel_budgets[1]) if len(rel_budgets) > 1 else 0.20
+    
     n = len(pred_u)
     rho, p_val = safe_spearmanr(pred_u, oracle_u)
     
     pred_ranks = np.argsort(-pred_u)
     oracle_ranks = np.argsort(-oracle_u)
     
-    k10 = max(1, int(n * 0.10))
-    k20 = max(1, int(n * 0.20))
+    k10 = max(1, int(n * b0))
+    k20 = max(1, int(n * b1))
     
     top_pred_10 = set(pred_ranks[:k10].tolist())
     top_ora_10 = set(oracle_ranks[:k10].tolist())
@@ -204,8 +220,16 @@ def main():
     print("   PHASE 4 & 5: LEARNED MARGINAL UTILITY, V0-V7 ABLATION & CAUSAL CHAIN PROOF")
     print("=" * 90)
     
+    protocol = load_protocol()
+    seeds = get_seeds(protocol)
+    splits = get_splits(protocol)
+    budget_cfg = get_budget_config(protocol)
+    stats_cfg = get_statistics_config(protocol)
+    state_factors = get_state_factor_config(protocol)
+    repo_root = str(get_repo_root())
+    
     data_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        repo_root,
         'results', 'oracle_dataset', 'oracle_dataset.json'
     )
     
@@ -293,8 +317,6 @@ def main():
         print(f"   - {name:<20}: ρ = {rho:+.4f} (p={p:.4f}) [{sig}]")
         
     # --- 2. Protocol Frozen Split (Phase 3 & Phase 4) ---
-    protocol = load_protocol()
-    splits = get_splits(protocol)
     train_frames = set(splits['train_frames'])
     val_frames = set(splits['val_frames'])
     
@@ -309,7 +331,6 @@ def main():
     std = X_mat[train_idx].std(dim=0, keepdim=True) + 1e-6
     X_norm = (X_mat - mean) / std
     
-    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     stats_dir = os.path.join(repo_root, 'results', 'statistics')
     os.makedirs(stats_dir, exist_ok=True)
     norm_log = {
@@ -342,7 +363,9 @@ def main():
     print("\n>> 3. Feature Ablation Progression V0–V7 (Phase 6):")
     ablation_rows = []
     prev_rho = 0.0
-    torch.manual_seed(42)
+    seed_ablation = seeds[0]
+    torch.manual_seed(seed_ablation)
+    np.random.seed(seed_ablation)
     
     for v_name, feat_ids in ablation_subsets.items():
         X_sub = X_norm[:, feat_ids]
@@ -403,7 +426,7 @@ def main():
     print("\n>> 5. Complete Benchmark Table on Independent Test Set (Phase 5.2):")
     
     # Baseline predictions on test set:
-    rng = np.random.default_rng(42)
+    rng = np.random.default_rng(seeds[0])
     s_random = rng.random(len(test_idx))
     s_rgb_err = X_mat[test_idx, 0].numpy()
     s_err_inf = (X_mat[test_idx, 0] + X_mat[test_idx, 1]).numpy() * X_mat[test_idx, 4].numpy()
@@ -573,6 +596,8 @@ def main():
     
     with open(json_file, 'w') as f:
         json.dump({
+            'protocol_version': protocol.get('protocol_version', '1.0.0'),
+            'seeds': seeds,
             'univariate_predictive_power': univariate_results,
             'v0_v7_ablation': ablation_rows,
             'benchmark_table': benchmark_rows,

@@ -16,16 +16,27 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import wilcoxon
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datasets.tum_dataset import TUMDataset
 from research.pipeline import OnlineReconstructionPipeline
-from research.protocol import load_protocol, get_seeds, get_resolution
+from research.protocol import (
+    load_protocol,
+    get_seeds,
+    get_resolution,
+    get_dataset_config,
+    get_budget_config,
+    get_statistics_config,
+)
 
 
-def load_tum_sequence(data_path: str, n_frames: int = 50, H: int = 240, W: int = 320, device: str = 'cuda'):
+def load_tum_sequence(data_path: str, n_frames: int = 50, H: Optional[int] = None, W: Optional[int] = None, device: str = 'cuda'):
+    if H is None or W is None:
+        proto_H, proto_W = get_resolution("tum_fr1_desk")
+        H = proto_H if H is None else H
+        W = proto_W if W is None else W
     dataset = TUMDataset(data_path, max_frames=n_frames, camera='freiburg1')
     frames = []
     orig_W, orig_H = 640.0, 480.0
@@ -58,16 +69,22 @@ def load_tum_sequence(data_path: str, n_frames: int = 50, H: int = 240, W: int =
     return frames, intrinsics
 
 
-def bootstrap_ci_95(data: np.ndarray, n_boot: int = 1000) -> Tuple[float, float]:
+def bootstrap_ci_95(data: np.ndarray, n_boot: Optional[int] = None, ci: Optional[float] = None) -> Tuple[float, float]:
     if len(data) == 0:
         return 0.0, 0.0
+    stats_cfg = get_statistics_config()
+    if n_boot is None:
+        n_boot = int(stats_cfg.get("bootstrap_resamples", 1000))
+    if ci is None:
+        ci = float(stats_cfg.get("confidence_interval_level", 0.95))
+    alpha = (1.0 - ci) / 2.0 * 100.0
     boot_means = []
     n = len(data)
-    rng = np.random.default_rng(42)
+    rng = np.random.default_rng(42)  # Category A: deterministic RNG seed for bootstrap reproducibility
     for _ in range(n_boot):
         sample = rng.choice(data, size=n, replace=True)
         boot_means.append(np.mean(sample))
-    return float(np.percentile(boot_means, 2.5)), float(np.percentile(boot_means, 97.5))
+    return float(np.percentile(boot_means, alpha)), float(np.percentile(boot_means, 100.0 - alpha))
 
 
 def compute_cohens_d(group: np.ndarray) -> float:
@@ -176,14 +193,19 @@ def main():
     
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     protocol = load_protocol()
-    dataset_cfg = protocol["datasets"]["tum_fr1_desk"]
-    data_path = os.path.join(repo_root, dataset_cfg["path"])
+    dataset_cfg = get_dataset_config("tum_fr1_desk", protocol)
+    data_path = dataset_cfg.get("full_path")
+    if not data_path or not os.path.exists(data_path):
+        data_path = os.path.join(repo_root, dataset_cfg["path"])
+        
+    H, W = get_resolution("tum_fr1_desk", protocol)
+    seeds = get_seeds(protocol)
+    budget_cfg = get_budget_config(protocol)
+    stats_cfg = get_statistics_config(protocol)
     
-    H = dataset_cfg["image_height"]
-    W = dataset_cfg["image_width"]
-    seeds = protocol["reproducibility"]["seeds"]
     n_frames = dataset_cfg.get("eval_horizon_frames", 60)
-    budget_ms = 15.0
+    wall_clock_budgets = budget_cfg.get("wall_clock_ms", [10.0, 15.0, 20.0, 33.3])
+    budget_ms = float(wall_clock_budgets[1]) if len(wall_clock_budgets) > 1 else 15.0
     
     print(f">> Loading {n_frames} frames from TUM fr1/desk at {W}x{H} (Budget = {budget_ms} ms)...")
     frames, intrinsics = load_tum_sequence(data_path, n_frames=n_frames, H=H, W=W, device=device)
@@ -202,7 +224,7 @@ def main():
         print(f">> Executing 50-frame online trajectory simulation...")
         for pol in policies_to_run:
             print(f"   Executing: {pol.upper()} (Target: {budget_ms} ms)...")
-            res = run_single_trajectory(pol, frames, intrinsics, budget_ms=budget_ms, seed=42, device=device)
+            res = run_single_trajectory(pol, frames, intrinsics, budget_ms=budget_ms, seed=seeds[0], device=device)
             results[pol] = res
             ls = res['latency_stats']
             print(f"   Done. Mean PSNR = {res['mean_psnr']:5.2f} dB | Final PSNR = {res['final_psnr']:5.2f} dB | Opt Mean = {ls['mean_opt_ms']:4.1f} ms (P95: {ls['p95_opt_ms']:4.1f} ms) | Active = {res['final_gaussians']}")
@@ -287,7 +309,11 @@ def main():
     median_dq = float(np.median(arr_dq))
     min_dq = float(np.min(arr_dq))
     max_dq = float(np.max(arr_dq))
-    ci_dq_low, ci_dq_high = bootstrap_ci_95(arr_dq)
+    ci_dq_low, ci_dq_high = bootstrap_ci_95(
+        arr_dq,
+        n_boot=int(stats_cfg.get("bootstrap_resamples", 1000)),
+        ci=float(stats_cfg.get("confidence_interval_level", 0.95))
+    )
     
     diff_nonzero = arr_dq[np.abs(arr_dq) > 1e-6]
     if len(diff_nonzero) >= 5:
@@ -351,6 +377,9 @@ def main():
     
     with open(os.path.join(save_dir, 'trajectory_50frames.json'), 'w') as f:
         json.dump({
+            'protocol_version': protocol.get('protocol_version', '1.0.0'),
+            'seeds': seeds,
+            'budget_ms': budget_ms,
             'policies': results,
             'quality_delta_statistics': {
                 'mean_delta_q_db': mean_dq,

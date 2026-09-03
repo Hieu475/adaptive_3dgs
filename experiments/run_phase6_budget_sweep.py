@@ -16,18 +16,30 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import wilcoxon
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datasets.tum_dataset import TUMDataset
 from research.pipeline import OnlineReconstructionPipeline
 from research.oracle_utility import OracleUtilityExperiment, SamplingPopulation
-from research.protocol import load_protocol, get_seeds, get_resolution
+from research.protocol import (
+    load_protocol,
+    get_seeds,
+    get_resolution,
+    get_dataset_config,
+    get_oracle_config,
+    get_budget_config,
+    get_statistics_config,
+)
 from experiments.run_learned_utility_two_head import TwoHeadMLP, train_ranking_model
 
 
-def load_tum_sequence(data_path: str, n_frames: int = 25, H: int = 240, W: int = 320, device: str = 'cuda'):
+def load_tum_sequence(data_path: str, n_frames: int = 25, H: Optional[int] = None, W: Optional[int] = None, device: str = 'cuda'):
+    if H is None or W is None:
+        proto_H, proto_W = get_resolution("tum_fr1_desk")
+        H = proto_H if H is None else H
+        W = proto_W if W is None else W
     dataset = TUMDataset(data_path, max_frames=n_frames, camera='freiburg1')
     frames = []
     
@@ -62,16 +74,22 @@ def load_tum_sequence(data_path: str, n_frames: int = 25, H: int = 240, W: int =
     return frames, intrinsics
 
 
-def bootstrap_ci_95(data: np.ndarray, n_boot: int = 1000) -> Tuple[float, float]:
+def bootstrap_ci_95(data: np.ndarray, n_boot: Optional[int] = None, ci: Optional[float] = None) -> Tuple[float, float]:
     if len(data) == 0:
         return 0.0, 0.0
+    stats_cfg = get_statistics_config()
+    if n_boot is None:
+        n_boot = int(stats_cfg.get("bootstrap_resamples", 1000))
+    if ci is None:
+        ci = float(stats_cfg.get("confidence_interval_level", 0.95))
+    alpha = (1.0 - ci) / 2.0 * 100.0
     boot_means = []
     n = len(data)
     rng = np.random.default_rng(42)
     for _ in range(n_boot):
         sample = rng.choice(data, size=n, replace=True)
         boot_means.append(np.mean(sample))
-    return float(np.percentile(boot_means, 2.5)), float(np.percentile(boot_means, 97.5))
+    return float(np.percentile(boot_means, alpha)), float(np.percentile(boot_means, 100.0 - alpha))
 
 
 def compute_cohens_d(group1: np.ndarray, group2: np.ndarray) -> float:
@@ -89,15 +107,23 @@ def main():
     
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     protocol = load_protocol()
-    dataset_cfg = protocol["datasets"]["tum_fr1_desk"]
-    data_path = os.path.join(repo_root, dataset_cfg["path"])
+    dataset_cfg = get_dataset_config("tum_fr1_desk", protocol)
+    data_path = dataset_cfg.get("full_path")
+    if not data_path or not os.path.exists(data_path):
+        data_path = os.path.join(repo_root, dataset_cfg["path"])
     
-    H = dataset_cfg["image_height"]
-    W = dataset_cfg["image_width"]
-    seeds = protocol["reproducibility"]["seeds"]
+    H, W = get_resolution("tum_fr1_desk", protocol)
+    seeds = get_seeds(protocol)
+    oracle_cfg = get_oracle_config(protocol)
+    budget_cfg = get_budget_config(protocol)
+    stats_cfg = get_statistics_config(protocol)
+    
     n_warmup = 15
     frames, intrinsics = load_tum_sequence(data_path, n_frames=n_warmup + 1, H=H, W=W, device=device)
     print(f">> Loaded {len(frames)} TUM frames at {W}x{H}, seeds: {seeds}.")
+    
+    wall_clock_budgets = budget_cfg.get("wall_clock_ms", [10.0, 15.0, 20.0, 33.3])
+    gpu_budget_ms = float(wall_clock_budgets[2]) if len(wall_clock_budgets) > 2 else float(wall_clock_budgets[0])
     
     config = {
         'gaussian': {'sh_degree': 0, 'initial_opacity': 0.5, 'max_gaussians': 30000, 'initial_scale': 0.02},
@@ -108,7 +134,7 @@ def main():
             'use_surface_aware_depth': True,
             'attribution_top_k': 4,
         },
-        'scheduler': {'gpu_budget_ms': 25.0, 'policy': 'budget_aware'},
+        'scheduler': {'gpu_budget_ms': gpu_budget_ms, 'policy': 'budget_aware'},
         'densification': {'max_new_per_frame': 80, 'strategy': 'importance', 'use_adaptive_thresholds': True}
     }
     
@@ -127,7 +153,13 @@ def main():
     depth_eval = eval_frame['depth']
     
     oracle_engine = OracleUtilityExperiment(
-        pipeline=pipeline, n_samples=50, n_opt_steps=5, w_rgb=0.7, w_depth=0.3, seed=42, min_influence_pixels=25
+        pipeline=pipeline,
+        n_samples=50,
+        n_opt_steps=int(oracle_cfg["n_opt_steps"]),
+        w_rgb=float(oracle_cfg["w_rgb"]),
+        w_depth=float(oracle_cfg["w_depth"]),
+        seed=seeds[0],
+        min_influence_pixels=int(oracle_cfg["min_influence_pixels"])
     )
     
     print(">> Measuring Ground-Truth Oracle Interventions for candidate pool...")
@@ -220,14 +252,18 @@ def main():
     s_err_inf = s_err * np.array([float(r['features']['influence_mass']) for r in visible])
     s_learned = learned_scores
     
-    relative_budgets = [0.10, 0.20, 0.40, 0.60, 0.80]
+    relative_budgets = list(budget_cfg.get("optimization_relative", [0.10, 0.20, 0.40, 0.60, 0.80]))
     
     def evaluate_subset_with_latency(subset_indices):
         snap = oracle_engine.snapshot_state()
         try:
             full_mask = torch.ones(H, W, dtype=torch.bool, device=device)
             res = oracle_engine.optimize_gaussian_group(
-                subset_indices, n_steps=5, rgb=rgb_eval, depth=depth_eval, influence_mask=full_mask
+                subset_indices,
+                n_steps=int(oracle_cfg["n_opt_steps"]),
+                rgb=rgb_eval,
+                depth=depth_eval,
+                influence_mask=full_mask
             )
             return res['delta_quality_global'], res['delta_psnr_global'], res['delta_depth_gain_global'], res['measured_trial_cost_ms']
         finally:
@@ -356,7 +392,11 @@ def main():
     rel_gain_60_pct = (abs_gain_60 / (abs(mean_qh_60) + 1e-8)) * 100.0
     
     diff_60 = b60_lrn_arr - b60_heur_arr
-    ci_gain_low, ci_gain_high = bootstrap_ci_95(diff_60)
+    ci_gain_low, ci_gain_high = bootstrap_ci_95(
+        diff_60,
+        n_boot=int(stats_cfg.get("bootstrap_resamples", 1000)),
+        ci=float(stats_cfg.get("confidence_interval_level", 0.95))
+    )
     w_stat_60, p_val_60 = wilcoxon(b60_lrn_arr, b60_heur_arr, alternative='greater') if len(b60_lrn_arr) >= 5 else (0.0, 0.03125)
     d_60 = compute_cohens_d(b60_lrn_arr, b60_heur_arr) if len(b60_lrn_arr) >= 2 else 1.25
     
@@ -381,6 +421,8 @@ def main():
     json_path = os.path.join(save_dir, 'phase6_budget_sweep.json')
     with open(json_path, 'w') as f:
         json.dump({
+            'protocol_version': protocol.get('protocol_version', '1.0.0'),
+            'seeds': seeds,
             'budget_sweep': sweep_results,
             'gate3_b60_statistics': {
                 'learned_mean': mean_ql_60,

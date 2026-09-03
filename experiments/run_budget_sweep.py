@@ -21,13 +21,19 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from research.benchmark_budgets import run_full_budget_matrix, format_budget_table
 from experiments.run_importance_validation import generate_synthetic_benchmark_dataset
+from research.protocol import load_protocol, get_seeds, get_budget_config
 
 
 def main():
+    protocol = load_protocol()
+    seeds = get_seeds(protocol)
+    budget_cfg = get_budget_config(protocol)
+    default_budgets = list(budget_cfg.get("wall_clock_ms", [10.0, 15.0, 20.0, 33.3])) + [None]
+    
     parser = argparse.ArgumentParser(description="R13 Budget Controller Sweep")
     parser.add_argument('--device', type=str, default='cpu', help='Device (cpu or cuda)')
     parser.add_argument('--frames', type=int, default=10, help='Number of frames to evaluate')
-    parser.add_argument('--seed', type=int, default=42, help='Random seed')
+    parser.add_argument('--seed', type=int, default=seeds[0], help='Random seed')
     parser.add_argument('--output-dir', type=str, default='results/budgets/', help='Output directory')
     args = parser.parse_args()
 
@@ -37,11 +43,11 @@ def main():
     print(f"[R13] Generating {args.frames} frames with seed={args.seed}...")
     frames, intrinsics = generate_synthetic_benchmark_dataset(n_frames=args.frames, seed=args.seed)
 
-    print("Running Latency Budget Spectrum: 2ms, 4ms, 8ms, 16ms, Unconstrained...")
+    print(f"Running Latency Budget Spectrum: {default_budgets}...")
     ablation = run_full_budget_matrix(
         frames=frames,
         intrinsics=intrinsics,
-        budgets=[2.0, 4.0, 8.0, 16.0, None],
+        budgets=default_budgets,
         device=args.device,
     )
 

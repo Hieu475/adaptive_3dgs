@@ -16,17 +16,29 @@ import torch
 import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datasets.tum_dataset import TUMDataset
 from research.pipeline import OnlineReconstructionPipeline
 from research.oracle_utility import OracleUtilityExperiment, SamplingPopulation
-from research.protocol import load_protocol, get_seeds, get_resolution
+from research.protocol import (
+    load_protocol,
+    get_seeds,
+    get_resolution,
+    get_dataset_config,
+    get_oracle_config,
+    get_budget_config,
+    get_statistics_config,
+)
 
 
-def load_tum_sequence(data_path: str, n_frames: int = 25, H: int = 240, W: int = 320, device: str = 'cuda'):
+def load_tum_sequence(data_path: str, n_frames: int = 25, H: Optional[int] = None, W: Optional[int] = None, device: str = 'cuda'):
+    if H is None or W is None:
+        proto_H, proto_W = get_resolution("tum_fr1_desk")
+        H = proto_H if H is None else H
+        W = proto_W if W is None else W
     dataset = TUMDataset(data_path, max_frames=n_frames, camera='freiburg1')
     frames = []
     orig_W, orig_H = 640.0, 480.0
@@ -59,16 +71,22 @@ def load_tum_sequence(data_path: str, n_frames: int = 25, H: int = 240, W: int =
     return frames, intrinsics
 
 
-def bootstrap_ci_95(data: np.ndarray, n_boot: int = 1000) -> Tuple[float, float]:
+def bootstrap_ci_95(data: np.ndarray, n_boot: Optional[int] = None, ci: Optional[float] = None) -> Tuple[float, float]:
     if len(data) == 0:
         return 0.0, 0.0
+    stats_cfg = get_statistics_config()
+    if n_boot is None:
+        n_boot = int(stats_cfg.get("bootstrap_resamples", 1000))
+    if ci is None:
+        ci = float(stats_cfg.get("confidence_interval_level", 0.95))
+    alpha = (1.0 - ci) / 2.0 * 100.0
     boot_means = []
     n = len(data)
-    rng = np.random.default_rng(42)
+    rng = np.random.default_rng(42)  # Fixed seed for bootstrap reproducibility (Category A)
     for _ in range(n_boot):
         sample = rng.choice(data, size=n, replace=True)
         boot_means.append(np.mean(sample))
-    return float(np.percentile(boot_means, 2.5)), float(np.percentile(boot_means, 97.5))
+    return float(np.percentile(boot_means, alpha)), float(np.percentile(boot_means, 100.0 - alpha))
 
 
 def compute_cohens_d(group1: np.ndarray, group2: np.ndarray) -> float:
@@ -86,17 +104,22 @@ def run_gate1_multi_seed():
     
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     protocol = load_protocol()
-    dataset_cfg = protocol["datasets"]["tum_fr1_desk"]
-    data_path = os.path.join(repo_root, dataset_cfg["path"])
+    dataset_cfg = get_dataset_config("tum_fr1_desk", protocol)
+    data_path = dataset_cfg.get("full_path")
+    if not data_path or not os.path.exists(data_path):
+        data_path = os.path.join(repo_root, dataset_cfg["path"])
     if not os.path.exists(data_path):
         raise FileNotFoundError(f"TUM dataset not found at {data_path}")
         
-    H = dataset_cfg["image_height"]
-    W = dataset_cfg["image_width"]
+    H, W = get_resolution("tum_fr1_desk", protocol)
+    seeds = get_seeds(protocol)
+    oracle_cfg = get_oracle_config(protocol)
+    budget_cfg = get_budget_config(protocol)
+    stats_cfg = get_statistics_config(protocol)
+    
     n_warmup = 15
     frames, intrinsics = load_tum_sequence(data_path, n_frames=n_warmup + 1, H=H, W=W, device=device)
     
-    seeds = protocol["reproducibility"]["seeds"]
     print(f">> Executing across {len(seeds)} frozen seeds: {seeds} at {W}x{H}...")
     
     seed_records = []
@@ -108,6 +131,9 @@ def run_gate1_multi_seed():
     q_random_list = []
     headroom_list = []
     headroom_psnr_list = []
+    
+    wall_clock_budgets = budget_cfg.get("wall_clock_ms", [10.0, 15.0, 20.0, 33.3])
+    gpu_budget_ms = float(wall_clock_budgets[2]) if len(wall_clock_budgets) > 2 else float(wall_clock_budgets[0])
     
     config = {
         'gaussian': {
@@ -124,7 +150,7 @@ def run_gate1_multi_seed():
             'attribution_top_k': 4,
         },
         'scheduler': {
-            'gpu_budget_ms': 25.0,
+            'gpu_budget_ms': gpu_budget_ms,
             'policy': 'budget_aware',
         },
         'densification': {
@@ -164,11 +190,11 @@ def run_gate1_multi_seed():
         oracle_engine = OracleUtilityExperiment(
             pipeline=pipeline,
             n_samples=n_samples,
-            n_opt_steps=5,
-            w_rgb=0.70,
-            w_depth=0.30,
+            n_opt_steps=int(oracle_cfg["n_opt_steps"]),
+            w_rgb=float(oracle_cfg["w_rgb"]),
+            w_depth=float(oracle_cfg["w_depth"]),
             seed=seed,
-            min_influence_pixels=25
+            min_influence_pixels=int(oracle_cfg["min_influence_pixels"])
         )
         last_oracle_engine = oracle_engine
         
@@ -188,7 +214,9 @@ def run_gate1_multi_seed():
         n_neg = sum(1 for u in u_stars if u < -1e-5)
         pct_neg = (n_neg / len(u_stars)) * 100.0 if u_stars else 0.0
         
-        K = max(1, int(len(vis_res) * 0.20))
+        rel_budgets = budget_cfg.get("optimization_relative", [0.10, 0.20, 0.40, 0.60, 0.80])
+        eval_budget_frac = float(rel_budgets[1]) if len(rel_budgets) > 1 else 0.20
+        K = max(1, int(len(vis_res) * eval_budget_frac))
         cand_indices = [r['gaussian_id'] for r in vis_res]
         last_eval_cand_indices = cand_indices
         u_by_id = {r['gaussian_id']: r['oracle_utility_joint'] for r in vis_res}
@@ -204,7 +232,11 @@ def run_gate1_multi_seed():
             try:
                 full_mask = torch.ones(H, W, dtype=torch.bool, device=device)
                 res = oracle_engine.optimize_gaussian_group(
-                    subset, n_steps=5, rgb=rgb_eval, depth=depth_eval, influence_mask=full_mask
+                    subset,
+                    n_steps=int(oracle_cfg["n_opt_steps"]),
+                    rgb=rgb_eval,
+                    depth=depth_eval,
+                    influence_mask=full_mask
                 )
                 return res['delta_psnr_global'], res['delta_quality_global']
             finally:
@@ -268,7 +300,11 @@ def run_gate1_multi_seed():
     
     mean_h = float(np.mean(arr_h))
     std_h = float(np.std(arr_h, ddof=1))
-    ci_h_low, ci_h_high = bootstrap_ci_95(arr_h)
+    ci_h_low, ci_h_high = bootstrap_ci_95(
+        arr_h,
+        n_boot=int(stats_cfg.get("bootstrap_resamples", 1000)),
+        ci=float(stats_cfg.get("confidence_interval_level", 0.95))
+    )
     
     w_stat, p_wilcoxon = wilcoxon(arr_q_ora, arr_q_rand, alternative='greater')
     cohen_d_headroom = compute_cohens_d(arr_q_ora, arr_q_rand)
@@ -319,7 +355,7 @@ def run_gate1_multi_seed():
     print("\n" + "=" * 80)
     print("   GROUP NON-ADDITIVITY & INTERACTION ERROR (PHASE 4.1)")
     print("=" * 80)
-    group_sizes = [1, 2, 4, 8, 16, 32]
+    group_sizes = list(oracle_cfg.get("group_additivity_sizes", [1, 4, 16]))
     print(f">> Evaluating group interaction across sizes {group_sizes}...")
     group_res = last_oracle_engine.evaluate_group_interaction(
         rgb=rgb_eval,
@@ -367,7 +403,7 @@ def run_gate1_multi_seed():
     os.makedirs(save_dir, exist_ok=True)
     
     gate1_summary = {
-        'protocol_version': '1.0.0',
+        'protocol_version': protocol.get('protocol_version', '1.0.0'),
         'seeds': seeds,
         'n_seeds': len(seeds),
         'headroom_statistics': {

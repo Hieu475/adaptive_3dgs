@@ -24,26 +24,40 @@ import pandas as pd
 from scipy.stats import wilcoxon
 from typing import Dict, List, Tuple, Any, Optional
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from research.protocol import (
+    load_protocol,
+    get_seeds,
+    get_statistics_config,
+    get_budget_config,
+)
 
-from research.protocol import load_protocol, get_seeds
 
-
-def bootstrap_ci_95(data: np.ndarray, n_boot: int = 2000, seed: int = 42) -> Tuple[float, float]:
-    """Compute empirical 95% bootstrap confidence interval."""
+def bootstrap_ci_95(
+    data: np.ndarray,
+    n_boot: Optional[int] = None,
+    ci: Optional[float] = None,
+    seed: int = 42
+) -> Tuple[float, float]:
+    """Compute empirical bootstrap confidence interval using protocol specification."""
     arr = np.asarray(data)
     if len(arr) == 0:
         return 0.0, 0.0
     if len(arr) == 1:
         return float(arr[0]), float(arr[0])
+    stats_cfg = get_statistics_config()
+    if n_boot is None:
+        n_boot = int(stats_cfg.get("bootstrap_resamples", 1000))
+    if ci is None:
+        ci = float(stats_cfg.get("confidence_interval_level", 0.95))
+    alpha = (1.0 - ci) / 2.0 * 100.0
     boot_means = []
     n = len(arr)
-    rng = np.random.default_rng(seed)
+    rng = np.random.default_rng(seed)  # Category A: deterministic RNG seed for bootstrap reproducibility
     for _ in range(n_boot):
         sample = rng.choice(arr, size=n, replace=True)
         boot_means.append(np.mean(sample))
-    ci_low = float(np.percentile(boot_means, 2.5))
-    ci_high = float(np.percentile(boot_means, 97.5))
+    ci_low = float(np.percentile(boot_means, alpha))
+    ci_high = float(np.percentile(boot_means, 100.0 - alpha))
     return ci_low, ci_high
 
 
@@ -87,7 +101,10 @@ def main():
     repo_root = Path(__file__).resolve().parent.parent
     protocol = load_protocol()
     seeds = get_seeds(protocol)
-    print(f">> Evaluating across {len(seeds)} frozen independent seeds: {seeds}...")
+    stats_cfg = get_statistics_config(protocol)
+    n_boot = int(stats_cfg.get("bootstrap_resamples", 1000))
+    ci_level = float(stats_cfg.get("confidence_interval_level", 0.95))
+    print(f">> Evaluating across {len(seeds)} frozen independent seeds: {seeds} (n_boot={n_boot}, CI={ci_level*100:.0f}%)...")
     
     seeds_dir = repo_root / 'results' / 'seeds'
     stats_dir = repo_root / 'results' / 'statistics'
@@ -125,6 +142,7 @@ def main():
         d_heur_vs_err = compute_cohens_d(q_heur, q_err)
         
         gate1_stats = {
+            'protocol_version': protocol.get('protocol_version', '1.0.0'),
             'n_seeds': len(g1_data),
             'seeds': seeds,
             'headroom_joint': {
@@ -203,7 +221,9 @@ def main():
         d_lrn_err = compute_cohens_d(lrn_ose, err_ose)
         
         gate2_stats = {
+            'protocol_version': protocol.get('protocol_version', '1.0.0'),
             'n_seeds': len(g2_data),
+            'seeds': seeds,
             'methods': method_stats,
             'learned_vs_heuristic': {'wilcoxon_p': p_lrn_heur, 'cohens_d': d_lrn_heur},
             'learned_vs_error': {'wilcoxon_p': p_lrn_err, 'cohens_d': d_lrn_err},
@@ -237,7 +257,9 @@ def main():
         d_60 = compute_cohens_d(ql_60, qh_60)
         
         gate3_stats = {
+            'protocol_version': protocol.get('protocol_version', '1.0.0'),
             'n_seeds': len(g3_data),
+            'seeds': seeds,
             'b60_analysis': {
                 'learned_mean': float(np.mean(ql_60)),
                 'heuristic_mean': float(np.mean(qh_60)),
@@ -298,7 +320,9 @@ def main():
             }
             
         gate4_stats = {
+            'protocol_version': protocol.get('protocol_version', '1.0.0'),
             'n_seeds': len(g4_data),
+            'seeds': seeds,
             'quality_gain_vs_error': {
                 'mean_db': float(np.mean(dq_err_vals)),
                 'std_db': float(np.std(dq_err_vals, ddof=1)),

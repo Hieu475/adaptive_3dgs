@@ -70,3 +70,32 @@ def get_splits(protocol: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         "test_scene": "tum_fr2_xyz",
         "raw_splits": protocol.get("splits", {})
     }
+
+
+def get_oracle_config(protocol: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Return oracle specification dictionary."""
+    if protocol is None:
+        protocol = load_protocol()
+    return dict(protocol["oracle_specification"])
+
+
+def get_budget_config(protocol: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Return budget levels configuration dictionary."""
+    if protocol is None:
+        protocol = load_protocol()
+    return dict(protocol["budget_levels"])
+
+
+def get_statistics_config(protocol: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Return statistical testing configuration dictionary."""
+    if protocol is None:
+        protocol = load_protocol()
+    return dict(protocol["statistical_testing"])
+
+
+def get_state_factor_config(protocol: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Return state factor feature configuration dictionary."""
+    if protocol is None:
+        protocol = load_protocol()
+    return dict(protocol["state_factors"])
+
