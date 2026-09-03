@@ -1,0 +1,9 @@
+{
+  "protocol_version": "1.0.0",
+  "deterministic_torch": true,
+  "persistent_ids_bitwise_identical": true,
+  "state_ema_tensors_bitwise_identical": true,
+  "monotonic_id_counter_identical": true,
+  "lineage_graph_identical": true,
+  "status": "PASS"
+}

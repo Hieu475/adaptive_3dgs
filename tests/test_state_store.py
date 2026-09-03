@@ -291,3 +291,264 @@ def test_temporal_state_follows_persistent_id():
     assert abs(model.state_store.ema_depth[0].item() - 0.25) < 1e-6
 
 
+def test_create_unique_ids():
+    """Invariant A: ID uniqueness and monotonic progression across batches."""
+    store = GaussianStateStore(device='cpu')
+    ids1 = store.create(count=10, frame_idx=0)
+    assert len(ids1) == 10
+    assert torch.equal(ids1, torch.arange(0, 10))
+    
+    ids2 = store.create(count=20, frame_idx=1)
+    assert len(ids2) == 20
+    assert torch.equal(ids2, torch.arange(10, 30))
+    
+    # ID uniqueness across all active Gaussians
+    all_ids = store.persistent_ids.cpu().numpy()
+    assert len(all_ids) == len(set(all_ids))
+    assert store._next_id == 30
+
+
+def test_create_parent_lineage():
+    """Verify root Gaussians have parent_id == -1 and metadata recorded."""
+    store = GaussianStateStore(device='cpu')
+    ids = store.create(count=5, frame_idx=0)
+    assert torch.all(store.parent_ids == -1)
+    for g_id in ids.tolist():
+        meta = store.get_lineage(g_id)
+        assert meta['parent_id'] == -1
+        assert meta['creation_frame'] == 0
+        assert meta['children'] == []
+        assert meta['status'] == 'active'
+
+
+def test_update_ema_formula():
+    """Verify exact formula: EMA_t = beta * EMA_{t-1} + (1 - beta) * x_t."""
+    store = GaussianStateStore(device='cpu')
+    store.create(count=1, frame_idx=0)
+    assert store.ema_rgb[0].item() == 0.0
+    
+    # x_1 = 1.0, beta = 0.9 => EMA_1 = 0.9 * 0 + 0.1 * 1.0 = 0.1
+    store.update_frame(frame_idx=1, rgb_errors=torch.tensor([1.0]), ema_decay=0.9)
+    assert abs(store.ema_rgb[0].item() - 0.1) < 1e-6
+    
+    # x_2 = 1.0 => EMA_2 = 0.9 * 0.1 + 0.1 * 1.0 = 0.19
+    store.update_frame(frame_idx=2, rgb_errors=torch.tensor([1.0]), ema_decay=0.9)
+    assert abs(store.ema_rgb[0].item() - 0.19) < 1e-6
+
+
+def test_age_semantics_exact():
+    """Verify age semantic: age_i(t) = t - t_{creation, i}."""
+    store = GaussianStateStore(device='cpu')
+    # Created at frame 10
+    store.create(count=3, frame_idx=10)
+    assert torch.all(store.ages == 0)
+    
+    # Frame 11
+    store.update_frame(frame_idx=11)
+    assert torch.all(store.ages == 1)
+    
+    # Frame 12
+    store.update_frame(frame_idx=12)
+    assert torch.all(store.ages == 2)
+
+
+def test_last_update_frame_selective():
+    """Verify last_update_frame is modified ONLY for Gaussians in optimized_mask."""
+    store = GaussianStateStore(device='cpu')
+    store.create(count=4, frame_idx=5)
+    assert torch.all(store.last_update_frames == 5)
+    
+    # Optimize indices 0 and 2 at frame 10
+    opt_mask = torch.tensor([True, False, True, False])
+    store.update_frame(frame_idx=10, optimized_mask=opt_mask)
+    
+    assert store.last_update_frames[0].item() == 10
+    assert store.last_update_frames[1].item() == 5  # untouched
+    assert store.last_update_frames[2].item() == 10
+    assert store.last_update_frames[3].item() == 5  # untouched
+
+
+def test_staleness_calculation():
+    """Verify staleness_i(t) = t - last_update_frame_i."""
+    store = GaussianStateStore(device='cpu')
+    store.create(count=2, frame_idx=90)
+    
+    # Optimize index 0 at frame 93
+    store.update_frame(frame_idx=93, optimized_mask=torch.tensor([True, False]))
+    assert store.last_update_frames[0].item() == 93
+    assert store.last_update_frames[1].item() == 90
+    
+    # Query staleness at frame 100
+    stale = store.get_staleness(frame_idx=100)
+    assert stale[0].item() == 7   # 100 - 93 = 7
+    assert stale[1].item() == 10  # 100 - 90 = 10
+
+
+def test_position_drift_calculation():
+    """Verify d_i(t) = ||mu_i(t) - mu_i(t-1)||_2."""
+    store = GaussianStateStore(device='cpu')
+    store.create(count=2, frame_idx=0)
+    
+    pos_0 = torch.tensor([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]])
+    store.update_frame(frame_idx=0, positions=pos_0)
+    assert torch.all(store.position_drift == 0.0)
+    
+    # Frame 1: index 0 moves (3, 4, 0) => drift = 5.0; index 1 stationary
+    pos_1 = torch.tensor([[3.0, 4.0, 0.0], [1.0, 1.0, 1.0]])
+    store.update_frame(frame_idx=1, positions=pos_1)
+    assert abs(store.position_drift[0].item() - 5.0) < 1e-5
+    assert abs(store.position_drift[1].item() - 0.0) < 1e-5
+
+
+def test_residual_drift_ema_calculation():
+    """Verify residual drift r_i(t) = |e_i(t) - e_i(t-1)| and its EMA."""
+    store = GaussianStateStore(device='cpu')
+    store.create(count=1, frame_idx=0)
+    
+    # Frame 0: error = 0.5
+    store.update_frame(frame_idx=0, rgb_errors=torch.tensor([0.5]))
+    assert store.residual_drift_ema[0].item() == 0.0
+    
+    # Frame 1: error = 0.8 => residual drift = |0.8 - 0.5| = 0.3
+    # EMA with decay=0.9 => 0.9 * 0 + 0.1 * 0.3 = 0.03
+    store.update_frame(frame_idx=1, rgb_errors=torch.tensor([0.8]), ema_decay=0.9)
+    assert abs(store.residual_drift_ema[0].item() - 0.03) < 1e-5
+
+
+def test_reordering_preserves_state():
+    """Invariant B: State tracks persistent ID, NOT tensor index under permutation."""
+    store = GaussianStateStore(device='cpu')
+    store.create(count=4, frame_idx=0)  # IDs 0, 1, 2, 3
+    
+    # Set distinct state signals for each Gaussian
+    store.ema_rgb = torch.tensor([10.0, 11.0, 12.0, 13.0])
+    store.ema_depth = torch.tensor([20.0, 21.0, 22.0, 23.0])
+    store.ages = torch.tensor([1, 2, 3, 4])
+    
+    # Permutation: [3, 0, 2, 1]
+    perm = torch.tensor([3, 0, 2, 1])
+    store.reorder(perm)
+    
+    # New order of persistent IDs must be [3, 0, 2, 1]
+    assert torch.equal(store.persistent_ids, torch.tensor([3, 0, 2, 1]))
+    # State values must follow their respective IDs
+    assert torch.equal(store.ema_rgb, torch.tensor([13.0, 10.0, 12.0, 11.0]))
+    assert torch.equal(store.ema_depth, torch.tensor([23.0, 20.0, 22.0, 21.0]))
+    assert torch.equal(store.ages, torch.tensor([4, 1, 3, 2]))
+
+
+def test_state_matrix_alignment_and_factors():
+    """Verify get_state_matrix() aligns with protocol state factors."""
+    store = GaussianStateStore(device='cpu')
+    store.create(count=3, frame_idx=0)
+    
+    matrix = store.get_state_matrix()
+    required_keys = [
+        'persistent_id', 'parent_id', 'age', 'creation_frame', 'last_update_frame',
+        'staleness', 'ema_rgb', 'ema_depth', 'ema_influence', 'ema_visibility',
+        'uncertainty', 'uncertainty_var', 'temporal_drift', 'position_drift',
+        'residual_drift_ema', 'gradient_ema', 'tier'
+    ]
+    for k in required_keys:
+        assert k in matrix, f"Missing state factor key: {k}"
+        assert len(matrix[k]) == 3
+
+
+def test_densification_lineage_preserves_persistent_parent_id():
+    """Verify child parent_id stores parent's PERSISTENT ID, not tensor index."""
+    store = GaussianStateStore(device='cpu')
+    store.create(count=5, frame_idx=0)  # IDs 0, 1, 2, 3, 4
+    
+    # Prune index 0 so indices shift! Surviving: [1, 2, 3, 4]
+    store.remap_after_pruning(torch.tensor([False, True, True, True, True]))
+    # Now index 0 has persistent_id 1; index 1 has persistent_id 2
+    assert store.persistent_ids[1].item() == 2
+    
+    # Densify parent at tensor index 1 (persistent_id = 2)
+    child_ids = store.register_densification(
+        parent_indices=torch.tensor([1]), n_children_per_parent=2, frame_idx=5
+    )
+    
+    # Parent ID of children must be 2, NOT tensor index 1!
+    c0_lineage = store.get_lineage(child_ids[0].item())
+    c1_lineage = store.get_lineage(child_ids[1].item())
+    assert c0_lineage['parent_id'] == 2, "Child parent_id must be persistent ID (2), not index (1)"
+    assert c1_lineage['parent_id'] == 2
+
+
+def test_child_state_initialization_policy():
+    """Verify densification policy: 'fresh' (clean state) vs 'inherit' (parent EMA)."""
+    store = GaussianStateStore(device='cpu')
+    store.create(count=2, frame_idx=0)
+    store.ema_rgb[0] = 0.85
+    store.ema_depth[0] = 0.42
+    
+    # 1. Fresh policy (protocol default)
+    c_fresh = store.register_densification(
+        parent_indices=torch.tensor([0]), n_children_per_parent=1, frame_idx=2, policy='fresh'
+    )
+    c_fresh_idx = (store.persistent_ids == c_fresh[0]).nonzero(as_tuple=True)[0].item()
+    assert store.ema_rgb[c_fresh_idx].item() == 0.0
+    assert store.ema_depth[c_fresh_idx].item() == 0.0
+    
+    # 2. Inherit policy
+    c_inherit = store.register_densification(
+        parent_indices=torch.tensor([0]), n_children_per_parent=1, frame_idx=3, policy='inherit'
+    )
+    c_inherit_idx = (store.persistent_ids == c_inherit[0]).nonzero(as_tuple=True)[0].item()
+    assert abs(store.ema_rgb[c_inherit_idx].item() - 0.85) < 1e-5
+    assert abs(store.ema_depth[c_inherit_idx].item() - 0.42) < 1e-5
+
+
+def test_snapshot_restore_persistence():
+    """Verify state_dict() and load_state_dict() restore state completely and isolate trials."""
+    store = GaussianStateStore(device='cpu')
+    store.create(count=3, frame_idx=0)
+    store.ema_rgb = torch.tensor([0.1, 0.2, 0.3])
+    store.ages = torch.tensor([5, 6, 7])
+    
+    # Save snapshot
+    snap = store.state_dict()
+    
+    # Mutate store (simulating trial optimization)
+    store.create(count=2, frame_idx=1)
+    store.ema_rgb = torch.tensor([9.9, 9.9, 9.9, 9.9, 9.9])
+    store.ages = torch.tensor([99, 99, 99, 99, 99])
+    
+    # Restore from snapshot
+    store.load_state_dict(snap)
+    
+    assert store.num_gaussians == 3
+    assert torch.equal(store.persistent_ids, torch.tensor([0, 1, 2]))
+    assert torch.equal(store.ema_rgb, torch.tensor([0.1, 0.2, 0.3]))
+    assert torch.equal(store.ages, torch.tensor([5, 6, 7]))
+    assert store._next_id == 3
+
+
+def test_state_store_determinism():
+    """Verify identical sequence of operations yields bitwise identical persistent state."""
+    def run_sequence():
+        s = GaussianStateStore(device='cpu')
+        s.create(count=5, frame_idx=0)
+        s.update_frame(
+            frame_idx=1,
+            rgb_errors=torch.tensor([0.1, 0.2, 0.3, 0.4, 0.5]),
+            depth_errors=torch.tensor([0.01, 0.02, 0.03, 0.04, 0.05]),
+            optimized_mask=torch.tensor([True, False, True, False, True])
+        )
+        s.remap_after_pruning(torch.tensor([True, False, True, True, False]))
+        s.register_densification(parent_indices=torch.tensor([0]), n_children_per_parent=2, frame_idx=2)
+        return s.state_dict()
+        
+    s1 = run_sequence()
+    s2 = run_sequence()
+    
+    assert s1['_next_id'] == s2['_next_id']
+    assert torch.equal(s1['persistent_ids'], s2['persistent_ids'])
+    assert torch.equal(s1['parent_ids'], s2['parent_ids'])
+    assert torch.equal(s1['ema_rgb'], s2['ema_rgb'])
+    assert torch.equal(s1['last_update_frames'], s2['last_update_frames'])
+    assert s1['_id_to_metadata'] == s2['_id_to_metadata']
+
+
+

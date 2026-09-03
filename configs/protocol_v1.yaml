@@ -60,6 +60,9 @@ state_factors:
   cost: ["projected_area", "tile_footprint"]
   pre_fusion_normalization: true
 
+densification_state_initialization:
+  policy: "fresh"  # 'fresh': child Gaussians get reset EMA/uncertainty; 'inherit': child inherits parent state
+
 budget_levels:
   optimization_relative: [0.10, 0.20, 0.40, 0.60, 0.80]
   wall_clock_ms: [10.0, 15.0, 20.0, 33.3]

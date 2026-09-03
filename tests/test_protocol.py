@@ -10,6 +10,7 @@ from research.protocol import (
     get_budget_config,
     get_statistics_config,
     get_state_factor_config,
+    get_densification_policy,
 )
 
 
@@ -88,3 +89,10 @@ def test_protocol_state_factors():
     assert "appearance" in factors
     assert "geometry" in factors
     assert "uncertainty" in factors
+
+
+def test_protocol_densification_policy():
+    policy = get_densification_policy()
+    assert policy in ["fresh", "inherit"]
+    assert policy == "fresh"
+

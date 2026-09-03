@@ -1,0 +1,12 @@
+{
+  "protocol_version": "1.0.0",
+  "parent_recorded_as_persistent_id_not_index": true,
+  "parent_persistent_id": 2,
+  "child_ids": [
+    5,
+    6
+  ],
+  "retrospective_lineage_queryable_after_pruning": true,
+  "densification_policy": "fresh",
+  "status": "PASS"
+}

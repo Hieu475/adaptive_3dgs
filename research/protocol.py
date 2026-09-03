@@ -99,3 +99,10 @@ def get_state_factor_config(protocol: Optional[Dict[str, Any]] = None) -> Dict[s
         protocol = load_protocol()
     return dict(protocol["state_factors"])
 
+
+def get_densification_policy(protocol: Optional[Dict[str, Any]] = None) -> str:
+    """Return densification state initialization policy (fresh vs inherit)."""
+    if protocol is None:
+        protocol = load_protocol()
+    return str(protocol.get("densification_state_initialization", {}).get("policy", "fresh"))
+

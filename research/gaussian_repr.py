@@ -373,3 +373,25 @@ class GaussianModel(nn.Module):
         # Remap state store after compaction to preserve persistent identities
         self.state_store.remap_after_pruning(keep)
         return keep
+
+    @torch.no_grad()
+    def reorder(self, permutation: torch.Tensor):
+        """Reorder active Gaussians according to a permutation tensor.
+        
+        Guarantees that parameter tensors and persistent state tensors
+        are permuted identically, preventing index aliasing.
+        """
+        perm = permutation.to(self.device)
+        self._xyz = nn.Parameter(self._xyz.data[perm])
+        self._scaling = nn.Parameter(self._scaling.data[perm])
+        self._rotation = nn.Parameter(self._rotation.data[perm])
+        self._opacity = nn.Parameter(self._opacity.data[perm])
+        self._features_dc = nn.Parameter(self._features_dc.data[perm])
+        if self._features_rest.numel() > 0:
+            self._features_rest = nn.Parameter(self._features_rest.data[perm])
+        if self._normals.numel() > 0:
+            self._normals = nn.Parameter(self._normals.data[perm])
+        self._confidence = self._confidence[perm]
+        self._state = self._state[perm]
+        self.state_store.reorder(perm)
+

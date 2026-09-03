@@ -13,3 +13,4 @@
 !statistics/*.csv
 !generalization/*.json
 !master/*.json
+!state_validation/*.json

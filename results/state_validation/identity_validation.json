@@ -1,0 +1,9 @@
+{
+  "protocol_version": "1.0.0",
+  "invariant_A_id_uniqueness": true,
+  "invariant_A_monotonic_next_id": true,
+  "invariant_B_reorder_state_invariance": true,
+  "pruning_compaction_identity_invariance": true,
+  "pruned_registry_status": "verified",
+  "status": "PASS"
+}

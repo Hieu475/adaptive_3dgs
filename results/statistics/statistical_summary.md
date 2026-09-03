@@ -6,8 +6,8 @@ Multi-seed independent verification across $N=5$ seeds: `[42, 43, 44, 45, 46]`.
 
 | Gate / Research Question | Metric | Mean | 95% Bootstrap CI | Paired Wilcoxon $p$ | Effect Size ($d$) | Scientific Assessment |
 |:---|:---|:---:|:---:|:---:|:---:|:---|
-| Gate 1 | Headroom H (Joint) | +0.000148 | [+0.000084, +0.000214] | 0.0312 | +1.77 | Statistically Significant ✅ |
-| Gate 1 | Negative Utility Rate (%) | 14.00% | [11.67%, 16.67%] | N/A | N/A | Empirical Evidence Provided |
+| Gate 1 | Headroom H (Joint) | +0.000151 | [+0.000093, +0.000214] | 0.0312 | +1.97 | Statistically Significant ✅ |
+| Gate 1 | Negative Utility Rate (%) | 13.33% | [11.00%, 16.33%] | N/A | N/A | Empirical Evidence Provided |
 | Gate 2 | OSE@20% - Random | 0.2640 | [0.2119, 0.3074] | N/A | N/A | Empirical Evidence Provided |
 | Gate 2 | OSE@20% - RGB Error | 0.3454 | [0.3454, 0.3454] | N/A | N/A | Empirical Evidence Provided |
 | Gate 2 | OSE@20% - Error × Influence | 0.3362 | [0.3362, 0.3362] | N/A | N/A | Empirical Evidence Provided |

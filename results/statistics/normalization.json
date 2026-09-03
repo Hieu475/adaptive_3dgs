@@ -1,5 +1,8 @@
 {
+  "protocol_version": "1.0.0",
   "fit_split": "train",
+  "train_frames": "0-40",
+  "provenance": "Fitted strictly on train split (frames 0-40) without val/test leakage per protocol_v1.yaml",
   "n_train_samples": 240,
   "features": {
     "rgb_error": {

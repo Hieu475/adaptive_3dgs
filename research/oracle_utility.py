@@ -115,10 +115,12 @@ class OracleUtilityExperiment:
             snapshot['optimizer_state'] = deepcopy(self.pipeline.optimizer.state_dict())
         else:
             snapshot['optimizer_state'] = None
+        if hasattr(model, 'state_store') and model.state_store is not None:
+            snapshot['state_store'] = model.state_store.state_dict()
         return snapshot
         
     def restore_state(self, snapshot: Dict):
-        """Restore all parameters and optimizer from snapshot."""
+        """Restore all parameters, optimizer, and persistent state from snapshot."""
         model = self.pipeline.gaussian_model
         for name, param in model.named_parameters():
             key = f'param_{name}'
@@ -130,6 +132,8 @@ class OracleUtilityExperiment:
                 buf.copy_(snapshot[key])
         if snapshot['optimizer_state'] is not None and self.pipeline.optimizer is not None:
             self.pipeline.optimizer.load_state_dict(snapshot['optimizer_state'])
+        if 'state_store' in snapshot and hasattr(model, 'state_store') and model.state_store is not None:
+            model.state_store.load_state_dict(snapshot['state_store'])
 
     def _render(self, H: int, W: int) -> Dict:
         """Render current scene state."""
