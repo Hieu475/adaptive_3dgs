@@ -34,6 +34,7 @@ class OptimizationPolicy(str, Enum):
     TOP_K = "top_k"                       # Policy 3: Continuous importance rank top-K / ratio r
     BUDGET_AWARE = "budget_aware"         # Policy 4: Importance/Cost knapsack optimization
     OURS = "ours"                         # Alias for BUDGET_AWARE
+    LEARNED_UTILITY = "learned_utility"   # Policy 5: Two-Head Learned Marginal Utility Knapsack
 
 
 def estimate_gaussian_costs(
@@ -230,6 +231,7 @@ class BudgetScheduler:
         top_k: Optional[int] = None,
         frame_idx: int = 0,
         binary_threshold: float = 0.5,
+        utility_scores: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """Select Gaussians for optimization according to specified policy.
         
@@ -312,6 +314,23 @@ class BudgetScheduler:
                 importance_scores, tiers, cost_estimates=cost_estimates, frame_idx=frame_idx
             )
             
+        elif policy_str in ("learned_utility", OptimizationPolicy.LEARNED_UTILITY.value):
+            score_tensor = utility_scores if utility_scores is not None else importance_scores
+            if cost_estimates is not None:
+                eff = score_tensor / (cost_estimates + 1e-6)
+                _, order = torch.sort(eff, descending=True)
+                budget_us = self.gpu_budget_ms * 1000.0 * self.budget_allocation['optimize']
+                cum_cost = torch.cumsum(cost_estimates[order], dim=0)
+                selected = order[cum_cost <= budget_us]
+                mask = torch.zeros(N, dtype=torch.bool, device=device)
+                mask[selected] = True
+                return mask
+            else:
+                mask = torch.zeros(N, dtype=torch.bool, device=device)
+                _, top_indices = torch.topk(score_tensor[:N], min(K, score_tensor.shape[0]))
+                mask[top_indices] = True
+                return mask
+                
         else:
             raise ValueError(f"Unknown optimization policy: {policy}")
     
