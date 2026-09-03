@@ -283,11 +283,19 @@ class BudgetScheduler:
         elif policy_str in ("binary", OptimizationPolicy.BINARY.value):
             if confidence is not None:
                 conf = confidence.squeeze(-1) if confidence.ndim > 1 else confidence
-                return conf < binary_threshold
+                mask = conf < binary_threshold
             elif tiers is not None:
-                return (tiers == 0) | (tiers == 1)
+                mask = (tiers == 0) | (tiers == 1)
             else:
-                return importance_scores >= binary_threshold
+                mask = importance_scores >= binary_threshold
+            if top_k is not None and mask.sum() > K:
+                active_idx = torch.where(mask)[0]
+                active_imp = importance_scores[active_idx]
+                _, sub_top = torch.topk(active_imp, min(K, active_idx.shape[0]))
+                new_mask = torch.zeros(N, dtype=torch.bool, device=device)
+                new_mask[active_idx[sub_top]] = True
+                return new_mask
+            return mask
                 
         elif policy_str in ("top_k", OptimizationPolicy.TOP_K.value):
             mask = torch.zeros(N, dtype=torch.bool, device=device)

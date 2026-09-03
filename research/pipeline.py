@@ -262,7 +262,7 @@ class OnlineReconstructionPipeline:
         if gt_pose is not None:
             self.current_pose = gt_pose.to(self.device)
         else:
-            self.current_pose = self.tracker.track_frame(rgb, depth, self.gaussian_model)
+            self.current_pose = self.tracker.track_frame(rgb, depth, self.gaussian_model).to(self.device)
         
         # === 2. Render Current Map (with per-Gaussian attribution) ===
         with torch.no_grad():
@@ -428,6 +428,9 @@ class OnlineReconstructionPipeline:
             error_scores = self.importance_estimator._running_depth_error + self.importance_estimator._running_color_error
             error_influence_scores = self.importance_estimator.compute_error_influence_score()
         
+        top_k = self.config['scheduler'].get('top_k', None)
+        binary_threshold = self.config['scheduler'].get('binary_threshold', 0.5)
+
         optimize_mask = self.scheduler.select_by_policy(
             policy=policy,
             importance_scores=importance,
@@ -437,7 +440,9 @@ class OnlineReconstructionPipeline:
             error_scores=error_scores,
             error_influence_scores=error_influence_scores,
             ratio=ratio,
+            top_k=top_k,
             frame_idx=self.frame_count,
+            binary_threshold=binary_threshold,
         )
         
         # === 7. True Selective Optimization with Frozen Background Cache (R21/R29) ===

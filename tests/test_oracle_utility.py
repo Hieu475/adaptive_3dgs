@@ -73,5 +73,52 @@ def test_oracle_repeatability():
     assert abs(res1['delta_psnr'] - res2['delta_psnr']) < 1e-5, "Delta PSNR must be strictly repeatable"
 
 
+def test_oracle_geometry_stratification_and_raw_metrics():
+    """Test geometry-stratified sampling, raw metrics extraction, and stability verification."""
+    from research.oracle_utility import OracleUtilityExperiment, SamplingPopulation
+    pipeline = OnlineReconstructionPipeline(device='cpu')
+    
+    H, W = 32, 40
+    torch.manual_seed(42)
+    rgb = torch.rand(H, W, 3)
+    depth = torch.ones(H, W) * 2.0
+    # Add depth discontinuity
+    depth[16:, :] = 4.0
+    fx, fy = 80.0, 80.0
+    intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
+    
+    pipeline.initialize(rgb, depth, intrinsics)
+    pipeline.process_frame(rgb, depth)
+    
+    exp = OracleUtilityExperiment(pipeline=pipeline, n_samples=12, n_opt_steps=2, seed=42)
+    
+    # Run oracle experiment with geometry stratification
+    results = exp.run_oracle_experiment(rgb, depth, population_type=SamplingPopulation.GEOMETRY_STRATIFIED)
+    
+    assert len(results) > 0
+    row = results[0]
+    # Check that raw decoupled metrics exist
+    assert 'delta_psnr_local' in row
+    assert 'delta_ssim_local' in row
+    assert 'delta_depth_gain_local' in row
+    assert 'delta_loss_local' in row
+    assert 'measured_trial_cost_ms' in row
+    assert 'oracle_utility_rgb' in row
+    assert 'oracle_utility_depth' in row
+    assert 'oracle_utility_joint' in row
+    assert 'features' in row
+    assert 'rgb_error' in row['features']
+    assert 'depth_error' in row['features']
+    assert 'geometry_stratum' in row
+    
+    # Test stability check on candidate subset
+    visible_candidates = [r['gaussian_id'] for r in results if r.get('visible', True)][:3]
+    if len(visible_candidates) > 0:
+        stability = exp.run_stability_check(rgb, depth, candidate_indices=visible_candidates, n_repeats=2)
+        assert 'mean_cv' in stability
+        assert 'stable_fraction' in stability
+        assert stability['n_repeats'] == 2
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

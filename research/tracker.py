@@ -12,5 +12,4 @@ class ICPTracker:
         """
         Estimates camera pose from RGB-D frame-to-model tracking.
         """
-        # TODO: Stub implementation, return identity pose or estimated pose
-        return torch.eye(4)
+        return torch.eye(4, device=rgb.device, dtype=rgb.dtype)

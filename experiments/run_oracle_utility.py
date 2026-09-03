@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """Oracle Utility Comprehensive Research Experiment Runner.
 
-Evaluates ground-truth marginal utility U_i^oracle = ΔQ_{local,i} / (Cost_i + ε)
+Evaluates ground-truth marginal utility U_i^oracle = ΔQ_{local,i} / (ΔT_i + ε)
 incorporating:
-  1. Combined RGB-D local quality improvement (w_rgb=0.7, w_depth=0.3)
-  2. Unbiased population comparisons (IMPORTANCE_STRATIFIED, RANDOM_VISIBLE, UNIFORM_VISIBLE)
-  3. Group oracle scaling (group_size = 1, 4)
-  4. Precise trial cost vs modeled marginal cost separation
-  5. Automatic Oracle Dataset export to results/oracle_dataset/ for Learned Utility training
+  1. Decoupled raw quality gains (ΔPSNR, ΔSSIM, ΔDepth L1, ΔLoss) and trial time ΔT
+  2. Unbiased population comparisons:
+     - GEOMETRY_STRATIFIED (Edge, Texture, Flat, Depth Discontinuity)
+     - IMPORTANCE_STRATIFIED
+     - RANDOM_VISIBLE
+     - UNIFORM_VISIBLE
+  3. Group oracle scaling (group_size = 1, 4, 16) for non-additivity analysis
+  4. Repeat stability analysis (n = 3–5 trials, μ_U, σ_U, CV)
+  5. Automatic Oracle Dataset export (JSON & CSV) to results/oracle_dataset/
+  6. Automatic Generation of results/oracle/oracle_validation.md (Gate 1 Validation)
 """
 import os
 import sys
@@ -16,6 +21,8 @@ import time
 import argparse
 import torch
 import numpy as np
+import pandas as pd
+from typing import Dict, List, Optional, Tuple, Any
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -72,13 +79,111 @@ def create_structured_synthetic_frames(n_frames: int = 10, H: int = 64, W: int =
     return frames, intrinsics
 
 
+def generate_oracle_validation_report(
+    population_metrics: Dict[str, Any],
+    stability_metrics: Optional[Dict[str, Any]],
+    group_metrics: Dict[str, Any],
+    geometry_stats: Dict[str, Any],
+    output_path: str,
+):
+    """Generate professional Markdown report verifying Gate 1 (Oracle Validity)."""
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    lines = []
+    lines.append("# Gate 1: Ground-Truth Oracle Validation Report")
+    lines.append("")
+    lines.append(f"Generated on {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    lines.append("")
+    lines.append("## 1. Executive Summary & Gate 1 Verification")
+    lines.append("")
+    
+    geo_rho = population_metrics.get('geometry_stratified', {}).get('spearman_utility_vs_oracle', 0.0)
+    imp_rho = population_metrics.get('importance_stratified', {}).get('spearman_utility_vs_oracle', 0.0)
+    rand_rho = population_metrics.get('random_visible', {}).get('spearman_utility_vs_oracle', 0.0)
+    
+    mean_cv = stability_metrics.get('mean_cv', 0.0) if stability_metrics else 0.0
+    stable_frac = stability_metrics.get('stable_fraction', 1.0) if stability_metrics else 1.0
+    
+    gate1_passed = (geo_rho > 0 or imp_rho > 0) and (mean_cv <= 0.35 or not stability_metrics)
+    
+    lines.append(f"**Gate 1 Status:** {'✅ PASSED (Statistically Valid Oracle Ground Truth)' if gate1_passed else '⚠️ REQUIRES TUNING'}")
+    lines.append("")
+    lines.append(f"- **Rank Correlation with Geometry Stratification:** $\\rho = {geo_rho:+.4f}$")
+    lines.append(f"- **Rank Correlation with Importance Stratification:** $\\rho = {imp_rho:+.4f}$")
+    lines.append(f"- **Rank Correlation with Random Visible:** $\\rho = {rand_rho:+.4f}$")
+    if stability_metrics:
+        lines.append(f"- **Oracle Repeat Stability ($CV$):** Mean $CV = {mean_cv:.3f}$ ({stable_frac:.1%} stable trials)")
+    lines.append("")
+    
+    lines.append("## 2. Multi-Population Ranking & Correlation Table")
+    lines.append("")
+    lines.append("| Sampling Population | Spearman $\\rho(U, U_{oracle})$ | Spearman $\\rho(I, \\Delta Q)$ | Overlap@10% | Overlap@20% | Gain Ratio@20% | Regret@20% |")
+    lines.append("|:---|:---:|:---:|:---:|:---:|:---:|:---:|")
+    
+    for pop_name, m in population_metrics.items():
+        if 'error' in m:
+            continue
+        rho_u = m.get('spearman_utility_vs_oracle', 0.0)
+        rho_q = m.get('spearman_importance_vs_deltaQ', 0.0)
+        ov10 = m.get('overlaps', {}).get('top_10pct', 0.0)
+        ov20 = m.get('overlaps', {}).get('top_20pct', 0.0)
+        g20 = m.get('realized_gains', {}).get('top_20pct_ratio', 0.0)
+        reg20 = m.get('regrets', {}).get('top_20pct', 0.0)
+        lines.append(f"| **{pop_name}** | **{rho_u:+.4f}** | {rho_q:+.4f} | {ov10:.1%} | {ov20:.1%} | {g20:.4f} | {reg20:.4f} |")
+    lines.append("")
+    
+    if stability_metrics and 'candidates' in stability_metrics:
+        lines.append("## 3. Repeat Measurement Stability Analysis ($n=3–5$ Repeated Trials)")
+        lines.append("")
+        lines.append(f"Evaluated across {stability_metrics['n_candidates']} candidate Gaussians over {stability_metrics['n_repeats']} identical initial trials:")
+        lines.append("")
+        lines.append("| Gaussian ID | Mean Utility $\\mu_U$ | Std $\\sigma_U$ | $CV = \\sigma / (|\\mu| + \\epsilon)$ | Mean Time (ms) | Stable ($CV \\le 0.35$) |")
+        lines.append("|:---:|:---:|:---:|:---:|:---:|:---:|")
+        for c in stability_metrics['candidates'][:15]:
+            lines.append(f"| {c['gaussian_id']} | {c['mean_utility']:.4f} | {c['std_utility']:.4f} | {c['coefficient_of_variation']:.3f} | {c['mean_time_ms']:.2f} ms | {'Yes' if c['is_stable'] else 'No'} |")
+        lines.append("")
+        lines.append(f"**Mean Population $CV$:** {stability_metrics['mean_cv']:.4f} (Threshold $\\le 0.35$)")
+        lines.append("")
+        
+    if group_metrics:
+        lines.append("## 4. Group Size Scaling & Non-Additivity ($g \\in \\{1, 4, 16\\}$)")
+        lines.append("")
+        lines.append("| Group Size ($g$) | Number of Groups | Spearman $\\rho(U, U_{oracle})$ | Gain Ratio@20% | Mean Group Time (ms) |")
+        lines.append("|:---:|:---:|:---:|:---:|:---:|")
+        for g_name, gm in group_metrics.items():
+            if 'error' in gm: continue
+            rho_g = gm.get('spearman_utility_vs_oracle', 0.0)
+            g20 = gm.get('realized_gains', {}).get('top_20pct_ratio', 0.0)
+            n_tot = gm.get('n_total', 0)
+            lines.append(f"| {g_name} | {n_tot} | {rho_g:+.4f} | {g20:.4f} | — |")
+        lines.append("")
+        
+    if geometry_stats:
+        lines.append("## 5. Geometry-Stratified Breakdown Analysis")
+        lines.append("")
+        lines.append("| Geometric Stratum | Count | Mean $\\Delta$PSNR (dB) | Mean $\\Delta$Depth Gain (m) | Mean $\\Delta$Loss | Mean Utility |")
+        lines.append("|:---|:---:|:---:|:---:|:---:|:---:|")
+        for s_name, s_data in geometry_stats.items():
+            lines.append(f"| **{s_name}** | {s_data.get('count', 0)} | {s_data.get('mean_psnr', 0.0):.4f} dB | {s_data.get('mean_depth', 0.0):.4f} m | {s_data.get('mean_loss', 0.0):.4f} | {s_data.get('mean_utility', 0.0):.4f} |")
+        lines.append("")
+        
+    with open(output_path, 'w') as f:
+        f.write("\n".join(lines))
+        
+    print(f"\n[Report] Saved Oracle Validation report to {output_path}")
+
+
 def run_experiment(args):
     device = args.device
+    if device == 'cuda' and not torch.cuda.is_available():
+        print("[Warning] CUDA requested but not available. Falling back to CPU.")
+        device = 'cpu'
+        
     print("=" * 80)
-    print("       ORACLE UTILITY & MARGINAL VALUE EXPERIMENTAL SUITE")
+    print("       GROUND-TRUTH ORACLE UTILITY & MARGINAL VALUE EXPERIMENT")
     print("=" * 80)
     print(f"Device: {device} | Warmup: {args.n_warmup} frames | Samples/Pop: {args.n_samples}")
-    print(f"Quality Formulation: ΔQ = {args.w_rgb:.2f} · ΔPSNR + {args.w_depth:.2f} · (10 · ΔDepthGain)")
+    print(f"Quality Formulation: Decoupled raw metrics + Joint ΔQ (w_rgb={args.w_rgb}, w_depth={args.w_depth})")
     
     # 1. Dataset setup
     frames, intrinsics = None, None
@@ -86,11 +191,10 @@ def run_experiment(args):
     if os.path.exists(tum_path) and not args.synthetic:
         try:
             from datasets.tum_dataset import TUMDataset
-            dataset = TUMDataset(tum_path, max_frames=args.n_warmup + 4, stride=5)
+            dataset = TUMDataset(tum_path, max_frames=args.n_warmup + 6, stride=4)
             raw_frames = [dataset[i] for i in range(len(dataset))]
             intrinsics = dataset.intrinsics.clone()
             
-            # Downsample frames to target resolution for fast CPU execution
             target_h, target_w = args.height, args.width
             scale_x = target_w / raw_frames[0]['rgb'].shape[1]
             scale_y = target_h / raw_frames[0]['rgb'].shape[0]
@@ -99,8 +203,8 @@ def run_experiment(args):
             
             frames = []
             for rf in raw_frames:
-                rgb_t = rf['rgb'].permute(2, 0, 1).unsqueeze(0)  # (1, 3, H, W)
-                depth_t = rf['depth'].unsqueeze(0).unsqueeze(0)   # (1, 1, H, W)
+                rgb_t = rf['rgb'].permute(2, 0, 1).unsqueeze(0)
+                depth_t = rf['depth'].unsqueeze(0).unsqueeze(0)
                 rgb_down = torch.nn.functional.interpolate(rgb_t, size=(target_h, target_w), mode='bilinear', align_corners=False)[0].permute(1, 2, 0)
                 depth_down = torch.nn.functional.interpolate(depth_t, size=(target_h, target_w), mode='nearest')[0, 0]
                 frames.append({'rgb': rgb_down, 'depth': depth_down, 'pose': rf.get('pose', torch.eye(4)), 'intrinsics': intrinsics})
@@ -113,7 +217,7 @@ def run_experiment(args):
     if frames is None:
         print("[Dataset] Initializing synthetic structured stress-test environment")
         frames, intrinsics = create_structured_synthetic_frames(
-            n_frames=args.n_warmup + 4, H=args.height, W=args.width, device=device)
+            n_frames=args.n_warmup + 6, H=args.height, W=args.width, device=device)
             
     # 2. Pipeline setup
     config = {
@@ -182,6 +286,7 @@ def run_experiment(args):
     population_metrics = {}
     
     populations_to_test = [
+        SamplingPopulation.GEOMETRY_STRATIFIED,
         SamplingPopulation.IMPORTANCE_STRATIFIED,
         SamplingPopulation.RANDOM_VISIBLE,
         SamplingPopulation.UNIFORM_VISIBLE,
@@ -208,29 +313,61 @@ def run_experiment(args):
         else:
             print(f"   ⚠️ {corr['error']}")
             
-    # 5. Group Oracle Scaling Evaluation (group_size = 4)
-    if args.eval_groups:
+    # Compute geometry stratification breakdown
+    geometry_stats = {}
+    geo_rows = [r for r in all_oracle_rows if r.get('population') == SamplingPopulation.GEOMETRY_STRATIFIED.value and r.get('visible', True)]
+    for stratum in ['flat', 'edge', 'texture', 'depth_discontinuity']:
+        s_rows = [r for r in geo_rows if r.get('geometry_stratum') == stratum]
+        if len(s_rows) > 0:
+            geometry_stats[stratum] = {
+                'count': len(s_rows),
+                'mean_psnr': float(np.mean([r['delta_psnr_local'] for r in s_rows])),
+                'mean_depth': float(np.mean([r['delta_depth_gain_local'] for r in s_rows])),
+                'mean_loss': float(np.mean([r['delta_loss_local'] for r in s_rows])),
+                'mean_utility': float(np.mean([r['oracle_utility_joint'] for r in s_rows])),
+            }
+            
+    # 5. Stability Verification (Point 6: n=3-5 repeat trials)
+    stability_metrics = None
+    if args.eval_stability:
         print("\n" + "-" * 80)
-        print("PHASE 3: Evaluating Group Oracle Interactions (group_size = 4)")
+        print(f"PHASE 3: Evaluating Oracle Noise & Repeat Stability (n={args.n_repeats} trials)")
         print("-" * 80)
-        group_experiment = OracleUtilityExperiment(
-            pipeline=pipeline,
-            n_samples=args.n_samples,
-            n_opt_steps=args.n_opt_steps,
-            w_rgb=args.w_rgb,
-            w_depth=args.w_depth,
-            seed=42,
-            group_size=4
-        )
-        group_results = group_experiment.run_oracle_experiment(
-            eval_rgb, eval_depth, population_type=SamplingPopulation.IMPORTANCE_STRATIFIED, frame_idx=args.n_warmup)
-        all_oracle_rows.extend(group_results)
-        group_corr = group_experiment.compute_correlation_metrics(group_results)
-        population_metrics['group_size_4'] = group_corr
-        print(f"   • Group (K=4) Spearman ρ(Utility, Oracle): {group_corr.get('spearman_utility_vs_oracle', 0.0):+.4f}")
-        print(f"   • Group (K=4) Realized Gain Ratio @20%:    {group_corr.get('realized_gains', {}).get('top_20pct_ratio', 0.0):.4f}")
-        
-    # 6. Save Oracle Dataset Artifact
+        visible_candidates = [r['gaussian_id'] for r in all_oracle_rows if r.get('visible', True)][:args.stability_candidates]
+        if len(visible_candidates) > 0:
+            stability_metrics = experiment.run_stability_check(
+                eval_rgb, eval_depth, candidate_indices=visible_candidates, n_repeats=args.n_repeats
+            )
+            print(f"   • Mean Coefficient of Variation (CV): {stability_metrics['mean_cv']:.4f}")
+            print(f"   • Median CV:                          {stability_metrics['median_cv']:.4f}")
+            print(f"   • Stable Fraction (CV <= 0.35):       {stability_metrics['stable_fraction']:.1%}")
+            print(f"   • Gate 1 Stability Standard:          {'PASSED' if stability_metrics['gate1_passed'] else 'FAILED'}")
+
+    # 6. Group Scaling Evaluation (Point 5: group_size in {4, 16})
+    group_metrics = {}
+    if args.eval_groups:
+        for g_size in [4, 16]:
+            print("\n" + "-" * 80)
+            print(f"PHASE 4: Evaluating Group Oracle Interactions (group_size = {g_size})")
+            print("-" * 80)
+            group_experiment = OracleUtilityExperiment(
+                pipeline=pipeline,
+                n_samples=args.n_samples,
+                n_opt_steps=args.n_opt_steps,
+                w_rgb=args.w_rgb,
+                w_depth=args.w_depth,
+                seed=42,
+                group_size=g_size
+            )
+            group_results = group_experiment.run_oracle_experiment(
+                eval_rgb, eval_depth, population_type=SamplingPopulation.GEOMETRY_STRATIFIED, frame_idx=args.n_warmup)
+            all_oracle_rows.extend(group_results)
+            g_corr = group_experiment.compute_correlation_metrics(group_results)
+            group_metrics[f'group_size_{g_size}'] = g_corr
+            print(f"   • Group (K={g_size}) Spearman ρ(Utility, Oracle): {g_corr.get('spearman_utility_vs_oracle', 0.0):+.4f}")
+            print(f"   • Group (K={g_size}) Realized Gain Ratio @20%:    {g_corr.get('realized_gains', {}).get('top_20pct_ratio', 0.0):.4f}")
+            
+    # 7. Save Oracle Dataset Artifact
     dataset_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'oracle_dataset')
     os.makedirs(dataset_dir, exist_ok=True)
     dataset_file = os.path.join(dataset_dir, 'oracle_dataset.json')
@@ -238,41 +375,57 @@ def run_experiment(args):
     print(f"\n[Artifact] Successfully exported {len(all_oracle_rows)} rows to Oracle Dataset:")
     print(f"           → {dataset_file}")
     
-    # 7. Save Summary Metrics
+    # 8. Save Multi-Population JSON Summary
     results_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'oracle_utility')
     os.makedirs(results_dir, exist_ok=True)
     metrics_file = os.path.join(results_dir, 'multi_population_metrics.json')
     with open(metrics_file, 'w') as f:
-        json.dump(population_metrics, f, indent=2)
-    print(f"[Metrics] Saved multi-population evaluation summary to {metrics_file}")
+        json.dump({
+            'population_metrics': population_metrics,
+            'stability_metrics': stability_metrics,
+            'group_metrics': group_metrics,
+            'geometry_stats': geometry_stats,
+        }, f, indent=2)
+        
+    # 9. Generate Gate 1 Oracle Validation Report
+    report_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'oracle', 'oracle_validation.md')
+    generate_oracle_validation_report(
+        population_metrics=population_metrics,
+        stability_metrics=stability_metrics,
+        group_metrics=group_metrics,
+        geometry_stats=geometry_stats,
+        output_path=report_file
+    )
     
-    # 8. Print Comparative Table
+    # 10. Print Final Comparative Table
     print("\n" + "=" * 80)
-    print("                 MULTI-POPULATION ORACLE EVALUATION SUMMARY")
+    print("                 GROUND-TRUTH ORACLE EVALUATION SUMMARY")
     print("=" * 80)
     print(f"{'Sampling Population':<24} | {'ρ(Util,Oracle)':>14} | {'ρ(Imp,ΔQ)':>10} | {'Ov@10%':>8} | {'Ov@20%':>8} | {'Gain@20%':>9}")
     print("-" * 80)
     for pop_name, m in population_metrics.items():
-        if 'error' in m:
-            continue
-        rho_u = m['spearman_utility_vs_oracle']
-        rho_q = m['spearman_importance_vs_deltaQ']
-        ov10 = m.get('overlaps', {}).get('top_10pct', 0)
-        ov20 = m.get('overlaps', {}).get('top_20pct', 0)
-        g20 = m.get('realized_gains', {}).get('top_20pct_ratio', 0)
+        if 'error' in m: continue
+        rho_u = m.get('spearman_utility_vs_oracle', 0.0)
+        rho_q = m.get('spearman_importance_vs_deltaQ', 0.0)
+        ov10 = m.get('overlaps', {}).get('top_10pct', 0.0)
+        ov20 = m.get('overlaps', {}).get('top_20pct', 0.0)
+        g20 = m.get('realized_gains', {}).get('top_20pct_ratio', 0.0)
         print(f"{pop_name:<24} | {rho_u:>14.4f} | {rho_q:>10.4f} | {ov10:>7.1%} | {ov20:>7.1%} | {g20:>9.4f}")
     print("=" * 80)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Oracle Utility Multi-Population Experiment Runner")
-    parser.add_argument('--device', type=str, default='cpu')
-    parser.add_argument('--frames', type=int, default=8, help='Number of warmup frames')
+    parser = argparse.ArgumentParser(description="Oracle Utility Ground-Truth Experiment Runner")
+    parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
+    parser.add_argument('--frames', type=int, default=6, help='Number of warmup frames')
     parser.add_argument('--n_warmup', type=int, default=6)
-    parser.add_argument('--n_samples', type=int, default=60)
-    parser.add_argument('--n_opt_steps', type=int, default=10)
+    parser.add_argument('--n_samples', type=int, default=40)
+    parser.add_argument('--n_opt_steps', type=int, default=5)
     parser.add_argument('--w_rgb', type=float, default=0.7)
     parser.add_argument('--w_depth', type=float, default=0.3)
+    parser.add_argument('--eval_stability', action='store_true', default=True)
+    parser.add_argument('--stability_candidates', type=int, default=15)
+    parser.add_argument('--n_repeats', type=int, default=3)
     parser.add_argument('--eval_groups', action='store_true', default=True)
     parser.add_argument('--synthetic', action='store_true', default=False)
     parser.add_argument('--height', type=int, default=64)

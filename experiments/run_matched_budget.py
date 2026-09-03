@@ -1,24 +1,23 @@
-"""
-Primary Research Experiment — True Matched-Budget Benchmark on Real 3DGS.
+#!/usr/bin/env python3
+"""Primary Research Experiment — True Matched-Budget Benchmark on Real 3DGS.
 
-Evaluates 6 Budget-Constrained Policies vs 1 Quality Upper Bound across 5 Budget Levels:
-    Budgets: B ∈ {1.0, 2.0, 4.0, 8.0, 16.0} ms
+Evaluates 6 Budget-Constrained Policies vs 1 Quality Upper Bound across 5 Relative Budgets:
+    Budgets: B_{rel} ∈ {10%, 20%, 40%, 60%, 80%} of Full Reference Optimization Cost
 
 Policies:
-    - Full: No (Quality Upper Bound, unconstrained)
-    - Random: Yes (Budget-Constrained)
-    - Error-Only: Yes (Ranked strictly by E_depth + E_color)
-    - Error × Influence: Yes (Strong Non-Learning Baseline: E_i × Influence_i)
-    - Binary: Yes (Threshold-based stable/unstable)
-    - Top-K: Yes (Continuous multi-signal importance Top-K)
-    - Ours: Yes (Proposed Importance/Cost Knapsack Optimization)
+    - Full: Reference Upper Bound (unconstrained)
+    - Random: Open-Loop Calibrated
+    - Error-Only: Open-Loop Calibrated (Ranked by E_depth + E_color)
+    - Error × Influence: Open-Loop Calibrated (E_i × Influence_i)
+    - Binary: Open-Loop Calibrated (Threshold-based stable/unstable)
+    - Top-K: Open-Loop Calibrated (Continuous multi-signal importance Top-K)
+    - Ours: Budget-Aware Importance/Cost Knapsack Optimization
 
 Metrics:
-    - PSNR (dB) ↑
-    - Depth L1 (m) ↓
-    - Measured Compute (ms)
-    - Budget Violation Rate (%) ↓
-    - Latency Jitter (ms) ↓
+    - PSNR (dB) ↑, SSIM ↑, Depth L1 (m) ↓
+    - Measured Compute: p50, p95, p99, Latency Jitter (ms) ↓
+    - Budget Utilization (T/B) and Budget Violation Rate (%) ↓
+    - Gain Efficiency: GE@B = (Q(B) - Q_{random}(B)) / (Q_{oracle}(B) - Q_{random}(B))
 """
 import sys
 import os
@@ -79,24 +78,10 @@ def create_benchmark_frames(n_frames: int = 12, H: int = 64, W: int = 80):
 
 
 def real_pipeline_factory(config_overrides, device):
-    """Instantiate real OnlineReconstructionPipeline with given budget overrides."""
-    budget_ms = config_overrides.get('scheduler', {}).get('gpu_budget_ms', 4.0)
+    """Instantiate OnlineReconstructionPipeline with budget overrides."""
+    budget_ms = config_overrides.get('scheduler', {}).get('gpu_budget_ms', 20.0)
     policy = config_overrides.get('scheduler', {}).get('policy', 'budget_aware')
-    
-    # Derive target Gaussian count dynamically from calibrated cost model: T(M) = T0 + beta*M
-    cost_per_gauss_ms = 0.0112
-    cost_model_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'cost_calibration', 'cost_model.json')
-    if os.path.exists(cost_model_path):
-        try:
-            with open(cost_model_path, 'r') as f:
-                cost_model = json.load(f)
-                cost_per_gauss_ms = cost_model.get('cost_per_gauss_ms', 0.0112)
-        except Exception as e:
-            print(f"Warning: Could not load cost model from {cost_model_path}: {e}")
-    else:
-        print(f"Warning: Cost model not found at {cost_model_path}. Using hardcoded fallback of {cost_per_gauss_ms}.")
-        
-    target_k = max(5, int((budget_ms * 5.0) / cost_per_gauss_ms)) if budget_ms > 0 else 50
+    top_k = config_overrides.get('scheduler', {}).get('top_k', None)
     
     base_config = {
         'gaussian': {'sh_degree': 0, 'initial_opacity': 0.5, 'max_gaussians': 20000, 'initial_scale': 0.02},
@@ -110,7 +95,7 @@ def real_pipeline_factory(config_overrides, device):
         'scheduler': {
             'gpu_budget_ms': budget_ms,
             'policy': policy,
-            'top_k': target_k if policy != 'ours' else None,  # Ours uses dynamic knapsack
+            'top_k': top_k,
         },
         'densification': {
             'max_new_per_frame': 60,
@@ -126,42 +111,71 @@ def real_pipeline_factory(config_overrides, device):
 
 def main():
     parser = argparse.ArgumentParser(description="Run Matched-Budget Primary Benchmark")
-    parser.add_argument('--n_frames', type=int, default=10)
+    parser.add_argument('--n_frames', type=int, default=15)
     parser.add_argument('--frames', type=int, default=None, help='Alias for n_frames')
-    parser.add_argument('--device', type=str, default='cpu')
+    parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
+    parser.add_argument('--synthetic', action='store_true', default=False)
     args = parser.parse_args()
     if args.frames is not None:
         args.n_frames = args.frames
     
     print("=" * 85)
-    print("      R27 PRIMARY RESEARCH BENCHMARK: TRUE MATCHED-BUDGET COMPARISON")
+    print("      R36 PRIMARY RESEARCH BENCHMARK: OPEN-LOOP CALIBRATED MATCHED-BUDGET")
     print("=" * 85)
     print(f"Device: {args.device} | Frames: {args.n_frames}")
     
-    frames, intrinsics = create_benchmark_frames(n_frames=args.n_frames)
+    # Dataset setup
+    frames, intrinsics = None, None
+    tum_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'datasets', 'TUM', 'rgbd_dataset_freiburg1_desk')
+    if os.path.exists(tum_path) and not args.synthetic:
+        try:
+            from datasets.tum_dataset import TUMDataset
+            dataset = TUMDataset(tum_path, max_frames=args.n_frames + 4, stride=3)
+            raw_frames = [dataset[i] for i in range(len(dataset))]
+            intrinsics = dataset.intrinsics.clone()
+            
+            target_h, target_w = 64, 80
+            scale_x = target_w / raw_frames[0]['rgb'].shape[1]
+            scale_y = target_h / raw_frames[0]['rgb'].shape[0]
+            intrinsics[0, :] *= scale_x
+            intrinsics[1, :] *= scale_y
+            
+            frames = []
+            for rf in raw_frames[:args.n_frames]:
+                rgb_t = rf['rgb'].permute(2, 0, 1).unsqueeze(0)
+                depth_t = rf['depth'].unsqueeze(0).unsqueeze(0)
+                rgb_down = torch.nn.functional.interpolate(rgb_t, size=(target_h, target_w), mode='bilinear', align_corners=False)[0].permute(1, 2, 0)
+                depth_down = torch.nn.functional.interpolate(depth_t, size=(target_h, target_w), mode='nearest')[0, 0]
+                frames.append({'rgb': rgb_down, 'depth': depth_down, 'pose': rf.get('pose', torch.eye(4)), 'intrinsics': intrinsics})
+                
+            print(f"[Dataset] Loaded {len(frames)} frames from TUM RGB-D ({target_w}x{target_h})")
+        except Exception as e:
+            print(f"[Dataset] TUM load fallback: {e}")
+            frames = None
+            
+    if frames is None:
+        print("[Dataset] Using synthetic structured benchmark frames")
+        frames, intrinsics = create_benchmark_frames(n_frames=args.n_frames)
     
-    budget_levels = [1.0, 2.0, 4.0, 8.0, 16.0]  # in ms
-    benchmark = MatchedBudgetBenchmark(budget_levels_ms=budget_levels, device=args.device)
+    relative_budgets = [0.10, 0.20, 0.40, 0.60, 0.80]
+    benchmark = MatchedBudgetBenchmark(relative_budgets=relative_budgets, device=args.device)
     
-    print(f"Running matrix: {len(benchmark.policies)} policies x {len(budget_levels)} budget levels...")
     start_time = time.time()
-    results = benchmark.run_full_matrix(real_pipeline_factory, frames, intrinsics)
+    results, meta = benchmark.run_full_suite(real_pipeline_factory, frames, intrinsics)
     total_time = time.time() - start_time
     
-    print(f"\nBenchmark matrix completed in {total_time:.1f}s")
+    print(f"\nBenchmark suite completed in {total_time:.1f}s")
     
-    table = benchmark.format_table(results)
-    print("\n" + table)
+    table_md = benchmark.format_results_markdown(results, meta)
+    print("\n" + table_md)
     
-    # Save results
+    # Save artifacts
     save_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'matched_budget')
     os.makedirs(save_dir, exist_ok=True)
     
     save_path = os.path.join(save_dir, 'results_table.md')
     with open(save_path, 'w') as f:
-        f.write("# R27 Primary Benchmark: True Matched-Budget Results\n\n")
-        f.write(f"Evaluated on {args.n_frames} frames using measured compute time.\n\n")
-        f.write(table)
+        f.write(table_md)
         f.write("\n")
         
     json_path = os.path.join(save_dir, 'benchmark_results.json')
@@ -171,11 +185,17 @@ def main():
     # Export Pareto curve data (Quality vs Compute: x = T_opt, y = PSNR)
     pareto_csv = os.path.join(save_dir, 'pareto_quality_vs_compute.csv')
     with open(pareto_csv, 'w') as f:
-        f.write("budget_ms,policy,budget_constrained,measured_compute_ms,psnr,depth_l1,jitter\n")
+        f.write("relative_budget,budget_ms,policy,measured_compute_ms,p50_ms,p95_ms,jitter,utilization,violation_rate,psnr,depth_l1,gain_efficiency\n")
         for r in results:
-            f.write(f"{r['budget_ms']},{r['policy_name']},{r['budget_constrained']},{r['measured_compute_ms']:.3f},{r['avg_psnr']:.3f},{r['avg_depth_l1']:.4f},{r['jitter']:.3f}\n")
+            f.write(
+                f"{r.get('relative_budget', 1.0)},{r.get('budget_ms', 0.0):.2f},"
+                f"{r['policy_name']},{r['measured_compute_ms']:.3f},{r['p50_ms']:.3f},"
+                f"{r['p95_ms']:.3f},{r['jitter']:.3f},{r.get('budget_utilization', 0.0)*100:.1f}%,"
+                f"{r.get('violation_rate', 0.0):.1f}%,{r['avg_psnr']:.3f},{r['avg_depth_l1']:.4f},"
+                f"{r.get('gain_efficiency', 0.0):.4f}\n"
+            )
             
-    print(f"\nArtifacts saved to:")
+    print(f"\n[Artifacts] Successfully updated:")
     print(f"  - {save_path}")
     print(f"  - {json_path}")
     print(f"  - {pareto_csv}")
