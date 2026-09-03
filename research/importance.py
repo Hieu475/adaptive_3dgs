@@ -127,6 +127,8 @@ class GaussianImportanceEstimator:
         self._running_depth_error: Optional[torch.Tensor] = None
         self._running_color_error: Optional[torch.Tensor] = None
         self._running_normal_error: Optional[torch.Tensor] = None
+        self._running_error_fast: Optional[torch.Tensor] = None
+        self._running_error_slow: Optional[torch.Tensor] = None
         self._visibility_count: Optional[torch.Tensor] = None
         self._prev_positions: Optional[torch.Tensor] = None
         self._zero_contrib_frames: Optional[torch.Tensor] = None
@@ -138,6 +140,20 @@ class GaussianImportanceEstimator:
         self.fixed_norm_stats: Optional[Tuple[float, float]] = None
         self.last_p5: float = 0.0
         self.last_p95: float = 1.0
+
+    @staticmethod
+    def _normalize_feature(feat: torch.Tensor, use_robust: bool = True) -> torch.Tensor:
+        """Normalize individual feature to [0, 1] prior to fusion (Point XVI)."""
+        if feat is None or feat.numel() <= 1:
+            return torch.zeros_like(feat) if feat is not None else None
+        if use_robust and feat.numel() > 10:
+            norm_feat, _, _ = robust_normalize(feat)
+            return norm_feat
+        f_min = feat.min()
+        f_max = feat.max()
+        if f_max - f_min > 1e-8:
+            return (feat - f_min) / (f_max - f_min)
+        return torch.zeros_like(feat)
 
     def freeze_normalization(self, p5: float, p95: float):
         """Freeze calibration normalization statistics for zero data-leakage test runs (Section V)."""
@@ -153,14 +169,29 @@ class GaussianImportanceEstimator:
     
     def _ensure_buffers(self, N: int, device: torch.device):
         """Lazily initialize running buffers when Gaussian count is known."""
-        if self._running_depth_error is None or self._running_depth_error.shape[0] != N:
+        if self._running_depth_error is None:
             self._running_depth_error = torch.zeros(N, device=device)
             self._running_color_error = torch.zeros(N, device=device)
             self._running_normal_error = torch.zeros(N, device=device)
+            self._running_error_fast = torch.zeros(N, device=device)
+            self._running_error_slow = torch.zeros(N, device=device)
             self._visibility_count = torch.zeros(N, device=device)
             self._prev_positions = None
             self._zero_contrib_frames = torch.zeros(N, dtype=torch.long, device=device)
             self._creation_frame = torch.full((N,), self._frame_count, dtype=torch.long, device=device)
+        elif self._running_depth_error.shape[0] < N:
+            self.expand_buffers(N - self._running_depth_error.shape[0], device)
+        elif self._running_depth_error.shape[0] > N:
+            self._running_depth_error = self._running_depth_error[:N]
+            self._running_color_error = self._running_color_error[:N]
+            self._running_normal_error = self._running_normal_error[:N]
+            if self._running_error_fast is not None:
+                self._running_error_fast = self._running_error_fast[:N]
+                self._running_error_slow = self._running_error_slow[:N]
+            self._visibility_count = self._visibility_count[:N]
+            self._zero_contrib_frames = self._zero_contrib_frames[:N]
+            if self._creation_frame is not None:
+                self._creation_frame = self._creation_frame[:N]
     
     def update_statistics(
         self,
@@ -206,8 +237,19 @@ class GaussianImportanceEstimator:
             decay * self._visibility_count + (1 - decay) * visibility_mask.float()
         )
         
-        # Zero-contribution tracking for pruning
-        no_contrib = ~visibility_mask | (depth_errors + color_errors < 1e-6)
+        # Multi-scale error tracking for temporal residual drift (Point XXX)
+        comb_errors = depth_errors + color_errors
+        self._running_error_fast = (
+            0.80 * self._running_error_fast + 0.20 * comb_errors
+        )
+        self._running_error_slow = (
+            0.98 * self._running_error_slow + 0.02 * comb_errors
+        )
+        
+        # Zero-contribution tracking for pruning (Point LII)
+        # Decouple non-visibility from convergence:
+        # A visible Gaussian with error < 1e-6 is well-converged and valuable, NOT lacking contribution.
+        no_contrib = ~visibility_mask
         self._zero_contrib_frames[no_contrib] += 1
         self._zero_contrib_frames[~no_contrib] = 0
         
@@ -218,8 +260,9 @@ class GaussianImportanceEstimator:
     def compute_importance(self) -> torch.Tensor:
         """Compute continuous importance score for all Gaussians.
         
-        I_i = w_g·E_{depth,i} + w_p·E_{color,i} + w_n·E_{normal,i}
-              + w_v·V_i + w_t·ΔT_i + w_s·S_i
+        Normalized component formulation (Point XVI):
+        I_i = w_g·Norm(E_{depth,i}) + w_p·Norm(E_{color,i}) + w_n·Norm(E_{normal,i})
+              + w_v·Norm(V_i) + w_t·Norm(ΔT_i) + w_s·Norm(S_i)
         
         Returns:
             importance: (N,) importance scores in [0, 1] (normalized)
@@ -229,59 +272,65 @@ class GaussianImportanceEstimator:
         
         w = self.weights
         
-        # Component scores
+        # Pre-fusion normalized components (Point XVI)
+        norm_depth = self._normalize_feature(self._running_depth_error, self.use_robust_normalization)
+        norm_color = self._normalize_feature(self._running_color_error, self.use_robust_normalization)
+        norm_normal = self._normalize_feature(self._running_normal_error, self.use_robust_normalization)
+        norm_vis = self._normalize_feature(self._visibility_count, self.use_robust_normalization)
+        
         score = torch.zeros_like(self._running_depth_error)
+        score += w['depth_error'] * norm_depth
+        score += w['color_error'] * norm_color
+        score += w['normal_error'] * norm_normal
+        score += w['visibility'] * norm_vis
         
-        score += w['depth_error'] * self._running_depth_error
-        score += w['color_error'] * self._running_color_error
-        score += w['normal_error'] * self._running_normal_error
-        score += w['visibility'] * self._visibility_count
-        
-        # Temporal change: ||μ_t - μ_{t-1}||₂
+        # Temporal change: position displacement + residual error drift (Point XXX)
         if self._prev_positions is not None and self._positions is not None:
             N_score = score.shape[0]
             temporal_change = torch.zeros(N_score, device=score.device)
             min_len = min(self._prev_positions.shape[0], self._positions.shape[0], N_score)
-            temporal_change[:min_len] = (self._positions[:min_len] - self._prev_positions[:min_len]).norm(dim=-1)
+            disp = (self._positions[:min_len] - self._prev_positions[:min_len]).norm(dim=-1)
+            norm_disp = self._normalize_feature(disp, self.use_robust_normalization)
+            
+            if self._running_error_fast is not None and self._running_error_slow is not None:
+                drift_ratio = self._running_error_fast[:min_len] / (self._running_error_slow[:min_len] + 1e-4)
+                norm_drift = self._normalize_feature(drift_ratio, self.use_robust_normalization)
+                temporal_change[:min_len] = 0.5 * norm_disp + 0.5 * norm_drift
+            else:
+                temporal_change[:min_len] = norm_disp
+                
             score += w['temporal'] * temporal_change
         
-        # Screen-space importance
+        # Screen-space importance (pre-fusion normalized)
         if self._screen_areas is not None:
             N_score = score.shape[0]
-            if self._screen_areas.shape[0] == N_score:
-                score += w['screen_space'] * self._screen_areas
+            sa = self._screen_areas[:N_score]
+            norm_sa = self._normalize_feature(sa, self.use_robust_normalization)
+            if sa.shape[0] == N_score:
+                score += w['screen_space'] * norm_sa
             else:
-                sa_len = min(self._screen_areas.shape[0], N_score)
-                score[:sa_len] += w['screen_space'] * self._screen_areas[:sa_len]
+                sa_len = min(sa.shape[0], N_score)
+                score[:sa_len] += w['screen_space'] * norm_sa[:sa_len]
         
-        # Novelty boost: new (unfitted) Gaussians get higher importance.
-        # Decays linearly from novelty_weight to 0 over novelty_warmup_frames.
-        # Fixes cold-start bias: oracle experiment showed new Gaussians with
-        # importance=0 actually have the highest marginal utility.
+        # Novelty boost (pre-fusion normalized)
         if self._creation_frame is not None and self.novelty_weight > 0:
             N_score = score.shape[0]
             age = self._frame_count - self._creation_frame[:N_score].float()
             novelty = (1.0 - age / max(1, self.novelty_warmup_frames)).clamp(min=0.0)
-            score += self.novelty_weight * novelty
+            norm_novelty = self._normalize_feature(novelty, self.use_robust_normalization)
+            score += self.novelty_weight * norm_novelty
         
-        # Uncertainty boost: high-uncertainty Gaussians need more optimization.
-        # UQ_i = EMA(E_i²) - EMA(E_i)² — variance of error signal.
-        # High uncertainty → error is unstable → Gaussian hasn't converged.
+        # Uncertainty boost (pre-fusion normalized)
         if (self._uncertainty_estimator is not None 
                 and self.uncertainty_weight > 0):
             uq = self._uncertainty_estimator.compute_uncertainty()
             if uq.numel() > 0:
                 N_score = score.shape[0]
                 uq_len = min(uq.shape[0], N_score)
-                # Normalize uncertainty to [0, 1] range
-                uq_max = uq[:uq_len].max()
-                if uq_max > 1e-8:
-                    uq_norm = uq[:uq_len] / uq_max
-                else:
-                    uq_norm = uq[:uq_len]
-                score[:uq_len] += self.uncertainty_weight * uq_norm
+                norm_uq = self._normalize_feature(uq[:uq_len], self.use_robust_normalization)
+                score[:uq_len] += self.uncertainty_weight * norm_uq
         
-        # Robust normalization (Section V)
+        # Robust normalization for final [0, 1] bounded scale
         if self.use_robust_normalization and score.numel() > 5:
             score, self.last_p5, self.last_p95 = robust_normalize(
                 score, fixed_stats=self.fixed_norm_stats
@@ -480,6 +529,12 @@ class GaussianImportanceEstimator:
             self._running_color_error, torch.full((n_new,), color_prior, device=device)])
         self._running_normal_error = torch.cat([
             self._running_normal_error, torch.full((n_new,), normal_prior, device=device)])
+        if self._running_error_fast is not None:
+            comb_prior = depth_prior + color_prior
+            self._running_error_fast = torch.cat([
+                self._running_error_fast, torch.full((n_new,), comb_prior, device=device)])
+            self._running_error_slow = torch.cat([
+                self._running_error_slow, torch.full((n_new,), comb_prior, device=device)])
         self._visibility_count = torch.cat([
             self._visibility_count, torch.zeros(n_new, device=device)])
         self._zero_contrib_frames = torch.cat([

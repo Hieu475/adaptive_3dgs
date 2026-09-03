@@ -77,6 +77,7 @@ class OracleUtilityExperiment:
         seed: int = 42,
         contribution_threshold: float = 0.01,
         group_size: int = 1,
+        min_influence_pixels: int = 25,
     ):
         """
         Args:
@@ -88,6 +89,7 @@ class OracleUtilityExperiment:
             seed: random seed for reproducibility
             contribution_threshold: minimum w_{u,i} to include pixel in local region
             group_size: Gaussians per optimization group (1, 4, 16)
+            min_influence_pixels: minimum pixel count for robust local utility estimation
         """
         self.pipeline = pipeline
         self.n_samples = n_samples
@@ -97,6 +99,7 @@ class OracleUtilityExperiment:
         self.seed = seed
         self.contribution_threshold = contribution_threshold
         self.group_size = group_size
+        self.min_influence_pixels = min_influence_pixels
         torch.manual_seed(seed)
         np.random.seed(seed)
         
@@ -254,17 +257,26 @@ class OracleUtilityExperiment:
         device = rgb.device
         
         n_influence_pixels = int(influence_mask.sum().item())
+        is_small_region = (n_influence_pixels < self.min_influence_pixels)
+        full_mask = torch.ones(H, W, dtype=torch.bool, device=device)
         
-        # === 1. Pre-optimization measurements ===
+        # === 1. Pre-optimization measurements (Local and Global) ===
         with torch.no_grad():
             before_out = self._render(H, W)
             before_color = before_out['color']
             before_depth = before_out['depth']
             
+            # Local metrics
             psnr_local_before = self._compute_local_psnr(before_color, rgb, influence_mask)
             ssim_local_before = self._compute_local_ssim(before_color, rgb, influence_mask)
             depth_l1_before = self._compute_local_depth_l1(before_depth, depth, influence_mask)
             loss_local_before = self._compute_local_loss(before_color, before_depth, rgb, depth, influence_mask)
+            
+            # Global metrics
+            psnr_global_before = self._compute_local_psnr(before_color, rgb, full_mask)
+            ssim_global_before = self._compute_local_ssim(before_color, rgb, full_mask)
+            depth_l1_global_before = self._compute_local_depth_l1(before_depth, depth, full_mask)
+            loss_global_before = self._compute_local_loss(before_color, before_depth, rgb, depth, full_mask)
         
         # === 2. Isolated True Selective Optimization Trial ===
         opt_mask = torch.zeros(model.num_gaussians, dtype=torch.bool, device=device)
@@ -321,33 +333,58 @@ class OracleUtilityExperiment:
             torch.cuda.synchronize()
         measured_trial_cost_ms = (time.perf_counter() - start_time) * 1000.0
         
-        # === 3. Post-optimization measurements ===
+        # === 3. Post-optimization measurements (Local and Global) ===
         with torch.no_grad():
             after_out = self._render(H, W)
             after_color = after_out['color']
             after_depth = after_out['depth']
             
+            # Local
             psnr_local_after = self._compute_local_psnr(after_color, rgb, influence_mask)
             ssim_local_after = self._compute_local_ssim(after_color, rgb, influence_mask)
             depth_l1_after = self._compute_local_depth_l1(after_depth, depth, influence_mask)
             loss_local_after = self._compute_local_loss(after_color, after_depth, rgb, depth, influence_mask)
             
+            # Global
+            psnr_global_after = self._compute_local_psnr(after_color, rgb, full_mask)
+            ssim_global_after = self._compute_local_ssim(after_color, rgb, full_mask)
+            depth_l1_global_after = self._compute_local_depth_l1(after_depth, depth, full_mask)
+            loss_global_after = self._compute_local_loss(after_color, after_depth, rgb, depth, full_mask)
+            
+        # Unclamped deltas (positive = quality improvement, negative = degradation)
         delta_psnr_local = psnr_local_after - psnr_local_before
         delta_ssim_local = ssim_local_after - ssim_local_before
-        delta_depth_gain_local = max(0.0, depth_l1_before - depth_l1_after)
-        delta_loss_local = max(0.0, loss_local_before - loss_local_after)
+        delta_depth_gain_local = depth_l1_before - depth_l1_after  # Unclamped: positive means error reduced
+        delta_loss_local = loss_local_before - loss_local_after    # Unclamped: positive means loss reduced
         
-        # Dimension-free normalized relative gains
+        # Dimension-free normalized relative gains (unclamped)
         norm_delta_psnr = delta_psnr_local / max(1.0, psnr_local_before)
         norm_delta_depth = delta_depth_gain_local / max(1e-3, depth_l1_before)
         delta_quality_local = self.w_rgb * norm_delta_psnr + self.w_depth * norm_delta_depth
         
+        # Global deltas (unclamped)
+        delta_psnr_global = psnr_global_after - psnr_global_before
+        delta_ssim_global = ssim_global_after - ssim_global_before
+        delta_depth_gain_global = depth_l1_global_before - depth_l1_global_after
+        delta_loss_global = loss_global_before - loss_global_after
+        norm_delta_psnr_global = delta_psnr_global / max(1.0, psnr_global_before)
+        norm_delta_depth_global = delta_depth_gain_global / max(1e-3, depth_l1_global_before)
+        delta_quality_global = self.w_rgb * norm_delta_psnr_global + self.w_depth * norm_delta_depth_global
+        
         # Actual trial cost strictly separating ΔQ and ΔT (Point 7)
         actual_cost_ms = max(0.001, measured_trial_cost_ms)
+        
+        # Local utilities
         oracle_util_rgb = delta_psnr_local / actual_cost_ms
         oracle_util_depth = delta_depth_gain_local / actual_cost_ms
         oracle_util_loss = delta_loss_local / actual_cost_ms
         oracle_util_joint = delta_quality_local / actual_cost_ms
+        
+        # Global utilities
+        oracle_util_rgb_global = delta_psnr_global / actual_cost_ms
+        oracle_util_depth_global = delta_depth_gain_global / actual_cost_ms
+        oracle_util_loss_global = delta_loss_global / actual_cost_ms
+        oracle_util_joint_global = delta_quality_global / actual_cost_ms
         
         return {
             'psnr_local_before': psnr_local_before,
@@ -363,12 +400,34 @@ class OracleUtilityExperiment:
             'loss_local_after': loss_local_after,
             'delta_loss_local': delta_loss_local,
             'delta_quality_local': delta_quality_local,
+            
+            'psnr_global_before': psnr_global_before,
+            'psnr_global_after': psnr_global_after,
+            'delta_psnr_global': delta_psnr_global,
+            'ssim_global_before': ssim_global_before,
+            'ssim_global_after': ssim_global_after,
+            'delta_ssim_global': delta_ssim_global,
+            'depth_l1_global_before': depth_l1_global_before,
+            'depth_l1_global_after': depth_l1_global_after,
+            'delta_depth_gain_global': delta_depth_gain_global,
+            'loss_global_before': loss_global_before,
+            'loss_global_after': loss_global_after,
+            'delta_loss_global': delta_loss_global,
+            'delta_quality_global': delta_quality_global,
+            
             'measured_trial_cost_ms': measured_trial_cost_ms,
             'oracle_utility_rgb': oracle_util_rgb,
             'oracle_utility_depth': oracle_util_depth,
             'oracle_utility_loss': oracle_util_loss,
             'oracle_utility_joint': oracle_util_joint,
+            
+            'oracle_utility_rgb_global': oracle_util_rgb_global,
+            'oracle_utility_depth_global': oracle_util_depth_global,
+            'oracle_utility_loss_global': oracle_util_loss_global,
+            'oracle_utility_joint_global': oracle_util_joint_global,
+            
             'n_influence_pixels': n_influence_pixels,
+            'is_small_region': is_small_region,
         }
 
     def sample_geometry_stratified(
@@ -647,6 +706,35 @@ class OracleUtilityExperiment:
         else:
             strata_map = {idx: 'prespecified' for idx in sample_indices}
             
+        # 3b. Compute 3D KNN Contextual Features (Phase 5 - Points XI, XII, XXVIII)
+        knn_features = {}
+        if len(sample_indices) > 0 and num_gaussians > 1:
+            try:
+                cand_t = torch.tensor(sample_indices, dtype=torch.long, device=model.positions.device)
+                cand_pos = model.positions[cand_t]
+                all_pos = model.positions
+                dists = torch.cdist(cand_pos, all_pos)
+                k_val = min(5, num_gaussians)
+                topk_dists, topk_idx = torch.topk(dists, k=k_val, largest=False, dim=-1)
+                
+                n_idx = topk_idx[:, 1:]
+                n_dst = topk_dists[:, 1:]
+                all_err = (color_error + depth_error)
+                all_z = model.positions[:, 2]
+                
+                d_mean = n_dst.mean(dim=-1).cpu().numpy()
+                e_mean = all_err[n_idx].mean(dim=-1).cpu().numpy()
+                z_var = all_z[n_idx].var(dim=-1).cpu().numpy() if k_val > 2 else np.zeros(len(sample_indices))
+                
+                for si, s_idx in enumerate(sample_indices):
+                    knn_features[s_idx] = {
+                        'knn_density': float(d_mean[si]),
+                        'knn_error_mean': float(e_mean[si]),
+                        'knn_depth_var': float(z_var[si]) if not np.isnan(z_var[si]) else 0.0,
+                    }
+            except Exception:
+                pass
+            
         # 4. Group Partitioning
         if self.group_size > 1:
             groups = [sample_indices[i:i + self.group_size]
@@ -663,6 +751,7 @@ class OracleUtilityExperiment:
             
             if n_pixels == 0:
                 for idx in group:
+                    knn_f = knn_features.get(idx, {'knn_density': 0.0, 'knn_error_mean': 0.0, 'knn_depth_var': 0.0})
                     results.append({
                         "scene": scene_name,
                         "frame": frame_idx,
@@ -679,6 +768,9 @@ class OracleUtilityExperiment:
                             "uncertainty": float(uncertainty[idx]),
                             "gradient_norm": float(influence_mass[idx] * (color_error[idx] + depth_error[idx])),
                             "projected_area": float(projected_area[idx]),
+                            "knn_density": knn_f['knn_density'],
+                            "knn_error_mean": knn_f['knn_error_mean'],
+                            "knn_depth_var": knn_f['knn_depth_var'],
                             "age": int(age[idx].item() if hasattr(age[idx], 'item') else age[idx]),
                             "update_frequency": 0.5,
                             "tier": int(tiers[idx].item() if hasattr(tiers[idx], 'item') else tiers[idx]),
@@ -713,6 +805,7 @@ class OracleUtilityExperiment:
                 delta_q = metrics['delta_quality_local']
                 
                 for idx in group:
+                    knn_f = knn_features.get(idx, {'knn_density': 0.0, 'knn_error_mean': 0.0, 'knn_depth_var': 0.0})
                     results.append({
                         "scene": scene_name,
                         "frame": frame_idx,
@@ -729,6 +822,9 @@ class OracleUtilityExperiment:
                             "uncertainty": float(uncertainty[idx]),
                             "gradient_norm": float(influence_mass[idx] * (color_error[idx] + depth_error[idx])),
                             "projected_area": float(projected_area[idx]),
+                            "knn_density": knn_f['knn_density'],
+                            "knn_error_mean": knn_f['knn_error_mean'],
+                            "knn_depth_var": knn_f['knn_depth_var'],
                             "age": int(age[idx].item() if hasattr(age[idx], 'item') else age[idx]),
                             "update_frequency": 0.5,
                             "tier": int(tiers[idx].item() if hasattr(tiers[idx], 'item') else tiers[idx]),
@@ -940,19 +1036,40 @@ class OracleUtilityExperiment:
         if len(visible) < 5:
             return {'error': 'Insufficient visible Gaussians for statistical evaluation', 'n_visible': len(visible)}
             
+        def _safe_spearmanr(x: np.ndarray, y: np.ndarray) -> Tuple[float, float]:
+            if len(x) < 3 or np.std(x) < 1e-7 or np.std(y) < 1e-7:
+                return float('nan'), float('nan')
+            r, p = spearmanr(x, y)
+            return (float(r) if not np.isnan(r) else float('nan')), (float(p) if not np.isnan(p) else float('nan'))
+
+        def _compute_ndcg(pred_scores: np.ndarray, true_scores: np.ndarray, k_val: int) -> float:
+            if k_val <= 0 or len(pred_scores) == 0:
+                return 0.0
+            k_eval = min(k_val, len(pred_scores))
+            p_idx = np.argsort(-pred_scores)[:k_eval]
+            i_idx = np.argsort(-true_scores)[:k_eval]
+            min_val = min(0.0, float(np.min(true_scores)))
+            rel = true_scores - min_val
+            discounts = np.log2(np.arange(2, k_eval + 2))
+            dcg = np.sum(rel[p_idx] / discounts)
+            idcg = np.sum(rel[i_idx] / discounts)
+            return float(dcg / (idcg + 1e-8)) if idcg > 0 else 1.0
+
         pred_imp = np.array([r['predicted_importance'] for r in visible])
         pred_util = np.array([r['predicted_utility'] for r in visible])
         oracle_util = np.array([r.get('oracle_utility_joint', r.get('oracle_utility', 0.0)) for r in visible])
         oracle_rgb = np.array([r.get('oracle_utility_rgb', 0.0) for r in visible])
         oracle_depth = np.array([r.get('oracle_utility_depth', 0.0) for r in visible])
+        oracle_util_global = np.array([r.get('oracle_utility_joint_global', 0.0) for r in visible])
         delta_q = np.array([r['delta_quality_local'] for r in visible])
         delta_psnr = np.array([r['delta_psnr_local'] for r in visible])
         
-        rho_util_oracle, p_util_oracle = spearmanr(pred_util, oracle_util)
-        rho_imp_oracle, p_imp_oracle = spearmanr(pred_imp, oracle_util)
-        rho_imp_deltaq, p_imp_deltaq = spearmanr(pred_imp, delta_q)
-        rho_util_rgb, p_util_rgb = spearmanr(pred_util, oracle_rgb)
-        rho_util_depth, p_util_depth = spearmanr(pred_util, oracle_depth)
+        rho_util_oracle, p_util_oracle = _safe_spearmanr(pred_util, oracle_util)
+        rho_imp_oracle, p_imp_oracle = _safe_spearmanr(pred_imp, oracle_util)
+        rho_imp_deltaq, p_imp_deltaq = _safe_spearmanr(pred_imp, delta_q)
+        rho_util_rgb, p_util_rgb = _safe_spearmanr(pred_util, oracle_rgb)
+        rho_util_depth, p_util_depth = _safe_spearmanr(pred_util, oracle_depth)
+        rho_util_global, p_util_global = _safe_spearmanr(pred_util, oracle_util_global)
         
         n = len(visible)
         imp_ranks = np.argsort(-pred_imp)
@@ -962,26 +1079,34 @@ class OracleUtilityExperiment:
         overlaps = {}
         realized_gains = {}
         regrets = {}
+        regrets_abs = {}
+        ose_metrics = {}
+        ndcg_metrics = {}
         lifts = {}
         coverages = {}
         total_positive_gain = float(np.sum(np.maximum(0.0, delta_q)))
         
         for k_pct in [0.05, 0.10, 0.20]:
             k = max(1, int(n * k_pct))
+            tag = f'top_{int(k_pct*100)}pct'
             top_k_util = set(util_ranks[:k].tolist())
             top_k_oracle = set(oracle_ranks[:k].tolist())
             
-            overlaps[f'top_{int(k_pct*100)}pct'] = len(top_k_util & top_k_oracle) / k
+            overlaps[tag] = len(top_k_util & top_k_oracle) / k
             
             gain_util = delta_q[list(top_k_util)].sum()
             gain_oracle = delta_q[list(top_k_oracle)].sum()
-            gain_ratio = float(gain_util / (gain_oracle + 1e-8))
-            realized_gains[f'top_{int(k_pct*100)}pct_ratio'] = gain_ratio
-            regrets[f'top_{int(k_pct*100)}pct'] = max(0.0, 1.0 - gain_ratio)
+            gain_ratio = float(gain_util / (gain_oracle + 1e-8)) if gain_oracle > 0 else 1.0
+            
+            realized_gains[f'{tag}_ratio'] = gain_ratio
+            ose_metrics[tag] = gain_ratio
+            regrets[tag] = max(0.0, 1.0 - gain_ratio)
+            regrets_abs[tag] = float(gain_oracle - gain_util)
+            ndcg_metrics[tag] = _compute_ndcg(pred_util, oracle_util, k)
             
             gain_random = float(np.mean(delta_q) * k)
-            lifts[f'top_{int(k_pct*100)}pct'] = float(gain_util / (gain_random + 1e-8)) if gain_random > 0 else 1.0
-            coverages[f'top_{int(k_pct*100)}pct'] = float(
+            lifts[tag] = float(gain_util / (gain_random + 1e-8)) if gain_random > 0 else 1.0
+            coverages[tag] = float(
                 np.sum(np.maximum(0.0, delta_q[list(top_k_util)])) / (total_positive_gain + 1e-8)
             )
             
@@ -996,9 +1121,14 @@ class OracleUtilityExperiment:
             'spearman_deltaQ_p': float(p_imp_deltaq),
             'spearman_utility_vs_rgb': float(rho_util_rgb),
             'spearman_utility_vs_depth': float(rho_util_depth),
+            'spearman_utility_vs_oracle_global': float(rho_util_global),
+            'spearman_utility_global_p': float(p_util_global),
             'overlaps': overlaps,
             'realized_gains': realized_gains,
+            'ose_metrics': ose_metrics,
+            'ndcg_metrics': ndcg_metrics,
             'regrets': regrets,
+            'regrets_abs': regrets_abs,
             'lifts': lifts,
             'coverages': coverages,
             'delta_quality_stats': {

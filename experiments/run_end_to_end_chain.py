@@ -66,9 +66,11 @@ def main():
         if len(ge_vals) >= 3 and np.std(ge_vals) > 1e-6 and np.std(quality_gains) > 1e-6:
             r_pearson, p_val = pearsonr(ge_vals, quality_gains)
             r_spearman, sp_pval = spearmanr(ge_vals, quality_gains)
+            status_str = "Statistically Evaluated" if p_val < 0.05 else "Inconclusive (p >= 0.05)"
         else:
-            r_pearson, p_val = 1.0, 0.0
-            r_spearman, sp_pval = 1.0, 0.0
+            r_pearson, p_val = float('nan'), float('nan')
+            r_spearman, sp_pval = float('nan'), float('nan')
+            status_str = "Undefined (Insufficient Variance / Sample Size)"
             
         correlations_by_budget.append({
             'relative_budget': b,
@@ -78,13 +80,18 @@ def main():
             'spearman_rho': float(r_spearman),
             'mean_quality_gain_db': float(np.mean(quality_gains)),
             'mean_ge': float(np.mean(ge_vals)),
+            'status': status_str,
         })
-        print(f"   [Budget {int(b*100):2d}%] Selection-to-Quality Correlation r_B = {r_pearson:+.4f} (p={p_val:.4f}) | Mean ΔQ = {np.mean(quality_gains):+.4f} dB")
+        r_str = f"{r_pearson:+.4f}" if not np.isnan(r_pearson) else "NaN"
+        p_str = f"{p_val:.4f}" if not np.isnan(p_val) else "NaN"
+        print(f"   [Budget {int(b*100):2d}%] Selection-to-Quality Association r_B = {r_str} (p={p_str}) | Mean ΔQ = {np.mean(quality_gains):+.4f} dB | {status_str}")
         
-    mean_r = float(np.mean([c['pearson_r'] for c in correlations_by_budget])) if correlations_by_budget else 1.0
-    print(f"\nOverall Mean Selection-to-Quality Correlation: r = {mean_r:+.4f}")
+    valid_rs = [c['pearson_r'] for c in correlations_by_budget if not np.isnan(c['pearson_r'])]
+    mean_r = float(np.mean(valid_rs)) if valid_rs else float('nan')
+    mean_r_str = f"{mean_r:+.4f}" if not np.isnan(mean_r) else "NaN"
+    print(f"\nOverall Mean Selection-to-Quality Association: r = {mean_r_str}")
     
-    # 2. Causal Chain Table
+    # 2. Association Summary Table
     chain_summary = {
         'selection_quality_correlation_mean': mean_r,
         'correlations_by_budget': correlations_by_budget,
@@ -97,19 +104,20 @@ def main():
     json_file = os.path.join(save_dir, 'end_to_end_chain_summary.json')
     
     lines = []
-    lines.append("# End-to-End Scientific Chain: Utility Prediction → Selection → Reconstruction")
+    lines.append("# Selection-to-Quality Empirical Association: Selection Efficiency → Reconstruction Gain")
     lines.append("")
-    lines.append("Demonstrates that selection quality ($GE@B$) directly correlates with final reconstruction quality gain ($\\Delta Q$).")
+    lines.append("Reports empirical association between selection efficiency ($GE@B$) and final reconstruction quality gain ($\\Delta Q$). Note: Observational correlation does not imply causality.")
     lines.append("")
-    lines.append("## 1. Selection-to-Quality Correlation by Budget Level ($r_B$)")
+    lines.append("## 1. Selection-to-Quality Association by Budget Level ($r_B$)")
     lines.append("")
     lines.append("| Budget Level | Pearson $r_B$ | Spearman $\\rho_B$ | Mean Gain Efficiency ($GE$) | Mean Quality Gain $\\Delta$PSNR (dB) | Status |")
     lines.append("|:---:|:---:|:---:|:---:|:---:|:---:|")
     for c in correlations_by_budget:
-        stat = "Strongly Coupled ✅" if c['pearson_r'] > 0.70 else "Positive Correlation"
-        lines.append(f"| **{c['budget_pct']}%** | **{c['pearson_r']:+.4f}** | {c['spearman_rho']:+.4f} | {c['mean_ge']:.3f} | {c['mean_quality_gain_db']:+.4f} dB | {stat} |")
+        r_fmt = f"**{c['pearson_r']:+.4f}**" if not np.isnan(c['pearson_r']) else "**NaN**"
+        rho_fmt = f"{c['spearman_rho']:+.4f}" if not np.isnan(c['spearman_rho']) else "NaN"
+        lines.append(f"| **{c['budget_pct']}%** | {r_fmt} | {rho_fmt} | {c['mean_ge']:.3f} | {c['mean_quality_gain_db']:+.4f} dB | {c['status']} |")
     lines.append("")
-    lines.append(f"**Mean Cross-Budget Coupling Coefficient:** $r = {mean_r:+.4f}$ (Proves that improved utility selection directly drives reconstruction gain).")
+    lines.append(f"**Mean Cross-Budget Association Coefficient:** $r = {mean_r_str}$ (Computed exclusively across budgets with non-degenerate variance).")
     lines.append("")
     
     with open(report_file, 'w') as f:

@@ -452,6 +452,7 @@ class OnlineReconstructionPipeline:
             top_k=top_k,
             frame_idx=self.frame_count,
             binary_threshold=binary_threshold,
+            utility_scores=getattr(self, '_learned_utility_scores', None),
         )
         
         # === 7. True Selective Optimization with Frozen Background Cache (R21/R29) ===
@@ -786,7 +787,7 @@ class OnlineReconstructionPipeline:
             depth_l1_after = (render_after['depth'][valid_d] - depth[valid_d]).abs().mean().item() if valid_d.any() else 0.0
             
         delta_psnr = psnr_after - psnr_before
-        delta_depth_gain = max(0.0, depth_l1_before - depth_l1_after)
+        delta_depth_gain = depth_l1_before - depth_l1_after  # Unclamped: positive is gain, negative is degradation
         delta_quality = 0.70 * delta_psnr + 0.30 * (10.0 * delta_depth_gain)
         
         # Restore state
