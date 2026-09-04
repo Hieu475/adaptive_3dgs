@@ -395,19 +395,20 @@ class OracleUtilityExperiment:
         # Actual trial cost strictly separating ΔQ and ΔT (Point 7)
         actual_cost_ms = max(0.001, measured_trial_cost_ms)
         
-        # Local utilities
-        oracle_util_rgb = delta_psnr_local / actual_cost_ms
-        oracle_util_depth = delta_depth_gain_local / actual_cost_ms
-        oracle_util_loss = delta_loss_local / actual_cost_ms
-        oracle_util_joint = delta_quality_local / actual_cost_ms
+        # Local utilities (secondary diagnostic)
+        oracle_util_rgb_local = delta_psnr_local / actual_cost_ms
+        oracle_util_depth_local = delta_depth_gain_local / actual_cost_ms
+        oracle_util_loss_local = delta_loss_local / actual_cost_ms
+        oracle_util_joint_local = delta_quality_local / actual_cost_ms
         
-        # Global utilities
+        # Global utilities (PRIMARY SCIENTIFIC ESTIMAND: 3-FIX-1)
         oracle_util_rgb_global = delta_psnr_global / actual_cost_ms
         oracle_util_depth_global = delta_depth_gain_global / actual_cost_ms
         oracle_util_loss_global = delta_loss_global / actual_cost_ms
         oracle_util_joint_global = delta_quality_global / actual_cost_ms
         
         return {
+            # Local metrics (secondary diagnostics)
             'psnr_local_before': psnr_local_before,
             'psnr_local_after': psnr_local_after,
             'delta_psnr_local': delta_psnr_local,
@@ -421,7 +422,12 @@ class OracleUtilityExperiment:
             'loss_local_after': loss_local_after,
             'delta_loss_local': delta_loss_local,
             'delta_quality_local': delta_quality_local,
+            'oracle_utility_rgb_local': oracle_util_rgb_local,
+            'oracle_utility_depth_local': oracle_util_depth_local,
+            'oracle_utility_loss_local': oracle_util_loss_local,
+            'oracle_utility_joint_local': oracle_util_joint_local,
             
+            # Global metrics (primary scientific estimand)
             'psnr_global_before': psnr_global_before,
             'psnr_global_after': psnr_global_after,
             'delta_psnr_global': delta_psnr_global,
@@ -435,21 +441,28 @@ class OracleUtilityExperiment:
             'loss_global_after': loss_global_after,
             'delta_loss_global': delta_loss_global,
             'delta_quality_global': delta_quality_global,
-            
-            'measured_trial_cost_ms': measured_trial_cost_ms,
-            'oracle_utility_rgb': oracle_util_rgb,
-            'oracle_utility_depth': oracle_util_depth,
-            'oracle_utility_loss': oracle_util_loss,
-            'oracle_utility_joint': oracle_util_joint,
-            
             'oracle_utility_rgb_global': oracle_util_rgb_global,
             'oracle_utility_depth_global': oracle_util_depth_global,
             'oracle_utility_loss_global': oracle_util_loss_global,
             'oracle_utility_joint_global': oracle_util_joint_global,
             
+            # Canonical primary aliases
+            'delta_quality': delta_quality_global,
+            'delta_psnr': delta_psnr_global,
+            'delta_ssim': delta_ssim_global,
+            'delta_depth': delta_depth_gain_global,
+            'delta_loss': delta_loss_global,
+            'oracle_utility_rgb': oracle_util_rgb_global,
+            'oracle_utility_depth': oracle_util_depth_global,
+            'oracle_utility_loss': oracle_util_loss_global,
+            'oracle_utility_joint': oracle_util_joint_global,
+            'oracle_utility': oracle_util_joint_global,
+            
+            'measured_trial_cost_ms': measured_trial_cost_ms,
             'n_influence_pixels': n_influence_pixels,
             'is_small_region': is_small_region,
         }
+
 
     def sample_geometry_stratified(
         self,
@@ -655,12 +668,14 @@ class OracleUtilityExperiment:
         scene_name: str = "scene",
         frame_idx: int = 0,
         split: Optional[str] = None,
+        seed: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """Run full oracle utility measurement on selected population with complete state tracking."""
         H, W = rgb.shape[:2]
         device = rgb.device
         model = self.pipeline.gaussian_model
         num_gaussians = model.num_gaussians
+        run_seed = seed if seed is not None else getattr(self, 'seed', 42)
         
         # Determine dataset split strictly per protocol
         if split is None:
@@ -713,16 +728,18 @@ class OracleUtilityExperiment:
             'temporal', torch.zeros(num_gaussians, device=device)
         )
 
-        
         # Extract synchronized state from GaussianStateStore if available
         store = getattr(model, 'state_store', None)
         if store is not None and store.num_gaussians >= num_gaussians:
+            # Update store's visibility_count using attribution pixel_count (3-FIX-4)
+            store.visibility_count[:num_gaussians] = pixel_count[:num_gaussians].float()
             pos_drift = store.position_drift[:num_gaussians]
             res_drift_ema = store.residual_drift_ema[:num_gaussians]
             store_age = store.ages[:num_gaussians]
             store_staleness = store.get_staleness(frame_idx)[:num_gaussians]
             store_vis_cnt = store.visibility_count[:num_gaussians]
             store_tiers = store.tiers[:num_gaussians]
+            store_update_freq = store.get_update_frequency(frame_idx)[:num_gaussians]
         else:
             pos_drift = temporal_change
             res_drift_ema = torch.zeros(num_gaussians, device=device)
@@ -734,6 +751,7 @@ class OracleUtilityExperiment:
             store_staleness = torch.zeros(num_gaussians, dtype=torch.long, device=device)
             store_vis_cnt = pixel_count
             store_tiers = tiers
+            store_update_freq = torch.full((num_gaussians,), 0.5, device=device)
         
         # Cost model estimates
         cost_estimates_us = estimate_gaussian_costs(
@@ -812,6 +830,7 @@ class OracleUtilityExperiment:
                     knn_f = knn_features.get(idx, {'knn_density': 0.0, 'knn_error_mean': 0.0, 'knn_depth_var': 0.0})
                     p_id = int(model.persistent_ids[idx].item()) if hasattr(model, 'persistent_ids') and idx < len(model.persistent_ids) else idx
                     results.append({
+                        "seed": int(run_seed),
                         "scene": scene_name,
                         "frame": frame_idx,
                         "split": split,
@@ -829,13 +848,12 @@ class OracleUtilityExperiment:
                             "influence_mass": float(influence_mass[idx]),
                             "position_drift": float(pos_drift[idx]),
                             "residual_drift_ema": float(res_drift_ema[idx]),
-                            "temporal_drift": float(pos_drift[idx]),
                             "uncertainty": float(uncertainty[idx]),
                             "uncertainty_var": float(uncertainty[idx]),
                             "projected_area": float(projected_area[idx]),
                             "age": int(store_age[idx].item() if hasattr(store_age[idx], 'item') else store_age[idx]),
                             "staleness": int(store_staleness[idx].item() if hasattr(store_staleness[idx], 'item') else store_staleness[idx]),
-                            "update_frequency": 0.5,
+                            "update_frequency": float(store_update_freq[idx].item() if hasattr(store_update_freq[idx], 'item') else store_update_freq[idx]),
                             "tier": int(store_tiers[idx].item() if hasattr(store_tiers[idx], 'item') else store_tiers[idx]),
                             "knn_density": knn_f['knn_density'],
                             "knn_error_mean": knn_f['knn_error_mean'],
@@ -844,6 +862,7 @@ class OracleUtilityExperiment:
                         },
                         "predicted_importance": float(predicted_importance[idx]),
                         "predicted_utility": float(predicted_utility[idx]),
+                        # Primary Global Metrics (3-FIX-1)
                         "psnr_before": 0.0,
                         "psnr_after": 0.0,
                         "delta_psnr": 0.0,
@@ -856,20 +875,38 @@ class OracleUtilityExperiment:
                         "loss_before": 0.0,
                         "loss_after": 0.0,
                         "delta_loss": 0.0,
-                        "delta_psnr_local": 0.0,
-                        "delta_ssim_local": 0.0,
-                        "delta_depth_gain_local": 0.0,
-                        "delta_loss_local": 0.0,
                         "delta_quality": 0.0,
-                        "delta_quality_local": 0.0,
-                        "delta_time_ms": 0.0,
-                        "measured_trial_cost_ms": 0.0,
-                        "modeled_marginal_cost_us": float(cost_estimates_us[idx]),
+                        "delta_quality_global": 0.0,
                         "oracle_utility": 0.0,
+                        "oracle_utility_joint": 0.0,
                         "oracle_utility_rgb": 0.0,
                         "oracle_utility_depth": 0.0,
                         "oracle_utility_loss": 0.0,
-                        "oracle_utility_joint": 0.0,
+                        "oracle_utility_joint_global": 0.0,
+                        "oracle_utility_rgb_global": 0.0,
+                        "oracle_utility_depth_global": 0.0,
+                        "oracle_utility_loss_global": 0.0,
+                        # Local secondary diagnostics
+                        "psnr_local_before": 0.0,
+                        "psnr_local_after": 0.0,
+                        "delta_psnr_local": 0.0,
+                        "ssim_local_before": 0.0,
+                        "ssim_local_after": 0.0,
+                        "delta_ssim_local": 0.0,
+                        "depth_local_before": 0.0,
+                        "depth_local_after": 0.0,
+                        "delta_depth_gain_local": 0.0,
+                        "loss_local_before": 0.0,
+                        "loss_local_after": 0.0,
+                        "delta_loss_local": 0.0,
+                        "delta_quality_local": 0.0,
+                        "oracle_utility_joint_local": 0.0,
+                        "oracle_utility_rgb_local": 0.0,
+                        "oracle_utility_depth_local": 0.0,
+                        "oracle_utility_loss_local": 0.0,
+                        "delta_time_ms": 0.0,
+                        "measured_trial_cost_ms": 0.0,
+                        "modeled_marginal_cost_us": float(cost_estimates_us[idx]),
                         "n_influence_pixels": 0,
                         "filtered": True,
                         "filter_reason": "zero_influence_pixels",
@@ -884,12 +921,14 @@ class OracleUtilityExperiment:
                 
                 trial_cost = metrics['measured_trial_cost_ms']
                 per_gauss_cost = trial_cost / len(group)
-                delta_q = metrics['delta_quality_local']
+                delta_q_global = metrics['delta_quality_global']
+                delta_q_local = metrics['delta_quality_local']
                 
                 for idx in group:
                     knn_f = knn_features.get(idx, {'knn_density': 0.0, 'knn_error_mean': 0.0, 'knn_depth_var': 0.0})
                     p_id = int(model.persistent_ids[idx].item()) if hasattr(model, 'persistent_ids') and idx < len(model.persistent_ids) else idx
                     results.append({
+                        "seed": int(run_seed),
                         "scene": scene_name,
                         "frame": frame_idx,
                         "split": split,
@@ -907,13 +946,12 @@ class OracleUtilityExperiment:
                             "influence_mass": float(influence_mass[idx]),
                             "position_drift": float(pos_drift[idx]),
                             "residual_drift_ema": float(res_drift_ema[idx]),
-                            "temporal_drift": float(pos_drift[idx]),
                             "uncertainty": float(uncertainty[idx]),
                             "uncertainty_var": float(uncertainty[idx]),
                             "projected_area": float(projected_area[idx]),
                             "age": int(store_age[idx].item() if hasattr(store_age[idx], 'item') else store_age[idx]),
                             "staleness": int(store_staleness[idx].item() if hasattr(store_staleness[idx], 'item') else store_staleness[idx]),
-                            "update_frequency": 0.5,
+                            "update_frequency": float(store_update_freq[idx].item() if hasattr(store_update_freq[idx], 'item') else store_update_freq[idx]),
                             "tier": int(store_tiers[idx].item() if hasattr(store_tiers[idx], 'item') else store_tiers[idx]),
                             "knn_density": knn_f['knn_density'],
                             "knn_error_mean": knn_f['knn_error_mean'],
@@ -921,48 +959,75 @@ class OracleUtilityExperiment:
                             "sh_degree": int(getattr(model, 'sh_degree', 0)),
                         },
                         "raw_metrics": {
-                            "psnr_before": float(metrics['psnr_local_before']),
-                            "psnr_after": float(metrics['psnr_local_after']),
-                            "delta_psnr": float(metrics['delta_psnr_local']),
-                            "ssim_before": float(metrics['ssim_local_before']),
-                            "ssim_after": float(metrics['ssim_local_after']),
-                            "delta_ssim": float(metrics['delta_ssim_local']),
-                            "depth_l1_before": float(metrics['depth_l1_before']),
-                            "depth_l1_after": float(metrics['depth_l1_after']),
-                            "delta_depth_gain": float(metrics['delta_depth_gain_local']),
-                            "loss_before": float(metrics['loss_local_before']),
-                            "loss_after": float(metrics['loss_local_after']),
-                            "delta_loss": float(metrics['delta_loss_local']),
+                            "psnr_before": float(metrics['psnr_global_before']),
+                            "psnr_after": float(metrics['psnr_global_after']),
+                            "delta_psnr": float(metrics['delta_psnr_global']),
+                            "ssim_before": float(metrics['ssim_global_before']),
+                            "ssim_after": float(metrics['ssim_global_after']),
+                            "delta_ssim": float(metrics['delta_ssim_global']),
+                            "depth_l1_before": float(metrics['depth_l1_global_before']),
+                            "depth_l1_after": float(metrics['depth_l1_global_after']),
+                            "delta_depth_gain": float(metrics['delta_depth_gain_global']),
+                            "loss_before": float(metrics['loss_global_before']),
+                            "loss_after": float(metrics['loss_global_after']),
+                            "delta_loss": float(metrics['delta_loss_global']),
                             "measured_trial_cost_ms": float(trial_cost),
+                            "psnr_local_before": float(metrics['psnr_local_before']),
+                            "psnr_local_after": float(metrics['psnr_local_after']),
+                            "delta_psnr_local": float(metrics['delta_psnr_local']),
+                            "depth_l1_local_before": float(metrics['depth_l1_before']),
+                            "depth_l1_local_after": float(metrics['depth_l1_after']),
+                            "delta_depth_gain_local": float(metrics['delta_depth_gain_local']),
+                            "delta_quality_local": float(delta_q_local),
                         },
-                        "psnr_before": float(metrics['psnr_local_before']),
-                        "psnr_after": float(metrics['psnr_local_after']),
-                        "delta_psnr": float(metrics['delta_psnr_local']),
-                        "ssim_before": float(metrics['ssim_local_before']),
-                        "ssim_after": float(metrics['ssim_local_after']),
-                        "delta_ssim": float(metrics['delta_ssim_local']),
-                        "depth_before": float(metrics['depth_l1_before']),
-                        "depth_after": float(metrics['depth_l1_after']),
-                        "delta_depth": float(metrics['delta_depth_gain_local']),
-                        "loss_before": float(metrics['loss_local_before']),
-                        "loss_after": float(metrics['loss_local_after']),
-                        "delta_loss": float(metrics['delta_loss_local']),
-                        "predicted_importance": float(predicted_importance[idx]),
-                        "predicted_utility": float(predicted_utility[idx]),
-                        "delta_psnr_local": float(metrics['delta_psnr_local']),
-                        "delta_ssim_local": float(metrics['delta_ssim_local']),
-                        "delta_depth_gain_local": float(metrics['delta_depth_gain_local']),
-                        "delta_loss_local": float(metrics['delta_loss_local']),
-                        "delta_quality": float(delta_q),
-                        "delta_quality_local": float(delta_q),
+                        # Primary Global Metrics (3-FIX-1)
+                        "psnr_before": float(metrics['psnr_global_before']),
+                        "psnr_after": float(metrics['psnr_global_after']),
+                        "delta_psnr": float(metrics['delta_psnr_global']),
+                        "ssim_before": float(metrics['ssim_global_before']),
+                        "ssim_after": float(metrics['ssim_global_after']),
+                        "delta_ssim": float(metrics['delta_ssim_global']),
+                        "depth_before": float(metrics['depth_l1_global_before']),
+                        "depth_after": float(metrics['depth_l1_global_after']),
+                        "delta_depth": float(metrics['delta_depth_gain_global']),
+                        "loss_before": float(metrics['loss_global_before']),
+                        "loss_after": float(metrics['loss_global_after']),
+                        "delta_loss": float(metrics['delta_loss_global']),
+                        "delta_quality": float(delta_q_global),
+                        "delta_quality_global": float(delta_q_global),
                         "delta_time_ms": float(per_gauss_cost),
                         "measured_trial_cost_ms": float(per_gauss_cost),
                         "modeled_marginal_cost_us": float(cost_estimates_us[idx]),
-                        "oracle_utility": float(metrics['oracle_utility_joint']),
-                        "oracle_utility_rgb": float(metrics['oracle_utility_rgb']),
-                        "oracle_utility_depth": float(metrics['oracle_utility_depth']),
-                        "oracle_utility_loss": float(metrics['oracle_utility_loss']),
-                        "oracle_utility_joint": float(metrics['oracle_utility_joint']),
+                        "oracle_utility": float(metrics['oracle_utility_joint_global']),
+                        "oracle_utility_joint": float(metrics['oracle_utility_joint_global']),
+                        "oracle_utility_rgb": float(metrics['oracle_utility_rgb_global']),
+                        "oracle_utility_depth": float(metrics['oracle_utility_depth_global']),
+                        "oracle_utility_loss": float(metrics['oracle_utility_loss_global']),
+                        "oracle_utility_joint_global": float(metrics['oracle_utility_joint_global']),
+                        "oracle_utility_rgb_global": float(metrics['oracle_utility_rgb_global']),
+                        "oracle_utility_depth_global": float(metrics['oracle_utility_depth_global']),
+                        "oracle_utility_loss_global": float(metrics['oracle_utility_loss_global']),
+                        # Secondary Local Diagnostics
+                        "psnr_local_before": float(metrics['psnr_local_before']),
+                        "psnr_local_after": float(metrics['psnr_local_after']),
+                        "delta_psnr_local": float(metrics['delta_psnr_local']),
+                        "ssim_local_before": float(metrics['ssim_local_before']),
+                        "ssim_local_after": float(metrics['ssim_local_after']),
+                        "delta_ssim_local": float(metrics['delta_ssim_local']),
+                        "depth_local_before": float(metrics['depth_l1_before']),
+                        "depth_local_after": float(metrics['depth_l1_after']),
+                        "delta_depth_gain_local": float(metrics['delta_depth_gain_local']),
+                        "loss_local_before": float(metrics['loss_local_before']),
+                        "loss_local_after": float(metrics['loss_local_after']),
+                        "delta_loss_local": float(metrics['delta_loss_local']),
+                        "delta_quality_local": float(delta_q_local),
+                        "oracle_utility_joint_local": float(metrics['oracle_utility_joint_local']),
+                        "oracle_utility_rgb_local": float(metrics['oracle_utility_rgb_local']),
+                        "oracle_utility_depth_local": float(metrics['oracle_utility_depth_local']),
+                        "oracle_utility_loss_local": float(metrics['oracle_utility_loss_local']),
+                        # Diagnostics and status
+                        "predicted_importance": float(predicted_importance[idx]),
+                        "predicted_utility": float(predicted_utility[idx]),
                         "influence_mass": float(influence_mass[idx]),
                         "projected_area": float(projected_area[idx]),
                         "n_influence_pixels": n_pixels,
@@ -1010,7 +1075,7 @@ class OracleUtilityExperiment:
                     m = self.optimize_gaussian_group([idx], self.n_opt_steps, rgb, depth, influence_mask)
                     trial_utilities.append(m['oracle_utility_joint'])
                     trial_times.append(m['measured_trial_cost_ms'])
-                    trial_gains.append(m['delta_quality_local'])
+                    trial_gains.append(m['delta_quality'])
                 finally:
                     self.restore_state(snapshot)
                     
@@ -1336,6 +1401,7 @@ class OracleUtilityExperiment:
         flat_rows = []
         for r in results:
             flat = {
+                'seed': r.get('seed', 42),
                 'scene': r.get('scene', 'scene'),
                 'frame': r.get('frame', 0),
                 'split': r.get('split', 'train'),
@@ -1344,24 +1410,33 @@ class OracleUtilityExperiment:
                 'population': r.get('population', ''),
                 'geometry_stratum': r.get('geometry_stratum', 'none'),
                 'group_size': r.get('group_size', 1),
+                # Primary Global Metrics (3-FIX-1)
                 'psnr_before': r.get('psnr_before', 0.0),
                 'psnr_after': r.get('psnr_after', 0.0),
-                'delta_psnr': r.get('delta_psnr', r.get('delta_psnr_local', 0.0)),
+                'delta_psnr': r.get('delta_psnr', 0.0),
                 'ssim_before': r.get('ssim_before', 0.0),
                 'ssim_after': r.get('ssim_after', 0.0),
-                'delta_ssim': r.get('delta_ssim', r.get('delta_ssim_local', 0.0)),
+                'delta_ssim': r.get('delta_ssim', 0.0),
                 'depth_before': r.get('depth_before', 0.0),
                 'depth_after': r.get('depth_after', 0.0),
-                'delta_depth': r.get('delta_depth', r.get('delta_depth_gain_local', 0.0)),
+                'delta_depth': r.get('delta_depth', 0.0),
                 'loss_before': r.get('loss_before', 0.0),
                 'loss_after': r.get('loss_after', 0.0),
-                'delta_loss': r.get('delta_loss', r.get('delta_loss_local', 0.0)),
-                'delta_quality': r.get('delta_quality', r.get('delta_quality_local', 0.0)),
+                'delta_loss': r.get('delta_loss', 0.0),
+                'delta_quality': r.get('delta_quality', 0.0),
                 'delta_time_ms': r.get('delta_time_ms', r.get('measured_trial_cost_ms', 0.0)),
                 'oracle_utility_joint': r.get('oracle_utility_joint', r.get('oracle_utility', 0.0)),
                 'oracle_utility_rgb': r.get('oracle_utility_rgb', 0.0),
                 'oracle_utility_depth': r.get('oracle_utility_depth', 0.0),
                 'oracle_utility_loss': r.get('oracle_utility_loss', 0.0),
+                # Local Secondary Diagnostics
+                'delta_psnr_local': r.get('delta_psnr_local', 0.0),
+                'delta_ssim_local': r.get('delta_ssim_local', 0.0),
+                'delta_depth_local': r.get('delta_depth_gain_local', 0.0),
+                'delta_loss_local': r.get('delta_loss_local', 0.0),
+                'delta_quality_local': r.get('delta_quality_local', 0.0),
+                'oracle_utility_joint_local': r.get('oracle_utility_joint_local', 0.0),
+                # Predictors & Diagnostics
                 'predicted_importance': r.get('predicted_importance', 0.0),
                 'predicted_utility': r.get('predicted_utility', 0.0),
                 'modeled_marginal_cost_us': r.get('modeled_marginal_cost_us', 0.0),

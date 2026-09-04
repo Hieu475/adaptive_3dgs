@@ -596,5 +596,32 @@ def test_temporal_drift_alias_unification():
     assert torch.equal(matrix['position_drift'], matrix['temporal_drift'])
 
 
+def test_observed_update_frequency():
+    """3-FIX-4: Verify true observed update frequency f_i(t) = updates_i / max(1, t - t_creation + 1)."""
+    store = GaussianStateStore(device='cpu')
+    store.create(count=2, frame_idx=0)
+    
+    # Frame 1: optimize Gaussian 0 only
+    store.update_frame(frame_idx=1, optimized_mask=torch.tensor([True, False]))
+    # Frame 2: optimize Gaussian 0 only
+    store.update_frame(frame_idx=2, optimized_mask=torch.tensor([True, False]))
+    # Frame 3: optimize neither
+    store.update_frame(frame_idx=3, optimized_mask=torch.tensor([False, False]))
+    # Frame 4: optimize Gaussian 0 and Gaussian 1
+    store.update_frame(frame_idx=4, optimized_mask=torch.tensor([True, True]))
+    
+    freq = store.get_update_frequency(frame_idx=4)
+    # Gaussian 0: 3 updates over 5 frames (0,1,2,3,4) => 3/5 = 0.6
+    assert abs(freq[0].item() - 0.60) < 1e-5
+    # Gaussian 1: 1 update over 5 frames => 1/5 = 0.2
+    assert abs(freq[1].item() - 0.20) < 1e-5
+    
+    # Check that update_frequency is in get_state_matrix()
+    matrix = store.get_state_matrix()
+    assert 'update_frequency' in matrix
+    assert abs(matrix['update_frequency'][0].item() - 0.60) < 1e-5
+
+
+
 
 

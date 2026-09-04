@@ -372,12 +372,13 @@ def test_oracle_dataset_schema_and_persistent_id():
     row = train_results[0]
     # Check all required fields from Phase 3.7
     required_keys = [
-        'gaussian_id', 'persistent_id', 'frame', 'split', 'geometry_stratum',
+        'seed', 'gaussian_id', 'persistent_id', 'frame', 'split', 'geometry_stratum',
         'features', 'psnr_before', 'psnr_after', 'delta_psnr',
         'ssim_before', 'ssim_after', 'delta_ssim',
         'depth_before', 'depth_after', 'delta_depth',
         'loss_before', 'loss_after', 'delta_loss',
-        'delta_quality', 'delta_time_ms', 'oracle_utility_joint', 'filtered'
+        'delta_quality', 'delta_time_ms', 'oracle_utility_joint', 'filtered',
+        'delta_psnr_local', 'delta_depth_gain_local', 'delta_quality_local'
     ]
     for k in required_keys:
         assert k in row, f"Missing key '{k}' in oracle dataset row"
@@ -386,10 +387,11 @@ def test_oracle_dataset_schema_and_persistent_id():
     feat_keys = [
         'rgb_error', 'depth_error', 'gradient_norm', 'visibility_count',
         'influence_mass', 'position_drift', 'residual_drift_ema',
-        'uncertainty_var', 'projected_area', 'age', 'staleness'
+        'uncertainty_var', 'projected_area', 'age', 'staleness', 'update_frequency'
     ]
     for fk in feat_keys:
         assert fk in row['features'], f"Missing feature '{fk}' in features dict"
+    assert 'temporal_drift' not in row['features'], "temporal_drift should be removed (duplicate of position_drift)"
 
 
 def test_oracle_diminishing_marginal_returns():

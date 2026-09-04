@@ -1,0 +1,29 @@
+{
+  "protocol_version": "1.0.0",
+  "reference_seed": 42,
+  "date_evaluated": "2026-09-04 15:13:03",
+  "description": "Group interaction analysis evaluating non-additivity Delta_Q(S) across group sizes |S| in {1, 4, 16}",
+  "group_interaction_results": {
+    "group_size_1": {
+      "group_size": 1,
+      "interaction_error_mean": 0.0,
+      "interaction_error_median": 0.0,
+      "additivity_ratio_mean": 1.0,
+      "n_groups": 32
+    },
+    "group_size_4": {
+      "group_size": 4,
+      "interaction_error_mean": 0.5240478468859913,
+      "interaction_error_median": 0.4412997606298492,
+      "additivity_ratio_mean": 0.45380608490955654,
+      "n_groups": 4
+    },
+    "group_size_16": {
+      "group_size": 16,
+      "interaction_error_mean": 0.8807932862078438,
+      "interaction_error_median": 0.8807932862078438,
+      "additivity_ratio_mean": 0.45762139296792936,
+      "n_groups": 2
+    }
+  }
+}

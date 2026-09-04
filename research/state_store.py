@@ -39,8 +39,10 @@ class GaussianStateStore:
         self.residual_drift_ema = torch.empty(0, dtype=torch.float32, device=self.device)
         self.gradient_ema = torch.empty(0, dtype=torch.float32, device=self.device)
         self.tiers = torch.empty(0, dtype=torch.long, device=self.device)
+        self.update_counts = torch.empty(0, dtype=torch.long, device=self.device)
         
         # Tracking buffers for differential quantities
+
         self.last_positions: Optional[torch.Tensor] = None
         self.last_rgb_errors: Optional[torch.Tensor] = None
         
@@ -127,6 +129,7 @@ class GaussianStateStore:
         self.residual_drift_ema = torch.cat([self.residual_drift_ema, zeros], dim=0)
         self.gradient_ema = torch.cat([self.gradient_ema, zeros], dim=0)
         self.tiers = torch.cat([self.tiers, tier_t], dim=0)
+        self.update_counts = torch.cat([self.update_counts, torch.zeros(count, dtype=torch.long, device=self.device)], dim=0)
         
         if self.last_positions is not None:
             self.last_positions = torch.cat([self.last_positions, torch.zeros(count, 3, device=self.device)], dim=0)
@@ -140,17 +143,27 @@ class GaussianStateStore:
                 'persistent_id': g_id,
                 'parent_id': p_id,
                 'creation_frame': frame_idx,
+                'initial_tier': initial_tier,
                 'children': [],
             }
             if p_id in self._id_to_metadata:
                 self._id_to_metadata[p_id]['children'].append(g_id)
-                
+            
         return new_ids
 
     def get_staleness(self, frame_idx: Optional[int] = None) -> torch.Tensor:
-        """Compute staleness: frame_idx - last_update_frames (clamped >= 0)."""
-        t = self._current_frame if frame_idx is None else frame_idx
+        """Compute exact staleness: staleness_i(t) = t - last_update_frame_i."""
+        t = frame_idx if frame_idx is not None else self._current_frame
         return (t - self.last_update_frames).clamp(min=0)
+
+    def get_update_frequency(self, frame_idx: Optional[int] = None) -> torch.Tensor:
+        """Compute observed update frequency f_i(t) = updates_i / max(1, t - t_creation + 1)."""
+        if self.num_gaussians == 0:
+            return torch.empty(0, dtype=torch.float32, device=self.device)
+        curr = frame_idx if frame_idx is not None else self._current_frame
+        effective_history = (curr - self.creation_frames + 1).clamp(min=1).float()
+        return self.update_counts.float() / effective_history
+
 
     def update_frame(
         self,
@@ -175,10 +188,11 @@ class GaussianStateStore:
         # Age follows exact semantic: age = frame_idx - creation_frame (clamped >= 0)
         self.ages = (frame_idx - self.creation_frames).clamp(min=0)
         
-        # Track last optimization update frame
+        # Track last optimization update frame and count
         if optimized_mask is not None:
             opt = optimized_mask[:N].to(self.device)
             self.last_update_frames[opt] = frame_idx
+            self.update_counts[opt] += 1
             
         # Position drift: d_i(t) = ||mu_i(t) - mu_i(t-1)||_2 (Point B)
         if positions is not None:
@@ -255,6 +269,7 @@ class GaussianStateStore:
         self.residual_drift_ema = self.residual_drift_ema[perm]
         self.gradient_ema = self.gradient_ema[perm]
         self.tiers = self.tiers[perm]
+        self.update_counts = self.update_counts[perm]
         
         if self.last_positions is not None:
             self.last_positions = self.last_positions[perm]
@@ -300,6 +315,7 @@ class GaussianStateStore:
         self.residual_drift_ema = self.residual_drift_ema[mask]
         self.gradient_ema = self.gradient_ema[mask]
         self.tiers = self.tiers[mask]
+        self.update_counts = self.update_counts[mask]
         
         if self.last_positions is not None:
             self.last_positions = self.last_positions[mask]
@@ -374,6 +390,7 @@ class GaussianStateStore:
             'creation_frame': self.creation_frames[idx],
             'last_update_frame': self.last_update_frames[idx],
             'staleness': self.get_staleness()[idx],
+            'update_frequency': self.get_update_frequency()[idx],
             'ema_rgb': self.ema_rgb[idx],
             'ema_depth': self.ema_depth[idx],
             'ema_influence': self.ema_influence[idx],
@@ -417,6 +434,7 @@ class GaussianStateStore:
             'residual_drift_ema': self.residual_drift_ema.clone(),
             'gradient_ema': self.gradient_ema.clone(),
             'tiers': self.tiers.clone(),
+            'update_counts': self.update_counts.clone(),
             'last_positions': self.last_positions.clone() if self.last_positions is not None else None,
             'last_rgb_errors': self.last_rgb_errors.clone() if self.last_rgb_errors is not None else None,
             '_id_to_metadata': copy.deepcopy(self._id_to_metadata),
@@ -442,7 +460,9 @@ class GaussianStateStore:
         self.residual_drift_ema = state.get('residual_drift_ema', torch.zeros_like(self.ema_rgb)).clone().to(self.device)
         self.gradient_ema = state['gradient_ema'].clone().to(self.device)
         self.tiers = state['tiers'].clone().to(self.device)
+        self.update_counts = state.get('update_counts', torch.zeros_like(self.ages)).clone().to(self.device)
         self.last_positions = state['last_positions'].clone().to(self.device) if state.get('last_positions') is not None else None
+
         self.last_rgb_errors = state['last_rgb_errors'].clone().to(self.device) if state.get('last_rgb_errors') is not None else None
         self._id_to_metadata = copy.deepcopy(state['_id_to_metadata'])
         self._pruned_registry = copy.deepcopy(state['_pruned_registry'])
