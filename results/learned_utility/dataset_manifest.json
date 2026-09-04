@@ -14,8 +14,8 @@
     "age"
   ],
   "split_counts": {
-    "cross_scene_test": 250,
     "validation": 250,
+    "cross_scene_test": 250,
     "train": 375
   },
   "target_statistics": {

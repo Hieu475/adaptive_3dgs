@@ -129,3 +129,39 @@ def test_save_manifest(tmp_path):
         data = json.load(f)
     assert data["total_samples"] == len(dataset)
     assert "target_statistics" in data
+
+
+def test_utility_dataset_from_oracle_interface():
+    ds = UtilityDataset.from_oracle()
+    assert isinstance(ds.X, torch.Tensor)
+    assert isinstance(ds.delta_q, torch.Tensor)
+    assert isinstance(ds.delta_t, torch.Tensor)
+    assert isinstance(ds.utility, torch.Tensor)
+    assert len(ds.seed) == len(ds)
+    assert len(ds.frame) == len(ds)
+    assert len(ds.scene) == len(ds)
+    assert len(ds.geometry_stratum) == len(ds)
+    assert len(ds.split) == len(ds)
+
+
+def test_utility_identity_formula_verification():
+    ds = UtilityDataset.from_oracle()
+    assert ds.verify_utility_identity(atol=1e-6, rtol=1e-4) is True
+
+
+def test_strict_split_guarantees():
+    ds = UtilityDataset.from_oracle()
+    train_ds = ds.get_split("train")
+    val_ds = ds.get_split("validation")
+    test_ds = ds.get_split("cross_scene_test")
+
+    # Train: fr1/desk 0-40
+    assert all(s == "tum_fr1_desk" for s in train_ds.scene)
+    assert all(0 <= f <= 40 for f in train_ds.frame)
+
+    # Validation: fr1/desk 41-60
+    assert all(s == "tum_fr1_desk" for s in val_ds.scene)
+    assert all(41 <= f <= 60 for f in val_ds.frame)
+
+    # Cross-scene test: fr2/xyz
+    assert all(s == "tum_fr2_xyz" for s in test_ds.scene)

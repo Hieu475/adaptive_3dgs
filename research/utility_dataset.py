@@ -23,6 +23,7 @@ from research.utility_features import (
     CANONICAL_FEATURE_NAMES,
     UTILITY_FEATURES,
     SchemaError,
+    DatasetSchemaError,
     extract_feature_vector,
 )
 from research.protocol import (
@@ -416,16 +417,50 @@ class UtilityDataset(Dataset):
             normalizer=normalizer,
         )
 
+    def verify_utility_identity(self, atol: float = 1e-6, rtol: float = 1e-4, eps: float = 0.0) -> bool:
+        """Verifies U_i* == Delta Q_i / (Delta T_i + eps) across all dataset samples."""
+        expected = self.delta_q_np / (self.delta_t_np + eps)
+        matches = np.isclose(expected, self.utility_np, atol=atol, rtol=rtol)
+        if not np.all(matches):
+            bad_idx = np.where(~matches)[0]
+            first_bad = bad_idx[0]
+            raise DatasetSchemaError(
+                f"Utility identity violation at sample {first_bad}: "
+                f"delta_q={self.delta_q_np[first_bad]}, delta_t={self.delta_t_np[first_bad]}, "
+                f"oracle_u={self.utility_np[first_bad]}, expected={expected[first_bad]}"
+            )
+        return True
+
+    @classmethod
+    def from_oracle(
+        cls,
+        dataset_path: Optional[str] = None,
+        filter_invisible: bool = True,
+        verify_identity: bool = True,
+    ) -> "UtilityDataset":
+        """Canonical single source of truth factory for Phase 4 dataset."""
+        return load_canonical_oracle_dataset(
+            dataset_path=dataset_path,
+            filter_invisible=filter_invisible,
+            verify_identity=verify_identity,
+        )
+
 
 def load_canonical_oracle_dataset(
     dataset_path: Optional[str] = None,
     filter_invisible: bool = True,
+    verify_identity: bool = True,
+    atol: float = 1e-6,
+    rtol: float = 1e-4,
 ) -> UtilityDataset:
     """Load and canonically parse the Phase 3 Oracle Dataset.
     
     Args:
         dataset_path: Path to oracle_dataset.json. If None, resolves from repo root.
         filter_invisible: If True, retains only Gaussians with visible=True and n_influence_pixels > 0.
+        verify_identity: If True, asserts U_i* == Delta Q_i / Delta T_i for each sample.
+        atol: Absolute tolerance for identity assertion.
+        rtol: Relative tolerance for identity assertion.
         
     Returns:
         Canonical UtilityDataset instance.
@@ -456,25 +491,26 @@ def load_canonical_oracle_dataset(
         # 1. Extract 11 canonical features with strict validation
         x_vec = extract_feature_vector(row, strict=True)
 
-        # 2. Canonical global targets with strict validation (NO 0.0 fallbacks)
-        if "delta_quality_global" in row:
-            dq = float(row["delta_quality_global"])
-        elif "delta_quality" in row:
-            dq = float(row["delta_quality"])
-        else:
-            raise SchemaError(f"Row {idx} missing canonical label delta_quality_global")
+        # 2. Canonical global targets with strict validation (NO fallbacks)
+        if "delta_quality_global" not in row:
+            raise DatasetSchemaError(f"Row {idx} missing canonical label delta_quality_global")
+        dq = float(row["delta_quality_global"])
 
-        if "delta_time_ms" in row:
-            dt = float(row["delta_time_ms"])
-        else:
-            raise SchemaError(f"Row {idx} missing canonical label delta_time_ms")
+        if "delta_time_ms" not in row:
+            raise DatasetSchemaError(f"Row {idx} missing canonical label delta_time_ms")
+        dt = float(row["delta_time_ms"])
 
-        if "oracle_utility_joint_global" in row:
-            u = float(row["oracle_utility_joint_global"])
-        elif "oracle_utility_joint" in row:
-            u = float(row["oracle_utility_joint"])
-        else:
-            raise SchemaError(f"Row {idx} missing canonical label oracle_utility_joint_global")
+        if "oracle_utility_joint_global" not in row:
+            raise DatasetSchemaError(f"Row {idx} missing canonical label oracle_utility_joint_global")
+        u = float(row["oracle_utility_joint_global"])
+
+        # 2.1 Verify utility identity on each sample
+        if verify_identity:
+            expected_u = dq / dt
+            if not np.isclose(expected_u, u, atol=atol, rtol=rtol):
+                raise DatasetSchemaError(
+                    f"Row {idx}: Utility identity violation: expected dq/dt={expected_u:.8e}, got u={u:.8e}"
+                )
 
         # 3. Provenance metadata and split validation
         seed = int(row.get("dataset_seed", row.get("seed", 42)))

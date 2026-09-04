@@ -1,26 +1,26 @@
 {
+  "flat": {
+    "n_samples": 60,
+    "mean_oracle_u": 1.1164909352601171e-07,
+    "rho_error": 0.471964434565157,
+    "rho_learned": 0.22256182272853575
+  },
   "edge": {
     "n_samples": 60,
     "mean_oracle_u": 4.397573150072276e-07,
     "rho_error": 0.33053626007224235,
-    "rho_learned": -0.07513198110586275
-  },
-  "depth_discontinuity": {
-    "n_samples": 60,
-    "mean_oracle_u": 1.4773291923120269e-07,
-    "rho_error": -0.048235621005834964,
-    "rho_learned": -0.03762156154487359
+    "rho_learned": 0.01994998610725202
   },
   "texture": {
     "n_samples": 60,
     "mean_oracle_u": 1.3080035898838105e-07,
     "rho_error": 0.11253125868296751,
-    "rho_learned": 0.3459294248402335
+    "rho_learned": 0.12097804945818286
   },
-  "flat": {
+  "depth_discontinuity": {
     "n_samples": 60,
-    "mean_oracle_u": 1.1164909352601171e-07,
-    "rho_error": 0.471964434565157,
-    "rho_learned": 0.05746040566824119
+    "mean_oracle_u": 1.4773291923120269e-07,
+    "rho_error": -0.048235621005834964,
+    "rho_learned": 0.034898582939705484
   }
 }

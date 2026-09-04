@@ -30,7 +30,7 @@
   "seed_results": {
     "42": {
       "two_head_mlp": {
-        "val_rho": 0.189027408438535,
+        "val_rho": 0.354238371813949,
         "checkpoint": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/learned_utility/checkpoints/two_head_mlp_seed_42.pt"
       },
       "two_head_linear": {
@@ -100,8 +100,8 @@
     }
   },
   "validation_aggregate": {
-    "two_head_mlp_rho_mean": 0.2151726971631546,
-    "two_head_mlp_rho_std": 0.053548203055342095,
+    "two_head_mlp_rho_mean": 0.24821488983823742,
+    "two_head_mlp_rho_std": 0.07420755151867113,
     "two_head_linear_rho_mean": 0.24644001344021502,
     "two_head_linear_rho_std": 0.1419576966368514,
     "direct_linear_rho_mean": -0.02545292564681035,

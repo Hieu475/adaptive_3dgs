@@ -1,5 +1,5 @@
 {
-  "budgets": [
+  "protocol_budgets": [
     0.1,
     0.2,
     0.4,
@@ -17,69 +17,149 @@
     "B6: Two-Head Linear",
     "B7: Two-Head MLP (Ours)"
   ],
-  "two_head_mlp_budget_performance": {
+  "two_head_mlp_budget_sweep": {
     "10pct": {
       "budget_fraction": 0.1,
       "ranking_selection": {
-        "ose_mean": 0.38560913334976565,
-        "ose_std": 0.09875733136499035,
-        "ose_ci_95": 0.08656461763376748,
-        "realized_delta_q_mean": 0.0005523801723029464,
-        "realized_delta_q_std": 0.00014146861938068173,
-        "overlap_mean": 0.192,
-        "regret_mean": 0.0008800970914307982
+        "ndcg_mean": 0.36461297697487216,
+        "ndcg_std": 0.052838406851363845,
+        "ndcg_ci_95": 0.04631490566063655,
+        "overlap_mean": 0.20800000000000002,
+        "overlap_std": 0.068818602136341,
+        "overlap_ci_95": 0.06032216441740132,
+        "regret_mean": 0.0008751924324315041,
+        "regret_std": 0.00013920071994625072,
+        "regret_ci_95": 0.00012201481074815717,
+        "ose_mean": 0.389033009514996,
+        "ose_std": 0.09717414141849143,
+        "ose_ci_95": 0.08517689045983447,
+        "realized_delta_q_mean": 0.0005572848313022405,
+        "realized_delta_q_std": 0.00013920071994625072,
+        "realized_delta_q_ci_95": 0.00012201481074815717
+      },
+      "budgeted_selection": {
+        "ose_mean": 0.35899961458241003,
+        "ose_std": 0.09730594586061021,
+        "ose_ci_95": 0.08529242214722157,
+        "realized_delta_q_mean": 0.0005627670616377145,
+        "realized_delta_q_std": 0.0001525366017329904,
+        "regret_mean": 0.001004820893285796
       },
       "oracle_delta_q": 0.0014324772637337446
     },
     "20pct": {
       "budget_fraction": 0.2,
       "ranking_selection": {
-        "ose_mean": 0.5142569057128078,
-        "ose_std": 0.07417047577047295,
-        "ose_ci_95": 0.06501328849254122,
-        "realized_delta_q_mean": 0.0010271615698002278,
-        "realized_delta_q_std": 0.00014814591982897958,
-        "overlap_mean": 0.368,
-        "regret_mean": 0.0009701989241875708
+        "ndcg_mean": 0.45656716077311127,
+        "ndcg_std": 0.06423146981375451,
+        "ndcg_ci_95": 0.05630136565692608,
+        "overlap_mean": 0.348,
+        "overlap_std": 0.0744043009509531,
+        "overlap_ci_95": 0.06521824529991588,
+        "regret_mean": 0.0010053949663415551,
+        "regret_std": 0.00020423457532977126,
+        "regret_ci_95": 0.00017901949836692264,
+        "ose_mean": 0.496635717125149,
+        "ose_std": 0.10225172342563849,
+        "ose_ci_95": 0.08962758732332424,
+        "realized_delta_q_mean": 0.0009919655276462436,
+        "realized_delta_q_std": 0.00020423457532977126,
+        "realized_delta_q_ci_95": 0.00017901949836692264
+      },
+      "budgeted_selection": {
+        "ose_mean": 0.48467159732487036,
+        "ose_std": 0.09688366594487206,
+        "ose_ci_95": 0.08492227748114921,
+        "realized_delta_q_mean": 0.0010250728810206056,
+        "realized_delta_q_std": 0.00020490744479788352,
+        "regret_mean": 0.001089901546947658
       },
       "oracle_delta_q": 0.0019973604939877987
     },
     "40pct": {
       "budget_fraction": 0.4,
       "ranking_selection": {
-        "ose_mean": 0.5906971570837607,
-        "ose_std": 0.07176407810972749,
-        "ose_ci_95": 0.06290398794241446,
-        "realized_delta_q_mean": 0.0014474597293883563,
-        "realized_delta_q_std": 0.00017585256985718227,
-        "overlap_mean": 0.496,
-        "regret_mean": 0.0010029563680291175
+        "ndcg_mean": 0.5479041969589484,
+        "ndcg_std": 0.040939170904132495,
+        "ndcg_ci_95": 0.03588476548097574,
+        "overlap_mean": 0.492,
+        "overlap_std": 0.07858753081755401,
+        "overlap_ci_95": 0.06888500794802888,
+        "regret_mean": 0.0009682197356596589,
+        "regret_std": 0.00012950645341152321,
+        "regret_ci_95": 0.00011351741147440558,
+        "ose_mean": 0.6048729089687361,
+        "ose_std": 0.05285058527086829,
+        "ose_ci_95": 0.04632558051599377,
+        "realized_delta_q_mean": 0.001482196361757815,
+        "realized_delta_q_std": 0.00012950645341152321,
+        "realized_delta_q_ci_95": 0.00011351741147440558
+      },
+      "budgeted_selection": {
+        "ose_mean": 0.5995224686512806,
+        "ose_std": 0.07068605435361414,
+        "ose_ci_95": 0.06195905845760305,
+        "realized_delta_q_mean": 0.0015062355203554034,
+        "realized_delta_q_std": 0.0001775910852861059,
+        "regret_mean": 0.0010061465902253986
       },
       "oracle_delta_q": 0.002450416097417474
     },
     "60pct": {
       "budget_fraction": 0.6,
       "ranking_selection": {
-        "ose_mean": 0.6582167598741583,
-        "ose_std": 0.09972507460191149,
-        "ose_ci_95": 0.08741288198147586,
-        "realized_delta_q_mean": 0.0017257273662835359,
-        "realized_delta_q_std": 0.0002614614224926279,
-        "overlap_mean": 0.6666666666666666,
-        "regret_mean": 0.0008960849139839411
+        "ndcg_mean": 0.6089490387486423,
+        "ndcg_std": 0.03931145965466489,
+        "ndcg_ci_95": 0.03445801366436787,
+        "overlap_mean": 0.6706666666666667,
+        "overlap_std": 0.07224649164876834,
+        "overlap_ci_95": 0.0633268420533066,
+        "regret_mean": 0.0008075899910181761,
+        "regret_std": 0.00018523615016213265,
+        "regret_ci_95": 0.0001623666444719318,
+        "ose_mean": 0.6919699717649112,
+        "ose_std": 0.07065168053390519,
+        "ose_ci_95": 0.061928928476176974,
+        "realized_delta_q_mean": 0.001814222289249301,
+        "realized_delta_q_std": 0.00018523615016213265,
+        "realized_delta_q_ci_95": 0.0001623666444719318
+      },
+      "budgeted_selection": {
+        "ose_mean": 0.6893811075237929,
+        "ose_std": 0.08685825702561192,
+        "ose_ci_95": 0.07613461910963544,
+        "realized_delta_q_mean": 0.0018207080429419875,
+        "realized_delta_q_std": 0.00022939927630232602,
+        "regret_mean": 0.0008203581674024463
       },
       "oracle_delta_q": 0.002621812280267477
     },
     "80pct": {
       "budget_fraction": 0.8,
       "ranking_selection": {
-        "ose_mean": 0.8083163528553257,
-        "ose_std": 0.08912367224529474,
-        "ose_ci_95": 0.07812034310159702,
-        "realized_delta_q_mean": 0.002149259904399514,
-        "realized_delta_q_std": 0.00023697397017024082,
-        "overlap_mean": 0.8109999999999999,
-        "regret_mean": 0.0005096641834825277
+        "ndcg_mean": 0.67293548327635,
+        "ndcg_std": 0.04073799501385735,
+        "ndcg_ci_95": 0.03570842703826874,
+        "overlap_mean": 0.8039999999999999,
+        "overlap_std": 0.036523964735499334,
+        "overlap_ci_95": 0.0320146666389016,
+        "regret_mean": 0.00048688019160181284,
+        "regret_std": 0.00021579808897548451,
+        "regret_ci_95": 0.00018915536497458266,
+        "ose_mean": 0.8168851970341084,
+        "ose_std": 0.0811596233088189,
+        "ose_ci_95": 0.07113954642074381,
+        "realized_delta_q_mean": 0.002172043896280229,
+        "realized_delta_q_std": 0.00021579808897548451,
+        "realized_delta_q_ci_95": 0.00018915536497458266
+      },
+      "budgeted_selection": {
+        "ose_mean": 0.8158668763060806,
+        "ose_std": 0.09470460384014476,
+        "ose_ci_95": 0.0830122453317505,
+        "realized_delta_q_mean": 0.002166108088567853,
+        "realized_delta_q_std": 0.00025143857945495417,
+        "regret_mean": 0.0004888592753559351
       },
       "oracle_delta_q": 0.002658924087882042
     }

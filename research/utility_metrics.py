@@ -15,8 +15,9 @@ Addresses:
       * OSE@k (Optimization Selection Efficiency: Gain_pred / Gain_oracle)
       * Realized Delta Q@k
 """
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union, Any
 import numpy as np
+import torch
 from scipy.stats import spearmanr, pearsonr
 
 
@@ -133,26 +134,36 @@ def rank_candidates(scores: np.ndarray) -> np.ndarray:
     return np.argsort(-scores)
 
 
-def select_under_budget(
-    scores: np.ndarray,
-    costs: np.ndarray,
+def select_candidates(
+    utility: Union[np.ndarray, torch.Tensor],
+    cost: Union[np.ndarray, torch.Tensor],
     budget: float,
 ) -> Tuple[List[int], float]:
-    """Greedy selection under budget:
+    """Greedy budget-constrained candidate selection for Phase 4 & Phase 5:
+    
+    argmax_{S} sum_{i in S} utility_i  s.t.  sum_{i in S} cost_i <= budget
     
     Sorts candidates descending by utility score, and selects items while
     cumulative cost <= budget.
     Returns (selected_indices, realized_cost).
     """
-    ranked = rank_candidates(scores)
+    if isinstance(utility, torch.Tensor):
+        utility = utility.detach().cpu().numpy()
+    if isinstance(cost, torch.Tensor):
+        cost = cost.detach().cpu().numpy()
+
+    ranked = rank_candidates(utility)
     selected = []
     cur_cost = 0.0
     for idx in ranked:
-        c = float(costs[idx])
+        c = float(cost[idx])
         if cur_cost + c <= budget + 1e-7:
             selected.append(int(idx))
             cur_cost += c
     return selected, cur_cost
+
+
+select_under_budget = select_candidates
 
 
 def evaluate_rq2_selection(
@@ -241,3 +252,132 @@ def evaluate_utility_complete(
     combined = dict(res_rq1)
     combined.update(res_rq2)
     return combined
+
+
+def analyze_utility_prediction_failures(
+    pred_u: np.ndarray,
+    oracle_u: np.ndarray,
+    X_features: np.ndarray,
+    feature_names: List[str],
+    strata: List[str],
+    gaussian_ids: Optional[List[int]] = None,
+    threshold_quantile: float = 0.10,
+) -> Dict[str, Any]:
+    """Diagnoses systematic failure modes of the learned utility estimator.
+    
+    Identifies:
+      1. Over-predicted Gaussians: U_hat_i >> U_i* (top residual quantile)
+      2. Under-predicted Gaussians: U_hat_i << U_i* (bottom residual quantile)
+      3. Geometry stratum breakdown: flat, edge, texture, depth_discontinuity
+      4. Feature profile anomalies: which Gaussian states drive systematic misprediction.
+    """
+    if isinstance(pred_u, torch.Tensor):
+        pred_u = pred_u.detach().cpu().numpy()
+    if isinstance(oracle_u, torch.Tensor):
+        oracle_u = oracle_u.detach().cpu().numpy()
+    if isinstance(X_features, torch.Tensor):
+        X_features = X_features.detach().cpu().numpy()
+
+    n = len(pred_u)
+    residuals = pred_u - oracle_u
+    abs_residuals = np.abs(residuals)
+
+    q_high = (1.0 - threshold_quantile) * 100.0
+    q_low = threshold_quantile * 100.0
+    cutoff_high = float(np.percentile(residuals, q_high))
+    cutoff_low = float(np.percentile(residuals, q_low))
+
+    over_idx = np.where(residuals >= cutoff_high)[0].tolist()
+    under_idx = np.where(residuals <= cutoff_low)[0].tolist()
+    calib_idx = np.where((residuals > cutoff_low) & (residuals < cutoff_high))[0].tolist()
+
+    # Strata breakdown
+    unique_strata = sorted(list(set(strata)))
+    strata_analysis = {}
+
+    for st in unique_strata:
+        st_indices = [i for i, s in enumerate(strata) if s == st]
+        n_st = len(st_indices)
+        if n_st == 0:
+            continue
+
+        st_over = [i for i in st_indices if i in over_idx]
+        st_under = [i for i in st_indices if i in under_idx]
+        st_res = residuals[st_indices]
+
+        strata_analysis[st] = {
+            "total_samples": n_st,
+            "fraction_of_dataset": float(n_st / n),
+            "n_over_predicted": len(st_over),
+            "n_under_predicted": len(st_under),
+            "over_prediction_rate": float(len(st_over) / n_st),
+            "under_prediction_rate": float(len(st_under) / n_st),
+            "mean_residual": float(np.mean(st_res)),
+            "std_residual": float(np.std(st_res)),
+            "mae_utility": float(np.mean(np.abs(st_res))),
+            "mean_oracle_utility": float(np.mean(oracle_u[st_indices])),
+            "mean_predicted_utility": float(np.mean(pred_u[st_indices])),
+        }
+
+    # Feature profile comparison across regimes
+    feature_profiles = {}
+    for f_idx, f_name in enumerate(feature_names):
+        f_vals = X_features[:, f_idx]
+        mean_all = float(np.mean(f_vals))
+        std_all = float(np.std(f_vals)) + 1e-7
+
+        mean_over = float(np.mean(f_vals[over_idx])) if len(over_idx) > 0 else mean_all
+        mean_under = float(np.mean(f_vals[under_idx])) if len(under_idx) > 0 else mean_all
+        mean_calib = float(np.mean(f_vals[calib_idx])) if len(calib_idx) > 0 else mean_all
+
+        # Standardized z-shift
+        z_shift_over = (mean_over - mean_all) / std_all
+        z_shift_under = (mean_under - mean_all) / std_all
+
+        feature_profiles[f_name] = {
+            "mean_overall": mean_all,
+            "mean_over_predicted": mean_over,
+            "mean_under_predicted": mean_under,
+            "mean_calibrated": mean_calib,
+            "z_shift_over_predicted": float(z_shift_over),
+            "z_shift_under_predicted": float(z_shift_under),
+        }
+
+    # Identify primary drivers of misprediction
+    sorted_by_over_shift = sorted(
+        feature_profiles.items(),
+        key=lambda x: abs(x[1]["z_shift_over_predicted"]),
+        reverse=True,
+    )
+    sorted_by_under_shift = sorted(
+        feature_profiles.items(),
+        key=lambda x: abs(x[1]["z_shift_under_predicted"]),
+        reverse=True,
+    )
+
+    key_over_drivers = [
+        {"feature": name, "z_shift": data["z_shift_over_predicted"]}
+        for name, data in sorted_by_over_shift[:3]
+    ]
+    key_under_drivers = [
+        {"feature": name, "z_shift": data["z_shift_under_predicted"]}
+        for name, data in sorted_by_under_shift[:3]
+    ]
+
+    return {
+        "n_samples": n,
+        "threshold_quantile": threshold_quantile,
+        "cutoff_over_predicted": cutoff_high,
+        "cutoff_under_predicted": cutoff_low,
+        "counts": {
+            "n_over_predicted": len(over_idx),
+            "n_under_predicted": len(under_idx),
+            "n_calibrated": len(calib_idx),
+        },
+        "strata_analysis": strata_analysis,
+        "feature_profiles": feature_profiles,
+        "systematic_drivers": {
+            "over_prediction_drivers": key_over_drivers,
+            "under_prediction_drivers": key_under_drivers,
+        },
+    }

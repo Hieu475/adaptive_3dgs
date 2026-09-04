@@ -57,6 +57,33 @@ def pairwise_utility_loss(
     return (pair_weights * torch.log1p(torch.exp(-diff_pred.clamp(-15.0, 15.0)))).mean()
 
 
+def two_head_loss(
+    pred_q: torch.Tensor,
+    pred_t: torch.Tensor,
+    pred_u: torch.Tensor,
+    target_q: torch.Tensor,
+    target_t: torch.Tensor,
+    pairs_i: torch.Tensor,
+    pairs_j: torch.Tensor,
+    pair_weights: torch.Tensor,
+    lambda_rank: float = 1.0,
+    lambda_q: float = 0.25,
+    lambda_t: float = 0.125,
+) -> Tuple[torch.Tensor, Dict[str, float]]:
+    """Functional two-head loss: L = lambda_rank * L_rank + lambda_q * L_q + lambda_t * L_t."""
+    l_rank = pairwise_utility_loss(pred_u, pairs_i, pairs_j, pair_weights)
+    l_q = quality_loss(pred_q, target_q)
+    l_t = cost_loss(pred_t, target_t)
+    total = lambda_rank * l_rank + lambda_q * l_q + lambda_t * l_t
+    metrics = {
+        "loss_total": float(total.item()),
+        "loss_rank": float(l_rank.item()),
+        "loss_quality": float(l_q.item()),
+        "loss_cost": float(l_t.item()),
+    }
+    return total, metrics
+
+
 class PairwiseRankingLoss(nn.Module):
     """Encapsulates pair mining and pairwise ranking loss computation."""
     def __init__(self, margin_eps: float = 1e-5, max_pairs: int = 25000):

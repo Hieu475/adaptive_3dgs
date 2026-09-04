@@ -165,6 +165,8 @@ class SchemaError(ValueError):
     """Raised when a dataset row violates the canonical schema contract."""
     pass
 
+DatasetSchemaError = SchemaError
+
 
 CANONICAL_FEATURE_NAMES: List[str] = [spec.name for spec in CANONICAL_FEATURE_SPECS]
 

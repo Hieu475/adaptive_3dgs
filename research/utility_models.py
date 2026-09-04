@@ -123,6 +123,9 @@ class TwoHeadLinear(nn.Module):
         return u
 
 
+LinearTwoHead = TwoHeadLinear
+
+
 class TwoHeadMLP(nn.Module):
     """B7: Two-head neural network predicting Quality Gain Delta Q and Cost Delta T independently.
     
