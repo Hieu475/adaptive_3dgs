@@ -315,9 +315,13 @@ class BudgetScheduler:
             )
             
         elif policy_str in ("learned_utility", OptimizationPolicy.LEARNED_UTILITY.value):
-            score_tensor = utility_scores if utility_scores is not None else importance_scores
             if cost_estimates is not None:
-                eff = score_tensor / (cost_estimates + 1e-6)
+                # If utility_scores (U_i = dQ/dT) is provided, it is already marginal efficiency.
+                # Otherwise, derive efficiency from importance / cost.
+                if utility_scores is not None:
+                    eff = utility_scores
+                else:
+                    eff = importance_scores / (cost_estimates + 1e-6)
                 _, order = torch.sort(eff, descending=True)
                 budget_us = self.gpu_budget_ms * 1000.0 * self.budget_allocation['optimize']
                 cum_cost = torch.cumsum(cost_estimates[order], dim=0)
@@ -326,6 +330,7 @@ class BudgetScheduler:
                 mask[selected] = True
                 return mask
             else:
+                score_tensor = utility_scores if utility_scores is not None else importance_scores
                 mask = torch.zeros(N, dtype=torch.bool, device=device)
                 _, top_indices = torch.topk(score_tensor[:N], min(K, score_tensor.shape[0]))
                 mask[top_indices] = True

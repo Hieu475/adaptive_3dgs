@@ -122,3 +122,19 @@ class TestOptimizationPolicies:
         budget_us = scheduler.gpu_budget_ms * 1000 * scheduler.budget_allocation['optimize']
         selected_cost = costs[mask].sum().item()
         assert selected_cost <= budget_us + max(costs).item()
+
+    def test_policy_5_learned_utility_cost_constraint(self, scheduler_setup):
+        scheduler, importance, tiers, confidence, costs, N = scheduler_setup
+        # Simulate learned marginal utility scores U_i
+        utility_scores = torch.rand(N)
+        mask = scheduler.select_by_policy(
+            OptimizationPolicy.LEARNED_UTILITY,
+            importance,
+            cost_estimates=costs,
+            utility_scores=utility_scores,
+        )
+        assert mask.shape == (N,)
+        assert mask.dtype == torch.bool
+        budget_us = scheduler.gpu_budget_ms * 1000.0 * scheduler.budget_allocation['optimize']
+        selected_cost = costs[mask].sum().item()
+        assert selected_cost <= budget_us, f"Selected cost {selected_cost} exceeds budget {budget_us}"
