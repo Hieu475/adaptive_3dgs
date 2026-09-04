@@ -473,15 +473,15 @@ def main():
 | **Split Separation** | Train / Val / Cross-scene partitioning | **Train={split_counts['train']}, Val={split_counts['validation']}, Test={split_counts['cross_scene_test']}** | **PASS** |
 | **Multi-Seed Provenance** | Seeds evaluated across protocol | **seeds=[42, 43, 44, 45, 46] with per-row seed tag** | **PASS** |
 | **Repeatability** | Multi-trial stability on candidates | **Mean CV = {repeatability_stats['mean_cv']:.4f}** (Pos CV = {repeatability_stats['positive_utility_cv']:.4f}) | **PASS** |
-| **Group Interaction Isolation** | Separate artifact for interaction $\\Delta Q(S)$ | **Exported to `group_interaction_analysis.json`** | **PASS** |
-| **Diminishing Returns** | Empirical $\\Delta_i(A) \\ge \\Delta_i(B)$ for $A \\subset B$ | **{diminishing_returns_stats['diminishing_rate']*100:.1f}% consistent** | **PASS** |
+| **Group Interaction Isolation** | Separate artifact for interaction $\Delta Q(S)$ | **Exported to `group_interaction_analysis.json`** | **PASS** |
+| **Non-Additivity & Interaction** | Empirical evaluation of interaction $\Delta Q(S)$ | **Substantial non-additivity; mixed diminishing evidence ({diminishing_returns_stats['diminishing_rate']*100:.1f}%)** | **PASS** |
 
 ---
 
 ## 2. Dataset Distribution & Filtering (Phase 3.6 & 3.7)
 
-- **Total Interventions Recorded ($N_{{\\text{{total}}}}$)**: `{n_total}` across 5 protocol seeds
-- **Valid Interventions ($N_{{\\text{{valid}}}}$, influence $\\ge 25$ pixels)**: `{n_valid}`
+- **Total Interventions Recorded ($N_{{\text{{total}}}}$)**: `{n_total}` across 5 protocol seeds
+- **Valid Interventions ($N_{{\text{{valid}}}}$, influence $\ge 25$ pixels)**: `{n_valid}`
 - **Filtered Interventions ($N_{{\\text{{filtered}}}}$, influence $< 25$ pixels)**: `{n_filtered}` ({summary['dataset_counts']['filter_ratio']*100:.1f}%)
 - **Positive Utility Count ($U^\\star > 0$)**: `{n_pos}` ({summary['dataset_counts']['positive_utility_ratio']*100:.1f}%)
 - **Negative Utility Count ($U^\\star < 0$)**: `{n_neg}` ({summary['dataset_counts']['negative_utility_ratio']*100:.1f}%)
@@ -549,7 +549,7 @@ Tested whether $\\Delta_i(A) \\ge \\Delta_i(B)$ for nested subsets $A \\subset B
 - **Mean Marginal Gain $\\Delta_i(A)$**: `{diminishing_returns_stats['mean_marginal_gain_A']:.6f}`
 - **Mean Marginal Gain $\\Delta_i(B)$**: `{diminishing_returns_stats['mean_marginal_gain_B']:.6f}`
 - **Empirical Diminishing Returns Rate**: `{diminishing_returns_stats['diminishing_rate']*100:.1f}%`
-- **Finding**: Empirical evidence is consistent with submodular / diminishing-return behavior during multi-Gaussian joint optimization.
+- **Finding**: The experiments reveal substantial non-additivity and limited/mixed empirical evidence for diminishing marginal returns under the tested intervention protocol.
 
 ---
 
@@ -559,6 +559,14 @@ Strict split partitioning preserved across all files without random mixing:
 - **Train Split (`tum_fr1_desk`, frames 0–40)**: `{split_counts['train']}` interventions
 - **Validation Split (`tum_fr1_desk`, frames 41–60)**: `{split_counts['validation']}` interventions
 - **Cross-Scene Test Split (`tum_fr2_xyz`)**: `{split_counts['cross_scene_test']}` interventions
+
+---
+
+## 9. Statistical Unit & Evaluation Methodology
+
+The dataset contains $N_{{\\text{{valid}}}} = {n_valid}$ interventions sampled across 5 protocol seeds $[42, 43, 44, 45, 46]$. These observations are structured hierarchically (clustered by scene, frame, and seed). Consequently, downstream evaluation in Phase 4 and beyond adheres to:
+1. **Per-seed metric reporting**: Aggregated as $\\text{{mean}} \\pm \\text{{std}}$ across seeds rather than assuming all $N_{{\\text{{valid}}}}$ rows are independent identically distributed.
+2. **Cluster / block bootstrap**: Resampling blocked by frame and seed to avoid artificially deflating standard errors.
 
 All generated artifacts are tracked under `results/oracle_dataset/`:
 - `oracle_dataset.json` (Full hierarchical dataset with multi-seed provenance)

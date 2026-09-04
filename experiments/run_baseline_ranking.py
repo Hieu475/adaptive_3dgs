@@ -134,7 +134,7 @@ def main():
     oracle_joint = np.array([r.get('oracle_utility_joint', r.get('oracle_utility', 0.0)) for r in visible])
     oracle_rgb = np.array([r.get('oracle_utility_rgb', 0.0) for r in visible])
     oracle_depth = np.array([r.get('oracle_utility_depth', 0.0) for r in visible])
-    delta_qs = np.array([r.get('delta_quality_local', 0.0) for r in visible])
+    delta_qs = np.array([r.get('delta_quality', r.get('delta_quality_global', 0.0)) for r in visible])
     
     # 1. Random Policy
     random_scores = np.random.rand(n)
@@ -152,8 +152,8 @@ def main():
     inf_mass = np.array([float(r.get('features', {}).get('influence_mass', r.get('influence_mass', 1.0))) for r in visible])
     error_inf_scores = error_scores * inf_mass
     
-    # 6. Temporal Drift Alone
-    temp_scores = np.array([float(r.get('features', {}).get('temporal_drift', 0.0)) for r in visible])
+    # 6. Temporal Position Drift Alone
+    temp_scores = np.array([float(r.get('features', {}).get('position_drift', r.get('features', {}).get('temporal_drift', 0.0))) for r in visible])
     
     # 7. Binary Tier Policy (RTG-SLAM stable/unstable)
     binary_scores = []

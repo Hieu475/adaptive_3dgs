@@ -242,28 +242,30 @@ def main():
     visible = [r for r in rows if r.get('visible', True) and r.get('n_influence_pixels', 0) > 0]
     print(f">> Loaded {len(visible)} visible samples from Oracle Dataset.\n")
     
-    # Feature ordering strictly aligned with factor taxonomy:
+    # Canonical feature schema strictly aligned with Protocol v1 taxonomy:
     # 0: appearance (rgb_error)
     # 1: geometry (depth_error)
     # 2: geometry gradient (gradient_norm)
-    # 3: visibility (visibility)
-    # 4: influence (influence_mass)
-    # 5: temporal (temporal_drift)
-    # 6: uncertainty (uncertainty)
-    # 7: cost / footprint (projected_area)
-    # 8: age (lifecycle)
-    # 9: update_frequency
+    # 3: visibility (visibility_count)
+    # 4: attribution (influence_mass)
+    # 5: temporal position drift (position_drift)
+    # 6: temporal residual drift (residual_drift_ema)
+    # 7: uncertainty (uncertainty_var)
+    # 8: cost / footprint (projected_area)
+    # 9: update frequency (update_frequency)
+    # 10: lifecycle (age)
     feature_names = [
         'rgb_error',          # 0: appearance
         'depth_error',        # 1: geometry
         'gradient_norm',      # 2: geometry gradient
-        'visibility',         # 3: visibility
+        'visibility_count',   # 3: visibility
         'influence_mass',     # 4: attribution
-        'temporal_drift',     # 5: temporal
-        'uncertainty',        # 6: uncertainty
-        'projected_area',     # 7: cost footprint
-        'age',                # 8: lifecycle
+        'position_drift',     # 5: temporal position drift
+        'residual_drift_ema', # 6: temporal residual drift
+        'uncertainty_var',    # 7: uncertainty
+        'projected_area',     # 8: cost footprint
         'update_frequency',   # 9: update frequency
+        'age',                # 10: lifecycle
     ]
     
     X_full = []
@@ -279,18 +281,20 @@ def main():
             float(f.get('rgb_error', 0.0)),
             float(f.get('depth_error', 0.0)),
             float(f.get('gradient_norm', 0.0)),
-            float(f.get('visibility', 0.0)),
+            float(f.get('visibility_count', f.get('visibility', 0.0))),
             float(f.get('influence_mass', r.get('influence_mass', 1.0))),
-            float(f.get('temporal_drift', 0.0)),
-            float(f.get('uncertainty', 0.5)),
+            float(f.get('position_drift', 0.0)),
+            float(f.get('residual_drift_ema', 0.0)),
+            float(f.get('uncertainty_var', f.get('uncertainty', 0.5))),
             float(f.get('projected_area', 1.0)),
+            float(f.get('update_frequency', 0.0)),
             float(f.get('age', 1.0)),
-            float(f.get('update_frequency', 0.5)),
         ]
         X_full.append(vec)
-        y_q.append(float(r.get('delta_quality_local', 0.0)))
-        y_t.append(float(r.get('measured_trial_cost_ms', 1.0)))
-        y_oracle.append(float(r.get('oracle_utility_joint', r.get('oracle_utility', 0.0))))
+        # Canonical global targets (MUST-FIX #4)
+        y_q.append(float(r.get('delta_quality', r.get('delta_quality_global', 0.0))))
+        y_t.append(float(r.get('delta_time_ms', r.get('measured_trial_cost_ms', 1.0))))
+        y_oracle.append(float(r.get('oracle_utility_joint', r.get('oracle_utility_joint_global', r.get('oracle_utility', 0.0)))))
         frames.append(int(r.get('frame', 0)))
         strata.append(r.get('geometry_stratum', 'unknown'))
         

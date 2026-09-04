@@ -81,8 +81,8 @@ def run_learned_utility_comparison():
         rgb_err = float(r.get('features', {}).get('rgb_error', 0.0))
         
         X.append([imp, inf, area, rgb_err, cost])
-        y_oracle.append(r.get('oracle_utility', 0.0))
-        y_delta_q.append(r.get('delta_quality_local', 0.0))
+        y_oracle.append(r.get('oracle_utility_joint', r.get('oracle_utility', 0.0)))
+        y_delta_q.append(r.get('delta_quality', r.get('delta_quality_global', 0.0)))
         imp_scores.append(imp)
         
     X_mat = torch.tensor(X, dtype=torch.float32)

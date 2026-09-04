@@ -1,48 +1,49 @@
 {
-  "protocol_version": "1.0.0",
   "fit_split": "train",
-  "train_frames": "0-40",
-  "provenance": "Fitted strictly on train split (frames 0-40) without val/test leakage per protocol_v1.yaml",
-  "n_train_samples": 240,
+  "n_train_samples": 625,
   "features": {
     "rgb_error": {
-      "mean": 0.3200896084308624,
-      "std": 0.24945737421512604
+      "mean": 0.26692014932632446,
+      "std": 0.23315930366516113
     },
     "depth_error": {
-      "mean": 0.30131450295448303,
-      "std": 0.4274340271949768
+      "mean": 0.3091384768486023,
+      "std": 0.5190215706825256
     },
     "gradient_norm": {
-      "mean": 5.678681373596191,
-      "std": 8.159432411193848
+      "mean": 4.687319755554199,
+      "std": 7.291189670562744
     },
-    "visibility": {
-      "mean": 0.000992404529824853,
-      "std": 0.0011151153594255447
+    "visibility_count": {
+      "mean": 82.25599670410156,
+      "std": 99.77377319335938
     },
     "influence_mass": {
-      "mean": 8.717608451843262,
-      "std": 9.589844703674316
+      "mean": 9.140732765197754,
+      "std": 11.655019760131836
     },
-    "temporal_drift": {
-      "mean": 0.7716363072395325,
-      "std": 0.4881060719490051
+    "position_drift": {
+      "mean": 0.0,
+      "std": 9.999999974752427e-07
     },
-    "uncertainty": {
-      "mean": 0.35397377610206604,
-      "std": 0.15298670530319214
+    "residual_drift_ema": {
+      "mean": 0.0,
+      "std": 9.999999974752427e-07
+    },
+    "uncertainty_var": {
+      "mean": 0.38038361072540283,
+      "std": 0.15806712210178375
     },
     "projected_area": {
-      "mean": 8.717608451843262,
-      "std": 9.589844703674316
-    },
-    "age": {
-      "mean": 25.429166793823242,
-      "std": 9.923304557800293
+      "mean": 9.140732765197754,
+      "std": 11.655019760131836
     },
     "update_frequency": {
-      "mean": 0.5,
+      "mean": 0.0,
+      "std": 9.999999974752427e-07
+    },
+    "age": {
+      "mean": 0.0,
       "std": 9.999999974752427e-07
     }
   }

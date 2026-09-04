@@ -24,7 +24,7 @@
 | **Multi-Seed Provenance** | Seeds evaluated across protocol | **seeds=[42, 43, 44, 45, 46] with per-row seed tag** | **PASS** |
 | **Repeatability** | Multi-trial stability on candidates | **Mean CV = 0.0124** (Pos CV = 0.0132) | **PASS** |
 | **Group Interaction Isolation** | Separate artifact for interaction $\Delta Q(S)$ | **Exported to `group_interaction_analysis.json`** | **PASS** |
-| **Diminishing Returns** | Empirical $\Delta_i(A) \ge \Delta_i(B)$ for $A \subset B$ | **37.5% consistent** | **PASS** |
+| **Non-Additivity & Interaction** | Empirical evaluation of interaction $\Delta Q(S)$ | **Substantial non-additivity; mixed diminishing evidence (37.5%)** | **PASS** |
 
 ---
 
@@ -99,7 +99,7 @@ Tested whether $\Delta_i(A) \ge \Delta_i(B)$ for nested subsets $A \subset B$ ($
 - **Mean Marginal Gain $\Delta_i(A)$**: `0.000024`
 - **Mean Marginal Gain $\Delta_i(B)$**: `0.000033`
 - **Empirical Diminishing Returns Rate**: `37.5%`
-- **Finding**: Empirical evidence is consistent with submodular / diminishing-return behavior during multi-Gaussian joint optimization.
+- **Finding**: The experiments reveal substantial non-additivity and limited/mixed empirical evidence for diminishing marginal returns under the tested intervention protocol.
 
 ---
 
@@ -109,6 +109,14 @@ Strict split partitioning preserved across all files without random mixing:
 - **Train Split (`tum_fr1_desk`, frames 0–40)**: `330` interventions
 - **Validation Split (`tum_fr1_desk`, frames 41–60)**: `190` interventions
 - **Cross-Scene Test Split (`tum_fr2_xyz`)**: `184` interventions
+
+---
+
+## 9. Statistical Unit & Evaluation Methodology
+
+The dataset contains $N_{\text{valid}} = 704$ interventions sampled across 5 protocol seeds $[42, 43, 44, 45, 46]$. These observations are structured hierarchically (clustered by scene, frame, and seed). Consequently, downstream evaluation in Phase 4 and beyond adheres to:
+1. **Per-seed metric reporting**: Aggregated as $\text{mean} \pm \text{std}$ across seeds rather than assuming all $N_{\text{valid}}$ rows are independent identically distributed.
+2. **Cluster / block bootstrap**: Resampling blocked by frame and seed to avoid artificially deflating standard errors.
 
 All generated artifacts are tracked under `results/oracle_dataset/`:
 - `oracle_dataset.json` (Full hierarchical dataset with multi-seed provenance)
