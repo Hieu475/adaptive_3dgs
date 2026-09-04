@@ -1,40 +1,64 @@
 """Loss Functions for Learned Utility Estimation and Learning-to-Rank (Phase 4).
 
-Provides:
-  - PointwiseTwoHeadLoss: SmoothL1 loss on Quality (Delta Q) and Cost (Delta T).
-  - PairwiseRankingLoss: Logistic pairwise ranking loss on derived utility.
-  - JointRankingAndPointwiseLoss: Combined ranking + calibration loss.
-  - DirectUtilityRegressionLoss: Direct regression loss on utility U* (for single-head models).
+Provides modular loss functions decoupled by component:
+  - quality_loss: SmoothL1 loss on quality head (Delta Q).
+  - cost_loss: SmoothL1 loss on execution cost head (Delta T).
+  - pairwise_utility_loss: Pairwise margin-weighted logistic ranking loss on U_hat.
+  - TwoHeadUtilityLoss: Configurable total loss:
+      L = lambda_rank * L_rank + lambda_q * L_q + lambda_t * L_t
+  - DirectUtilityRegressionLoss: Direct SmoothL1 loss on U* (for single-head baselines).
 """
+from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
 import torch
 import torch.nn as nn
 
 
-class PointwiseTwoHeadLoss(nn.Module):
-    """Calibrates independent quality and cost heads with Smooth L1 regression."""
-    def __init__(self, cost_weight: float = 0.5):
-        super().__init__()
-        self.cost_weight = cost_weight
-        self.loss_fn = nn.SmoothL1Loss()
+@dataclass
+class LossConfig:
+    """Hyperparameters and weighting for two-head utility objectives."""
+    lambda_rank: float = 1.0
+    lambda_q: float = 0.25
+    lambda_t: float = 0.125
+    margin_eps: float = 1e-5
+    max_pairs: int = 25000
 
-    def forward(
-        self,
-        pred_q: torch.Tensor,
-        pred_t: torch.Tensor,
-        target_q: torch.Tensor,
-        target_t: torch.Tensor,
-    ) -> torch.Tensor:
-        loss_q = self.loss_fn(pred_q, target_q)
-        loss_t = self.loss_fn(pred_t, target_t)
-        return loss_q + self.cost_weight * loss_t
+
+def quality_loss(
+    pred_q: torch.Tensor,
+    target_q: torch.Tensor,
+    loss_fn: Optional[nn.Module] = None,
+) -> torch.Tensor:
+    """Pointwise reconstruction loss on Quality head."""
+    fn = loss_fn or nn.SmoothL1Loss()
+    return fn(pred_q, target_q)
+
+
+def cost_loss(
+    pred_t: torch.Tensor,
+    target_t: torch.Tensor,
+    loss_fn: Optional[nn.Module] = None,
+) -> torch.Tensor:
+    """Pointwise reconstruction loss on Cost head."""
+    fn = loss_fn or nn.SmoothL1Loss()
+    return fn(pred_t, target_t)
+
+
+def pairwise_utility_loss(
+    pred_u: torch.Tensor,
+    pairs_i: torch.Tensor,
+    pairs_j: torch.Tensor,
+    pair_weights: torch.Tensor,
+) -> torch.Tensor:
+    """Margin-weighted logistic pairwise ranking loss."""
+    if len(pairs_i) == 0:
+        return torch.tensor(0.0, device=pred_u.device, requires_grad=True)
+    diff_pred = pred_u[pairs_i] - pred_u[pairs_j]
+    return (pair_weights * torch.log1p(torch.exp(-diff_pred.clamp(-15.0, 15.0)))).mean()
 
 
 class PairwiseRankingLoss(nn.Module):
-    """Pairwise margin-weighted logistic ranking loss over utility values.
-    
-    Pairs (i, j) are formed whenever target_u[i] - target_u[j] > margin_eps.
-    """
+    """Encapsulates pair mining and pairwise ranking loss computation."""
     def __init__(self, margin_eps: float = 1e-5, max_pairs: int = 25000):
         super().__init__()
         self.margin_eps = margin_eps
@@ -81,29 +105,23 @@ class PairwiseRankingLoss(nn.Module):
         pairs_j: torch.Tensor,
         pair_weights: torch.Tensor,
     ) -> torch.Tensor:
-        if len(pairs_i) == 0:
-            return torch.tensor(0.0, device=pred_u.device, requires_grad=True)
-            
-        diff_pred = pred_u[pairs_i] - pred_u[pairs_j]
-        loss_pair = (pair_weights * torch.log1p(torch.exp(-diff_pred.clamp(-15.0, 15.0)))).mean()
-        return loss_pair
+        return pairwise_utility_loss(pred_u, pairs_i, pairs_j, pair_weights)
 
 
-class JointRankingAndPointwiseLoss(nn.Module):
-    """Joint objective balancing pairwise ranking ordering with pointwise metric calibration.
+class TwoHeadUtilityLoss(nn.Module):
+    """Canonical Two-Head Loss balancing ranking and pointwise calibration:
     
-    L_total = L_pairwise + lambda_pointwise * (L_q + cost_weight * L_t)
+    L = lambda_rank * L_rank + lambda_q * L_q + lambda_t * L_t
     """
-    def __init__(
-        self,
-        lambda_pointwise: float = 0.25,
-        cost_weight: float = 0.5,
-        margin_eps: float = 1e-5,
-    ):
+    def __init__(self, config: Optional[LossConfig] = None):
         super().__init__()
-        self.lambda_pointwise = lambda_pointwise
-        self.pointwise_loss = PointwiseTwoHeadLoss(cost_weight=cost_weight)
-        self.ranking_loss = PairwiseRankingLoss(margin_eps=margin_eps)
+        self.config = config or LossConfig()
+        self.ranking_loss = PairwiseRankingLoss(
+            margin_eps=self.config.margin_eps,
+            max_pairs=self.config.max_pairs,
+        )
+        self.loss_fn_q = nn.SmoothL1Loss()
+        self.loss_fn_t = nn.SmoothL1Loss()
 
     def forward(
         self,
@@ -116,17 +134,62 @@ class JointRankingAndPointwiseLoss(nn.Module):
         pairs_j: torch.Tensor,
         pair_weights: torch.Tensor,
     ) -> Tuple[torch.Tensor, Dict[str, float]]:
-        loss_pt = self.pointwise_loss(pred_q, pred_t, target_q, target_t)
-        loss_pair = self.ranking_loss(pred_u, pairs_i, pairs_j, pair_weights)
+        l_rank = pairwise_utility_loss(pred_u, pairs_i, pairs_j, pair_weights)
+        l_q = quality_loss(pred_q, target_q, self.loss_fn_q)
+        l_t = cost_loss(pred_t, target_t, self.loss_fn_t)
         
-        total_loss = loss_pair + self.lambda_pointwise * loss_pt
+        total_loss = (
+            self.config.lambda_rank * l_rank +
+            self.config.lambda_q * l_q +
+            self.config.lambda_t * l_t
+        )
         
         metrics = {
             "loss_total": float(total_loss.item()),
-            "loss_pairwise": float(loss_pair.item()),
-            "loss_pointwise": float(loss_pt.item()),
+            "loss_rank": float(l_rank.item()),
+            "loss_pairwise": float(l_rank.item()),
+            "loss_quality": float(l_q.item()),
+            "loss_cost": float(l_t.item()),
+            "loss_pointwise": float((self.config.lambda_q * l_q + self.config.lambda_t * l_t).item()),
         }
         return total_loss, metrics
+
+
+# Backward-compatible alias
+class JointRankingAndPointwiseLoss(TwoHeadUtilityLoss):
+    """Backward-compatible wrapper for TwoHeadUtilityLoss."""
+    def __init__(
+        self,
+        lambda_pointwise: float = 0.25,
+        cost_weight: float = 0.5,
+        margin_eps: float = 1e-5,
+    ):
+        config = LossConfig(
+            lambda_rank=1.0,
+            lambda_q=lambda_pointwise,
+            lambda_t=lambda_pointwise * cost_weight,
+            margin_eps=margin_eps,
+        )
+        super().__init__(config=config)
+
+
+class PointwiseTwoHeadLoss(nn.Module):
+    """Calibrates independent quality and cost heads with Smooth L1 regression."""
+    def __init__(self, cost_weight: float = 0.5):
+        super().__init__()
+        self.cost_weight = cost_weight
+        self.loss_fn = nn.SmoothL1Loss()
+
+    def forward(
+        self,
+        pred_q: torch.Tensor,
+        pred_t: torch.Tensor,
+        target_q: torch.Tensor,
+        target_t: torch.Tensor,
+    ) -> torch.Tensor:
+        loss_q = self.loss_fn(pred_q, target_q)
+        loss_t = self.loss_fn(pred_t, target_t)
+        return loss_q + self.cost_weight * loss_t
 
 
 class DirectUtilityRegressionLoss(nn.Module):

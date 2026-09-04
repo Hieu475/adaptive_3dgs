@@ -7,7 +7,7 @@ Handles:
   - Reproducible multi-seed training across protocol seeds.
   - Model serialization and checkpoint loading.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 import json
 from typing import Dict, List, Optional, Tuple, Any
@@ -18,7 +18,8 @@ import torch.optim as optim
 
 from research.utility_dataset import UtilityDataset
 from research.utility_losses import (
-    JointRankingAndPointwiseLoss,
+    LossConfig,
+    TwoHeadUtilityLoss,
     DirectUtilityRegressionLoss,
     PairwiseRankingLoss,
 )
@@ -31,10 +32,7 @@ class TrainingConfig:
     epochs: int = 200
     learning_rate: float = 0.005
     weight_decay: float = 1e-4
-    lambda_pointwise: float = 0.25
-    cost_weight: float = 0.5
-    margin_eps: float = 1e-5
-    max_pairs: int = 25000
+    loss_config: LossConfig = field(default_factory=LossConfig)
     device: str = "cpu"
 
 
@@ -52,7 +50,7 @@ class UtilityModelTrainer:
         val_ds: Optional[UtilityDataset] = None,
         seed: int = 42,
     ) -> Dict[str, Any]:
-        """Train a two-head model (TwoHeadMLP or TwoHeadLinear) using Joint Ranking & Pointwise Loss."""
+        """Train a two-head model (TwoHeadMLP or TwoHeadLinear) using TwoHeadUtilityLoss."""
         torch.manual_seed(seed)
         np.random.seed(seed)
         
@@ -63,11 +61,7 @@ class UtilityModelTrainer:
             weight_decay=self.config.weight_decay,
         )
 
-        loss_fn = JointRankingAndPointwiseLoss(
-            lambda_pointwise=self.config.lambda_pointwise,
-            cost_weight=self.config.cost_weight,
-            margin_eps=self.config.margin_eps,
-        )
+        loss_fn = TwoHeadUtilityLoss(config=self.config.loss_config)
 
         # Precompute pairwise constraints on train targets
         X_train = train_ds.X.to(self.device)
@@ -103,8 +97,9 @@ class UtilityModelTrainer:
             log_entry = {
                 "epoch": epoch,
                 "loss_total": loss_components["loss_total"],
-                "loss_pairwise": loss_components["loss_pairwise"],
-                "loss_pointwise": loss_components["loss_pointwise"],
+                "loss_rank": loss_components["loss_rank"],
+                "loss_quality": loss_components["loss_quality"],
+                "loss_cost": loss_components["loss_cost"],
             }
 
             # Optional validation step

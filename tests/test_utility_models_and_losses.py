@@ -92,3 +92,36 @@ def test_losses_joint_and_pairwise():
     assert "loss_total" in metrics
     assert "loss_pairwise" in metrics
     assert "loss_pointwise" in metrics
+
+
+def test_two_head_utility_loss_config():
+    from research.utility_losses import LossConfig, TwoHeadUtilityLoss
+    cfg = LossConfig(lambda_rank=2.0, lambda_q=0.5, lambda_t=0.25)
+    loss_fn = TwoHeadUtilityLoss(config=cfg)
+    assert loss_fn.config.lambda_rank == 2.0
+    assert loss_fn.config.lambda_q == 0.5
+    assert loss_fn.config.lambda_t == 0.25
+
+
+def test_selection_metrics_and_budget():
+    from research.utility_metrics import (
+        PROTOCOL_BUDGETS,
+        rank_candidates,
+        select_under_budget,
+        compute_confidence_interval_95,
+    )
+    assert len(PROTOCOL_BUDGETS) == 5
+    assert PROTOCOL_BUDGETS == (0.10, 0.20, 0.40, 0.60, 0.80)
+
+    scores = np.array([0.1, 0.9, 0.4, 0.7])
+    ranked = rank_candidates(scores)
+    assert list(ranked) == [1, 3, 2, 0]
+
+    costs = np.array([10.0, 20.0, 15.0, 25.0])
+    selected, real_cost = select_under_budget(scores, costs, budget=45.0)
+    # Ranked order: index 1 (cost 20) -> index 3 (cost 25) -> sum = 45.0
+    assert selected == [1, 3]
+    assert real_cost == 45.0
+
+    ci = compute_confidence_interval_95(std=0.1, n=5)
+    assert np.isclose(ci, 1.96 * 0.1 / np.sqrt(5))

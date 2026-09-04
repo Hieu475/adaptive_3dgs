@@ -21,6 +21,8 @@ from torch.utils.data import Dataset
 
 from research.utility_features import (
     CANONICAL_FEATURE_NAMES,
+    UTILITY_FEATURES,
+    SchemaError,
     extract_feature_vector,
 )
 from research.protocol import (
@@ -208,20 +210,98 @@ class UtilityDataset(Dataset):
         return [m.seed for m in self._metadata]
 
     @property
+    def seed(self) -> List[int]:
+        """Singular alias for seeds."""
+        return self.seeds
+
+    @property
     def frames(self) -> List[int]:
         return [m.frame for m in self._metadata]
+
+    @property
+    def frame(self) -> List[int]:
+        """Singular alias for frames."""
+        return self.frames
 
     @property
     def scenes(self) -> List[str]:
         return [m.scene for m in self._metadata]
 
     @property
+    def scene(self) -> List[str]:
+        """Singular alias for scenes."""
+        return self.scenes
+
+    @property
     def geometry_strata(self) -> List[str]:
         return [m.geometry_stratum for m in self._metadata]
 
     @property
+    def geometry_stratum(self) -> List[str]:
+        """Singular alias for geometry_strata."""
+        return self.geometry_strata
+
+    @property
     def splits(self) -> List[str]:
         return [m.split for m in self._metadata]
+
+    @property
+    def split(self) -> List[str]:
+        """Singular alias for splits."""
+        return self.splits
+
+    def save_manifest(self, path: str) -> None:
+        """Saves a comprehensive dataset manifest JSON describing counts, splits, and distributions."""
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        split_counts = {}
+        for s in set(self.splits):
+            split_counts[s] = sum(1 for m in self._metadata if m.split == s)
+
+        manifest = {
+            "total_samples": len(self),
+            "feature_names": self.feature_names,
+            "split_counts": split_counts,
+            "target_statistics": {
+                "delta_q": {
+                    "min": float(self.delta_q_np.min()) if len(self) > 0 else 0.0,
+                    "max": float(self.delta_q_np.max()) if len(self) > 0 else 0.0,
+                    "mean": float(self.delta_q_np.mean()) if len(self) > 0 else 0.0,
+                    "std": float(self.delta_q_np.std()) if len(self) > 0 else 0.0,
+                },
+                "delta_t": {
+                    "min": float(self.delta_t_np.min()) if len(self) > 0 else 0.0,
+                    "max": float(self.delta_t_np.max()) if len(self) > 0 else 0.0,
+                    "mean": float(self.delta_t_np.mean()) if len(self) > 0 else 0.0,
+                    "std": float(self.delta_t_np.std()) if len(self) > 0 else 0.0,
+                },
+                "utility": {
+                    "min": float(self.utility_np.min()) if len(self) > 0 else 0.0,
+                    "max": float(self.utility_np.max()) if len(self) > 0 else 0.0,
+                    "mean": float(self.utility_np.mean()) if len(self) > 0 else 0.0,
+                    "std": float(self.utility_np.std()) if len(self) > 0 else 0.0,
+                    "negative_fraction": float(np.mean(self.utility_np < 0)) if len(self) > 0 else 0.0,
+                },
+            },
+            "split_breakdown": {
+                "train": {
+                    "scene": "tum_fr1_desk",
+                    "frame_range": [0, 40],
+                    "n_samples": split_counts.get("train", 0),
+                },
+                "validation": {
+                    "scene": "tum_fr1_desk",
+                    "frame_range": [41, 60],
+                    "n_samples": split_counts.get("validation", 0),
+                },
+                "cross_scene_test": {
+                    "scene": "tum_fr2_xyz",
+                    "evaluation_mode": "zero_shot_cross_scene",
+                    "n_samples": split_counts.get("cross_scene_test", 0),
+                },
+            },
+        }
+        with open(path, "w") as f:
+            json.dump(manifest, f, indent=2)
 
     # Numpy array accessors
     @property
@@ -373,18 +453,49 @@ def load_canonical_oracle_dataset(
         if filter_invisible and (not is_visible or n_pixels <= 0):
             continue
 
-        # Extract 11 canonical features
-        x_vec = extract_feature_vector(row)
+        # 1. Extract 11 canonical features with strict validation
+        x_vec = extract_feature_vector(row, strict=True)
 
-        # Canonical global targets (MUST-FIX #4 from Protocol v1)
-        dq = float(row.get("delta_quality", row.get("delta_quality_global", 0.0)))
-        dt = float(row.get("delta_time_ms", row.get("measured_trial_cost_ms", 1.0)))
-        u = float(row.get("oracle_utility_joint", row.get("oracle_utility_joint_global", row.get("oracle_utility", 0.0))))
+        # 2. Canonical global targets with strict validation (NO 0.0 fallbacks)
+        if "delta_quality_global" in row:
+            dq = float(row["delta_quality_global"])
+        elif "delta_quality" in row:
+            dq = float(row["delta_quality"])
+        else:
+            raise SchemaError(f"Row {idx} missing canonical label delta_quality_global")
 
+        if "delta_time_ms" in row:
+            dt = float(row["delta_time_ms"])
+        else:
+            raise SchemaError(f"Row {idx} missing canonical label delta_time_ms")
+
+        if "oracle_utility_joint_global" in row:
+            u = float(row["oracle_utility_joint_global"])
+        elif "oracle_utility_joint" in row:
+            u = float(row["oracle_utility_joint"])
+        else:
+            raise SchemaError(f"Row {idx} missing canonical label oracle_utility_joint_global")
+
+        # 3. Provenance metadata and split validation
         seed = int(row.get("dataset_seed", row.get("seed", 42)))
-        scene = str(row.get("scene", "tum_fr1_desk"))
+        scene = str(row.get("scene", ""))
         frame = int(row.get("frame", 0))
-        split = str(row.get("split", "train"))
+        split = str(row.get("split", ""))
+
+        if split == "train":
+            if scene != "tum_fr1_desk" or not (0 <= frame <= 40):
+                raise SchemaError(f"Row {idx}: Invalid train assignment (scene='{scene}', frame={frame})")
+        elif split in ("val", "validation"):
+            split = "validation"
+            if scene != "tum_fr1_desk" or not (41 <= frame <= 60):
+                raise SchemaError(f"Row {idx}: Invalid validation assignment (scene='{scene}', frame={frame})")
+        elif split in ("test", "cross_scene_test"):
+            split = "cross_scene_test"
+            if scene != "tum_fr2_xyz":
+                raise SchemaError(f"Row {idx}: Invalid cross_scene_test assignment (scene='{scene}', frame={frame})")
+        else:
+            raise SchemaError(f"Row {idx}: Unrecognized split '{split}'")
+
         gid = int(row.get("gaussian_id", 0))
         pid = row.get("persistent_id", gid)
         stratum = str(row.get("geometry_stratum", "unknown"))

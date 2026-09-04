@@ -117,9 +117,9 @@ def main():
             f"{m['ndcg_20pct']:>7.4f}  | {m['ose_20pct']:>6.3f} | {m['realized_delta_q_20pct']:>+11.6f}"
         )
 
-    # 2. Causal Chain Verification
+    # 2. Empirical Chain Verification
     print("\n" + "=" * 85)
-    print(">> Causal Chain Verification (Fidelity -> Selection Quality -> Realized Reconstruction Gain):")
+    print(">> Empirical Chain Verification (Fidelity -> Selection Quality -> Realized Reconstruction Gain):")
 
     df_chain = pd.DataFrame(ablation_rows)
     r_rho_ndcg, p_rho_ndcg = pearsonr(df_chain["spearman_rho"], df_chain["ndcg_20pct"])

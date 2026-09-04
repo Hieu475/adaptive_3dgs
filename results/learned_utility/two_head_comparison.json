@@ -1,0 +1,143 @@
+{
+  "ablation": [
+    {
+      "spearman_rho": 0.4766170451424596,
+      "overlap_10pct": 0.0,
+      "overlap_20pct": 0.2857142857142857,
+      "gain_ratio_20pct": 0.5482367291526067,
+      "regret_20pct": 0.4517632708473933,
+      "version": "V0: Error Only",
+      "n_features": 2
+    },
+    {
+      "spearman_rho": 0.4554884614410504,
+      "overlap_10pct": 0.0,
+      "overlap_20pct": 0.14285714285714285,
+      "gain_ratio_20pct": 0.3582706730729228,
+      "regret_20pct": 0.6417293269270772,
+      "version": "V1: + Visibility",
+      "n_features": 3
+    },
+    {
+      "spearman_rho": 0.37471027863139444,
+      "overlap_10pct": 0.0,
+      "overlap_20pct": 0.14285714285714285,
+      "gain_ratio_20pct": 0.24096835045848755,
+      "regret_20pct": 0.7590316495415125,
+      "version": "V2: + Influence",
+      "n_features": 4
+    },
+    {
+      "spearman_rho": 0.32124465524063334,
+      "overlap_10pct": 0.0,
+      "overlap_20pct": 0.14285714285714285,
+      "gain_ratio_20pct": 0.31461399766701914,
+      "regret_20pct": 0.6853860023329809,
+      "version": "V3: + Temporal Drift",
+      "n_features": 5
+    },
+    {
+      "spearman_rho": 0.3854926301902432,
+      "overlap_10pct": 0.0,
+      "overlap_20pct": 0.14285714285714285,
+      "gain_ratio_20pct": 0.2771061856367486,
+      "regret_20pct": 0.7228938143632514,
+      "version": "V4: + Uncertainty",
+      "n_features": 6
+    },
+    {
+      "spearman_rho": 0.17038141429947368,
+      "overlap_10pct": 0.0,
+      "overlap_20pct": 0.14285714285714285,
+      "gain_ratio_20pct": 0.2170144667402453,
+      "regret_20pct": 0.7829855332597547,
+      "version": "V5: + Gradient Norm",
+      "n_features": 7
+    },
+    {
+      "spearman_rho": 0.11330847174017926,
+      "overlap_10pct": 0.0,
+      "overlap_20pct": 0.14285714285714285,
+      "gain_ratio_20pct": 0.4614728509257401,
+      "regret_20pct": 0.5385271490742599,
+      "version": "V6: + Projected Area",
+      "n_features": 8
+    },
+    {
+      "spearman_rho": 0.5044449358711449,
+      "overlap_10pct": 0.0,
+      "overlap_20pct": 0.14285714285714285,
+      "gain_ratio_20pct": 0.3236972829315165,
+      "regret_20pct": 0.6763027170684834,
+      "version": "V7: Full State",
+      "n_features": 10
+    }
+  ],
+  "architectures": [
+    {
+      "spearman_rho": 0.4307525585711079,
+      "overlap_10pct": 0.3333333333333333,
+      "overlap_20pct": 0.7142857142857143,
+      "gain_ratio_20pct": 0.8707930048717546,
+      "regret_20pct": 0.1292069951282454,
+      "architecture": "Linear Two-Head",
+      "inference_latency_us_per_gaussian": 0.009514628000033554
+    },
+    {
+      "spearman_rho": 0.348299549004633,
+      "overlap_10pct": 0.3333333333333333,
+      "overlap_20pct": 0.14285714285714285,
+      "gain_ratio_20pct": 0.5107900634014335,
+      "regret_20pct": 0.4892099365985665,
+      "architecture": "MLP-Small (32)",
+      "inference_latency_us_per_gaussian": 0.16843042400068953
+    },
+    {
+      "spearman_rho": 0.11794645352829349,
+      "overlap_10pct": 0.0,
+      "overlap_20pct": 0.14285714285714285,
+      "gain_ratio_20pct": 0.3365717258535357,
+      "regret_20pct": 0.6634282741464643,
+      "architecture": "MLP-Medium (64, Regression)",
+      "inference_latency_us_per_gaussian": 0.09320365199891967
+    },
+    {
+      "spearman_rho": 0.43023722726131747,
+      "overlap_10pct": 0.0,
+      "overlap_20pct": 0.42857142857142855,
+      "gain_ratio_20pct": 0.6962599112493328,
+      "regret_20pct": 0.30374008875066716,
+      "architecture": "Two-Head Ranking MLP (Pairwise Loss)",
+      "inference_latency_us_per_gaussian": 0.08511257999998634
+    }
+  ],
+  "direct_comparison": [
+    {
+      "method": "Two-Head Regression (Smooth-L1)",
+      "spearman_rho": 0.11794645352829349,
+      "overlap_10pct": 0.0,
+      "overlap_20pct": 0.14285714285714285,
+      "gain_ratio_20pct": 0.3365717258535357,
+      "regret_20pct": 0.6634282741464643,
+      "inference_us": 0.09320365199891967
+    },
+    {
+      "method": "Two-Head + Pairwise Ranking (Ours)",
+      "spearman_rho": 0.43023722726131747,
+      "overlap_10pct": 0.0,
+      "overlap_20pct": 0.42857142857142855,
+      "gain_ratio_20pct": 0.6962599112493328,
+      "regret_20pct": 0.30374008875066716,
+      "inference_us": 0.08511257999998634
+    },
+    {
+      "method": "Oracle Upper Bound",
+      "spearman_rho": 1.0,
+      "overlap_10pct": 1.0,
+      "overlap_20pct": 1.0,
+      "gain_ratio_20pct": 1.0,
+      "regret_20pct": 0.0,
+      "inference_us": 15420.0
+    }
+  ]
+}

@@ -1,0 +1,169 @@
+{
+  "protocol_version": "1.0.0",
+  "eval_seed": 42,
+  "v0_v7_ablation": [
+    {
+      "version": "V0: RGB Error",
+      "inputs": 1,
+      "features": [
+        "rgb_error"
+      ],
+      "spearman_rho": -0.3215725051600825,
+      "delta_rho": -0.3215725051600825,
+      "ndcg_20pct": 0.16623502449499286,
+      "overlap_20pct": 0.0,
+      "ose_20pct": 0.042301936533878884,
+      "regret_20pct": 0.0019128678541164845,
+      "realized_delta_q": 8.449263987131417e-05
+    },
+    {
+      "version": "V1: + Depth Error",
+      "inputs": 2,
+      "features": [
+        "rgb_error",
+        "depth_error"
+      ],
+      "spearman_rho": 0.271699323189171,
+      "delta_rho": 0.5932718283492535,
+      "ndcg_20pct": 0.5108956976072421,
+      "overlap_20pct": 0.5,
+      "ose_20pct": 0.5403602420470482,
+      "regret_20pct": 0.0009180608903989196,
+      "realized_delta_q": 0.0010792996035888791
+    },
+    {
+      "version": "V2: + Gradient Norm",
+      "inputs": 3,
+      "features": [
+        "rgb_error",
+        "depth_error",
+        "gradient_norm"
+      ],
+      "spearman_rho": -0.11042672682762923,
+      "delta_rho": -0.3821260500168002,
+      "ndcg_20pct": 0.3290985563595502,
+      "overlap_20pct": 0.2,
+      "ose_20pct": 0.26879444116237394,
+      "regret_20pct": 0.0014604784082621336,
+      "realized_delta_q": 0.0005368820857256651
+    },
+    {
+      "version": "V3: + Visibility",
+      "inputs": 4,
+      "features": [
+        "rgb_error",
+        "depth_error",
+        "gradient_norm",
+        "visibility_count"
+      ],
+      "spearman_rho": 0.10912878606057697,
+      "delta_rho": 0.21955551288820618,
+      "ndcg_20pct": 0.39410368624818415,
+      "overlap_20pct": 0.28,
+      "ose_20pct": 0.3811331852191163,
+      "regret_20pct": 0.0012360963155515492,
+      "realized_delta_q": 0.0007612641784362495
+    },
+    {
+      "version": "V4: + Influence Mass",
+      "inputs": 5,
+      "features": [
+        "rgb_error",
+        "depth_error",
+        "gradient_norm",
+        "visibility_count",
+        "influence_mass"
+      ],
+      "spearman_rho": 0.15677169044721456,
+      "delta_rho": 0.0476429043866376,
+      "ndcg_20pct": 0.36936766743166083,
+      "overlap_20pct": 0.26,
+      "ose_20pct": 0.3915723970389575,
+      "regret_20pct": 0.0012152453418821096,
+      "realized_delta_q": 0.000782115152105689
+    },
+    {
+      "version": "V5: + Temporal State",
+      "inputs": 7,
+      "features": [
+        "rgb_error",
+        "depth_error",
+        "gradient_norm",
+        "visibility_count",
+        "influence_mass",
+        "position_drift",
+        "residual_drift_ema"
+      ],
+      "spearman_rho": -0.1381662051871969,
+      "delta_rho": -0.2949378956344115,
+      "ndcg_20pct": 0.44704862691050745,
+      "overlap_20pct": 0.26,
+      "ose_20pct": 0.43902839879824784,
+      "regret_20pct": 0.00112045812420547,
+      "realized_delta_q": 0.0008769023697823286
+    },
+    {
+      "version": "V6: + Uncertainty",
+      "inputs": 8,
+      "features": [
+        "rgb_error",
+        "depth_error",
+        "gradient_norm",
+        "visibility_count",
+        "influence_mass",
+        "position_drift",
+        "residual_drift_ema",
+        "uncertainty_var"
+      ],
+      "spearman_rho": 0.1335054960879374,
+      "delta_rho": 0.2716717012751343,
+      "ndcg_20pct": 0.48316957794873383,
+      "overlap_20pct": 0.42,
+      "ose_20pct": 0.513991146834056,
+      "regret_20pct": 0.0009707297431305051,
+      "realized_delta_q": 0.0010266307508572936
+    },
+    {
+      "version": "V7: + Cost & Lifecycle",
+      "inputs": 11,
+      "features": [
+        "rgb_error",
+        "depth_error",
+        "gradient_norm",
+        "visibility_count",
+        "influence_mass",
+        "position_drift",
+        "residual_drift_ema",
+        "uncertainty_var",
+        "projected_area",
+        "update_frequency",
+        "age"
+      ],
+      "spearman_rho": 0.21231354101665623,
+      "delta_rho": 0.07880804492871882,
+      "ndcg_20pct": 0.5011145209397252,
+      "overlap_20pct": 0.44,
+      "ose_20pct": 0.5898343373600337,
+      "regret_20pct": 0.0008192427922040224,
+      "realized_delta_q": 0.0011781177017837763
+    }
+  ],
+  "causal_chain_correlations": {
+    "corr_rho_to_ndcg": {
+      "r": 0.8094885875757057,
+      "p": 0.014910514556869797
+    },
+    "corr_ndcg_to_delta_q": {
+      "r": 0.9877329000818393,
+      "p": 4.572581618863098e-06
+    },
+    "corr_ose_to_delta_q": {
+      "r": 1.0,
+      "p": 0.0
+    },
+    "corr_rho_to_delta_q": {
+      "r": 0.8541269207217902,
+      "p": 0.006935847103858787
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # Online RGB-D 3D Gaussian Splatting with Marginal Utility Estimation under Compute Budget
 
-[![Tests](https://img.shields.io/badge/tests-180%20passed-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-239%20passed-brightgreen.svg)](tests/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-orange.svg)](https://pytorch.org/)
 [![CUDA](https://img.shields.io/badge/CUDA-Custom%20C%2B%2B%2FCUDA-green.svg)](csrc/)
@@ -37,7 +37,7 @@ where $\Delta Q_i = w_{rgb} \Delta\text{PSNR}_i + w_{depth} \Delta\text{Depth}_i
 
 ### Gate 1: Measurability, Headroom & Group Non-Additivity
 - **Measurability:** Evaluated on real TUM RGB-D (`rgbd_dataset_freiburg1_desk`), confirming strictly positive variance $\text{Var}(U^\star) > 0$.
-- **Negative Utility:** **$8.3\%$** of counterfactual interventions degraded quality ($U^\star < 0$). Optimizing flat regions produced mean negative utility ($-0.0002$), providing evidence that unconstrained optimization wastes compute on converged surfaces.
+- **Negative Utility:** **$20.5\%$** of counterfactual interventions degraded quality ($U^\star < 0$, 144/704 valid samples across 5 seeds). Optimizing flat regions produced frequent negative utility, providing evidence that unconstrained optimization wastes compute on converged surfaces.
 - **Optimization Headroom:** Headroom $H = \Delta Q(S^\star_K) - \Delta Q(S_{\text{random}}) = \mathbf{+0.000149} > 0$ ($\Delta\text{PSNR Headroom} = \mathbf{+0.0014\text{ dB}}$).
 - **Group Non-Additivity ($R_{add}$):** Direct measurement of joint interaction ratio $R_{add}(S) = \frac{\Delta Q(S)}{\sum_{i \in S} \Delta Q_i}$:
   $$R_{add}(g=4) = \mathbf{0.2249} \ll 1.0, \quad R_{add}(g=16) = \mathbf{0.0048} \ll 1.0$$
@@ -80,7 +80,10 @@ adaptive_3dgs/
 ├── experiments/                    # Scientific evaluation scripts
 │   ├── run_gate1_headroom.py       # Gate 1 & Headroom verification
 │   ├── run_baseline_ranking.py     # Phase 3 Heuristic utility benchmark
-│   ├── run_learned_utility_two_head.py # Phase 4 Two-Head ranking & feature ablation
+│   ├── train_utility_model.py      # Phase 4 Two-Head utility training (5 seeds)
+│   ├── eval_utility_model.py       # Phase 4 RQ1 prediction fidelity & RQ2 selection benchmark
+│   ├── eval_selection.py           # Phase 4 RQ2 budget-constrained selection sweep (10%-80%)
+│   ├── run_feature_ablation.py     # Phase 4 V0-V7 feature ablation ladder
 │   ├── run_phase6_budget_sweep.py  # Phase 6 Budget sweep (10% to 80%)
 │   ├── run_phase7_online_trajectory.py # Phase 7 50-frame online trajectory
 │   ├── run_phase8_generalization.py# Phase 8 Zero-shot cross-viewpoint transfer
@@ -88,6 +91,12 @@ adaptive_3dgs/
 ├── research/                       # Core algorithms & scientific modules
 │   ├── pipeline.py                 # Online RGB-D reconstruction pipeline
 │   ├── oracle_utility.py           # Counterfactual intervention engine (Gate 1)
+│   ├── utility_dataset.py          # Phase 4 canonical dataset loader & normalizer
+│   ├── utility_features.py         # Phase 4 11 canonical features & schema validation
+│   ├── utility_models.py           # Phase 4 TwoHeadMLP, TwoHeadLinear & baseline ladder
+│   ├── utility_losses.py           # Phase 4 TwoHeadUtilityLoss & pairwise ranking loss
+│   ├── utility_metrics.py          # Phase 4 RQ1/RQ2 evaluation & budget selection
+│   ├── utility_training.py         # Phase 4 multi-seed trainer
 │   ├── importance.py               # Pre-fusion normalized state estimation
 │   ├── scheduler.py                # Budget-constrained knapsack & learned utility scheduler
 │   └── gaussian_model.py           # 3D Gaussian scene representation
@@ -97,7 +106,7 @@ adaptive_3dgs/
 │   ├── budget_sweep/               # Budget sweep tables
 │   ├── online_trajectory/          # 50-frame trajectory metrics
 │   └── statistics/                 # Bootstrap CI & Cohen's d reports
-└── tests/                          # 180 unit and integration tests (100% passing)
+└── tests/                          # 239 unit and integration tests (100% passing)
 ```
 
 ---
@@ -117,8 +126,11 @@ python3 experiments/run_gate1_headroom.py
 # 2. Phase 3: Heuristic Utility Benchmark
 python3 experiments/run_baseline_ranking.py
 
-# 3. Phase 4: Two-Head Learned Utility Model & Geometry Strata Breakdown
-python3 experiments/run_learned_utility_two_head.py
+# 3. Phase 4: Two-Head Learned Utility Model & Evaluation
+python3 experiments/train_utility_model.py
+python3 experiments/eval_utility_model.py
+python3 experiments/eval_selection.py
+python3 experiments/run_feature_ablation.py
 
 # 4. Phase 6: Budget Sweep across Relative Capacities (10% - 80%)
 python3 experiments/run_phase6_budget_sweep.py

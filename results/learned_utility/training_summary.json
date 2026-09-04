@@ -1,0 +1,110 @@
+{
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "n_train": 375,
+  "n_val": 250,
+  "n_test": 250,
+  "feature_names": [
+    "rgb_error",
+    "depth_error",
+    "gradient_norm",
+    "visibility_count",
+    "influence_mass",
+    "position_drift",
+    "residual_drift_ema",
+    "uncertainty_var",
+    "projected_area",
+    "update_frequency",
+    "age"
+  ],
+  "loss_config": {
+    "lambda_rank": 1.0,
+    "lambda_q": 0.25,
+    "lambda_t": 0.125
+  },
+  "seed_results": {
+    "42": {
+      "two_head_mlp": {
+        "val_rho": 0.189027408438535,
+        "checkpoint": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/learned_utility/checkpoints/two_head_mlp_seed_42.pt"
+      },
+      "two_head_linear": {
+        "val_rho": 0.3628470215523448,
+        "checkpoint": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/learned_utility/checkpoints/two_head_linear_seed_42.pt"
+      },
+      "direct_linear": {
+        "val_rho": 0.027440695051120817,
+        "checkpoint": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/learned_utility/checkpoints/linear_direct_seed_42.pt"
+      }
+    },
+    "43": {
+      "two_head_mlp": {
+        "val_rho": 0.14725522008352132,
+        "checkpoint": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/learned_utility/checkpoints/two_head_mlp_seed_43.pt"
+      },
+      "two_head_linear": {
+        "val_rho": 0.3355603129650074,
+        "checkpoint": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/learned_utility/checkpoints/two_head_linear_seed_43.pt"
+      },
+      "direct_linear": {
+        "val_rho": -0.12190697451159217,
+        "checkpoint": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/learned_utility/checkpoints/linear_direct_seed_43.pt"
+      }
+    },
+    "44": {
+      "two_head_mlp": {
+        "val_rho": 0.2178347813565017,
+        "checkpoint": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/learned_utility/checkpoints/two_head_mlp_seed_44.pt"
+      },
+      "two_head_linear": {
+        "val_rho": 0.07365660250564009,
+        "checkpoint": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/learned_utility/checkpoints/two_head_linear_seed_44.pt"
+      },
+      "direct_linear": {
+        "val_rho": -0.01875140402246436,
+        "checkpoint": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/learned_utility/checkpoints/linear_direct_seed_44.pt"
+      }
+    },
+    "45": {
+      "two_head_mlp": {
+        "val_rho": 0.3101506264100225,
+        "checkpoint": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/learned_utility/checkpoints/two_head_mlp_seed_45.pt"
+      },
+      "two_head_linear": {
+        "val_rho": 0.07374031584505351,
+        "checkpoint": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/learned_utility/checkpoints/two_head_linear_seed_45.pt"
+      },
+      "direct_linear": {
+        "val_rho": 0.016119425910814573,
+        "checkpoint": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/learned_utility/checkpoints/linear_direct_seed_45.pt"
+      }
+    },
+    "46": {
+      "two_head_mlp": {
+        "val_rho": 0.21159544952719245,
+        "checkpoint": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/learned_utility/checkpoints/two_head_mlp_seed_46.pt"
+      },
+      "two_head_linear": {
+        "val_rho": 0.38639581433302933,
+        "checkpoint": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/learned_utility/checkpoints/two_head_linear_seed_46.pt"
+      },
+      "direct_linear": {
+        "val_rho": -0.030166370661930588,
+        "checkpoint": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/learned_utility/checkpoints/linear_direct_seed_46.pt"
+      }
+    }
+  },
+  "validation_aggregate": {
+    "two_head_mlp_rho_mean": 0.2151726971631546,
+    "two_head_mlp_rho_std": 0.053548203055342095,
+    "two_head_linear_rho_mean": 0.24644001344021502,
+    "two_head_linear_rho_std": 0.1419576966368514,
+    "direct_linear_rho_mean": -0.02545292564681035,
+    "direct_linear_rho_std": 0.052719078184219476
+  }
+}

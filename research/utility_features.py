@@ -161,11 +161,18 @@ CANONICAL_FEATURE_SPECS: List[FeatureSpec] = [
     ),
 ]
 
+class SchemaError(ValueError):
+    """Raised when a dataset row violates the canonical schema contract."""
+    pass
+
+
 CANONICAL_FEATURE_NAMES: List[str] = [spec.name for spec in CANONICAL_FEATURE_SPECS]
+
+UTILITY_FEATURES: Tuple[str, ...] = tuple(CANONICAL_FEATURE_NAMES)
 
 FEATURE_SPEC_BY_NAME: Dict[str, FeatureSpec] = {spec.name: spec for spec in CANONICAL_FEATURE_SPECS}
 
-# Feature ablation ladder V0-V7 (Phase 6)
+# Feature ablation ladder V0-V7 (Phase 6 taxonomy)
 ABLATION_SUBSETS: Dict[str, List[str]] = {
     "V0: RGB Error": [
         "rgb_error",
@@ -183,7 +190,7 @@ ABLATION_SUBSETS: Dict[str, List[str]] = {
         "rgb_error", "depth_error", "gradient_norm", "visibility_count",
         "influence_mass",
     ],
-    "V5: + Temporal Drift": [
+    "V5: + Temporal State": [
         "rgb_error", "depth_error", "gradient_norm", "visibility_count",
         "influence_mass", "position_drift", "residual_drift_ema",
     ],
@@ -191,7 +198,7 @@ ABLATION_SUBSETS: Dict[str, List[str]] = {
         "rgb_error", "depth_error", "gradient_norm", "visibility_count",
         "influence_mass", "position_drift", "residual_drift_ema", "uncertainty_var",
     ],
-    "V7: + Cost & Lifecycle (All 11)": [
+    "V7: + Cost & Lifecycle": [
         "rgb_error", "depth_error", "gradient_norm", "visibility_count",
         "influence_mass", "position_drift", "residual_drift_ema", "uncertainty_var",
         "projected_area", "update_frequency", "age",
@@ -209,29 +216,40 @@ def get_feature_specs() -> List[FeatureSpec]:
     return list(CANONICAL_FEATURE_SPECS)
 
 
-def extract_feature_vector(row: Dict[str, Any]) -> np.ndarray:
+def extract_feature_vector(row: Dict[str, Any], strict: bool = True) -> np.ndarray:
     """Extract canonical 11-dimensional feature vector s_i(t) from a raw oracle row.
     
-    Robust to flat or nested feature dictionaries, with explicit fallbacks for
-    legacy keys (e.g. visibility -> visibility_count).
+    Args:
+        row: Sample dictionary from oracle dataset.
+        strict: If True, raises SchemaError if any canonical feature is missing.
+                If False, falls back to legacy aliases or defaults.
     """
-    f = row.get("features", {})
-    if not isinstance(f, dict):
+    f = row.get("features")
+    if f is None or not isinstance(f, dict):
+        if strict:
+            raise SchemaError(f"Row {row.get('gaussian_id', '?')} is missing 'features' dictionary.")
         f = {}
-        
-    vec = [
-        float(f.get("rgb_error", row.get("rgb_error", 0.0))),
-        float(f.get("depth_error", row.get("depth_error", 0.0))),
-        float(f.get("gradient_norm", row.get("gradient_norm", 0.0))),
-        float(f.get("visibility_count", f.get("visibility", row.get("visibility_count", 0.0)))),
-        float(f.get("influence_mass", row.get("influence_mass", 1.0))),
-        float(f.get("position_drift", row.get("position_drift", 0.0))),
-        float(f.get("residual_drift_ema", row.get("residual_drift_ema", 0.0))),
-        float(f.get("uncertainty_var", f.get("uncertainty", row.get("uncertainty_var", 0.0)))),
-        float(f.get("projected_area", row.get("projected_area", 1.0))),
-        float(f.get("update_frequency", row.get("update_frequency", 0.0))),
-        float(f.get("age", row.get("age", 1.0))),
-    ]
+
+    if strict:
+        missing = [name for name in UTILITY_FEATURES if name not in f]
+        if missing:
+            raise SchemaError(f"Row {row.get('gaussian_id', '?')} missing required canonical features: {missing}")
+        vec = [float(f[name]) for name in UTILITY_FEATURES]
+    else:
+        vec = [
+            float(f.get("rgb_error", row.get("rgb_error", 0.0))),
+            float(f.get("depth_error", row.get("depth_error", 0.0))),
+            float(f.get("gradient_norm", row.get("gradient_norm", 0.0))),
+            float(f.get("visibility_count", f.get("visibility", row.get("visibility_count", 0.0)))),
+            float(f.get("influence_mass", row.get("influence_mass", 1.0))),
+            float(f.get("position_drift", row.get("position_drift", 0.0))),
+            float(f.get("residual_drift_ema", row.get("residual_drift_ema", 0.0))),
+            float(f.get("uncertainty_var", f.get("uncertainty", row.get("uncertainty_var", 0.0)))),
+            float(f.get("projected_area", row.get("projected_area", 1.0))),
+            float(f.get("update_frequency", row.get("update_frequency", 0.0))),
+            float(f.get("age", row.get("age", 1.0))),
+        ]
+
     return np.array(vec, dtype=np.float32)
 
 

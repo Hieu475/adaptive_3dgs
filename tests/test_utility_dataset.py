@@ -105,3 +105,27 @@ def test_prepare_normalized_splits_train_only_leakage_check():
 
     # Normalizer should record n_samples_fit equal to train length
     assert normalizer.n_samples_fit == len(train_norm)
+
+
+def test_schema_error_on_missing_feature():
+    from research.utility_features import SchemaError
+    bad_row = {
+        "features": {
+            "rgb_error": 0.5,
+            # missing other 10 features
+        }
+    }
+    with pytest.raises(SchemaError):
+        extract_feature_vector(bad_row, strict=True)
+
+
+def test_save_manifest(tmp_path):
+    dataset = load_canonical_oracle_dataset()
+    manifest_file = str(tmp_path / "manifest.json")
+    dataset.save_manifest(manifest_file)
+    import os, json
+    assert os.path.exists(manifest_file)
+    with open(manifest_file) as f:
+        data = json.load(f)
+    assert data["total_samples"] == len(dataset)
+    assert "target_statistics" in data

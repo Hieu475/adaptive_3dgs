@@ -1,0 +1,37 @@
+{
+  "1. Error-Only": {
+    "spearman_rho": 0.10371829553521283,
+    "overlap_10pct": 0.0,
+    "overlap_20pct": 0.0,
+    "gain_ratio_20pct": 0.4851318968885081,
+    "regret_10pct": 0.5148681031114919
+  },
+  "2. Error \u00d7 Influence": {
+    "spearman_rho": 0.09953881813291385,
+    "overlap_10pct": 0.0,
+    "overlap_20pct": 0.0,
+    "gain_ratio_20pct": 0.48513189688850805,
+    "regret_10pct": 0.5148681031114919
+  },
+  "3. Heuristic (Ours V6)": {
+    "spearman_rho": 0.10371829553521283,
+    "overlap_10pct": 0.0,
+    "overlap_20pct": 0.0,
+    "gain_ratio_20pct": 0.4851318968885081,
+    "regret_10pct": 0.5148681031114919
+  },
+  "4. Learned MLP (64\u219232\u21921)": {
+    "spearman_rho": 0.0544720937217098,
+    "overlap_10pct": 0.2,
+    "overlap_20pct": 0.4,
+    "gain_ratio_20pct": 0.5698280301993423,
+    "regret_10pct": 0.43017196980065775
+  },
+  "5. Oracle (Upper Bound)": {
+    "spearman_rho": 1.0,
+    "overlap_10pct": 1.0,
+    "overlap_20pct": 1.0,
+    "gain_ratio_20pct": 0.9999999867942947,
+    "regret_10pct": 1.3205705307051119e-08
+  }
+}

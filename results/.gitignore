@@ -16,4 +16,6 @@
 !state_validation/*.json
 !oracle_dataset/*.json
 !oracle_dataset/*.csv
+!learned_utility/*.json
+!learned_utility/**/*.json
 

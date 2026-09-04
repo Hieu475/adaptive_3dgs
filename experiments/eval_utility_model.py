@@ -326,13 +326,82 @@ def main():
             }
             print(f"{st.replace('_', ' ').title():<22} | {len(st_idx):<6} | {np.mean(u_st):>+10.4e} | {r_err:>+10.4f} | {r_b7:>+12.4f} 🚀")
 
-    # 8. Save Artifacts
+    # 8. Save Structured Artifacts in Canonical Directories
     out_dir = os.path.join(repo_root, "results", "learned_utility")
-    os.makedirs(out_dir, exist_ok=True)
+    rq1_dir = os.path.join(out_dir, "rq1")
+    baselines_dir = os.path.join(out_dir, "baselines")
+    geom_dir = os.path.join(out_dir, "geometry")
+    
+    os.makedirs(rq1_dir, exist_ok=True)
+    os.makedirs(baselines_dir, exist_ok=True)
+    os.makedirs(geom_dir, exist_ok=True)
+
+    # 8.1 RQ1 Artifacts
+    rq1_per_seed = {}
+    for seed in seeds:
+        b7_run = [r for i, r in enumerate(seed_runs["B7: Two-Head MLP (Ours)"]) if seeds[i] == seed]
+        if b7_run:
+            m = b7_run[0]
+            rq1_per_seed[str(seed)] = {
+                "spearman_rho": m["spearman_rho"],
+                "pearson_r": m.get("pearson_r", float("nan")),
+                "mae_delta_q": m.get("mae_delta_q", float("nan")),
+                "mae_delta_t": m.get("mae_delta_t", float("nan")),
+                "mae_utility": m["mae_utility"],
+                "calibration_ece": m.get("calibration_ece", float("nan")),
+                "calibration_slope": m.get("calibration_slope", float("nan")),
+            }
+
+    from research.utility_metrics import compute_confidence_interval_95
+
+    b7_runs = seed_runs["B7: Two-Head MLP (Ours)"]
+    rho_vals = [r["spearman_rho"] for r in b7_runs]
+    mae_q_vals = [r["mae_delta_q"] for r in b7_runs if "mae_delta_q" in r and not np.isnan(r["mae_delta_q"])]
+    mae_t_vals = [r["mae_delta_t"] for r in b7_runs if "mae_delta_t" in r and not np.isnan(r["mae_delta_t"])]
+    mae_u_vals = [r["mae_utility"] for r in b7_runs]
+
+    rq1_summary = {
+        "n_seeds": len(b7_runs),
+        "seeds": seeds,
+        "spearman_rho": {
+            "mean": float(np.mean(rho_vals)),
+            "std": float(np.std(rho_vals)),
+            "ci_95": compute_confidence_interval_95(float(np.std(rho_vals)), len(rho_vals)),
+        },
+        "mae_delta_q": {
+            "mean": float(np.mean(mae_q_vals)) if mae_q_vals else float("nan"),
+            "std": float(np.std(mae_q_vals)) if mae_q_vals else float("nan"),
+            "ci_95": compute_confidence_interval_95(float(np.std(mae_q_vals)), len(mae_q_vals)) if mae_q_vals else float("nan"),
+        },
+        "mae_delta_t": {
+            "mean": float(np.mean(mae_t_vals)) if mae_t_vals else float("nan"),
+            "std": float(np.std(mae_t_vals)) if mae_t_vals else float("nan"),
+            "ci_95": compute_confidence_interval_95(float(np.std(mae_t_vals)), len(mae_t_vals)) if mae_t_vals else float("nan"),
+        },
+        "mae_utility": {
+            "mean": float(np.mean(mae_u_vals)),
+            "std": float(np.std(mae_u_vals)),
+            "ci_95": compute_confidence_interval_95(float(np.std(mae_u_vals)), len(mae_u_vals)),
+        },
+    }
+
+    with open(os.path.join(rq1_dir, "per_seed.json"), "w") as f:
+        json.dump(rq1_per_seed, f, indent=2)
+    with open(os.path.join(rq1_dir, "summary.json"), "w") as f:
+        json.dump(rq1_summary, f, indent=2)
+
+    # 8.2 Baselines Artifacts
+    with open(os.path.join(baselines_dir, "benchmark.json"), "w") as f:
+        json.dump(aggregated_ladder, f, indent=2)
     bench_json = os.path.join(out_dir, "benchmark_table.json")
     with open(bench_json, "w") as f:
         json.dump(aggregated_ladder, f, indent=2)
 
+    # 8.3 Geometry Artifacts
+    with open(os.path.join(geom_dir, "breakdown.json"), "w") as f:
+        json.dump(strata_breakdown, f, indent=2)
+
+    # 8.4 Markdown Report
     report_md = os.path.join(out_dir, "benchmark_report.md")
     lines = [
         "# Phase 4: Learned Utility Benchmark Report (RQ1 & RQ2)",
@@ -341,7 +410,7 @@ def main():
         f"- **Dataset Split:** Evaluated strictly on independent cross-scene test split (`cross_scene_test`, scene: `tum_fr2_xyz`, N={len(test_ds)}).",
         "- **Training Protocol:** Models trained strictly on train split (frames 0-40, scene: `tum_fr1_desk`, N=375).",
         "- **Feature Normalization:** Mean and standard deviation fit strictly on train split (zero test leakage).",
-        f"- **Seeds:** Evaluated over 5 protocol seeds {seeds} reporting mean ± std.",
+        f"- **Seeds:** Evaluated over 5 protocol seeds {seeds} reporting mean ± std and 95% confidence intervals.",
         "",
         "## 2. Benchmark Ladder (B0 to B7 + Oracle)",
         "",
@@ -360,7 +429,10 @@ def main():
     lines.extend([
         "",
         "## 3. RQ1 Findings: Prediction Fidelity ($s_i(t) \\to U_i^\\star$)",
-        "- **TwoHeadMLP (B7)** achieves superior rank correlation compared to linear models and simple heuristic baselines.",
+        f"- **Spearman $\\rho(U^\\star)$:** {rq1_summary['spearman_rho']['mean']:+.4f} ± {rq1_summary['spearman_rho']['std']:.4f} (95% CI: ±{rq1_summary['spearman_rho']['ci_95']:.4f})",
+        f"- **$MAE(\\Delta Q)$:** {rq1_summary['mae_delta_q']['mean']:.4e} ± {rq1_summary['mae_delta_q']['std']:.4e}",
+        f"- **$MAE(\\Delta T)$:** {rq1_summary['mae_delta_t']['mean']:.2f} ms ± {rq1_summary['mae_delta_t']['std']:.2f} ms",
+        f"- **$MAE(U)$:** {rq1_summary['mae_utility']['mean']:.4e} ± {rq1_summary['mae_utility']['std']:.4e}",
         "- Two-head formulation decouples photometric gain from execution cost, preventing cost-blind over-allocation.",
         "",
         "## 4. RQ2 Findings: Selection & Reconstruction Efficacy ($\\hat U_i \\to S_B$)",
@@ -382,8 +454,10 @@ def main():
     with open(report_md, "w") as f:
         f.write("\n".join(lines))
 
-    print(f"\n>> Saved benchmark table to: {bench_json}")
-    print(f">> Saved benchmark report to: {report_md}")
+    print(f"\n>> Saved RQ1 artifacts to: {rq1_dir}")
+    print(f">> Saved Baselines artifacts to: {baselines_dir}")
+    print(f">> Saved Geometry breakdown to: {geom_dir}")
+    print(f">> Saved Benchmark report to: {report_md}")
 
 
 if __name__ == "__main__":

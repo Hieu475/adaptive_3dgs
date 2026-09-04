@@ -118,22 +118,63 @@ def evaluate_rq1_prediction(
     return metrics
 
 
+PROTOCOL_BUDGETS: Tuple[float, ...] = (0.10, 0.20, 0.40, 0.60, 0.80)
+
+
+def compute_confidence_interval_95(std: float, n: int) -> float:
+    """Computes half-width of 95% confidence interval: 1.96 * std / sqrt(n)."""
+    if n <= 1 or np.isnan(std):
+        return 0.0
+    return float(1.96 * std / np.sqrt(n))
+
+
+def rank_candidates(scores: np.ndarray) -> np.ndarray:
+    """Returns candidate indices sorted descending by score."""
+    return np.argsort(-scores)
+
+
+def select_under_budget(
+    scores: np.ndarray,
+    costs: np.ndarray,
+    budget: float,
+) -> Tuple[List[int], float]:
+    """Greedy selection under budget:
+    
+    Sorts candidates descending by utility score, and selects items while
+    cumulative cost <= budget.
+    Returns (selected_indices, realized_cost).
+    """
+    ranked = rank_candidates(scores)
+    selected = []
+    cur_cost = 0.0
+    for idx in ranked:
+        c = float(costs[idx])
+        if cur_cost + c <= budget + 1e-7:
+            selected.append(int(idx))
+            cur_cost += c
+    return selected, cur_cost
+
+
 def evaluate_rq2_selection(
     pred_u: np.ndarray,
     oracle_u: np.ndarray,
     delta_q: np.ndarray,
-    k_fractions: Tuple[float, ...] = (0.10, 0.20),
+    costs: Optional[np.ndarray] = None,
+    k_fractions: Tuple[float, ...] = PROTOCOL_BUDGETS,
 ) -> Dict[str, float]:
-    """Evaluates RQ2 (Selection Efficiency): U_hat_i -> S_B."""
+    """Evaluates RQ2 (Selection Efficiency): U_hat_i -> S_B across all protocol budgets."""
     n = len(pred_u)
-    pred_ranks = np.argsort(-pred_u)
-    oracle_ranks = np.argsort(-oracle_u)
+    pred_ranks = rank_candidates(pred_u)
+    oracle_ranks = rank_candidates(oracle_u)
     
     results = {}
+    total_cost = float(costs.sum()) if costs is not None else float(n)
+
     for frac in k_fractions:
         pct_label = f"{int(frac * 100)}pct"
         k = max(1, int(n * frac))
         
+        # 1. Top-k ranking selection
         top_pred = set(pred_ranks[:k].tolist())
         top_ora = set(oracle_ranks[:k].tolist())
         overlap = len(top_pred & top_ora) / k
@@ -151,6 +192,21 @@ def evaluate_rq2_selection(
         results[f"regret_{pct_label}"] = float(regret)
         results[f"realized_delta_q_{pct_label}"] = float(gain_pred)
         results[f"oracle_delta_q_{pct_label}"] = float(gain_ora)
+
+        # 2. Budget-constrained selection (when costs provided)
+        if costs is not None:
+            budget_val = frac * total_cost
+            sel_pred, c_pred = select_under_budget(pred_u, costs, budget_val)
+            sel_ora, c_ora = select_under_budget(oracle_u, costs, budget_val)
+
+            gain_bg_pred = float(delta_q[sel_pred].sum()) if len(sel_pred) > 0 else 0.0
+            gain_bg_ora = float(delta_q[sel_ora].sum()) if len(sel_ora) > 0 else 0.0
+            ose_bg = float(gain_bg_pred / (gain_bg_ora + 1e-8)) if gain_bg_ora > 0 else 1.0
+
+            results[f"budget_ose_{pct_label}"] = float(ose_bg)
+            results[f"budget_realized_delta_q_{pct_label}"] = float(gain_bg_pred)
+            results[f"budget_oracle_delta_q_{pct_label}"] = float(gain_bg_ora)
+            results[f"budget_cost_{pct_label}"] = float(c_pred)
         
     return results
 
@@ -163,7 +219,8 @@ def evaluate_utility_complete(
     true_q: Optional[np.ndarray] = None,
     pred_t: Optional[np.ndarray] = None,
     true_t: Optional[np.ndarray] = None,
-    k_fractions: Tuple[float, ...] = (0.10, 0.20),
+    costs: Optional[np.ndarray] = None,
+    k_fractions: Tuple[float, ...] = PROTOCOL_BUDGETS,
 ) -> Dict[str, float]:
     """Full evaluation encompassing both RQ1 and RQ2 metrics."""
     res_rq1 = evaluate_rq1_prediction(
@@ -178,6 +235,7 @@ def evaluate_utility_complete(
         pred_u=pred_u,
         oracle_u=oracle_u,
         delta_q=delta_q,
+        costs=costs,
         k_fractions=k_fractions,
     )
     combined = dict(res_rq1)

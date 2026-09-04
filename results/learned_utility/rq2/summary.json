@@ -1,0 +1,87 @@
+{
+  "budgets": [
+    0.1,
+    0.2,
+    0.4,
+    0.6,
+    0.8
+  ],
+  "evaluated_methods": [
+    "B1: RGB Error",
+    "B2: RGB + Depth Error",
+    "B3: Error \u00d7 Influence",
+    "B4: Binary Threshold",
+    "Oracle (Reference)",
+    "B0: Random",
+    "B5: Linear Utility",
+    "B6: Two-Head Linear",
+    "B7: Two-Head MLP (Ours)"
+  ],
+  "two_head_mlp_budget_performance": {
+    "10pct": {
+      "budget_fraction": 0.1,
+      "ranking_selection": {
+        "ose_mean": 0.38560913334976565,
+        "ose_std": 0.09875733136499035,
+        "ose_ci_95": 0.08656461763376748,
+        "realized_delta_q_mean": 0.0005523801723029464,
+        "realized_delta_q_std": 0.00014146861938068173,
+        "overlap_mean": 0.192,
+        "regret_mean": 0.0008800970914307982
+      },
+      "oracle_delta_q": 0.0014324772637337446
+    },
+    "20pct": {
+      "budget_fraction": 0.2,
+      "ranking_selection": {
+        "ose_mean": 0.5142569057128078,
+        "ose_std": 0.07417047577047295,
+        "ose_ci_95": 0.06501328849254122,
+        "realized_delta_q_mean": 0.0010271615698002278,
+        "realized_delta_q_std": 0.00014814591982897958,
+        "overlap_mean": 0.368,
+        "regret_mean": 0.0009701989241875708
+      },
+      "oracle_delta_q": 0.0019973604939877987
+    },
+    "40pct": {
+      "budget_fraction": 0.4,
+      "ranking_selection": {
+        "ose_mean": 0.5906971570837607,
+        "ose_std": 0.07176407810972749,
+        "ose_ci_95": 0.06290398794241446,
+        "realized_delta_q_mean": 0.0014474597293883563,
+        "realized_delta_q_std": 0.00017585256985718227,
+        "overlap_mean": 0.496,
+        "regret_mean": 0.0010029563680291175
+      },
+      "oracle_delta_q": 0.002450416097417474
+    },
+    "60pct": {
+      "budget_fraction": 0.6,
+      "ranking_selection": {
+        "ose_mean": 0.6582167598741583,
+        "ose_std": 0.09972507460191149,
+        "ose_ci_95": 0.08741288198147586,
+        "realized_delta_q_mean": 0.0017257273662835359,
+        "realized_delta_q_std": 0.0002614614224926279,
+        "overlap_mean": 0.6666666666666666,
+        "regret_mean": 0.0008960849139839411
+      },
+      "oracle_delta_q": 0.002621812280267477
+    },
+    "80pct": {
+      "budget_fraction": 0.8,
+      "ranking_selection": {
+        "ose_mean": 0.8083163528553257,
+        "ose_std": 0.08912367224529474,
+        "ose_ci_95": 0.07812034310159702,
+        "realized_delta_q_mean": 0.002149259904399514,
+        "realized_delta_q_std": 0.00023697397017024082,
+        "overlap_mean": 0.8109999999999999,
+        "regret_mean": 0.0005096641834825277
+      },
+      "oracle_delta_q": 0.002658924087882042
+    }
+  }
+}

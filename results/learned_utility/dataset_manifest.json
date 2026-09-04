@@ -1,0 +1,65 @@
+{
+  "total_samples": 875,
+  "feature_names": [
+    "rgb_error",
+    "depth_error",
+    "gradient_norm",
+    "visibility_count",
+    "influence_mass",
+    "position_drift",
+    "residual_drift_ema",
+    "uncertainty_var",
+    "projected_area",
+    "update_frequency",
+    "age"
+  ],
+  "split_counts": {
+    "cross_scene_test": 250,
+    "validation": 250,
+    "train": 375
+  },
+  "target_statistics": {
+    "delta_q": {
+      "min": -8.095433440757915e-05,
+      "max": 0.00039089747588150203,
+      "mean": 1.406765659339726e-05,
+      "std": 3.1958144973032176e-05
+    },
+    "delta_t": {
+      "min": 26.779455184936523,
+      "max": 126.02821350097656,
+      "mean": 60.74330520629883,
+      "std": 16.395299911499023
+    },
+    "utility": {
+      "min": -1.0828191534528742e-06,
+      "max": 4.6235895752033684e-06,
+      "mean": 2.507428291664837e-07,
+      "std": 5.38076392331277e-07,
+      "negative_fraction": 0.21371428571428572
+    }
+  },
+  "split_breakdown": {
+    "train": {
+      "scene": "tum_fr1_desk",
+      "frame_range": [
+        0,
+        40
+      ],
+      "n_samples": 375
+    },
+    "validation": {
+      "scene": "tum_fr1_desk",
+      "frame_range": [
+        41,
+        60
+      ],
+      "n_samples": 250
+    },
+    "cross_scene_test": {
+      "scene": "tum_fr2_xyz",
+      "evaluation_mode": "zero_shot_cross_scene",
+      "n_samples": 250
+    }
+  }
+}
