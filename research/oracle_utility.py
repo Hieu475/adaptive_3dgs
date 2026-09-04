@@ -71,27 +71,43 @@ class OracleUtilityExperiment:
         self,
         pipeline,
         n_samples: int = 150,
-        n_opt_steps: int = 10,
-        w_rgb: float = 0.7,
-        w_depth: float = 0.3,
+        n_opt_steps: int = 5,
+        w_rgb: float = 0.70,
+        w_depth: float = 0.30,
         seed: int = 42,
         contribution_threshold: float = 0.01,
         group_size: int = 1,
         min_influence_pixels: int = 25,
+        protocol: Optional[Dict[str, Any]] = None,
     ):
         """
         Args:
             pipeline: OnlineReconstructionPipeline instance (initialized)
             n_samples: number of Gaussians to evaluate per population
-            n_opt_steps: gradient steps per Gaussian/group
-            w_rgb: weight of photometric improvement in joint ΔQ (default: 0.7)
-            w_depth: weight of geometric depth improvement in joint ΔQ (default: 0.3)
+            n_opt_steps: gradient steps per Gaussian/group (default: 5, locked by protocol)
+            w_rgb: weight of photometric improvement in joint ΔQ (default: 0.70)
+            w_depth: weight of geometric depth improvement in joint ΔQ (default: 0.30)
             seed: random seed for reproducibility
             contribution_threshold: minimum w_{u,i} to include pixel in local region
             group_size: Gaussians per optimization group (1, 4, 16)
-            min_influence_pixels: minimum pixel count for robust local utility estimation
+            min_influence_pixels: minimum pixel count for robust local utility estimation (default: 25)
+            protocol: optional loaded protocol dictionary
         """
         self.pipeline = pipeline
+        self.protocol = protocol
+        
+        # Override defaults with protocol if provided
+        if protocol is not None:
+            try:
+                from research.protocol import get_oracle_config
+                ocfg = get_oracle_config(protocol)
+                n_opt_steps = int(ocfg.get('n_opt_steps', n_opt_steps))
+                w_rgb = float(ocfg.get('w_rgb', w_rgb))
+                w_depth = float(ocfg.get('w_depth', w_depth))
+                min_influence_pixels = int(ocfg.get('min_influence_pixels', min_influence_pixels))
+            except Exception:
+                pass
+                
         self.n_samples = n_samples
         self.n_opt_steps = n_opt_steps
         self.w_rgb = w_rgb
@@ -102,6 +118,7 @@ class OracleUtilityExperiment:
         self.min_influence_pixels = min_influence_pixels
         torch.manual_seed(seed)
         np.random.seed(seed)
+
         
     def snapshot_state(self) -> Dict:
         """Save all Gaussian parameters and optimizer state (deep copy)."""
@@ -637,12 +654,23 @@ class OracleUtilityExperiment:
         sample_indices: Optional[List[int]] = None,
         scene_name: str = "scene",
         frame_idx: int = 0,
+        split: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Run full oracle utility measurement on selected population with complete state tracking."""
         H, W = rgb.shape[:2]
         device = rgb.device
         model = self.pipeline.gaussian_model
         num_gaussians = model.num_gaussians
+        
+        # Determine dataset split strictly per protocol
+        if split is None:
+            sc = scene_name.lower()
+            if "fr2" in sc or "xyz" in sc:
+                split = "cross_scene_test"
+            elif frame_idx <= 40:
+                split = "train"
+            else:
+                split = "validation"
         
         # 1. Attribution & per-Gaussian state extraction
         with torch.no_grad():
@@ -666,15 +694,46 @@ class OracleUtilityExperiment:
             color_error = proj_areas['color_error']
             depth_error = proj_areas['depth_error']
             visibility = proj_areas['visibility']
+            pixel_count = proj_areas.get('pixel_count', torch.zeros(num_gaussians, device=device))
             
-        # 2. Extract pipeline diagnostics & state features
-        diagnostics = self.pipeline.get_importance_diagnostics()
+        # 2. Extract pipeline diagnostics & persistent state features (Points III & IV)
+        try:
+            diagnostics = self.pipeline.get_importance_diagnostics()
+        except RuntimeError:
+            diagnostics = {
+                'importance': torch.zeros(num_gaussians, device=device),
+                'tiers': torch.zeros(num_gaussians, dtype=torch.long, device=device),
+                'confidence': torch.full((num_gaussians,), 0.5, device=device),
+                'components': {'temporal': torch.zeros(num_gaussians, device=device)},
+            }
         predicted_importance = diagnostics['importance']
         tiers = diagnostics.get('tiers', torch.zeros(num_gaussians, dtype=torch.long, device=device))
         confidence = diagnostics.get('confidence', torch.full((num_gaussians,), 0.5, device=device))
         temporal_change = diagnostics.get('components', {}).get(
             'temporal', torch.zeros(num_gaussians, device=device)
         )
+
+        
+        # Extract synchronized state from GaussianStateStore if available
+        store = getattr(model, 'state_store', None)
+        if store is not None and store.num_gaussians >= num_gaussians:
+            pos_drift = store.position_drift[:num_gaussians]
+            res_drift_ema = store.residual_drift_ema[:num_gaussians]
+            store_age = store.ages[:num_gaussians]
+            store_staleness = store.get_staleness(frame_idx)[:num_gaussians]
+            store_vis_cnt = store.visibility_count[:num_gaussians]
+            store_tiers = store.tiers[:num_gaussians]
+        else:
+            pos_drift = temporal_change
+            res_drift_ema = torch.zeros(num_gaussians, device=device)
+            creation_frame = getattr(self.pipeline.importance_estimator, '_creation_frame', None)
+            if creation_frame is not None and creation_frame.shape[0] >= num_gaussians:
+                store_age = (frame_idx - creation_frame[:num_gaussians]).clamp(min=0)
+            else:
+                store_age = torch.zeros(num_gaussians, dtype=torch.long, device=device)
+            store_staleness = torch.zeros(num_gaussians, dtype=torch.long, device=device)
+            store_vis_cnt = pixel_count
+            store_tiers = tiers
         
         # Cost model estimates
         cost_estimates_us = estimate_gaussian_costs(
@@ -683,14 +742,7 @@ class OracleUtilityExperiment:
             device=device
         )
         predicted_utility = predicted_importance / (cost_estimates_us / 1000.0 + 1e-6)
-        
-        # Uncertainty and age
         uncertainty = (1.0 - confidence).clamp(0.0, 1.0)
-        creation_frame = getattr(self.pipeline.importance_estimator, '_creation_frame', None)
-        if creation_frame is not None and creation_frame.shape[0] >= num_gaussians:
-            age = (frame_idx - creation_frame[:num_gaussians]).clamp(min=0)
-        else:
-            age = torch.zeros(num_gaussians, dtype=torch.long, device=device)
             
         # 3. Candidate Sampling
         strata_map = {}
@@ -752,41 +804,65 @@ class OracleUtilityExperiment:
         for gi, group in enumerate(groups):
             influence_mask = self._get_influence_mask(group, contrib_indices, contrib_weights)
             n_pixels = int(influence_mask.sum().item())
+            is_filtered = bool(n_pixels < self.min_influence_pixels)
+            filter_reason = "min_influence_pixels" if is_filtered else "none"
             
             if n_pixels == 0:
                 for idx in group:
                     knn_f = knn_features.get(idx, {'knn_density': 0.0, 'knn_error_mean': 0.0, 'knn_depth_var': 0.0})
+                    p_id = int(model.persistent_ids[idx].item()) if hasattr(model, 'persistent_ids') and idx < len(model.persistent_ids) else idx
                     results.append({
                         "scene": scene_name,
                         "frame": frame_idx,
+                        "split": split,
                         "gaussian_id": idx,
+                        "persistent_id": p_id,
                         "population": population_type.value if hasattr(population_type, 'value') else str(population_type),
                         "geometry_stratum": strata_map.get(idx, 'none'),
                         "group_size": self.group_size,
                         "features": {
                             "rgb_error": float(color_error[idx]),
                             "depth_error": float(depth_error[idx]),
+                            "gradient_norm": float(influence_mass[idx] * (color_error[idx] + depth_error[idx])),
+                            "visibility_count": float(store_vis_cnt[idx]),
                             "visibility": float(visibility[idx]),
                             "influence_mass": float(influence_mass[idx]),
-                            "temporal_drift": float(temporal_change[idx]),
+                            "position_drift": float(pos_drift[idx]),
+                            "residual_drift_ema": float(res_drift_ema[idx]),
+                            "temporal_drift": float(pos_drift[idx]),
                             "uncertainty": float(uncertainty[idx]),
-                            "gradient_norm": float(influence_mass[idx] * (color_error[idx] + depth_error[idx])),
+                            "uncertainty_var": float(uncertainty[idx]),
                             "projected_area": float(projected_area[idx]),
+                            "age": int(store_age[idx].item() if hasattr(store_age[idx], 'item') else store_age[idx]),
+                            "staleness": int(store_staleness[idx].item() if hasattr(store_staleness[idx], 'item') else store_staleness[idx]),
+                            "update_frequency": 0.5,
+                            "tier": int(store_tiers[idx].item() if hasattr(store_tiers[idx], 'item') else store_tiers[idx]),
                             "knn_density": knn_f['knn_density'],
                             "knn_error_mean": knn_f['knn_error_mean'],
                             "knn_depth_var": knn_f['knn_depth_var'],
-                            "age": int(age[idx].item() if hasattr(age[idx], 'item') else age[idx]),
-                            "update_frequency": 0.5,
-                            "tier": int(tiers[idx].item() if hasattr(tiers[idx], 'item') else tiers[idx]),
                             "sh_degree": int(getattr(model, 'sh_degree', 0)),
                         },
                         "predicted_importance": float(predicted_importance[idx]),
                         "predicted_utility": float(predicted_utility[idx]),
+                        "psnr_before": 0.0,
+                        "psnr_after": 0.0,
+                        "delta_psnr": 0.0,
+                        "ssim_before": 0.0,
+                        "ssim_after": 0.0,
+                        "delta_ssim": 0.0,
+                        "depth_before": 0.0,
+                        "depth_after": 0.0,
+                        "delta_depth": 0.0,
+                        "loss_before": 0.0,
+                        "loss_after": 0.0,
+                        "delta_loss": 0.0,
                         "delta_psnr_local": 0.0,
                         "delta_ssim_local": 0.0,
                         "delta_depth_gain_local": 0.0,
                         "delta_loss_local": 0.0,
+                        "delta_quality": 0.0,
                         "delta_quality_local": 0.0,
+                        "delta_time_ms": 0.0,
                         "measured_trial_cost_ms": 0.0,
                         "modeled_marginal_cost_us": float(cost_estimates_us[idx]),
                         "oracle_utility": 0.0,
@@ -795,6 +871,8 @@ class OracleUtilityExperiment:
                         "oracle_utility_loss": 0.0,
                         "oracle_utility_joint": 0.0,
                         "n_influence_pixels": 0,
+                        "filtered": True,
+                        "filter_reason": "zero_influence_pixels",
                         "visible": False,
                     })
                 continue
@@ -810,28 +888,36 @@ class OracleUtilityExperiment:
                 
                 for idx in group:
                     knn_f = knn_features.get(idx, {'knn_density': 0.0, 'knn_error_mean': 0.0, 'knn_depth_var': 0.0})
+                    p_id = int(model.persistent_ids[idx].item()) if hasattr(model, 'persistent_ids') and idx < len(model.persistent_ids) else idx
                     results.append({
                         "scene": scene_name,
                         "frame": frame_idx,
+                        "split": split,
                         "gaussian_id": idx,
+                        "persistent_id": p_id,
                         "population": population_type.value if hasattr(population_type, 'value') else str(population_type),
                         "geometry_stratum": strata_map.get(idx, 'none'),
                         "group_size": self.group_size,
                         "features": {
                             "rgb_error": float(color_error[idx]),
                             "depth_error": float(depth_error[idx]),
+                            "gradient_norm": float(influence_mass[idx] * (color_error[idx] + depth_error[idx])),
+                            "visibility_count": float(store_vis_cnt[idx]),
                             "visibility": float(visibility[idx]),
                             "influence_mass": float(influence_mass[idx]),
-                            "temporal_drift": float(temporal_change[idx]),
+                            "position_drift": float(pos_drift[idx]),
+                            "residual_drift_ema": float(res_drift_ema[idx]),
+                            "temporal_drift": float(pos_drift[idx]),
                             "uncertainty": float(uncertainty[idx]),
-                            "gradient_norm": float(influence_mass[idx] * (color_error[idx] + depth_error[idx])),
+                            "uncertainty_var": float(uncertainty[idx]),
                             "projected_area": float(projected_area[idx]),
+                            "age": int(store_age[idx].item() if hasattr(store_age[idx], 'item') else store_age[idx]),
+                            "staleness": int(store_staleness[idx].item() if hasattr(store_staleness[idx], 'item') else store_staleness[idx]),
+                            "update_frequency": 0.5,
+                            "tier": int(store_tiers[idx].item() if hasattr(store_tiers[idx], 'item') else store_tiers[idx]),
                             "knn_density": knn_f['knn_density'],
                             "knn_error_mean": knn_f['knn_error_mean'],
                             "knn_depth_var": knn_f['knn_depth_var'],
-                            "age": int(age[idx].item() if hasattr(age[idx], 'item') else age[idx]),
-                            "update_frequency": 0.5,
-                            "tier": int(tiers[idx].item() if hasattr(tiers[idx], 'item') else tiers[idx]),
                             "sh_degree": int(getattr(model, 'sh_degree', 0)),
                         },
                         "raw_metrics": {
@@ -849,13 +935,27 @@ class OracleUtilityExperiment:
                             "delta_loss": float(metrics['delta_loss_local']),
                             "measured_trial_cost_ms": float(trial_cost),
                         },
+                        "psnr_before": float(metrics['psnr_local_before']),
+                        "psnr_after": float(metrics['psnr_local_after']),
+                        "delta_psnr": float(metrics['delta_psnr_local']),
+                        "ssim_before": float(metrics['ssim_local_before']),
+                        "ssim_after": float(metrics['ssim_local_after']),
+                        "delta_ssim": float(metrics['delta_ssim_local']),
+                        "depth_before": float(metrics['depth_l1_before']),
+                        "depth_after": float(metrics['depth_l1_after']),
+                        "delta_depth": float(metrics['delta_depth_gain_local']),
+                        "loss_before": float(metrics['loss_local_before']),
+                        "loss_after": float(metrics['loss_local_after']),
+                        "delta_loss": float(metrics['delta_loss_local']),
                         "predicted_importance": float(predicted_importance[idx]),
                         "predicted_utility": float(predicted_utility[idx]),
                         "delta_psnr_local": float(metrics['delta_psnr_local']),
                         "delta_ssim_local": float(metrics['delta_ssim_local']),
                         "delta_depth_gain_local": float(metrics['delta_depth_gain_local']),
                         "delta_loss_local": float(metrics['delta_loss_local']),
+                        "delta_quality": float(delta_q),
                         "delta_quality_local": float(delta_q),
+                        "delta_time_ms": float(per_gauss_cost),
                         "measured_trial_cost_ms": float(per_gauss_cost),
                         "modeled_marginal_cost_us": float(cost_estimates_us[idx]),
                         "oracle_utility": float(metrics['oracle_utility_joint']),
@@ -866,6 +966,8 @@ class OracleUtilityExperiment:
                         "influence_mass": float(influence_mass[idx]),
                         "projected_area": float(projected_area[idx]),
                         "n_influence_pixels": n_pixels,
+                        "filtered": is_filtered,
+                        "filter_reason": filter_reason,
                         "visible": True,
                     })
             finally:
@@ -938,16 +1040,26 @@ class OracleUtilityExperiment:
         stable_frac = float(np.mean([1.0 if c <= 0.35 else 0.0 for c in cvs])) if cvs else 1.0
         mean_sign_stability = float(np.mean([c['p_positive_gain'] for c in candidate_stats])) if candidate_stats else 1.0
         
+        pos_candidates = [c for c in candidate_stats if c['mean_utility'] > 0]
+        neg_candidates = [c for c in candidate_stats if c['mean_utility'] < 0]
+        pos_cv = float(np.mean([c['coefficient_of_variation'] for c in pos_candidates])) if pos_candidates else 0.0
+        neg_cv = float(np.mean([c['coefficient_of_variation'] for c in neg_candidates])) if neg_candidates else 0.0
+        
         return {
             "n_candidates": len(candidate_stats),
             "n_repeats": n_repeats,
             "mean_cv": mean_cv,
             "median_cv": median_cv,
+            "positive_utility_count": len(pos_candidates),
+            "negative_utility_count": len(neg_candidates),
+            "positive_utility_cv": pos_cv,
+            "negative_utility_cv": neg_cv,
             "stable_fraction": stable_frac,
             "mean_sign_stability": mean_sign_stability,
             "gate1_passed": (mean_cv <= 0.35 or median_cv <= 0.35) and (mean_sign_stability >= 0.70),
             "candidates": candidate_stats,
         }
+
 
     def evaluate_group_interaction(
         self,
@@ -1226,24 +1338,36 @@ class OracleUtilityExperiment:
             flat = {
                 'scene': r.get('scene', 'scene'),
                 'frame': r.get('frame', 0),
+                'split': r.get('split', 'train'),
                 'gaussian_id': r.get('gaussian_id', -1),
+                'persistent_id': r.get('persistent_id', r.get('gaussian_id', -1)),
                 'population': r.get('population', ''),
                 'geometry_stratum': r.get('geometry_stratum', 'none'),
                 'group_size': r.get('group_size', 1),
-                'predicted_importance': r.get('predicted_importance', 0.0),
-                'predicted_utility': r.get('predicted_utility', 0.0),
+                'psnr_before': r.get('psnr_before', 0.0),
+                'psnr_after': r.get('psnr_after', 0.0),
+                'delta_psnr': r.get('delta_psnr', r.get('delta_psnr_local', 0.0)),
+                'ssim_before': r.get('ssim_before', 0.0),
+                'ssim_after': r.get('ssim_after', 0.0),
+                'delta_ssim': r.get('delta_ssim', r.get('delta_ssim_local', 0.0)),
+                'depth_before': r.get('depth_before', 0.0),
+                'depth_after': r.get('depth_after', 0.0),
+                'delta_depth': r.get('delta_depth', r.get('delta_depth_gain_local', 0.0)),
+                'loss_before': r.get('loss_before', 0.0),
+                'loss_after': r.get('loss_after', 0.0),
+                'delta_loss': r.get('delta_loss', r.get('delta_loss_local', 0.0)),
+                'delta_quality': r.get('delta_quality', r.get('delta_quality_local', 0.0)),
+                'delta_time_ms': r.get('delta_time_ms', r.get('measured_trial_cost_ms', 0.0)),
                 'oracle_utility_joint': r.get('oracle_utility_joint', r.get('oracle_utility', 0.0)),
                 'oracle_utility_rgb': r.get('oracle_utility_rgb', 0.0),
                 'oracle_utility_depth': r.get('oracle_utility_depth', 0.0),
                 'oracle_utility_loss': r.get('oracle_utility_loss', 0.0),
-                'delta_quality_local': r.get('delta_quality_local', 0.0),
-                'delta_psnr_local': r.get('delta_psnr_local', 0.0),
-                'delta_ssim_local': r.get('delta_ssim_local', 0.0),
-                'delta_depth_gain_local': r.get('delta_depth_gain_local', 0.0),
-                'delta_loss_local': r.get('delta_loss_local', 0.0),
-                'measured_trial_cost_ms': r.get('measured_trial_cost_ms', 0.0),
+                'predicted_importance': r.get('predicted_importance', 0.0),
+                'predicted_utility': r.get('predicted_utility', 0.0),
                 'modeled_marginal_cost_us': r.get('modeled_marginal_cost_us', 0.0),
                 'n_influence_pixels': r.get('n_influence_pixels', 0),
+                'filtered': r.get('filtered', False),
+                'filter_reason': r.get('filter_reason', 'none'),
                 'visible': r.get('visible', True),
             }
             if 'features' in r:

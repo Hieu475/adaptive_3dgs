@@ -14,3 +14,6 @@
 !generalization/*.json
 !master/*.json
 !state_validation/*.json
+!oracle_dataset/*.json
+!oracle_dataset/*.csv
+

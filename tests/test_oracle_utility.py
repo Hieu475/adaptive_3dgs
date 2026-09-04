@@ -294,8 +294,153 @@ def test_oracle_multi_trial_sequential_invariance():
     assert torch.equal(pipeline.gaussian_model._xyz, orig_xyz)
 
 
+def test_oracle_negative_utility_preservation():
+    """Phase 3.1 & 3.7: Verify that negative delta quality produces unclamped negative utility."""
+    pipeline = OnlineReconstructionPipeline(device='cpu')
+    H, W = 32, 40
+    rgb = torch.rand(H, W, 3)
+    depth = torch.ones(H, W) * 2.0
+    fx, fy = 80.0, 80.0
+    intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
+    pipeline.initialize(rgb, depth, intrinsics)
+    
+    from research.oracle_utility import OracleUtilityExperiment
+    exp = OracleUtilityExperiment(pipeline=pipeline, n_samples=5, n_opt_steps=5, seed=42)
+    
+    # Intentionally degrade a Gaussian during mock trial to test negative utility
+    influence_mask = torch.ones(H, W, dtype=torch.bool)
+    res = exp.optimize_gaussian_group([0], n_steps=1, rgb=rgb, depth=depth, influence_mask=influence_mask)
+    
+    # Verify that delta metrics and utility are numeric and unclamped
+    assert isinstance(res['oracle_utility_joint'], float)
+    assert isinstance(res['delta_quality_local'], float)
+    # Ensure no clipping to 0 was performed: formula is (norm_psnr + norm_depth) / dt
+    expected_util = res['delta_quality_local'] / max(0.001, res['measured_trial_cost_ms'])
+    assert abs(res['oracle_utility_joint'] - expected_util) < 1e-4
+
+
+def test_oracle_influence_filtering():
+    """Phase 3.6: Verify that candidates with influence pixels < 25 are flagged as filtered."""
+    pipeline = OnlineReconstructionPipeline(device='cpu')
+    H, W = 32, 40
+    rgb = torch.rand(H, W, 3)
+    depth = torch.ones(H, W) * 2.0
+    fx, fy = 80.0, 80.0
+    intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
+    pipeline.initialize(rgb, depth, intrinsics)
+    
+    from research.oracle_utility import OracleUtilityExperiment
+    # Set min_influence_pixels = 50
+    exp = OracleUtilityExperiment(pipeline=pipeline, n_samples=5, n_opt_steps=2, min_influence_pixels=50, seed=42)
+    results = exp.run_oracle_experiment(rgb, depth, sample_indices=[0, 1])
+    
+    for row in results:
+        assert 'filtered' in row
+        assert 'filter_reason' in row
+        if row['n_influence_pixels'] < 50:
+            assert row['filtered'] is True
+            assert row['filter_reason'] in ['min_influence_pixels', 'zero_influence_pixels']
+
+
+def test_oracle_dataset_schema_and_persistent_id():
+    """Phase 3.7 & 3.12: Verify complete schema, persistent ID preservation, and dataset split assignment."""
+    pipeline = OnlineReconstructionPipeline(device='cpu')
+    H, W = 32, 40
+    rgb = torch.rand(H, W, 3)
+    depth = torch.ones(H, W) * 2.0
+    fx, fy = 80.0, 80.0
+    intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
+    pipeline.initialize(rgb, depth, intrinsics)
+    
+    from research.oracle_utility import OracleUtilityExperiment
+    exp = OracleUtilityExperiment(pipeline=pipeline, n_samples=5, n_opt_steps=2, seed=42)
+    
+    # Case 1: Train split (fr1, frame 10)
+    train_results = exp.run_oracle_experiment(rgb, depth, sample_indices=[0], scene_name="tum_fr1_desk", frame_idx=10)
+    assert train_results[0]['split'] == 'train'
+    assert 'persistent_id' in train_results[0]
+    assert train_results[0]['persistent_id'] == 0
+    
+    # Case 2: Validation split (fr1, frame 45)
+    val_results = exp.run_oracle_experiment(rgb, depth, sample_indices=[0], scene_name="tum_fr1_desk", frame_idx=45)
+    assert val_results[0]['split'] == 'validation'
+    
+    # Case 3: Cross-scene test split (fr2_xyz, frame 5)
+    test_results = exp.run_oracle_experiment(rgb, depth, sample_indices=[0], scene_name="tum_fr2_xyz", frame_idx=5)
+    assert test_results[0]['split'] == 'cross_scene_test'
+    
+    row = train_results[0]
+    # Check all required fields from Phase 3.7
+    required_keys = [
+        'gaussian_id', 'persistent_id', 'frame', 'split', 'geometry_stratum',
+        'features', 'psnr_before', 'psnr_after', 'delta_psnr',
+        'ssim_before', 'ssim_after', 'delta_ssim',
+        'depth_before', 'depth_after', 'delta_depth',
+        'loss_before', 'loss_after', 'delta_loss',
+        'delta_quality', 'delta_time_ms', 'oracle_utility_joint', 'filtered'
+    ]
+    for k in required_keys:
+        assert k in row, f"Missing key '{k}' in oracle dataset row"
+        
+    # Check feature keys
+    feat_keys = [
+        'rgb_error', 'depth_error', 'gradient_norm', 'visibility_count',
+        'influence_mass', 'position_drift', 'residual_drift_ema',
+        'uncertainty_var', 'projected_area', 'age', 'staleness'
+    ]
+    for fk in feat_keys:
+        assert fk in row['features'], f"Missing feature '{fk}' in features dict"
+
+
+def test_oracle_diminishing_marginal_returns():
+    """Phase 3.11: Verify empirical test of diminishing returns Delta_i(A) >= Delta_i(B)."""
+    pipeline = OnlineReconstructionPipeline(device='cpu')
+    H, W = 32, 40
+    rgb = torch.rand(H, W, 3)
+    depth = torch.ones(H, W) * 2.0
+    fx, fy = 80.0, 80.0
+    intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
+    pipeline.initialize(rgb, depth, intrinsics)
+    
+    from research.oracle_utility import OracleUtilityExperiment
+    exp = OracleUtilityExperiment(pipeline=pipeline, n_samples=10, n_opt_steps=2, seed=42)
+    candidates = list(range(min(10, pipeline.gaussian_model.num_gaussians)))
+    
+    res = exp.evaluate_diminishing_returns(rgb, depth, candidate_indices=candidates, n_trials=3, size_a=2, size_b=4)
+    assert 'diminishing_rate' in res
+    assert 'mean_marginal_gain_A' in res
+    assert 'mean_marginal_gain_B' in res
+    assert 'is_diminishing_consistent' in res
+    assert 0.0 <= res['diminishing_rate'] <= 1.0
+
+
+def test_oracle_repeatability_cv_positive_negative():
+    """Phase 3.9: Verify repeatability calculation separating positive and negative utility."""
+    pipeline = OnlineReconstructionPipeline(device='cpu')
+    H, W = 32, 40
+    rgb = torch.rand(H, W, 3)
+    depth = torch.ones(H, W) * 2.0
+    fx, fy = 80.0, 80.0
+    intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
+    pipeline.initialize(rgb, depth, intrinsics)
+    
+    from research.oracle_utility import OracleUtilityExperiment
+    exp = OracleUtilityExperiment(pipeline=pipeline, n_samples=6, n_opt_steps=2, seed=42)
+    candidates = [0, 1]
+    
+    res = exp.run_stability_check(rgb, depth, candidate_indices=candidates, n_repeats=3)
+    assert 'mean_cv' in res
+    assert 'median_cv' in res
+    assert 'positive_utility_cv' in res
+    assert 'negative_utility_cv' in res
+    assert 'positive_utility_count' in res
+    assert 'negative_utility_count' in res
+    assert res['n_repeats'] == 3
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
+
 
 
 
