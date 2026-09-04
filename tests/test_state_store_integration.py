@@ -148,3 +148,60 @@ def test_oracle_snapshot_restore_isolation():
     assert torch.equal(pipeline.gaussian_model.state_store.persistent_ids, orig_ids)
     assert pipeline.gaussian_model.state_store._next_id == orig_next_id
     assert abs(pipeline.gaussian_model.state_store.ema_rgb[0].item() - 0.555) < 1e-6
+
+
+def test_add_gaussians_dimension_validation():
+    """Point C: Verify explicit parent mapping and dimension validation in add_gaussians."""
+    model = GaussianModel(sh_degree=0, device='cpu')
+    points = torch.tensor([[float(i), 0.0, 0.0] for i in range(4)])
+    model.initialize_from_points(points)
+    assert model.num_gaussians == 4
+    
+    # Case 1: 2 parents each spawn 2 children => 4 new Gaussians
+    new_params_4 = {
+        'xyz': torch.tensor([[10.0, 0.0, 0.0], [10.1, 0.0, 0.0], [11.0, 0.0, 0.0], [11.1, 0.0, 0.0]])
+    }
+    # parent indices [0, 1] with n_children_per_parent=2 (2 * 2 == 4)
+    model.add_gaussians(new_params_4, parent_indices=torch.tensor([0, 1]), n_children_per_parent=2, frame_idx=1)
+    assert model.num_gaussians == 8
+    assert model.state_store.num_gaussians == 8
+    
+    # Check parent IDs
+    assert model.state_store.get_lineage(4)['parent_id'] == 0
+    assert model.state_store.get_lineage(5)['parent_id'] == 0
+    assert model.state_store.get_lineage(6)['parent_id'] == 1
+    assert model.state_store.get_lineage(7)['parent_id'] == 1
+    
+    # Case 2: Dimension mismatch error check
+    new_params_3 = {'xyz': torch.zeros(3, 3)}
+    # 2 parents with n_children=1 != 3 new Gaussians => must raise ValueError
+    with pytest.raises(ValueError) as excinfo:
+        model.add_gaussians(new_params_3, parent_indices=torch.tensor([0, 1]), n_children_per_parent=1)
+    assert "Dimension mismatch in add_gaussians" in str(excinfo.value)
+
+
+def test_gaussian_model_state_separation_contract():
+    """Point D: Verify separation of concerns between GaussianModel._state and StateStore."""
+    model = GaussianModel(sh_degree=0, device='cpu')
+    points = torch.tensor([[float(i), 0.0, 0.0] for i in range(5)])
+    model.initialize_from_points(points)
+    
+    # GaussianModel._state manages execution/rendering flags
+    model._state[1] = GaussianState.FROZEN
+    model._state[3] = GaussianState.PRUNED
+    
+    # GaussianStateStore manages research tiers and identity independently
+    model.state_store.tiers[1] = 0  # Priority Tier A
+    model.state_store.tiers[3] = 3  # Priority Tier D
+    
+    # Compact prunes the PRUNED Gaussian from both
+    model.compact()
+    
+    # Surviving are indices 0, 1, 2, 4 (total 4)
+    assert model.num_gaussians == 4
+    assert model.state_store.num_gaussians == 4
+    assert model._state[1] == GaussianState.FROZEN
+    assert model.state_store.tiers[1] == 0  # Tier preserved
+    # PRUNED Gaussian (ID 3) archived in StateStore registry
+    assert model.state_store.get_lineage(3)['status'] == 'pruned'
+

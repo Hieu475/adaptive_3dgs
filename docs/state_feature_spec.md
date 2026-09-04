@@ -48,17 +48,29 @@ $$i \ne j \implies \text{persistent\_id}_i \ne \text{persistent\_id}_j$$
 $$\pi(\mathbf{G}) \implies \mathbf{s}_{\pi(i)} = \mathbf{s}_i$$
 - When tensor indices shift due to pruning, sorting, or compaction, state signals follow the `persistent_id`, never the physical tensor index.
 
+### Separation of Concerns: Engine Execution vs Research State (Point D)
+- **`GaussianModel._state`**: Low-level engine execution flags (`UNSTABLE=0, STABLE=1, FROZEN=2, PRUNED=3`). Dictates rasterizer memory compaction and CUDA kernel filtering.
+- **`GaussianStateStore`**: Research-level persistent state, identity provenance, continuous signals (EMAs, drift, age, staleness), and budget priority tiers (`Tier 0..3`).
+- **Synchronization Invariant**: At all lifecycle boundaries (`initialize_from_points`, `compact`, `add_gaussians`, `reorder`), the invariant `model.num_gaussians == model.state_store.num_gaussians` is strictly asserted.
+
 ### Pruning Lifecycle
 - Pruned Gaussians are evicted from the active state tensors and archived in `_pruned_registry` with `pruned_frame` and historical lineage intact for retrospective lineage queries (`get_lineage(id)`).
 
-### Densification Lineage & Initialization Policy
-- Spawning $K$ children from parent $P$ assigns unique IDs $C_1 \dots C_K$ with `parent_id = P.persistent_id` (not tensor index).
+### Densification Lineage & Dimension Validation (Point C)
+- Spawning $K$ children from parents $P$ assigns unique IDs $C_1 \dots C_K$ with `parent_id = P.persistent_id` (not tensor index).
+- **Dimension Invariant**: `add_gaussians(new_params, parent_indices, n_children_per_parent)` strictly validates that $N_{\text{new}} = |\text{parent\_indices}| \times n_{\text{children\_per\_parent}}$ (or $N_{\text{new}} = |\text{parent\_indices}|$ when $1$-to-$1$), preventing parameter vs state store count desynchronization.
 - **Initialization Policy**: `fresh` (per `protocol_v1.yaml`), children initialize with prior uncertainty ($0.5$), zero EMA, age $0$. (Alternative `inherit` copies parent EMA).
 
-### Exact Temporal Semantics
+### Exact Temporal Semantics & Feature Unification (Point B)
 - **Age**: $\text{age}_i(t) = t - t_{\text{creation}, i}$
 - **Staleness**: $\text{staleness}_i(t) = t - t_{\text{last\_update}, i}$
 - **EMA Decay**: $\text{EMA}_t = \beta \text{EMA}_{t-1} + (1 - \beta) x_t$ with $\beta = 0.90$.
+- **Temporal Factor Unification**: The canonical temporal state factors are `position_drift` ($d_i(t) = \|\mu_i(t) - \mu_i(t-1)\|_2$) and `residual_drift_ema` ($r_i(t) = \text{EMA}(|e_i(t) - e_i(t-1)|)$). `temporal_drift` is retained strictly as a property alias for `position_drift` to prevent feeding duplicate collinear features into downstream utility estimators.
+
+### Visibility Semantics (Point A)
+- **`visibility_count`**: Exact integer/float count of screen pixels influenced by Gaussian $g_i$ ($V_i(t) = \#\{\text{pixels influenced}\}$ from attribution footprint).
+- **`ema_visibility`**: Identity-preserving exponential moving average of visibility over time.
+
 
 ---
 

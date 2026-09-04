@@ -32,9 +32,9 @@ class GaussianStateStore:
         self.ema_rgb = torch.empty(0, dtype=torch.float32, device=self.device)
         self.ema_depth = torch.empty(0, dtype=torch.float32, device=self.device)
         self.ema_influence = torch.empty(0, dtype=torch.float32, device=self.device)
+        self.visibility_count = torch.empty(0, dtype=torch.float32, device=self.device)
         self.ema_visibility = torch.empty(0, dtype=torch.float32, device=self.device)
         self.uncertainty = torch.empty(0, dtype=torch.float32, device=self.device)
-        self.temporal_drift = torch.empty(0, dtype=torch.float32, device=self.device)
         self.position_drift = torch.empty(0, dtype=torch.float32, device=self.device)
         self.residual_drift_ema = torch.empty(0, dtype=torch.float32, device=self.device)
         self.gradient_ema = torch.empty(0, dtype=torch.float32, device=self.device)
@@ -60,6 +60,15 @@ class GaussianStateStore:
     @uncertainty_var.setter
     def uncertainty_var(self, value: torch.Tensor) -> None:
         self.uncertainty = value
+
+    @property
+    def temporal_drift(self) -> torch.Tensor:
+        """Backward-compatibility alias for position_drift (Point B)."""
+        return self.position_drift
+
+    @temporal_drift.setter
+    def temporal_drift(self, value: torch.Tensor) -> None:
+        self.position_drift = value
 
     def create(
         self,
@@ -111,9 +120,9 @@ class GaussianStateStore:
         self.ema_rgb = torch.cat([self.ema_rgb, zeros], dim=0)
         self.ema_depth = torch.cat([self.ema_depth, zeros], dim=0)
         self.ema_influence = torch.cat([self.ema_influence, zeros], dim=0)
+        self.visibility_count = torch.cat([self.visibility_count, zeros], dim=0)
         self.ema_visibility = torch.cat([self.ema_visibility, zeros], dim=0)
         self.uncertainty = torch.cat([self.uncertainty, uncert], dim=0)
-        self.temporal_drift = torch.cat([self.temporal_drift, zeros], dim=0)
         self.position_drift = torch.cat([self.position_drift, zeros], dim=0)
         self.residual_drift_ema = torch.cat([self.residual_drift_ema, zeros], dim=0)
         self.gradient_ema = torch.cat([self.gradient_ema, zeros], dim=0)
@@ -149,6 +158,7 @@ class GaussianStateStore:
         rgb_errors: Optional[torch.Tensor] = None,
         depth_errors: Optional[torch.Tensor] = None,
         influence_scores: Optional[torch.Tensor] = None,
+        visibility_count: Optional[torch.Tensor] = None,
         visibility_mask: Optional[torch.Tensor] = None,
         gradient_norms: Optional[torch.Tensor] = None,
         uncertainty: Optional[torch.Tensor] = None,
@@ -170,16 +180,14 @@ class GaussianStateStore:
             opt = optimized_mask[:N].to(self.device)
             self.last_update_frames[opt] = frame_idx
             
-        # Position drift: d_i(t) = ||mu_i(t) - mu_i(t-1)||_2
+        # Position drift: d_i(t) = ||mu_i(t) - mu_i(t-1)||_2 (Point B)
         if positions is not None:
             pos_t = positions[:N].to(self.device)
             if self.last_positions is not None and self.last_positions.shape == pos_t.shape:
                 pos_diff = pos_t - self.last_positions
                 self.position_drift = torch.norm(pos_diff, p=2, dim=-1)
-                self.temporal_drift = self.position_drift.clone()
             else:
                 self.position_drift = torch.zeros(N, dtype=torch.float32, device=self.device)
-                self.temporal_drift = self.position_drift.clone()
             self.last_positions = pos_t.clone()
             
         # EMA error updates & residual drift
@@ -202,8 +210,14 @@ class GaussianStateStore:
             inf = influence_scores[:N].to(self.device)
             self.ema_influence = ema_decay * self.ema_influence + (1.0 - ema_decay) * inf
             
-        if visibility_mask is not None:
+        # Visibility count and EMA (Point A)
+        if visibility_count is not None:
+            vis = visibility_count[:N].to(self.device).float()
+            self.visibility_count = vis
+            self.ema_visibility = ema_decay * self.ema_visibility + (1.0 - ema_decay) * vis
+        elif visibility_mask is not None:
             vis = visibility_mask[:N].to(self.device).float()
+            self.visibility_count = vis
             self.ema_visibility = ema_decay * self.ema_visibility + (1.0 - ema_decay) * vis
             
         if gradient_norms is not None:
@@ -234,9 +248,9 @@ class GaussianStateStore:
         self.ema_rgb = self.ema_rgb[perm]
         self.ema_depth = self.ema_depth[perm]
         self.ema_influence = self.ema_influence[perm]
+        self.visibility_count = self.visibility_count[perm]
         self.ema_visibility = self.ema_visibility[perm]
         self.uncertainty = self.uncertainty[perm]
-        self.temporal_drift = self.temporal_drift[perm]
         self.position_drift = self.position_drift[perm]
         self.residual_drift_ema = self.residual_drift_ema[perm]
         self.gradient_ema = self.gradient_ema[perm]
@@ -279,9 +293,9 @@ class GaussianStateStore:
         self.ema_rgb = self.ema_rgb[mask]
         self.ema_depth = self.ema_depth[mask]
         self.ema_influence = self.ema_influence[mask]
+        self.visibility_count = self.visibility_count[mask]
         self.ema_visibility = self.ema_visibility[mask]
         self.uncertainty = self.uncertainty[mask]
-        self.temporal_drift = self.temporal_drift[mask]
         self.position_drift = self.position_drift[mask]
         self.residual_drift_ema = self.residual_drift_ema[mask]
         self.gradient_ema = self.gradient_ema[mask]
@@ -335,12 +349,14 @@ class GaussianStateStore:
             parent_ema_depth = self.ema_depth[p_idx].repeat_interleave(n_children_per_parent)
             parent_ema_inf = self.ema_influence[p_idx].repeat_interleave(n_children_per_parent)
             parent_ema_vis = self.ema_visibility[p_idx].repeat_interleave(n_children_per_parent)
+            parent_vis_cnt = self.visibility_count[p_idx].repeat_interleave(n_children_per_parent)
             
             child_slice = slice(N, N + n_new)
             self.ema_rgb[child_slice] = parent_ema_rgb
             self.ema_depth[child_slice] = parent_ema_depth
             self.ema_influence[child_slice] = parent_ema_inf
             self.ema_visibility[child_slice] = parent_ema_vis
+            self.visibility_count[child_slice] = parent_vis_cnt
             
         return child_ids
 
@@ -361,12 +377,13 @@ class GaussianStateStore:
             'ema_rgb': self.ema_rgb[idx],
             'ema_depth': self.ema_depth[idx],
             'ema_influence': self.ema_influence[idx],
+            'visibility_count': self.visibility_count[idx],
             'ema_visibility': self.ema_visibility[idx],
             'uncertainty': self.uncertainty[idx],
             'uncertainty_var': self.uncertainty[idx],
-            'temporal_drift': self.temporal_drift[idx],
             'position_drift': self.position_drift[idx],
             'residual_drift_ema': self.residual_drift_ema[idx],
+            'temporal_drift': self.position_drift[idx],  # legacy alias
             'gradient_ema': self.gradient_ema[idx],
             'tier': self.tiers[idx],
         }
@@ -392,10 +409,11 @@ class GaussianStateStore:
             'ema_rgb': self.ema_rgb.clone(),
             'ema_depth': self.ema_depth.clone(),
             'ema_influence': self.ema_influence.clone(),
+            'visibility_count': self.visibility_count.clone(),
             'ema_visibility': self.ema_visibility.clone(),
             'uncertainty': self.uncertainty.clone(),
-            'temporal_drift': self.temporal_drift.clone(),
             'position_drift': self.position_drift.clone(),
+            'temporal_drift': self.position_drift.clone(),  # legacy alias
             'residual_drift_ema': self.residual_drift_ema.clone(),
             'gradient_ema': self.gradient_ema.clone(),
             'tiers': self.tiers.clone(),
@@ -417,10 +435,10 @@ class GaussianStateStore:
         self.ema_rgb = state['ema_rgb'].clone().to(self.device)
         self.ema_depth = state['ema_depth'].clone().to(self.device)
         self.ema_influence = state['ema_influence'].clone().to(self.device)
+        self.visibility_count = state.get('visibility_count', state.get('ema_visibility')).clone().to(self.device)
         self.ema_visibility = state['ema_visibility'].clone().to(self.device)
         self.uncertainty = state['uncertainty'].clone().to(self.device)
-        self.temporal_drift = state['temporal_drift'].clone().to(self.device)
-        self.position_drift = state.get('position_drift', state['temporal_drift']).clone().to(self.device)
+        self.position_drift = state.get('position_drift', state.get('temporal_drift', torch.zeros_like(self.ema_rgb))).clone().to(self.device)
         self.residual_drift_ema = state.get('residual_drift_ema', torch.zeros_like(self.ema_rgb)).clone().to(self.device)
         self.gradient_ema = state['gradient_ema'].clone().to(self.device)
         self.tiers = state['tiers'].clone().to(self.device)

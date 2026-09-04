@@ -551,4 +551,50 @@ def test_state_store_determinism():
     assert s1['_id_to_metadata'] == s2['_id_to_metadata']
 
 
+def test_visibility_count_and_ema():
+    """Point A: Verify raw visibility_count is preserved and ema_visibility tracks it."""
+    store = GaussianStateStore(device='cpu')
+    store.create(count=3, frame_idx=0)
+    
+    # Frame 0: pixel counts [120, 45, 0]
+    store.update_frame(frame_idx=0, visibility_count=torch.tensor([120.0, 45.0, 0.0]), ema_decay=0.9)
+    assert abs(store.visibility_count[0].item() - 120.0) < 1e-5
+    assert abs(store.visibility_count[1].item() - 45.0) < 1e-5
+    assert abs(store.visibility_count[2].item() - 0.0) < 1e-5
+    # EMA: 0.9 * 0 + 0.1 * count
+    assert abs(store.ema_visibility[0].item() - 12.0) < 1e-5
+    assert abs(store.ema_visibility[1].item() - 4.5) < 1e-5
+    
+    # Frame 1: pixel counts [150, 50, 10]
+    store.update_frame(frame_idx=1, visibility_count=torch.tensor([150.0, 50.0, 10.0]), ema_decay=0.9)
+    # EMA: 0.9 * 12.0 + 0.1 * 150 = 10.8 + 15.0 = 25.8
+    assert abs(store.ema_visibility[0].item() - 25.8) < 1e-4
+    
+    # Check state matrix contains both
+    matrix = store.get_state_matrix()
+    assert 'visibility_count' in matrix
+    assert 'ema_visibility' in matrix
+    assert abs(matrix['visibility_count'][0].item() - 150.0) < 1e-5
+
+
+def test_temporal_drift_alias_unification():
+    """Point B: Verify position_drift and temporal_drift refer to the same underlying tensor."""
+    store = GaussianStateStore(device='cpu')
+    store.create(count=2, frame_idx=0)
+    
+    # Mutating position_drift directly changes temporal_drift
+    store.position_drift = torch.tensor([0.05, 0.12])
+    assert torch.equal(store.temporal_drift, store.position_drift)
+    assert abs(store.temporal_drift[0].item() - 0.05) < 1e-5
+    
+    # Mutating via legacy setter
+    store.temporal_drift = torch.tensor([0.20, 0.35])
+    assert torch.equal(store.position_drift, torch.tensor([0.20, 0.35]))
+    
+    # State matrix contains both pointing to the same data
+    matrix = store.get_state_matrix()
+    assert torch.equal(matrix['position_drift'], matrix['temporal_drift'])
+
+
+
 

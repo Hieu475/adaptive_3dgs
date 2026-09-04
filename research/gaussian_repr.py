@@ -16,7 +16,16 @@ from research.state_store import GaussianStateStore
 
 
 class GaussianState:
-    """State tracking constants for Gaussian lifecycle."""
+    """State tracking constants for Gaussian rendering & memory lifecycle.
+    
+    NOTE ON SEPARATION OF CONCERNS (Point D):
+    - GaussianModel._state: Controls low-level engine memory lifecycle and rasterizer
+      compaction flags (UNSTABLE=0, STABLE=1, FROZEN=2, PRUNED=3).
+    - GaussianStateStore: Controls research-level persistent identity, historical signals
+      (EMAs, drift, age, staleness, visibility_count), and adaptive scheduling priority tiers (0..3).
+    These two systems serve orthogonal purposes and remain strictly synchronized at lifecycle
+    boundaries (initialization, compaction, densification, and reordering).
+    """
     UNSTABLE = 0
     STABLE = 1
     FROZEN = 2
@@ -296,6 +305,7 @@ class GaussianModel(nn.Module):
         self,
         new_params: Dict[str, torch.Tensor],
         parent_indices: Optional[torch.Tensor] = None,
+        n_children_per_parent: int = 1,
         frame_idx: int = 0,
     ):
         """Add new Gaussians to the model and register persistent identities.
@@ -304,12 +314,30 @@ class GaussianModel(nn.Module):
             new_params: Dict with keys matching parameter names.
                 Required: 'xyz'. Optional: 'scaling', 'rotation', 'opacity',
                 'features_dc', 'features_rest', 'normals', 'confidence'
-            parent_indices: optional (P,) parent indices for lineage tracking
+            parent_indices: optional (P,) parent indices for lineage tracking.
+                Must satisfy: len(parent_indices) * n_children_per_parent == N_new,
+                or len(parent_indices) == N_new (when one parent index per new Gaussian).
+            n_children_per_parent: number of children spawned per parent entry (default 1).
             frame_idx: video frame index of creation
         """
         new_xyz = new_params['xyz']
         N_new = new_xyz.shape[0]
         device = new_xyz.device
+        
+        # Verify parent mapping alignment if parents provided (Point C)
+        effective_n_children = 1
+        if parent_indices is not None and len(parent_indices) > 0:
+            P = len(parent_indices)
+            if P * n_children_per_parent == N_new:
+                effective_n_children = n_children_per_parent
+            elif P == N_new:
+                effective_n_children = 1
+            else:
+                raise ValueError(
+                    f"Dimension mismatch in add_gaussians: new_xyz has {N_new} Gaussians, "
+                    f"but parent_indices has {P} with n_children_per_parent={n_children_per_parent} "
+                    f"(expected {P * n_children_per_parent} == {N_new} or {P} == {N_new})."
+                )
         
         def _cat(old, new):
             return nn.Parameter(torch.cat([old.data, new], dim=0))
@@ -337,9 +365,16 @@ class GaussianModel(nn.Module):
         
         # Register in persistent state store with lineage (Section IV)
         if parent_indices is not None and len(parent_indices) > 0:
-            self.state_store.register_densification(parent_indices, n_children_per_parent=1, frame_idx=frame_idx)
+            self.state_store.register_densification(
+                parent_indices, n_children_per_parent=effective_n_children, frame_idx=frame_idx
+            )
         else:
             self.state_store.create(N_new, frame_idx=frame_idx)
+            
+        assert self.num_gaussians == self.state_store.num_gaussians, (
+            f"StateStore size ({self.state_store.num_gaussians}) out of sync with "
+            f"GaussianModel size ({self.num_gaussians}) after add_gaussians."
+        )
     
     @torch.no_grad()
     def prune_gaussians(self, mask: torch.Tensor):
@@ -372,6 +407,10 @@ class GaussianModel(nn.Module):
         
         # Remap state store after compaction to preserve persistent identities
         self.state_store.remap_after_pruning(keep)
+        assert self.num_gaussians == self.state_store.num_gaussians, (
+            f"StateStore size ({self.state_store.num_gaussians}) out of sync with "
+            f"GaussianModel size ({self.num_gaussians}) after compact."
+        )
         return keep
 
     @torch.no_grad()
@@ -394,4 +433,8 @@ class GaussianModel(nn.Module):
         self._confidence = self._confidence[perm]
         self._state = self._state[perm]
         self.state_store.reorder(perm)
+        assert self.num_gaussians == self.state_store.num_gaussians, (
+            f"StateStore size ({self.state_store.num_gaussians}) out of sync with "
+            f"GaussianModel size ({self.num_gaussians}) after reorder."
+        )
 
