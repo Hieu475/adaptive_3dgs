@@ -57,7 +57,10 @@ class Phase6FeatureNormalizer:
         if isinstance(X, torch.Tensor):
             X = X.detach().cpu().numpy()
         self.mean = np.mean(X, axis=0).astype(np.float32)
-        self.std = (np.std(X, axis=0) + self.eps).astype(np.float32)
+        raw_std = np.std(X, axis=0).astype(np.float32)
+        # For constant/near-zero variance features, set std to 1.0 to avoid 1e-6 scaling explosion
+        raw_std[raw_std < 1e-4] = 1.0
+        self.std = raw_std
         self.n_samples_fit = len(X)
         return self
 

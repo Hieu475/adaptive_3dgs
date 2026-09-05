@@ -130,18 +130,22 @@ def adaptive_greedy_select(
     
     # Pre-compute static feature slices [0:24]
     precomputed_static = []
-    for cand_idx in active_indices:
-        ctx = build_full_context(
-            positions=positions,
-            candidate_idx=cand_idx,
-            all_features=all_features,
-            selected_indices=[],
-            contrib_indices=contrib_indices,
-            contrib_weights=contrib_weights,
-            config=config,
-        )
-        # Slices: self(11) + neighbor(8) + overlap(5) = 24
-        precomputed_static.append(ctx["full_vector"][:24].copy())
+    for i, c in enumerate(candidates):
+        if "full_feature_vector" in c and len(c["full_feature_vector"]) >= 24:
+            precomputed_static.append(np.asarray(c["full_feature_vector"], dtype=np.float32)[:24].copy())
+        else:
+            cand_idx = active_indices[i]
+            ctx = build_full_context(
+                positions=positions,
+                candidate_idx=cand_idx,
+                all_features=all_features,
+                selected_indices=[],
+                contrib_indices=contrib_indices,
+                contrib_weights=contrib_weights,
+                config=config,
+            )
+            # Slices: self(11) + neighbor(8) + overlap(5) = 24
+            precomputed_static.append(ctx["full_vector"][:24].copy())
 
     selected_cand_indices: List[int] = []
     selected_gaussian_ids: List[int] = []
@@ -282,16 +286,19 @@ def static_context_select(
     config = context_config or ContextConfig()
 
     # Build S = ∅ context vectors for all candidates
-    ctx_dict = build_full_context_batch(
-        positions=positions,
-        candidate_indices=active_indices,
-        all_features=all_features,
-        selected_indices=[],
-        contrib_indices=contrib_indices,
-        contrib_weights=contrib_weights,
-        config=config,
-    )
-    feature_matrix = np.stack([ctx_dict[g_id]["full_vector"] for g_id in active_indices])
+    if all("full_feature_vector" in c and len(c["full_feature_vector"]) == PHASE6_FEATURE_DIM for c in candidates):
+        feature_matrix = np.stack([np.asarray(c["full_feature_vector"], dtype=np.float32) for c in candidates])
+    else:
+        ctx_dict = build_full_context_batch(
+            positions=positions,
+            candidate_indices=active_indices,
+            all_features=all_features,
+            selected_indices=[],
+            contrib_indices=contrib_indices,
+            contrib_weights=contrib_weights,
+            config=config,
+        )
+        feature_matrix = np.stack([ctx_dict[g_id]["full_vector"] for g_id in active_indices])
 
     device = predictor.device
     batch_t = torch.tensor(feature_matrix, dtype=torch.float32, device=device)

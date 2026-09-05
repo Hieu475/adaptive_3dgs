@@ -1,0 +1,76 @@
+{
+  "ablation_ladder": [
+    {
+      "variant": "V8",
+      "features_dim": 11,
+      "spearman_rho": 0.19964545437704348,
+      "pearson_r": 0.14638960809984178,
+      "ndcg_5": 0.44044505652362265,
+      "mae_utility": 0.003341834425015029,
+      "val_loss": 10.597859382629395,
+      "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_V8.pt",
+      "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_V8.json",
+      "train_time_s": 1.5597358419981902
+    },
+    {
+      "variant": "V9",
+      "features_dim": 19,
+      "spearman_rho": 0.343534070144282,
+      "pearson_r": 0.06251862813432887,
+      "ndcg_5": 0.38099865765288365,
+      "mae_utility": 0.00506252027831785,
+      "val_loss": 10.557755470275879,
+      "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_V9.pt",
+      "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_V9.json",
+      "train_time_s": 0.6044590710007469
+    },
+    {
+      "variant": "V10",
+      "features_dim": 24,
+      "spearman_rho": -0.4190755934220823,
+      "pearson_r": -0.38794046255230075,
+      "ndcg_5": 0.25744608685062126,
+      "mae_utility": 0.004240195357219272,
+      "val_loss": 10.571690559387207,
+      "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_V10.pt",
+      "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_V10.json",
+      "train_time_s": 0.606345168002008
+    },
+    {
+      "variant": "V11",
+      "features_dim": 32,
+      "spearman_rho": 0.6499999999999999,
+      "pearson_r": 0.34627508417034947,
+      "ndcg_5": 0.4137293215230927,
+      "mae_utility": 0.028254074120449273,
+      "val_loss": 5.833715438842773,
+      "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_V11.pt",
+      "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_V11.json",
+      "train_time_s": 0.7445182629962801
+    }
+  ],
+  "interaction_analysis": {
+    "low_overlap": {
+      "n_samples": 24,
+      "mean_interaction_residual": -4.0422769635497796e-05,
+      "sub_additive_fraction": 0.875,
+      "mean_additivity_ratio": 0.9848510746712876,
+      "median_additivity_ratio": 0.9995809479509521
+    },
+    "medium_overlap": {
+      "n_samples": 56,
+      "mean_interaction_residual": -2.4245766503476673e-05,
+      "sub_additive_fraction": 0.9107142857142857,
+      "mean_additivity_ratio": 0.9993041362910897,
+      "median_additivity_ratio": 0.9995986971013897
+    },
+    "high_overlap": {
+      "n_samples": 0,
+      "mean_interaction_residual": 0.0,
+      "sub_additive_fraction": 0.0,
+      "mean_additivity_ratio": 1.0,
+      "median_additivity_ratio": 1.0
+    }
+  },
+  "thesis_confirmed": false
+}
