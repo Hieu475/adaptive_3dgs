@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# =============================================================================
+# DEPRECATED: This script uses non-unified budget semantics.
+# The authoritative Phase 5 benchmark is: experiments/run_phase5_budget_selection.py
+# This file is retained for historical reference only.
+# =============================================================================
 """Stage A: Controlled Equal-Compute Budget Sweep Benchmark (Phase 5).
 
 Evaluates hypothesis RQ2 across protocol seeds [42, 43, 44, 45, 46]:

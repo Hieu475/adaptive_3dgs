@@ -1,6 +1,6 @@
 {
   "protocol_version": "1.0.0",
-  "date_locked": "2026-09-03",
+  "benchmark_name": "Phase 5: Budget-Constrained Utility-Guided Selection",
   "test_scene": "tum_fr2_xyz",
   "seeds": [
     42,
@@ -27,13 +27,20 @@
     33.3
   ],
   "safety_factor": 1.1,
+  "safety_factor_ablation_alphas": [
+    1.0,
+    1.05,
+    1.1,
+    1.2
+  ],
   "policies": [
-    "oracle",
-    "learned_utility",
-    "heuristic",
-    "error_influence",
+    "no_op",
+    "random",
     "error_only",
-    "random"
+    "error_influence",
+    "heuristic",
+    "learned_utility",
+    "oracle_reference"
   ],
   "device": "cuda"
 }

@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# =============================================================================
+# DEPRECATED: This script predates the Phase 5 budget semantics reform.
+# It uses non-unified budget definitions (budget_val for baselines vs
+# budget_pred for learned) which makes policy comparisons unfair.
+# The authoritative Phase 5 benchmark is: experiments/run_phase5_budget_selection.py
+# This file is retained for historical reference and backward compatibility only.
+# =============================================================================
 """Phase 6 & 8: Equal-Compute Budget Sweep Benchmark & Pareto Frontier (Gate 3).
 
 Strictly adheres to Phase 5 Protocol Reforms:

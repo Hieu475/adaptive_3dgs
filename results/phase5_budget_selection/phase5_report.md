@@ -11,9 +11,11 @@
 - [x] **Negative Utility Rejection:** $\hat U_i \le 0$ rejected by default; empty subset $S = \emptyset$ validly generated when no positive candidates exist.
 
 ### Gate 5B — Decision Quality
-- [x] **Learned > Random:** $\Delta Q_{learned} = +0.000153$ vs $\Delta Q_{random} = +0.000148$ at B=60%.
-- [x] **Learned > Error-Only:** Cohen's $d = -0.637$, Wilcoxon $p = 9.5801e-01$.
-- [x] **Learned > Heuristic:** Cohen's $d = -0.767$, Wilcoxon $p = 9.9512e-01$.
+- **Status: FAIL / INCONCLUSIVE**
+- [~] **Learned > Random:** Weak evidence ($\Delta Q_{learned} = +0.000153$ vs $\Delta Q_{random} = +0.000148$ at B=60%).
+- [ ] **Learned > Error-Only:** NO (Cohen's $d = -0.637$, Wilcoxon $p = 9.5801e-01$).
+- [ ] **Learned > Heuristic:** NO (Cohen's $d = -0.767$, Wilcoxon $p = 9.9512e-01$).
+- [ ] **Learned > Error×Influence:** NO ($\Delta Q_{learned} = +0.000153$ vs $\Delta Q_{error×inf} = +0.000239$).
 
 ### Gate 5C — Budget Efficiency
 - [x] **OSE:** Computed as $\Delta Q_{{learned}} / \Delta Q_{{oracle}}$ with scientific hygiene (NaN for non-positive oracle denominator).
@@ -21,9 +23,11 @@
 - [x] **Policy Efficiency:** Measured quality gain per millisecond compute ($\Delta Q / C_{{actual}}$).
 
 ### Gate 5D — Systems & Latency
+- **Status: FAIL**
+- **Reason:** Nominal/scheduled budget constraint satisfied ($\sum \alpha \hat C_i \le B$), but actual intervention latency violates budget due to fixed GPU rasterization overhead ($T_{fixed} \approx 500-700$ ms).
 - [x] **Latency Breakdown:** Component breakdown $T_{{feat}}, T_{{pred}}, T_{{select}}, T_{{opt}}, T_{{total}}$ rigorously timed with CUDA synchronization.
 - [x] **Overhead:** Prediction + selection latency is negligible compared to optimization.
-- [x] **Hard Budget Safety Margin:** Applied safety factor $\alpha = 1.10$, maintaining near-zero actual budget overshoots.
+- [ ] **Actual Budget Compliance:** Safety factor $\alpha = 1.10$ applied but actual GPU group optimization cost far exceeds scheduled budget. Violation rates: 85-100% at 15ms target.
 - [x] **Memory Footprint:** Baseline VRAM = 24.6 MB, Learned Scheduler VRAM = 24.6 MB ($\Delta M = +0.0$ MB).
 
 ### Gate 5E — Reproducibility
@@ -118,6 +122,7 @@
 
 ## 6. Summary & Conclusions
 
-1. **Hypothesis Verified:** Across 5 independent protocol seeds, learned utility selection consistently dominates error-only and heuristic baselines under equal compute budgets.
-2. **Cost Accuracy:** Model cost predictions combined with safety margin strictly bound wall-clock execution, preventing GPU budget overruns.
-3. **Zero-Leakage Assurance:** Clean separation between Phase 4 offline frozen weights and Phase 5 online execution completely satisfied.
+1. **Gate 5B Honest Outcome:** Under equal-compute knapsack selection, learned utility does **NOT** outperform heuristic or error-driven policies at $B=60\%$ (Cohen's $d = -0.767$, Wilcoxon $p = 0.995$). The root cause is sub-additive photometric overlap during group optimization — marginal utility models cannot capture group interaction effects.
+2. **Gate 5D Systems Bottleneck:** The scheduler strictly obeys *scheduled* budget constraints ($\sum \alpha \hat C_i \le B$). However, **actual GPU group optimization latency violates the budget** due to fixed rasterization overhead ($T_{fixed} \approx 500-700$ ms). Budget violation rates range from 85% to 100% at the 15ms wall-clock target. Future work must incorporate a non-linear group cost model $C(S) = T_{fixed} + \sum C_i$.
+3. **Gate 5A Verified:** Zero-leakage assurance confirmed — clean separation between Phase 4 offline frozen weights and Phase 5 online execution.
+4. **Gate 5E Verified:** Full reproducibility across 5 independent protocol seeds `[42, 43, 44, 45, 46]` with complete per-seed JSON artifacts.

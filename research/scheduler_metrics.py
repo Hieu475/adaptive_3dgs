@@ -2,10 +2,10 @@
 
 Provides standardized evaluation metrics for compute-budgeted Gaussian scheduling:
   - Oracle Selection Efficiency (OSE) with scientific hygiene (NaN for non-positive denominator)
-  - Absolute and Relative Regret
+  - Absolute and Relative Regret, and Selection Regret
   - Policy Efficiency (Realized Gain / Actual Cost in ms)
-  - Cost Calibration: Absolute Error, MAPE_C, and Hard Budget Violation (V_B)
-  - Selection Churn across sequential frames
+  - Cost Calibration: Absolute Error, MAPE_C, R2_C, and Hard Budget Violation (V_B)
+  - Selection Churn and retention tracking across sequential frames
   - Memory overhead tracking (GPU VRAM / RAM)
   - Multi-seed statistical tests (95% Bootstrap CI, Wilcoxon Signed-Rank, Cohen's d)
 """
@@ -18,9 +18,11 @@ from scipy.stats import wilcoxon
 def compute_ose(delta_q_learned: float, delta_q_oracle: float) -> Optional[float]:
     """Computes Oracle Selection Efficiency: OSE(B) = Delta Q_learned(B) / Delta Q_oracle(B).
     
-    Scientific Hygiene Rule (Point 18):
-      When Delta Q_oracle <= 0, denominator has no valid scientific upper bound.
-      Returns None (JSON null / float('nan')) instead of an unprincipled fallback (e.g. 1.0).
+    Scientific Hygiene Rule (Point 18, Phase 5 IV/V):
+      When Delta Q_oracle <= 0, denominator has no valid scientific reference.
+      Returns None (JSON null / float('nan')) instead of an unprincipled fallback.
+      OSE is interpreted as efficiency relative to oracle-guided reference policy,
+      NOT as fraction of a combinatorial global optimum.
     """
     if delta_q_oracle is None or np.isnan(delta_q_oracle) or delta_q_oracle <= 0.0:
         return None
@@ -44,6 +46,11 @@ def compute_regret(
         "regret_abs": regret_abs,
         "regret_rel": regret_rel,
     }
+
+
+def compute_selection_regret(delta_q_oracle: float, delta_q_policy: float) -> float:
+    """Computes Selection Regret: SelectionRegret(B) = Q(S*_B) - Q(S_B)."""
+    return float(delta_q_oracle - delta_q_policy)
 
 
 def compute_policy_efficiency(
@@ -84,6 +91,32 @@ def compute_cost_metrics(
     }
 
 
+def compute_cost_calibration_metrics(
+    actual_costs: np.ndarray,
+    predicted_costs: np.ndarray,
+    eps: float = 1e-6,
+) -> Dict[str, float]:
+    """Computes MAE_C, MAPE_C, and R2_C across paired cost observations."""
+    acts = np.asarray(actual_costs, dtype=np.float64)
+    preds = np.asarray(predicted_costs, dtype=np.float64)
+    if len(acts) == 0:
+        return {"mae_c": 0.0, "mape_c": 0.0, "r2_c": 0.0}
+
+    errors = np.abs(acts - preds)
+    mae_c = float(np.mean(errors))
+    mape_c = float(np.mean(errors / (np.abs(acts) + eps)) * 100.0)
+
+    ss_res = np.sum((acts - preds) ** 2)
+    ss_tot = np.sum((acts - np.mean(acts)) ** 2)
+    r2_c = float(1.0 - (ss_res / (ss_tot + eps))) if ss_tot > eps else 0.0
+
+    return {
+        "mae_c": mae_c,
+        "mape_c": mape_c,
+        "r2_c": r2_c,
+    }
+
+
 def compute_selection_churn(
     current_selected_ids: Union[Set[int], List[int]],
     previous_selected_ids: Union[Set[int], List[int]],
@@ -103,6 +136,27 @@ def compute_selection_churn(
         return 0.0
     inter_len = len(s_curr & s_prev)
     return float(1.0 - (inter_len / union_len))
+
+
+def compute_extended_churn(
+    current_selected_ids: Union[Set[int], List[int]],
+    previous_selected_ids: Union[Set[int], List[int]],
+) -> Dict[str, Any]:
+    """Computes detailed churn, retained count, and new count (Section XX)."""
+    s_curr = set(current_selected_ids)
+    s_prev = set(previous_selected_ids)
+    
+    churn_val = compute_selection_churn(s_curr, s_prev)
+    retained = len(s_curr & s_prev)
+    new_sel = len(s_curr - s_prev)
+    total_sel = len(s_curr)
+
+    return {
+        "selection_churn": churn_val,
+        "selected_count": total_sel,
+        "retained_count": retained,
+        "new_selected_count": new_sel,
+    }
 
 
 def compute_memory_overhead(device: Optional[Union[str, torch.device]] = None) -> Dict[str, float]:
@@ -151,7 +205,7 @@ def bootstrap_ci_95(
 
 
 def compute_cohens_d(group1: np.ndarray, group2: np.ndarray) -> float:
-    """Computes paired Cohen's d effect size."""
+    """Computes paired Cohen's d effect size on n paired observations."""
     g1 = np.asarray(group1, dtype=np.float64)
     g2 = np.asarray(group2, dtype=np.float64)
     diff = g1 - g2
@@ -163,7 +217,7 @@ def compute_cohens_d(group1: np.ndarray, group2: np.ndarray) -> float:
 
 
 def paired_wilcoxon_test(group1: np.ndarray, group2: np.ndarray) -> Tuple[float, float]:
-    """Runs paired Wilcoxon signed-rank test (alternative: group1 > group2)."""
+    """Runs paired Wilcoxon signed-rank test on n paired observations (alternative: group1 > group2)."""
     g1 = np.asarray(group1, dtype=np.float64)
     g2 = np.asarray(group2, dtype=np.float64)
     if len(g1) < 5 or np.allclose(g1, g2):

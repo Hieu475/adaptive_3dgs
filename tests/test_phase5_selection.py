@@ -52,7 +52,12 @@ def test_frozen_utility_predictor_inference():
 
 
 def test_selection_hard_budget_constraint():
-    """Verify that all policies strictly respect the hard compute budget."""
+    """Verify that all policies strictly respect the hard compute budget.
+
+    Reform: Under unified budget semantics, ALL policies (including baselines)
+    must satisfy the same scheduled_cost <= budget constraint. The scheduled_cost
+    is defined as sum(packing_cost_i * safety_factor) for all selected candidates.
+    """
     candidates = [
         {
             "gaussian_id": i,
@@ -72,21 +77,27 @@ def test_selection_hard_budget_constraint():
     budget = 25.0
 
     for policy in PolicyName:
-        res = select_budget_constrained_subset(
-            candidates,
-            policy=policy,
-            budget=budget,
-            seed=42,
-            cost_key="measured_trial_cost_ms",
-            pred_cost_key="predicted_delta_t",
-        )
-        assert isinstance(res, SelectionResult)
-        if policy == PolicyName.LEARNED_UTILITY:
-            # Learned policy enforces budget on predicted cost
-            assert res.predicted_cost <= budget + 1e-6
-        else:
-            # Baseline policies enforce budget on nominal cost
-            assert res.nominal_cost <= budget + 1e-6
+        for sf in [1.0, 1.10]:
+            res = select_budget_constrained_subset(
+                candidates,
+                policy=policy,
+                budget=budget,
+                seed=42,
+                use_predicted_cost=True,
+                safety_factor=sf,
+                cost_key="measured_trial_cost_ms",
+                pred_cost_key="predicted_delta_t",
+            )
+            assert isinstance(res, SelectionResult)
+            # Unified budget semantics: ALL policies must satisfy scheduled_cost <= budget
+            assert res.scheduled_cost <= budget + 1e-6, (
+                f"Policy {policy.value} (alpha={sf}) violates budget: "
+                f"scheduled_cost={res.scheduled_cost:.4f} > budget={budget:.4f}"
+            )
+            # Scheduled violation must be near zero
+            assert res.scheduled_budget_violation < 1e-5, (
+                f"Policy {policy.value} has non-zero scheduled violation: {res.scheduled_budget_violation}"
+            )
 
 
 def test_negative_utility_rejection():
@@ -144,3 +155,105 @@ def test_empty_candidate_pool_graceful():
     assert res.predicted_cost == 0.0
     assert res.nominal_cost == 0.0
     assert res.selected_indices == []
+
+
+def test_budget_violation_tracking():
+    """Verify that actual cost violations are correctly detected and reported.
+
+    Phase 5 Reform (Item I): The evaluation must track actual_cost vs budget
+    and report violations. C_actual(S_B) > B must be flagged as is_violation=True.
+    """
+    from research.scheduler_metrics import compute_cost_metrics
+
+    # Case 1: No violation (actual < budget)
+    m1 = compute_cost_metrics(actual_cost_ms=15.0, predicted_cost_ms=12.0, budget_ms=20.0)
+    assert m1["is_violation"] is False
+    assert m1["budget_violation_ms"] == 0.0
+
+    # Case 2: Violation (actual > budget)
+    m2 = compute_cost_metrics(actual_cost_ms=700.0, predicted_cost_ms=12.0, budget_ms=20.0)
+    assert m2["is_violation"] is True
+    assert m2["budget_violation_ms"] == pytest.approx(680.0)
+
+    # Case 3: Large violation typical of group optimization overhead
+    m3 = compute_cost_metrics(actual_cost_ms=994.0, predicted_cost_ms=16.2, budget_ms=138.0)
+    assert m3["is_violation"] is True
+    assert m3["budget_violation_ms"] == pytest.approx(856.0)
+    assert m3["cost_error_ms"] == pytest.approx(994.0 - 16.2)
+
+
+def test_cost_calibration_metrics():
+    """Verify MAE_C, MAPE_C, and R2_C computation for cost calibration (Item XIII)."""
+    from research.scheduler_metrics import compute_cost_calibration_metrics
+
+    # Perfect calibration
+    actual = np.array([10.0, 20.0, 30.0])
+    predicted = np.array([10.0, 20.0, 30.0])
+    m = compute_cost_calibration_metrics(actual, predicted)
+    assert m["mae_c"] == pytest.approx(0.0, abs=1e-6)
+    assert m["r2_c"] == pytest.approx(1.0, abs=1e-4)
+
+    # Imperfect calibration
+    actual2 = np.array([700.0, 800.0, 900.0, 1000.0])
+    predicted2 = np.array([10.0, 15.0, 20.0, 25.0])
+    m2 = compute_cost_calibration_metrics(actual2, predicted2)
+    assert m2["mae_c"] > 600.0  # Large systematic underestimation
+    assert m2["mape_c"] > 90.0  # Very high MAPE
+
+
+def test_selection_with_safety_factor_reduces_count():
+    """Verify that higher safety factors reduce the number of selected candidates.
+
+    Phase 5 Reform (Item XIV): Safety factor alpha should trade off between
+    fewer candidates (lower violation risk) and quality loss.
+    """
+    candidates = [
+        {
+            "gaussian_id": i,
+            "measured_trial_cost_ms": 5.0,
+            "predicted_delta_t": 5.0,
+            "predicted_utility": float(1.0),
+            "oracle_utility_joint_global": float(1.0),
+            "features": {"rgb_error": 0.5, "depth_error": 0.5, "influence_mass": 1.0},
+        }
+        for i in range(10)
+    ]
+    budget = 25.0
+
+    res_100 = select_budget_constrained_subset(
+        candidates, policy=PolicyName.LEARNED_UTILITY, budget=budget,
+        safety_factor=1.0, use_predicted_cost=True,
+    )
+    res_120 = select_budget_constrained_subset(
+        candidates, policy=PolicyName.LEARNED_UTILITY, budget=budget,
+        safety_factor=1.20, use_predicted_cost=True,
+    )
+    # Higher safety factor means fewer candidates fit under budget
+    assert res_100.k_count >= res_120.k_count
+    # alpha=1.0: 5*5=25 <= 25, so 5 fit. alpha=1.2: 5*6=30 > 25, 4*6=24 <= 25, so 4 fit.
+    assert res_100.k_count == 5
+    assert res_120.k_count == 4
+
+
+def test_noop_baseline():
+    """Verify NO_OP baseline returns zero cost and zero quality (Item XVI)."""
+    candidates = [
+        {
+            "gaussian_id": i,
+            "measured_trial_cost_ms": 10.0,
+            "predicted_delta_t": 10.0,
+            "predicted_utility": 0.5,
+            "oracle_utility_joint_global": 0.5,
+            "features": {"rgb_error": 0.5, "depth_error": 0.5, "influence_mass": 1.0},
+        }
+        for i in range(5)
+    ]
+    res = select_budget_constrained_subset(
+        candidates, policy=PolicyName.NO_OP, budget=100.0
+    )
+    assert res.k_count == 0
+    assert res.predicted_cost == 0.0
+    assert res.scheduled_cost == 0.0
+    assert res.nominal_cost == 0.0
+    assert len(res.selected_indices) == 0
+    assert len(res.selected_gaussian_ids) == 0
