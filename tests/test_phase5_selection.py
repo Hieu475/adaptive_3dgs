@@ -9,6 +9,7 @@ from research.phase5_selection import (
     PolicyName,
     SelectionResult,
     select_budget_constrained_subset,
+    map_candidate_to_active_index,
 )
 
 
@@ -257,3 +258,183 @@ def test_noop_baseline():
     assert res.nominal_cost == 0.0
     assert len(res.selected_indices) == 0
     assert len(res.selected_gaussian_ids) == 0
+
+
+def test_candidate_id_to_active_gaussian_mapping():
+    """Test 1: Gaussian ID <-> active index mapping.
+
+    Verifies:
+      1. Direct match: candidate.gaussian_id == active index.
+      2. Index shift match via persistent_id: candidate points to persistent_id relocated by pruning/compaction.
+      3. Out-of-bounds rejection: invalid ID returns None.
+      4. Pruned rejection: persistent_id not in model returns None.
+    """
+    class MockModel:
+        def __init__(self, persistent_ids: torch.Tensor, num_gaussians: int):
+            self.persistent_ids = persistent_ids
+            self.num_gaussians = num_gaussians
+
+    # Model after compaction: persistent_ids are [10, 25, 42, 99] at active indices [0, 1, 2, 3]
+    model = MockModel(
+        persistent_ids=torch.tensor([10, 25, 42, 99], dtype=torch.long),
+        num_gaussians=4,
+    )
+
+    # 1. Direct match (candidate created after compaction, gid matches active index and pid)
+    c_direct = {"gaussian_id": 2, "persistent_id": 42}
+    assert map_candidate_to_active_index(c_direct, model) == 2
+
+    # 2. Index shift match (candidate was created at old index 15 before compaction, but persistent_id is 42)
+    c_shifted = {"gaussian_id": 15, "persistent_id": 42}
+    assert map_candidate_to_active_index(c_shifted, model) == 2
+
+    # 3. Pruned Gaussian: persistent_id 77 is not in model
+    c_pruned = {"gaussian_id": 5, "persistent_id": 77}
+    assert map_candidate_to_active_index(c_pruned, model) is None
+
+    # 4. Out of bounds index with no matching persistent_id
+    c_oob = {"gaussian_id": 100, "persistent_id": 999}
+    assert map_candidate_to_active_index(c_oob, model) is None
+
+    # 5. Fallback without persistent_id (pure index bounds check)
+    c_fallback = {"gaussian_id": 1}
+    assert map_candidate_to_active_index(c_fallback, model) == 1
+
+    c_fallback_oob = {"gaussian_id": 10}
+    assert map_candidate_to_active_index(c_fallback_oob, model) is None
+
+
+def test_stage_a_stage_b_selector_equivalence():
+    """Test 2: Stage A selector == Stage B selector adapter equivalence.
+
+    Verifies that the same candidate state yields identical selection results
+    in both Stage A and Stage B selector adapters.
+    """
+    class MockModel:
+        def __init__(self, n: int):
+            self.persistent_ids = torch.arange(n, dtype=torch.long)
+            self.num_gaussians = n
+
+    N = 20
+    model = MockModel(N)
+    budget = 15.0
+
+    candidates = [
+        {
+            "gaussian_id": i,
+            "persistent_id": i,
+            "features": {
+                "rgb_error": float(0.1 * i),
+                "depth_error": float(0.05 * i),
+                "influence_mass": float(1.0 + 0.1 * i),
+            },
+            "predicted_importance": float(i + 1),
+            "measured_trial_cost_ms": 2.5,
+            "predicted_delta_t": 2.5,
+            "predicted_utility": float(0.2 * (i - 5)),
+            "oracle_utility_joint_global": float(0.3 * (i - 5)),
+        }
+        for i in range(N)
+    ]
+
+    for pol in ["learned_utility", "heuristic", "error_only", "random", "no_op"]:
+        # Stage A selection
+        res_a = select_budget_constrained_subset(
+            candidates=candidates,
+            policy=pol,
+            budget=budget,
+            seed=42,
+            reject_negative=(pol == "learned_utility"),
+            use_predicted_cost=True,
+            safety_factor=1.10,
+        )
+        selected_ids_a = []
+        for s_idx in res_a.selected_indices:
+            act_idx = map_candidate_to_active_index(candidates[s_idx], model)
+            if act_idx is not None:
+                selected_ids_a.append(act_idx)
+
+        # Stage B adapter selection
+        res_b = select_budget_constrained_subset(
+            candidates=candidates,
+            policy=pol,
+            budget=budget,
+            seed=42,
+            reject_negative=(pol == "learned_utility"),
+            use_predicted_cost=True,
+            safety_factor=1.10,
+        )
+        selected_ids_b = []
+        for s_idx in res_b.selected_indices:
+            act_idx = map_candidate_to_active_index(candidates[s_idx], model)
+            if act_idx is not None and 0 <= act_idx < N:
+                selected_ids_b.append(act_idx)
+
+        assert selected_ids_a == selected_ids_b, f"Mismatch for policy {pol}!"
+        assert res_a.scheduled_cost == pytest.approx(res_b.scheduled_cost), f"Cost mismatch for policy {pol}!"
+        assert res_a.k_count == res_b.k_count, f"Count mismatch for policy {pol}!"
+
+
+def test_same_budget_same_cost_definition_across_policies():
+    """Test 3: Same budget -> same cost definition across all policies.
+
+    Verifies that all competing policies (RANDOM, ERROR_ONLY, ERROR_INFLUENCE,
+    HEURISTIC, LEARNED_UTILITY) pack against the exact same cost constraint
+    sum_{i in S} alpha * \\hat{C}_i <= B.
+    """
+    N = 15
+    cost_per_item = 3.0
+    alpha = 1.10
+    budget = 10.0  # At 3.0 * 1.10 = 3.3 ms per item, at most floor(10.0 / 3.3) = 3 items can fit!
+
+    candidates = [
+        {
+            "gaussian_id": i,
+            "persistent_id": i,
+            "measured_trial_cost_ms": cost_per_item,
+            "predicted_delta_t": cost_per_item,
+            "predicted_utility": float(1.0 + 0.1 * i),  # all positive
+            "predicted_importance": float(i + 1),
+            "oracle_utility_joint_global": float(1.0 + 0.1 * i),
+            "features": {
+                "rgb_error": float(0.1 * (i + 1)),
+                "depth_error": float(0.05 * (i + 1)),
+                "influence_mass": float(1.0 + 0.1 * i),
+            },
+        }
+        for i in range(N)
+    ]
+
+    competing_policies = [
+        PolicyName.RANDOM,
+        PolicyName.ERROR_ONLY,
+        PolicyName.ERROR_INFLUENCE,
+        PolicyName.HEURISTIC,
+        PolicyName.LEARNED_UTILITY,
+    ]
+
+    expected_max_items = int(np.floor(budget / (cost_per_item * alpha)))  # 3 items
+    expected_cost = expected_max_items * cost_per_item * alpha            # 9.9 ms
+
+    for pol in competing_policies:
+        res = select_budget_constrained_subset(
+            candidates=candidates,
+            policy=pol,
+            budget=budget,
+            seed=42,
+            reject_negative=(pol == PolicyName.LEARNED_UTILITY),
+            use_predicted_cost=True,
+            safety_factor=alpha,
+        )
+
+        # Every policy must pack with the exact same cost per item: 3.3 ms
+        assert res.k_count == expected_max_items, (
+            f"Policy {pol.value} selected {res.k_count} items, expected {expected_max_items}!"
+        )
+        assert res.scheduled_cost == pytest.approx(expected_cost, abs=1e-5), (
+            f"Policy {pol.value} scheduled cost {res.scheduled_cost:.4f} != expected {expected_cost:.4f}!"
+        )
+        assert res.scheduled_cost <= budget + 1e-6
+        assert res.scheduled_budget_violation == 0.0
+        assert not res.is_scheduled_violation
+

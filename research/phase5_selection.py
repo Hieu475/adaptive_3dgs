@@ -52,6 +52,57 @@ class SelectionResult:
     is_scheduled_violation: bool = False
 
 
+def map_candidate_to_active_index(candidate: Dict[str, Any], model: Any) -> Optional[int]:
+    """Resolves a candidate representation to the current active Gaussian tensor index in the model.
+
+    Invariant:
+      candidate.gaussian_id matches either the direct tensor index or model.persistent_ids lookup.
+      Guarantees validity across densification, pruning, and compaction operations.
+
+    Args:
+        candidate: Candidate dictionary containing 'gaussian_id' and optionally 'persistent_id'.
+        model: Gaussian model with 'persistent_ids' or 'num_gaussians'/'positions'.
+
+    Returns:
+        Active integer index in [0, num_gaussians - 1], or None if invalid/out-of-bounds/pruned.
+    """
+    gid = candidate.get("gaussian_id")
+    pid = candidate.get("persistent_id")
+
+    if hasattr(model, "persistent_ids") and model.persistent_ids is not None:
+        pids = model.persistent_ids
+        n_pids = len(pids)
+
+        # Fast path: direct position matches persistent_id
+        if gid is not None and 0 <= gid < n_pids:
+            p_val = pids[gid].item() if hasattr(pids[gid], "item") else pids[gid]
+            if pid is None or p_val == pid:
+                return int(gid)
+
+        # Search path: persistent_id relocated due to compaction/reordering/pruning
+        if pid is not None:
+            if isinstance(pids, torch.Tensor):
+                matches = (pids == pid).nonzero(as_tuple=True)[0]
+                if len(matches) > 0:
+                    return int(matches[0].item())
+            elif isinstance(pids, np.ndarray):
+                matches = np.where(pids == pid)[0]
+                if len(matches) > 0:
+                    return int(matches[0])
+            elif isinstance(pids, list):
+                if pid in pids:
+                    return pids.index(pid)
+
+    num_g = getattr(model, "num_gaussians", None)
+    if num_g is None and hasattr(model, "positions") and model.positions is not None:
+        num_g = len(model.positions)
+
+    if gid is not None and num_g is not None and 0 <= gid < num_g:
+        return int(gid)
+
+    return None
+
+
 def select_budget_constrained_subset(
     candidates: List[Dict[str, Any]],
     policy: Union[str, PolicyName],

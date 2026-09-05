@@ -20,6 +20,8 @@ import sys
 import json
 import time
 import argparse
+import hashlib
+import subprocess
 from typing import Dict, List, Any, Tuple, Optional
 import numpy as np
 import pandas as pd
@@ -33,7 +35,12 @@ from datasets.tum_dataset import TUMDataset
 from research.pipeline import OnlineReconstructionPipeline
 from research.oracle_utility import OracleUtilityExperiment
 from research.utility_predictor import FrozenUtilityPredictor
-from research.phase5_selection import PolicyName, SelectionResult, select_budget_constrained_subset
+from research.phase5_selection import (
+    PolicyName,
+    SelectionResult,
+    select_budget_constrained_subset,
+    map_candidate_to_active_index,
+)
 from research.phase5_evaluator import Phase5Evaluator
 from research.scheduler_metrics import (
     compute_ose,
@@ -175,6 +182,9 @@ def run_stage_b_online_trajectory(
     policies = ["no_op", "learned_utility", "heuristic", "error_only", "random"]
     traj_summary = {}
 
+    # Initialize frozen predictor once to provide identical candidate cost predictions for all policies
+    predictor = FrozenUtilityPredictor(seed=seed, device=device)
+
     for pol in policies:
         torch.manual_seed(seed)
         np.random.seed(seed)
@@ -183,8 +193,6 @@ def run_stage_b_online_trajectory(
         pipe.config['scheduler']['gpu_budget_ms'] = budget_ms
         pipe.scheduler.gpu_budget_ms = budget_ms
         pipe.scheduler.budget_scale_factor = 1.0
-
-        predictor = FrozenUtilityPredictor(seed=seed, device=device) if pol == "learned_utility" else None
 
         # Unified Phase 5 selection adapter:
         # Ensures Stage B uses the exact same select_budget_constrained_subset policy path as Stage A
@@ -204,12 +212,10 @@ def run_stage_b_online_trajectory(
             inf_mass_t = inf_mass[:N_gaussians] if inf_mass is not None and inf_mass.shape[0] >= N_gaussians else torch.ones(N_gaussians, device=device)
             imp_scores = est.compute_importance()[:N_gaussians]
 
-            pred_u = None
-            pred_t = None
-            if pol == "learned_utility" and predictor is not None:
-                res_p = predictor.predict_features(X)
-                pred_u = res_p["predicted_utility"]
-                pred_t = res_p["predicted_delta_t"]
+            # Unified cost model: Predict delta_t for ALL candidates across ALL policies
+            res_p = predictor.predict_features(X)
+            pred_t = res_p["predicted_delta_t"]
+            pred_u = res_p["predicted_utility"] if pol == "learned_utility" else None
 
             # 3. Build candidate representations for select_budget_constrained_subset
             cand_list = []
@@ -217,36 +223,41 @@ def run_stage_b_online_trajectory(
             depth_err_np = depth_err.detach().cpu().numpy()
             inf_mass_np = inf_mass_t.detach().cpu().numpy()
             imp_scores_np = imp_scores.detach().cpu().numpy()
+            pids = getattr(pipeline_obj.gaussian_model, "persistent_ids", None)
 
             for idx in range(N_gaussians):
+                pid = int(pids[idx].item()) if (pids is not None and idx < len(pids)) else idx
                 c_dict = {
                     "gaussian_id": idx,
+                    "persistent_id": pid,
                     "features": {
                         "rgb_error": float(color_err_np[idx]),
                         "depth_error": float(depth_err_np[idx]),
                         "influence_mass": float(inf_mass_np[idx]),
                     },
                     "predicted_importance": float(imp_scores_np[idx]),
-                    "measured_trial_cost_ms": 1.0,
+                    "measured_trial_cost_ms": float(pred_t[idx]),
+                    "predicted_delta_t": float(pred_t[idx]),
                 }
-                if pred_t is not None:
-                    c_dict["predicted_delta_t"] = float(pred_t[idx])
                 if pred_u is not None:
                     c_dict["predicted_utility"] = float(pred_u[idx])
                 cand_list.append(c_dict)
 
-            # 4. Invoke canonical Phase 5 selection
+            # 4. Invoke canonical Phase 5 selection with identical cost model for ALL policies
             sel_res = select_budget_constrained_subset(
                 candidates=cand_list,
                 policy=pol,
                 budget=budget_ms,
                 seed=seed + pipeline_obj.frame_count,
                 reject_negative=(pol == "learned_utility"),
-                use_predicted_cost=(pol == "learned_utility"),
+                use_predicted_cost=True,
                 safety_factor=1.10,
             )
             if sel_res.selected_indices:
-                mask[sel_res.selected_indices] = True
+                for s_idx in sel_res.selected_indices:
+                    act_idx = map_candidate_to_active_index(cand_list[s_idx], pipeline_obj.gaussian_model)
+                    if act_idx is not None and 0 <= act_idx < N_gaussians:
+                        mask[act_idx] = True
             return mask
 
         pipe._custom_selector_fn = stage_b_selector
@@ -341,7 +352,7 @@ def main():
     parser.add_argument("--seeds", type=int, nargs="+", default=None, help="Protocol seeds to evaluate")
     parser.add_argument("--frames", type=int, nargs="+", default=[10, 20], help="Benchmark frames")
     parser.add_argument("--safety-factor", type=float, default=1.10, help="Scheduler safety factor alpha (default: 1.10)")
-    parser.add_argument("--run-online", action="store_true", default=True, help="Also run Stage B online trajectory")
+    parser.add_argument("--skip-online", action="store_true", default=False, help="Skip Stage B online trajectory")
     parser.add_argument("--force-rerun", action="store_true", default=False, help="Force rerun even if seed JSONs exist")
     args = parser.parse_args()
 
@@ -403,7 +414,18 @@ def main():
         PolicyName.LEARNED_UTILITY,
     ]
 
-    # Save Config Snapshot
+    # Save Config Snapshot with full provenance
+    try:
+        commit_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo_root).decode("utf-8").strip()
+    except Exception:
+        commit_sha = "unknown"
+
+    ckpt_path = os.path.join(repo_root, "checkpoints", "best_utility_model.pt")
+    ckpt_hash = None
+    if os.path.exists(ckpt_path):
+        with open(ckpt_path, "rb") as f:
+            ckpt_hash = hashlib.sha256(f.read()).hexdigest()
+
     config_snapshot = {
         "protocol_version": protocol.get("protocol_version", "1.0.0"),
         "benchmark_name": "Phase 5: Budget-Constrained Utility-Guided Selection",
@@ -416,15 +438,28 @@ def main():
         "safety_factor_ablation_alphas": safety_alphas,
         "policies": [p.value for p in base_policies] + [PolicyName.ORACLE_REFERENCE.value],
         "device": device,
+        "provenance": {
+            "git_commit": commit_sha,
+            "checkpoint_path": "checkpoints/best_utility_model.pt",
+            "checkpoint_sha256": ckpt_hash,
+            "seed_list": seeds,
+        },
     }
+    config_snapshot_str = json.dumps(config_snapshot, sort_keys=True)
+    config_snapshot["provenance"]["config_sha256"] = hashlib.sha256(config_snapshot_str.encode("utf-8")).hexdigest()
+
     with open(os.path.join(out_dir, "config_snapshot.json"), "w") as f:
         json.dump(config_snapshot, f, indent=2)
 
-    # Copy Model Manifest if present
+    # Copy Model Manifest if present and inject Phase 5 provenance
     model_manifest_src = os.path.join(repo_root, "results", "learned_utility", "model_manifest.json")
+    manifest_data = {}
     if os.path.exists(model_manifest_src):
-        with open(model_manifest_src, "r") as f_in, open(os.path.join(out_dir, "model_manifest.json"), "w") as f_out:
-            json.dump(json.load(f_in), f_out, indent=2)
+        with open(model_manifest_src, "r") as f_in:
+            manifest_data = json.load(f_in)
+    manifest_data["phase5_provenance"] = config_snapshot["provenance"]
+    with open(os.path.join(out_dir, "model_manifest.json"), "w") as f_out:
+        json.dump(manifest_data, f_out, indent=2)
 
     all_detailed_runs: List[Dict[str, Any]] = []
     all_annotated_candidates: List[Dict[str, Any]] = []
@@ -480,8 +515,10 @@ def main():
             ]
             if not cand_pool:
                 cand_pool = [dict(r) for r in test_candidates if r.get("frame") == t][:25]
-            num_curr_g = pipeline.gaussian_model.num_gaussians
-            cand_pool = [c for c in cand_pool if 0 <= int(c.get("gaussian_id", 0)) < num_curr_g]
+            cand_pool = [
+                c for c in cand_pool
+                if map_candidate_to_active_index(c, pipeline.gaussian_model) is not None
+            ]
 
             annotated_cands, t_feat, t_pred = predictor.predict_candidates(cand_pool, strict=True)
             all_annotated_candidates.extend([dict(c) for c in annotated_cands])
@@ -848,7 +885,7 @@ def main():
 
     # 5. Execute Stage B: Online Sequential Trajectory (Section XX, XXI)
     online_results = {}
-    if args.run_online:
+    if not args.skip_online:
         print("\n" + "=" * 110)
         print("  EXECUTING STAGE B: ONLINE MULTI-FRAME SEQUENTIAL TRAJECTORY (15ms Budget & Churn)")
         print("=" * 110)

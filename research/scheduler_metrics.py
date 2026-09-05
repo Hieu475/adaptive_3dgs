@@ -69,8 +69,8 @@ def compute_policy_efficiency(
 def compute_cost_metrics(
     actual_cost_ms: float,
     predicted_cost_ms: float,
-    scheduled_cost_ms: float,
     budget_ms: float,
+    scheduled_cost_ms: Optional[float] = None,
     eps: float = 1e-6,
 ) -> Dict[str, Any]:
     """Computes cost error, MAPE_C, and hard budget violations (Points 8, 9).
@@ -84,8 +84,10 @@ def compute_cost_metrics(
     mape_c = float(abs(cost_error) / max(eps, actual_cost_ms))
     budget_violation_ms = float(max(0.0, actual_cost_ms - budget_ms))
     is_violation = bool(actual_cost_ms > budget_ms + 1e-4)
-    scheduled_violation_ms = float(max(0.0, scheduled_cost_ms - budget_ms))
-    is_scheduled_violation = bool(scheduled_cost_ms > budget_ms + 1e-4)
+
+    sched_cost = scheduled_cost_ms if scheduled_cost_ms is not None else predicted_cost_ms
+    scheduled_violation_ms = float(max(0.0, sched_cost - budget_ms))
+    is_scheduled_violation = bool(sched_cost > budget_ms + 1e-4)
 
     return {
         "cost_error_ms": cost_error,

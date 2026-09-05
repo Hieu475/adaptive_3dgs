@@ -16,6 +16,7 @@ from research.phase5_selection import (
     PolicyName,
     SelectionResult,
     select_budget_constrained_subset,
+    map_candidate_to_active_index,
 )
 from research.scheduler_metrics import (
     compute_ose,
@@ -111,8 +112,13 @@ class Phase5Evaluator:
         self.sync_gpu()
         t_select_ms = (time.perf_counter() - t_sel_0) * 1000.0
 
-        num_g = oracle_engine.pipeline.gaussian_model.num_gaussians
-        selected_ids = [int(i) for i in sel_res.selected_gaussian_ids if 0 <= int(i) < num_g]
+        model = oracle_engine.pipeline.gaussian_model
+        selected_cands = [candidates[i] for i in sel_res.selected_indices]
+        selected_ids = []
+        for c in selected_cands:
+            act_idx = map_candidate_to_active_index(c, model)
+            if act_idx is not None:
+                selected_ids.append(act_idx)
         k_count = len(selected_ids)
 
         # Compute predicted stats for selected set
