@@ -1,0 +1,22 @@
+{
+  "total_samples": 100,
+  "frames_evaluated": [
+    10,
+    20
+  ],
+  "scene": "tum_fr2_xyz",
+  "seed": 42,
+  "feature_dim": 32,
+  "checks": {
+    "feature_vector_dim_32": true,
+    "empty_context_dq_s_zero": true,
+    "empty_context_identity": true,
+    "delta_q_identity": true,
+    "delta_q_identity_max_error": 0.0,
+    "context_size_variety": true,
+    "context_type_variety": true,
+    "no_nan_features": true,
+    "state_integrity": true
+  },
+  "overall_pass": true
+}

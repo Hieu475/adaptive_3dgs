@@ -1,0 +1,129 @@
+{
+  "phase": "Phase 6 \u2014 Conditional Oracle Dataset",
+  "scene": "tum_fr2_xyz",
+  "seed": 42,
+  "total_samples": 100,
+  "feature_dim": 32,
+  "feature_names": [
+    "rgb_error",
+    "depth_error",
+    "gradient_norm",
+    "visibility_count",
+    "influence_mass",
+    "position_drift",
+    "residual_drift_ema",
+    "uncertainty_var",
+    "projected_area",
+    "update_frequency",
+    "age",
+    "neighbor_mean_rgb_error",
+    "neighbor_mean_depth_error",
+    "neighbor_mean_gradient_norm",
+    "neighbor_mean_influence_mass",
+    "neighbor_mean_uncertainty_var",
+    "neighbor_mean_projected_area",
+    "neighbor_std_rgb_error",
+    "neighbor_count",
+    "mean_overlap",
+    "max_overlap",
+    "high_overlap_count",
+    "weighted_overlap",
+    "overlap_area_fraction",
+    "selected_count",
+    "selected_mean_rgb_error",
+    "selected_mean_depth_error",
+    "selected_mean_influence",
+    "selected_spatial_density",
+    "candidate_selected_overlap",
+    "candidate_selected_distance",
+    "selected_budget_fraction"
+  ],
+  "frame_stats": [
+    {
+      "frame": 10,
+      "n_candidates": 10,
+      "n_samples": 50,
+      "n_gaussians": 4887,
+      "state_integrity": true,
+      "time_s": 92.129195608999,
+      "delta_q_mean": 8.59057525427969e-06,
+      "delta_q_std": 1.2889850293905925e-05,
+      "delta_q_min": -5.013168245193736e-05,
+      "delta_q_max": 3.2726719403998204e-05,
+      "utility_mean": 3.7965010190704816e-06,
+      "utility_std": 8.787191590310056e-06,
+      "positive_utility_frac": 0.74,
+      "context_size_distribution": {
+        "0": 10,
+        "1": 10,
+        "4": 20,
+        "8": 10
+      }
+    },
+    {
+      "frame": 20,
+      "n_candidates": 10,
+      "n_samples": 50,
+      "n_gaussians": 4887,
+      "state_integrity": true,
+      "time_s": 87.93230957400374,
+      "delta_q_mean": 3.6564233184487885e-06,
+      "delta_q_std": 2.5590787076793934e-06,
+      "delta_q_min": -5.939903914860251e-07,
+      "delta_q_max": 1.1239066161491542e-05,
+      "utility_mean": 2.16811461211313e-06,
+      "utility_std": 3.7852238956439942e-06,
+      "positive_utility_frac": 0.96,
+      "context_size_distribution": {
+        "0": 10,
+        "1": 10,
+        "4": 20,
+        "8": 10
+      }
+    }
+  ],
+  "verification": {
+    "total_samples": 100,
+    "frames_evaluated": [
+      10,
+      20
+    ],
+    "scene": "tum_fr2_xyz",
+    "seed": 42,
+    "feature_dim": 32,
+    "checks": {
+      "feature_vector_dim_32": true,
+      "empty_context_dq_s_zero": true,
+      "empty_context_identity": true,
+      "delta_q_identity": true,
+      "delta_q_identity_max_error": 0.0,
+      "context_size_variety": true,
+      "context_type_variety": true,
+      "no_nan_features": true,
+      "state_integrity": true
+    },
+    "overall_pass": true
+  },
+  "config": {
+    "n_opt_steps": 5,
+    "k_neighbors": 8,
+    "context_sizes": [
+      0,
+      1,
+      4,
+      8
+    ],
+    "context_size_weights": [
+      0.3,
+      0.25,
+      0.25,
+      0.2
+    ],
+    "context_types": [
+      "empty",
+      "spatial_knn",
+      "overlap_top",
+      "random"
+    ]
+  }
+}
