@@ -35,6 +35,7 @@ class OptimizationPolicy(str, Enum):
     BUDGET_AWARE = "budget_aware"         # Policy 4: Importance/Cost knapsack optimization
     OURS = "ours"                         # Alias for BUDGET_AWARE
     LEARNED_UTILITY = "learned_utility"   # Policy 5: Two-Head Learned Marginal Utility Knapsack
+    ORACLE = "oracle"                     # Policy 6: Ground truth marginal utility upper bound
 
 
 def estimate_gaussian_costs(
@@ -232,17 +233,23 @@ class BudgetScheduler:
         frame_idx: int = 0,
         binary_threshold: float = 0.5,
         utility_scores: Optional[torch.Tensor] = None,
+        oracle_scores: Optional[torch.Tensor] = None,
+        safety_factor: float = 1.0,
+        budget_override_us: Optional[float] = None,
+        reject_negative: bool = True,
+        seed: int = 42,
     ) -> torch.Tensor:
         """Select Gaussians for optimization according to specified policy.
         
-        Policies (Milestone R4, R19, R23):
-            - FULL (Policy 0): 100% of Gaussians selected.
-            - RANDOM (Policy 1): Uniform random sample of ratio r (or top_k).
-            - ERROR_ONLY: Ranked strictly by raw photometric + depth error (E_i).
-            - ERROR_INFLUENCE: Strong non-learning baseline (E_i × Influence_i).
-            - BINARY (Policy 2): Binary stable/unstable (e.g. confidence < threshold or tier in {A, B}).
-            - TOP_K (Policy 3): Top-K highest continuous importance scores.
-            - BUDGET_AWARE (Policy 4): Importance/Cost knapsack selection.
+        Fairness and Budget Constraint Contract (Phase 5):
+          All policies obey the exact same hard budget constraint:
+              sum_{i in S_B} C_i <= B
+          Random: random ordering -> budget packing
+          Error: error ordering -> budget packing
+          Error x Influence: (error * influence) ordering -> budget packing
+          Heuristic: value density (importance / cost) -> budget packing
+          Learned Utility: predicted U_hat ordering -> reject U_hat <= 0 -> safety-aware budget packing
+          Oracle: oracle U* ordering -> reject U* <= 0 -> budget packing
         """
         N = importance_scores.shape[0]
         device = importance_scores.device
@@ -253,92 +260,123 @@ class BudgetScheduler:
         if N == 0:
             return torch.zeros(0, dtype=torch.bool, device=device)
         
-        # Determine target count K
-        if top_k is not None:
-            K = min(N, max(1, top_k))
+        # Effective budget in microseconds
+        if budget_override_us is not None:
+            budget_us = float(budget_override_us)
         else:
-            K = min(N, max(1, int(round(N * ratio))))
+            budget_us = float(self.gpu_budget_ms * 1000.0 * self.budget_allocation['optimize'] * self.budget_scale_factor)
             
+        if cost_estimates is None:
+            cost_estimates = torch.full((N,), self.cost_per_gaussian_us, device=device)
+
         if policy_str in ("full", OptimizationPolicy.FULL.value):
             return torch.ones(N, dtype=torch.bool, device=device)
-            
-        elif policy_str in ("random", OptimizationPolicy.RANDOM.value):
+
+        def _pack_by_scores(
+            scores: torch.Tensor,
+            costs: torch.Tensor,
+            max_budget: float,
+            reject_neg: bool = False,
+            safety: float = 1.0,
+        ) -> torch.Tensor:
             mask = torch.zeros(N, dtype=torch.bool, device=device)
-            perm = torch.randperm(N, device=device)[:K]
-            mask[perm] = True
-            return mask
-            
-        elif policy_str in ("error_only", OptimizationPolicy.ERROR_ONLY.value):
-            score_tensor = error_scores if error_scores is not None else importance_scores
-            mask = torch.zeros(N, dtype=torch.bool, device=device)
-            _, top_indices = torch.topk(score_tensor[:N], min(K, score_tensor.shape[0]))
-            mask[top_indices] = True
-            return mask
-            
-        elif policy_str in ("error_influence", OptimizationPolicy.ERROR_INFLUENCE.value):
-            score_tensor = error_influence_scores if error_influence_scores is not None else importance_scores
-            mask = torch.zeros(N, dtype=torch.bool, device=device)
-            _, top_indices = torch.topk(score_tensor[:N], min(K, score_tensor.shape[0]))
-            mask[top_indices] = True
-            return mask
-            
-        elif policy_str in ("binary", OptimizationPolicy.BINARY.value):
-            if confidence is not None:
-                conf = confidence.squeeze(-1) if confidence.ndim > 1 else confidence
-                mask = conf < binary_threshold
-            elif tiers is not None:
-                mask = (tiers == 0) | (tiers == 1)
+            if reject_neg:
+                valid_idx = torch.where(scores > 0)[0]
+                if len(valid_idx) == 0:
+                    return mask  # Empty selection: avoids wasting compute on harmful optimization
+                sub_scores = scores[valid_idx]
+                sub_costs = costs[valid_idx] * safety
+                sub_order = torch.argsort(sub_scores, descending=True)
+                cum_costs = torch.cumsum(sub_costs[sub_order], dim=0)
+                selected_sub = sub_order[cum_costs <= max_budget + 1e-7]
+                mask[valid_idx[selected_sub]] = True
+                return mask
             else:
-                mask = importance_scores >= binary_threshold
-            if top_k is not None and mask.sum() > K:
-                active_idx = torch.where(mask)[0]
-                active_imp = importance_scores[active_idx]
-                _, sub_top = torch.topk(active_imp, min(K, active_idx.shape[0]))
-                new_mask = torch.zeros(N, dtype=torch.bool, device=device)
-                new_mask[active_idx[sub_top]] = True
-                return new_mask
-            return mask
-                
-        elif policy_str in ("top_k", OptimizationPolicy.TOP_K.value):
-            mask = torch.zeros(N, dtype=torch.bool, device=device)
-            _, top_indices = torch.topk(importance_scores, K)
-            mask[top_indices] = True
-            return mask
-            
-        elif policy_str in ("budget_aware", "ours", OptimizationPolicy.BUDGET_AWARE.value, OptimizationPolicy.OURS.value):
-            if tiers is None:
-                tiers = torch.full((N,), 2, dtype=torch.long, device=device)
-                tiers[importance_scores > 0.8] = 0
-                tiers[(importance_scores >= 0.2) & (importance_scores <= 0.8)] = 1
-            return self.select_for_optimization(
-                importance_scores, tiers, cost_estimates=cost_estimates, frame_idx=frame_idx
-            )
-            
-        elif policy_str in ("learned_utility", OptimizationPolicy.LEARNED_UTILITY.value):
-            if cost_estimates is not None:
-                # If utility_scores (U_i = dQ/dT) is provided, it is already marginal efficiency.
-                # Otherwise, derive efficiency from importance / cost.
-                if utility_scores is not None:
-                    eff = utility_scores
-                else:
-                    eff = importance_scores / (cost_estimates + 1e-6)
-                _, order = torch.sort(eff, descending=True)
-                budget_us = self.gpu_budget_ms * 1000.0 * self.budget_allocation['optimize']
-                cum_cost = torch.cumsum(cost_estimates[order], dim=0)
-                condition = cum_cost <= budget_us
-                if utility_scores is not None:
-                    condition = condition & (eff[order] > 0)
-                selected = order[condition]
-                mask = torch.zeros(N, dtype=torch.bool, device=device)
+                sub_costs = costs * safety
+                order = torch.argsort(scores, descending=True)
+                cum_costs = torch.cumsum(sub_costs[order], dim=0)
+                selected = order[cum_costs <= max_budget + 1e-7]
                 mask[selected] = True
                 return mask
+
+        if policy_str in ("random", OptimizationPolicy.RANDOM.value):
+            mask = torch.zeros(N, dtype=torch.bool, device=device)
+            try:
+                g = torch.Generator(device=device)
+                g.manual_seed(seed + frame_idx * 17)
+                perm = torch.randperm(N, generator=g, device=device)
+            except Exception:
+                perm = torch.randperm(N, device=device)
+            cum_cost = torch.cumsum(cost_estimates[perm], dim=0)
+            selected = perm[cum_cost <= budget_us + 1e-7]
+            mask[selected] = True
+            return mask
+
+        elif policy_str in ("error_only", OptimizationPolicy.ERROR_ONLY.value):
+            score_tensor = error_scores if error_scores is not None else importance_scores
+            return _pack_by_scores(score_tensor, cost_estimates, budget_us)
+
+        elif policy_str in ("error_influence", OptimizationPolicy.ERROR_INFLUENCE.value):
+            score_tensor = error_influence_scores if error_influence_scores is not None else (
+                (error_scores if error_scores is not None else importance_scores) * importance_scores
+            )
+            return _pack_by_scores(score_tensor, cost_estimates, budget_us)
+
+        elif policy_str in ("binary", OptimizationPolicy.BINARY.value):
+            mask = torch.zeros(N, dtype=torch.bool, device=device)
+            if confidence is not None:
+                conf = confidence.squeeze(-1) if confidence.ndim > 1 else confidence
+                eligible = conf < binary_threshold
+            elif tiers is not None:
+                eligible = (tiers == 0) | (tiers == 1)
             else:
-                score_tensor = utility_scores if utility_scores is not None else importance_scores
+                eligible = importance_scores >= binary_threshold
+            if not eligible.any():
+                return mask
+            elig_idx = torch.where(eligible)[0]
+            elig_scores = (error_scores[elig_idx] if error_scores is not None else importance_scores[elig_idx])
+            elig_costs = cost_estimates[elig_idx]
+            order = torch.argsort(elig_scores, descending=True)
+            cum_cost = torch.cumsum(elig_costs[order], dim=0)
+            selected = order[cum_cost <= budget_us + 1e-7]
+            mask[elig_idx[selected]] = True
+            return mask
+
+        elif policy_str in ("top_k", OptimizationPolicy.TOP_K.value):
+            if top_k is not None and budget_override_us is None:
                 mask = torch.zeros(N, dtype=torch.bool, device=device)
-                _, top_indices = torch.topk(score_tensor[:N], min(K, score_tensor.shape[0]))
+                _, top_indices = torch.topk(importance_scores, min(top_k, N))
                 mask[top_indices] = True
                 return mask
-                
+            return _pack_by_scores(importance_scores, cost_estimates, budget_us)
+
+        elif policy_str in ("budget_aware", "ours", "heuristic", OptimizationPolicy.BUDGET_AWARE.value, OptimizationPolicy.OURS.value):
+            # Knapsack heuristic value density: importance / cost
+            density = importance_scores / (cost_estimates + 1e-6)
+            return _pack_by_scores(density, cost_estimates, budget_us)
+
+        elif policy_str in ("learned_utility", OptimizationPolicy.LEARNED_UTILITY.value):
+            eff = utility_scores if utility_scores is not None else (importance_scores / (cost_estimates + 1e-6))
+            return _pack_by_scores(
+                scores=eff,
+                costs=cost_estimates,
+                max_budget=budget_us,
+                reject_neg=reject_negative,
+                safety=safety_factor,
+            )
+
+        elif policy_str in ("oracle", OptimizationPolicy.ORACLE.value):
+            eff = oracle_scores if oracle_scores is not None else (
+                utility_scores if utility_scores is not None else importance_scores
+            )
+            return _pack_by_scores(
+                scores=eff,
+                costs=cost_estimates,
+                max_budget=budget_us,
+                reject_neg=reject_negative,
+                safety=1.0,
+            )
+
         else:
             raise ValueError(f"Unknown optimization policy: {policy}")
     

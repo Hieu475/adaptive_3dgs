@@ -45,9 +45,15 @@ class FrozenUtilityPredictor:
         repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
         if checkpoint_path is None:
-            checkpoint_path = os.path.join(
-                repo_root, "results", "learned_utility", "models", f"seed_{seed}.pt"
+            ckpt_candidate = os.path.join(
+                repo_root, "results", "learned_utility", "checkpoints", f"two_head_mlp_seed_{seed}.pt"
             )
+            if os.path.exists(ckpt_candidate):
+                checkpoint_path = ckpt_candidate
+            else:
+                checkpoint_path = os.path.join(
+                    repo_root, "results", "learned_utility", "models", f"seed_{seed}.pt"
+                )
         if normalizer_path is None:
             normalizer_path = os.path.join(
                 repo_root, "results", "learned_utility", "normalization.json"
@@ -63,18 +69,24 @@ class FrozenUtilityPredictor:
         else:
             self.device = torch.device(device)
 
-        # 1. Load Feature Normalizer
+        # 1. Load Feature Normalizer strictly from Phase 4
         self.normalizer = FeatureNormalizer.load_json(normalizer_path)
         self.feature_names = list(CANONICAL_FEATURE_NAMES)
 
-        # 2. Load Checkpoint and Instantiate TwoHeadMLP
+        # 2. Load Checkpoint and Instantiate TwoHeadMLP with full manifest
         ckpt = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
         self.in_features = int(ckpt.get("in_features", len(self.feature_names)))
         self.metadata = ckpt.get("metadata", {})
-        self.seed = int(self.metadata.get("seed", seed))
+        self.seed = int(ckpt.get("seed", self.metadata.get("seed", seed)))
+        self.protocol_version = ckpt.get("protocol_version", "1.0.0")
+        self.git_commit = ckpt.get("git_commit", "unknown")
+        self.training_config = ckpt.get("training_config", {})
+        self.feature_schema = ckpt.get("feature_schema", self.feature_names)
+        self.normalization_dict = ckpt.get("normalization", self.normalizer.to_dict())
 
         self.model = TwoHeadMLP(in_features=self.in_features).to(self.device)
-        self.model.load_state_dict(ckpt["state_dict"])
+        state_dict = ckpt.get("model_state", ckpt.get("state_dict"))
+        self.model.load_state_dict(state_dict)
         
         # 3. Strictly Freeze Model
         self.model.eval()

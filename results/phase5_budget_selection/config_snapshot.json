@@ -1,0 +1,39 @@
+{
+  "protocol_version": "1.0.0",
+  "date_locked": "2026-09-03",
+  "test_scene": "tum_fr2_xyz",
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "eval_frames": [
+    10,
+    20
+  ],
+  "relative_budgets": [
+    0.1,
+    0.2,
+    0.4,
+    0.6,
+    0.8
+  ],
+  "wall_clock_budgets_ms": [
+    10.0,
+    15.0,
+    20.0,
+    33.3
+  ],
+  "safety_factor": 1.1,
+  "policies": [
+    "oracle",
+    "learned_utility",
+    "heuristic",
+    "error_influence",
+    "error_only",
+    "random"
+  ],
+  "device": "cuda"
+}

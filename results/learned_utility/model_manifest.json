@@ -1,0 +1,104 @@
+{
+  "protocol_version": "1.0.0",
+  "git_commit": "c55e6bea65f71350ce9f7c1b70479cd5695f1f5d",
+  "training_config": {
+    "epochs": 200,
+    "learning_rate": 0.005,
+    "weight_decay": 0.0001,
+    "loss_config": {
+      "lambda_rank": 1.0,
+      "lambda_q": 0.25,
+      "lambda_t": 0.125
+    }
+  },
+  "feature_schema": [
+    "rgb_error",
+    "depth_error",
+    "gradient_norm",
+    "visibility_count",
+    "influence_mass",
+    "position_drift",
+    "residual_drift_ema",
+    "uncertainty_var",
+    "projected_area",
+    "update_frequency",
+    "age"
+  ],
+  "normalization": {
+    "n_samples_fit": 375,
+    "eps": 1e-06,
+    "features": {
+      "rgb_error": {
+        "mean": 0.3546921908855438,
+        "std": 0.2522951364517212
+      },
+      "depth_error": {
+        "mean": 0.3455677628517151,
+        "std": 0.4932246208190918
+      },
+      "gradient_norm": {
+        "mean": 6.2787017822265625,
+        "std": 8.678497314453125
+      },
+      "visibility_count": {
+        "mean": 84.02666473388672,
+        "std": 106.91979217529297
+      },
+      "influence_mass": {
+        "mean": 9.338586807250977,
+        "std": 11.883179664611816
+      },
+      "position_drift": {
+        "mean": 0.0,
+        "std": 9.999999974752427e-07
+      },
+      "residual_drift_ema": {
+        "mean": 0.0,
+        "std": 9.999999974752427e-07
+      },
+      "uncertainty_var": {
+        "mean": 0.35278475284576416,
+        "std": 0.16220685839653015
+      },
+      "projected_area": {
+        "mean": 9.338586807250977,
+        "std": 11.883179664611816
+      },
+      "update_frequency": {
+        "mean": 0.0,
+        "std": 9.999999974752427e-07
+      },
+      "age": {
+        "mean": 0.0,
+        "std": 9.999999974752427e-07
+      }
+    }
+  },
+  "models": {
+    "42": {
+      "seed": 42,
+      "checkpoint_path": "results/learned_utility/checkpoints/two_head_mlp_seed_42.pt",
+      "val_spearman_rho": 0.354238371813949
+    },
+    "43": {
+      "seed": 43,
+      "checkpoint_path": "results/learned_utility/checkpoints/two_head_mlp_seed_43.pt",
+      "val_spearman_rho": 0.14725522008352132
+    },
+    "44": {
+      "seed": 44,
+      "checkpoint_path": "results/learned_utility/checkpoints/two_head_mlp_seed_44.pt",
+      "val_spearman_rho": 0.2178347813565017
+    },
+    "45": {
+      "seed": 45,
+      "checkpoint_path": "results/learned_utility/checkpoints/two_head_mlp_seed_45.pt",
+      "val_spearman_rho": 0.3101506264100225
+    },
+    "46": {
+      "seed": 46,
+      "checkpoint_path": "results/learned_utility/checkpoints/two_head_mlp_seed_46.pt",
+      "val_spearman_rho": 0.21159544952719245
+    }
+  }
+}

@@ -37,8 +37,10 @@ class SelectionResult:
     selected_gaussian_ids: List[int]  # Actual Gaussian IDs in 3DGS model
     k_count: int
     predicted_cost: float             # Sum of predicted costs (\hat{C})
+    scheduled_cost: float             # Sum of safety-adjusted costs (\alpha * \hat{C})
     nominal_cost: float               # Sum of reference/measured costs (C)
     budget: float
+    safety_factor: float
     selection_time_ms: float
     rejected_negative_count: int = 0
     budget_violation: float = 0.0     # max(0, nominal_cost - budget)
@@ -51,6 +53,7 @@ def select_budget_constrained_subset(
     seed: int = 42,
     reject_negative: bool = True,
     use_predicted_cost: bool = False,
+    safety_factor: float = 1.0,
     cost_key: str = "measured_trial_cost_ms",
     pred_cost_key: str = "predicted_delta_t",
     pred_utility_key: str = "predicted_utility",
@@ -80,8 +83,10 @@ def select_budget_constrained_subset(
             selected_gaussian_ids=[],
             k_count=0,
             predicted_cost=0.0,
+            scheduled_cost=0.0,
             nominal_cost=0.0,
             budget=budget,
+            safety_factor=float(safety_factor),
             selection_time_ms=0.0,
             rejected_negative_count=0,
             budget_violation=0.0,
@@ -194,10 +199,11 @@ def select_budget_constrained_subset(
             if reject_negative and u_val <= 0.0:
                 rejected_neg += 1
                 continue
-            c = pred_costs[idx] if use_predicted_cost else nom_costs[idx]
-            if cur_cost + c <= budget + 1e-7:
+            raw_c = pred_costs[idx] if use_predicted_cost else nom_costs[idx]
+            sched_c = raw_c * safety_factor
+            if cur_cost + sched_c <= budget + 1e-7:
                 selected_indices.append(int(idx))
-                cur_cost += c
+                cur_cost += sched_c
 
     elif p_str in (PolicyName.ORACLE.value, "oracle", "oracle_utility"):
         # Oracle upper bound: U*_i = \Delta Q*_i / \Delta T*_i
@@ -225,6 +231,7 @@ def select_budget_constrained_subset(
 
     sel_ids = [cand_ids[i] for i in selected_indices]
     tot_pred_cost = float(pred_costs[selected_indices].sum()) if selected_indices else 0.0
+    tot_sched_cost = float(tot_pred_cost * safety_factor) if use_predicted_cost else float(nom_costs[selected_indices].sum() * safety_factor if selected_indices else 0.0)
     tot_nom_cost = float(nom_costs[selected_indices].sum()) if selected_indices else 0.0
     violation = max(0.0, tot_nom_cost - budget)
 
@@ -234,8 +241,10 @@ def select_budget_constrained_subset(
         selected_gaussian_ids=sel_ids,
         k_count=len(selected_indices),
         predicted_cost=tot_pred_cost,
+        scheduled_cost=tot_sched_cost,
         nominal_cost=tot_nom_cost,
         budget=float(budget),
+        safety_factor=float(safety_factor),
         selection_time_ms=float(sel_time_ms),
         rejected_negative_count=int(rejected_neg),
         budget_violation=float(violation),

@@ -454,6 +454,7 @@ class OnlineReconstructionPipeline:
             binary_threshold=binary_threshold,
             utility_scores=getattr(self, '_learned_utility_scores', None),
         )
+        self._last_optimize_mask = optimize_mask
         
         # === 7. True Selective Optimization with Frozen Background Cache (R21/R29) ===
         n_optimized = 0

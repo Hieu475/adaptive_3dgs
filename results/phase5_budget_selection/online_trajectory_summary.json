@@ -1,0 +1,34 @@
+{
+  "learned_utility": {
+    "mean_psnr": 12.563558459281921,
+    "mean_ssim": 0.0,
+    "mean_depth_l1": 1.3661454796791077,
+    "mean_opt_time_ms": 272.509765625,
+    "mean_churn": 0.24259053044895312,
+    "violation_rate_pct": 85.0
+  },
+  "heuristic": {
+    "mean_psnr": 12.563558459281921,
+    "mean_ssim": 0.0,
+    "mean_depth_l1": 1.3661454796791077,
+    "mean_opt_time_ms": 399.4029760360718,
+    "mean_churn": 0.01644757637735259,
+    "violation_rate_pct": 100.0
+  },
+  "error_only": {
+    "mean_psnr": 12.563558459281921,
+    "mean_ssim": 0.0,
+    "mean_depth_l1": 1.3661454796791077,
+    "mean_opt_time_ms": 403.93805503845215,
+    "mean_churn": 0.01644757637735259,
+    "violation_rate_pct": 100.0
+  },
+  "random": {
+    "mean_psnr": 12.563558459281921,
+    "mean_ssim": 0.0,
+    "mean_depth_l1": 1.3661454796791077,
+    "mean_opt_time_ms": 420.20461559295654,
+    "mean_churn": 0.01644757637735259,
+    "violation_rate_pct": 100.0
+  }
+}
