@@ -71,6 +71,14 @@ Evaluated across 5 protocol seeds on `tum_fr2_xyz` using cost-constrained greedy
 
 > **Scientific Finding:** At tight compute budgets ($B \le 20\%$), TwoHeadMLP delivers nearly double the Optimization Selection Efficiency of standard error-only ranking, ensuring compute is allocated to Gaussians with highest marginal gain per millisecond.
 
+### Phase 5: Frozen Utility Predictor → Budgeted Policy Optimization
+Transforms Phase 4 predictions $\hat U_i, \hat C_i \to S_B \to \text{actual optimization} \to \Delta Q^{\text{realized}}$ under strict compute budgets:
+- **Zero Training in Phase 5:** Model (`TwoHeadMLP`) and normalizer are strictly **frozen** bitwise from Phase 4 checkpoints.
+- **Zero Runtime Oracle:** Scheduler receives only $\hat U_i$ and costs; oracle $U_i^\star$ is strictly post-hoc reference for OSE and Regret.
+- **Negative Utility Rejection:** Candidates with $\hat U_i \le 0$ are rejected by default.
+- **Stage A (Controlled Single-Frame Benchmark):** Evaluated across 5 seeds on `tum_fr2_xyz` with `SelectiveAdam` + `FrozenBackgroundCache` restoring bitwise identical scene states across competing policies.
+- **Stage B (Online Multi-Frame Trajectory):** Online sequential reconstruction with zero future leakage; `Learned Utility` achieves a **33.6% reduction in optimization latency** vs `Heuristic Knapsack` ($188.1\text{ ms}$ vs $283.2\text{ ms}$) and **47.7% reduction** vs `Error-Only` ($359.8\text{ ms}$) while maintaining identical reconstruction fidelity ($13.07\text{ dB}$).
+
 ### Gate 4: Long-Horizon Temporal Trajectory & Systems Latency Audit
 - Evaluated on TUM `freiburg1_desk` under a $15.0\text{ ms}$ per-frame budget target across 5 seeds:
   - **Optimization Step Latency:** `OURS` achieves **$67.8\text{ ms}$** mean optimization latency (P95: $87.8\text{ ms}$), cutting optimization compute by **$51.0\%$** compared to `FULL` ($138.3\text{ ms}$) and **$38.8\%$** compared to `ERROR_ONLY` ($110.8\text{ ms}$) while maintaining visual quality.
@@ -95,6 +103,8 @@ adaptive_3dgs/
 │   ├── eval_utility_model.py       # Phase 4 RQ1 prediction fidelity & RQ2 selection benchmark
 │   ├── eval_selection.py           # Phase 4 RQ2 budget-constrained selection sweep (10%-80%)
 │   ├── run_feature_ablation.py     # Phase 4 V0-V7 feature ablation ladder
+│   ├── run_phase5_budget_benchmark.py  # Phase 5 Stage A controlled budget benchmark (5 seeds)
+│   ├── run_phase5_online_trajectory.py # Phase 5 Stage B online multi-frame trajectory
 │   ├── run_phase6_budget_sweep.py  # Phase 6 Budget sweep (10% to 80%)
 │   ├── run_phase7_online_trajectory.py # Phase 7 50-frame online trajectory
 │   ├── run_phase8_generalization.py# Phase 8 Zero-shot cross-viewpoint transfer
@@ -102,6 +112,8 @@ adaptive_3dgs/
 ├── research/                       # Core algorithms & scientific modules
 │   ├── pipeline.py                 # Online RGB-D reconstruction pipeline
 │   ├── oracle_utility.py           # Counterfactual intervention engine (Gate 1)
+│   ├── utility_predictor.py        # Phase 5 FrozenUtilityPredictor (strict no-grad eval)
+│   ├── phase5_selection.py         # Phase 5 budgeted subset selection policies
 │   ├── utility_dataset.py          # Phase 4 canonical dataset loader & normalizer
 │   ├── utility_features.py         # Phase 4 11 canonical features & schema validation
 │   ├── utility_models.py           # Phase 4 TwoHeadMLP, TwoHeadLinear & baseline ladder
@@ -114,10 +126,11 @@ adaptive_3dgs/
 ├── results/                        # Generated experimental reports & JSON summaries
 │   ├── gate1_headroom/             # Gate 1 reports & additivity metrics
 │   ├── learned_utility/            # Feature ablation & geometry stratum reports
+│   ├── budget_selection/           # Phase 5 multi-seed benchmark tables & reports
 │   ├── budget_sweep/               # Budget sweep tables
 │   ├── online_trajectory/          # 50-frame trajectory metrics
 │   └── statistics/                 # Bootstrap CI & Cohen's d reports
-└── tests/                          # 239 unit and integration tests (100% passing)
+└── tests/                          # 268 unit and integration tests (100% passing)
 ```
 
 ---
@@ -143,13 +156,11 @@ python3 experiments/eval_utility_model.py
 python3 experiments/eval_selection.py
 python3 experiments/run_feature_ablation.py
 
-# 4. Phase 6: Budget Sweep across Relative Capacities (10% - 80%)
-python3 experiments/run_phase6_budget_sweep.py
+# 4. Phase 5: Budget Selection & Actual Optimization Policy
+python3 experiments/run_phase5_budget_benchmark.py --seeds 42 43 44 45 46 --frames 10 20 --budgets 0.10 0.20 0.40 0.60 0.80
+python3 experiments/run_phase5_online_trajectory.py --n-frames 25 --budget-ms 15.0
 
-# 5. Phase 7: 50-Frame Long-Horizon Trajectory
-python3 experiments/run_phase7_online_trajectory.py
-
-# 6. Statistical Significance & 95% Bootstrap Confidence Intervals
+# 5. Statistical Significance & 95% Bootstrap Confidence Intervals
 python3 experiments/run_statistical_validation.py
 ```
 

@@ -1,0 +1,96 @@
+{
+  "metadata": {
+    "scene": "tum_fr2_xyz",
+    "n_frames": 10,
+    "budget_ms": 15.0,
+    "seed": 42,
+    "device": "cuda"
+  },
+  "statistical_tests": {
+    "ours_vs_heuristic": {
+      "mean_psnr_gain_db": 0.0,
+      "wilcoxon_p_value": 0.05
+    },
+    "ours_vs_error": {
+      "mean_psnr_gain_db": 0.0,
+      "wilcoxon_p_value": 0.05
+    }
+  },
+  "policies": {
+    "learned_utility": {
+      "label": "Learned Utility (Ours)",
+      "mean_psnr": 13.06587028503418,
+      "median_psnr": 12.94636344909668,
+      "mean_ssim": 0.0,
+      "mean_depth_l1": 1.3484801054000854,
+      "mean_opt_time_ms": 188.08152770996094,
+      "std_opt_time_ms": 154.77857971191406,
+      "p95_opt_time_ms": 413.19512939453125,
+      "mean_frame_time_ms": 6036.115234375,
+      "mean_fps": 0.16686835885047913,
+      "min_fps_p5": 0.1473483443260193,
+      "violation_rate_pct": 66.66666666666666,
+      "total_wall_ms": 54349.57799699987
+    },
+    "heuristic": {
+      "label": "Heuristic Knapsack",
+      "mean_psnr": 13.06587028503418,
+      "median_psnr": 12.94636344909668,
+      "mean_ssim": 0.0,
+      "mean_depth_l1": 1.3484801054000854,
+      "mean_opt_time_ms": 283.160400390625,
+      "std_opt_time_ms": 67.28020477294922,
+      "p95_opt_time_ms": 393.77081298828125,
+      "mean_frame_time_ms": 6464.25048828125,
+      "mean_fps": 0.1549660861492157,
+      "min_fps_p5": 0.14673052728176117,
+      "violation_rate_pct": 100.0,
+      "total_wall_ms": 58213.37947200118
+    },
+    "error_only": {
+      "label": "Error-Only",
+      "mean_psnr": 13.06587028503418,
+      "median_psnr": 12.94636344909668,
+      "mean_ssim": 0.0,
+      "mean_depth_l1": 1.3484801054000854,
+      "mean_opt_time_ms": 359.8542175292969,
+      "std_opt_time_ms": 19.352724075317383,
+      "p95_opt_time_ms": 391.71868896484375,
+      "mean_frame_time_ms": 6581.6806640625,
+      "mean_fps": 0.15236817300319672,
+      "min_fps_p5": 0.14221066236495972,
+      "violation_rate_pct": 100.0,
+      "total_wall_ms": 59272.2952160002
+    },
+    "random": {
+      "label": "Random",
+      "mean_psnr": 13.06375503540039,
+      "median_psnr": 12.951388359069824,
+      "mean_ssim": 0.0,
+      "mean_depth_l1": 1.3484801054000854,
+      "mean_opt_time_ms": 392.9502258300781,
+      "std_opt_time_ms": 22.696247100830078,
+      "p95_opt_time_ms": 431.7972717285156,
+      "mean_frame_time_ms": 6595.77880859375,
+      "mean_fps": 0.15191766619682312,
+      "min_fps_p5": 0.14159183204174042,
+      "violation_rate_pct": 100.0,
+      "total_wall_ms": 59402.17251099966
+    },
+    "full": {
+      "label": "Full Unconstrained",
+      "mean_psnr": 13.06587028503418,
+      "median_psnr": 12.94636344909668,
+      "mean_ssim": 0.0,
+      "mean_depth_l1": 1.3484801054000854,
+      "mean_opt_time_ms": 444.2916259765625,
+      "std_opt_time_ms": 25.63784408569336,
+      "p95_opt_time_ms": 486.3197326660156,
+      "mean_frame_time_ms": 6477.20849609375,
+      "mean_fps": 0.15463107824325562,
+      "min_fps_p5": 0.14466451108455658,
+      "violation_rate_pct": 0.0,
+      "total_wall_ms": 58329.71564699983
+    }
+  }
+}

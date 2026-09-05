@@ -138,6 +138,7 @@ def select_candidates(
     utility: Union[np.ndarray, torch.Tensor],
     cost: Union[np.ndarray, torch.Tensor],
     budget: float,
+    reject_negative: bool = True,
 ) -> Tuple[List[int], float]:
     """Greedy budget-constrained candidate selection for Phase 4 & Phase 5:
     
@@ -156,6 +157,8 @@ def select_candidates(
     selected = []
     cur_cost = 0.0
     for idx in ranked:
+        if reject_negative and utility[idx] <= 0.0:
+            continue
         c = float(cost[idx])
         if cur_cost + c <= budget + 1e-7:
             selected.append(int(idx))

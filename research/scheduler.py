@@ -325,7 +325,10 @@ class BudgetScheduler:
                 _, order = torch.sort(eff, descending=True)
                 budget_us = self.gpu_budget_ms * 1000.0 * self.budget_allocation['optimize']
                 cum_cost = torch.cumsum(cost_estimates[order], dim=0)
-                selected = order[cum_cost <= budget_us]
+                condition = cum_cost <= budget_us
+                if utility_scores is not None:
+                    condition = condition & (eff[order] > 0)
+                selected = order[condition]
                 mask = torch.zeros(N, dtype=torch.bool, device=device)
                 mask[selected] = True
                 return mask
