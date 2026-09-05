@@ -187,9 +187,14 @@ def select_budget_constrained_subset(
                     cur_scheduled_cost += c
 
     elif p_str in (PolicyName.HEURISTIC.value, "heuristic", "knapsack"):
-        # Knapsack heuristic: predicted_importance / cost
+        # Frozen Baseline Heuristic: Knapsack Value Density
+        # Definition: s_i = I_i / C_i
+        # Where:
+        #   - I_i: Canonical normalized importance score in [0, 1] from GaussianImportanceEstimator
+        #          (represented by candidate key 'predicted_importance' or fallback 'importance')
+        #   - C_i: Candidate packing cost (raw_packing_costs[i])
         heur_eff = np.array([
-            float(c.get("predicted_importance", 1.0)) / max(1e-4, raw_packing_costs[i])
+            float(c.get("predicted_importance", c.get("importance", 1.0))) / max(1e-4, raw_packing_costs[i])
             for i, c in enumerate(candidates)
         ], dtype=np.float32)
         order = np.argsort(-heur_eff)

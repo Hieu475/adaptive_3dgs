@@ -1,0 +1,8 @@
+{
+  "spearman_rho_delta_q": 0.2424287721606027,
+  "mae_delta_q": 0.006996042109352704,
+  "spearman_rho_delta_t": 0.09166744029795557,
+  "mae_delta_t_ms": 25.174046713445755,
+  "spearman_rho_utility": 0.21034693822960643,
+  "mae_utility": 0.0024793161171347143
+}

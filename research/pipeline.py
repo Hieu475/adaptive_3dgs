@@ -93,6 +93,13 @@ class OnlineReconstructionPipeline:
         
         # Metrics collection
         self.metrics_history = []
+        
+        # Custom selector function (Phase 5: Policy Path Unification)
+        # Allows external policy (e.g. select_budget_constrained_subset) to run
+        # at Step 6 with frame-t state, ensuring Stage A and Stage B share identical policy semantics.
+        # Signature: selector_fn(pipeline: OnlineReconstructionPipeline, N: int) -> torch.Tensor (bool mask)
+        self._custom_selector_fn = None
+        self._pre_scheduling_hook = None
     
     @staticmethod
     def _default_config() -> Dict:
@@ -440,20 +447,23 @@ class OnlineReconstructionPipeline:
         top_k = self.config['scheduler'].get('top_k', None)
         binary_threshold = self.config['scheduler'].get('binary_threshold', 0.5)
 
-        optimize_mask = self.scheduler.select_by_policy(
-            policy=policy,
-            importance_scores=importance,
-            tiers=tiers,
-            confidence=self.gaussian_model._confidence if hasattr(self.gaussian_model, '_confidence') else None,
-            cost_estimates=cost_estimates,
-            error_scores=error_scores,
-            error_influence_scores=error_influence_scores,
-            ratio=ratio,
-            top_k=top_k,
-            frame_idx=self.frame_count,
-            binary_threshold=binary_threshold,
-            utility_scores=getattr(self, '_learned_utility_scores', None),
-        )
+        if getattr(self, '_custom_selector_fn', None) is not None:
+            optimize_mask = self._custom_selector_fn(self, N_updated)
+        else:
+            optimize_mask = self.scheduler.select_by_policy(
+                policy=policy,
+                importance_scores=importance,
+                tiers=tiers,
+                confidence=self.gaussian_model._confidence if hasattr(self.gaussian_model, '_confidence') else None,
+                cost_estimates=cost_estimates,
+                error_scores=error_scores,
+                error_influence_scores=error_influence_scores,
+                ratio=ratio,
+                top_k=top_k,
+                frame_idx=self.frame_count,
+                binary_threshold=binary_threshold,
+                utility_scores=getattr(self, '_learned_utility_scores', None),
+            )
         self._last_optimize_mask = optimize_mask
         
         # === 7. True Selective Optimization with Frozen Background Cache (R21/R29) ===
@@ -519,6 +529,27 @@ class OnlineReconstructionPipeline:
             opt_loss_val = losses['total'].item()
             opt_time = time.time() - opt_start
         
+        # === 7b. Post-Optimization Quality Assessment ===
+        # Re-render after optimization to measure actual quality improvement
+        if n_optimized > 0:
+            with torch.no_grad():
+                cov3D_post = self.gaussian_model.build_covariance()
+                post_render = render_with_attribution(
+                    means3D=self.gaussian_model.positions,
+                    cov3D=cov3D_post,
+                    colors=self.gaussian_model.get_colors(),
+                    opacities=self.gaussian_model.opacities.squeeze(-1),
+                    extrinsics=self.current_pose,
+                    intrinsics=self.intrinsics,
+                    image_width=W,
+                    image_height=H,
+                    tile_size=self.config['rendering']['tile_size'],
+                    top_k=self.config['rendering'].get('attribution_top_k', 8),
+                )
+                rendered_color_post = post_render['color']
+        else:
+            rendered_color_post = rendered_color
+
         # === 8. Pruning ===
         prune_low_value(
             self.gaussian_model, importance[:self.gaussian_model.num_gaussians],
@@ -549,12 +580,34 @@ class OnlineReconstructionPipeline:
             n_optimized=n_optimized,
         )
         
-        # Compute quality metrics
+        # Compute quality metrics (pre and post optimization)
         with torch.no_grad():
-            psnr = -10 * torch.log10(
+            # Pre-optimization PSNR (diagnostic)
+            psnr_pre = -10 * torch.log10(
                 ((rendered_color - rgb) ** 2).mean() + 1e-8
             ).item()
+            # Post-optimization PSNR (primary metric)
+            psnr_post = -10 * torch.log10(
+                ((rendered_color_post - rgb) ** 2).mean() + 1e-8
+            ).item()
+            psnr = psnr_post  # Primary metric is post-optimization
             depth_l1 = depth_err[depth_valid].mean().item() if depth_valid.any() else 0.0
+            
+            # SSIM computation (structural similarity)
+            def _compute_ssim_simple(img1, img2):
+                """Compute mean SSIM between two (H,W,3) images."""
+                c1, c2 = 0.01 ** 2, 0.03 ** 2
+                mu1 = img1.mean(dim=(0, 1))
+                mu2 = img2.mean(dim=(0, 1))
+                sig1_sq = ((img1 - mu1) ** 2).mean(dim=(0, 1))
+                sig2_sq = ((img2 - mu2) ** 2).mean(dim=(0, 1))
+                sig12 = ((img1 - mu1) * (img2 - mu2)).mean(dim=(0, 1))
+                ssim_map = ((2 * mu1 * mu2 + c1) * (2 * sig12 + c2)) / (
+                    (mu1 ** 2 + mu2 ** 2 + c1) * (sig1_sq + sig2_sq + c2)
+                )
+                return ssim_map.mean().item()
+            
+            ssim = _compute_ssim_simple(rendered_color_post, rgb)
         
         budget_ms = self.config['scheduler'].get('gpu_budget_ms', 16.6)
         budget_violated = (frame_time * 1000.0) > budget_ms if budget_ms > 0 else False
@@ -563,6 +616,9 @@ class OnlineReconstructionPipeline:
         metrics = {
             'frame': self.frame_count,
             'psnr': psnr,
+            'psnr_pre': psnr_pre,
+            'psnr_post': psnr_post,
+            'ssim': ssim,
             'depth_l1': depth_l1,
             'color_loss': per_gaussian_color_err.mean().item(),
             'n_gaussians': self.gaussian_model.num_gaussians,

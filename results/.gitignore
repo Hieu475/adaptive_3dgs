@@ -18,4 +18,8 @@
 !oracle_dataset/*.csv
 !learned_utility/*.json
 !learned_utility/**/*.json
+!phase5_budget_selection/*.json
+!phase5_budget_selection/**/*.json
+!phase5_budget_selection/*.csv
+
 

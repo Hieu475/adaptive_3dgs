@@ -72,7 +72,14 @@ class Phase5Evaluator:
         t_feat_ms: float = 0.0,
         t_pred_ms: float = 0.0,
     ) -> Dict[str, Any]:
-        """Evaluates a policy on candidate Gaussians for the given frame."""
+        """Evaluates a policy on candidate Gaussians for the given frame.
+        
+        Budget Concepts:
+            B_sched: Scheduling budget — sum of safety-factored predicted costs.
+                     Violation: V_s = max(0, scheduled_cost - budget)
+            B_wall:  Wall-clock budget — actual measured execution time.
+                     Violation: V_e = max(0, actual_cost_ms - budget_ms)
+        """
         p_str = str(policy.value if hasattr(policy, "value") else policy).lower()
 
         # Strict State Leakage Assertion
@@ -104,7 +111,8 @@ class Phase5Evaluator:
         self.sync_gpu()
         t_select_ms = (time.perf_counter() - t_sel_0) * 1000.0
 
-        selected_ids = sel_res.selected_gaussian_ids
+        num_g = oracle_engine.pipeline.gaussian_model.num_gaussians
+        selected_ids = [int(i) for i in sel_res.selected_gaussian_ids if 0 <= int(i) < num_g]
         k_count = len(selected_ids)
 
         # Compute predicted stats for selected set
@@ -153,6 +161,7 @@ class Phase5Evaluator:
         cost_metrics = compute_cost_metrics(
             actual_cost_ms=actual_opt_cost_ms,
             predicted_cost_ms=sel_res.predicted_cost,
+            scheduled_cost_ms=sel_res.scheduled_cost,
             budget_ms=budget,
         )
 
@@ -191,6 +200,7 @@ class Phase5Evaluator:
             "predicted_utility": pred_u_mean,
             "predicted_total_cost_ms": sel_res.predicted_cost,
             "scheduled_cost_ms": sel_res.scheduled_cost,
+            "scheduled_cost": sel_res.scheduled_cost,
             "actual_cost_ms": actual_opt_cost_ms,
             "actual_delta_q": delta_q_realized,
             "actual_delta_psnr": delta_psnr_realized,
@@ -204,8 +214,9 @@ class Phase5Evaluator:
             "overhead_ratio": float(overhead_ratio),
             "budget_violation_ms": float(cost_metrics["budget_violation_ms"]),
             "is_violation": bool(cost_metrics["is_violation"]),
-            "scheduled_violation_ms": float(sel_res.scheduled_budget_violation),
-            "is_scheduled_violation": bool(sel_res.is_scheduled_violation),
+            "is_wall_violation": bool(cost_metrics["is_violation"]),
+            "scheduled_violation_ms": float(cost_metrics["scheduled_violation_ms"]),
+            "is_scheduled_violation": bool(cost_metrics["is_scheduled_violation"]),
             "ose": ose,
             "regret_abs": regret_abs,
             "regret_rel": regret_rel,

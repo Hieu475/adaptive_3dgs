@@ -69,25 +69,31 @@ def compute_policy_efficiency(
 def compute_cost_metrics(
     actual_cost_ms: float,
     predicted_cost_ms: float,
+    scheduled_cost_ms: float,
     budget_ms: float,
     eps: float = 1e-6,
 ) -> Dict[str, Any]:
-    """Computes cost error, MAPE_C, and hard budget violation V_B (Points 8, 9).
+    """Computes cost error, MAPE_C, and hard budget violations (Points 8, 9).
     
     Cost Error = C_actual - C_pred
     MAPE_C = |C_actual - C_pred| / (C_actual + eps)
-    V_B = max(0, C_actual - B)
+    V_B_sched = max(0, C_sched - B)
+    V_B_wall = max(0, C_actual - B)
     """
     cost_error = float(actual_cost_ms - predicted_cost_ms)
     mape_c = float(abs(cost_error) / max(eps, actual_cost_ms))
-    violation_ms = float(max(0.0, actual_cost_ms - budget_ms))
+    budget_violation_ms = float(max(0.0, actual_cost_ms - budget_ms))
     is_violation = bool(actual_cost_ms > budget_ms + 1e-4)
+    scheduled_violation_ms = float(max(0.0, scheduled_cost_ms - budget_ms))
+    is_scheduled_violation = bool(scheduled_cost_ms > budget_ms + 1e-4)
 
     return {
         "cost_error_ms": cost_error,
         "mape_c": mape_c,
-        "budget_violation_ms": violation_ms,
+        "budget_violation_ms": budget_violation_ms,
         "is_violation": is_violation,
+        "scheduled_violation_ms": scheduled_violation_ms,
+        "is_scheduled_violation": is_scheduled_violation,
     }
 
 

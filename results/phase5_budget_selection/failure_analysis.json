@@ -1,0 +1,18 @@
+{
+  "top_over_predicted_summary": {
+    "mean_rgb_error": 0.19680546931922435,
+    "mean_depth_error": 0.1635667659342289,
+    "mean_influence_mass": 7.4874878346920015,
+    "mean_visibility_count": 72.55,
+    "mean_projected_area": 7.4874878346920015,
+    "mean_delta_q_global": 1.3536324346000692e-05
+  },
+  "top_under_predicted_summary": {
+    "mean_rgb_error": 0.10555023094639182,
+    "mean_depth_error": 0.32005782109335995,
+    "mean_influence_mass": 9.044825899600983,
+    "mean_visibility_count": 81.5,
+    "mean_projected_area": 9.044825899600983,
+    "mean_delta_q_global": 9.722818770102303e-06
+  }
+}

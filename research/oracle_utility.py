@@ -300,8 +300,10 @@ class OracleUtilityExperiment:
             loss_global_before = self._compute_local_loss(before_color, before_depth, rgb, depth, full_mask)
         
         # === 2. Isolated True Selective Optimization Trial ===
+        valid_indices = [int(i) for i in indices if 0 <= int(i) < model.num_gaussians]
         opt_mask = torch.zeros(model.num_gaussians, dtype=torch.bool, device=device)
-        opt_mask[indices] = True
+        if valid_indices:
+            opt_mask[valid_indices] = True
         
         trial_opt = SelectiveAdam([{'params': list(model.parameters()), 'lr': 0.001}])
         trial_cache = FrozenBackgroundCache(device=device)
