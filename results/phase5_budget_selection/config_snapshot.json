@@ -42,5 +42,18 @@
     "learned_utility",
     "oracle_reference"
   ],
-  "device": "cuda"
+  "device": "cuda",
+  "provenance": {
+    "git_commit": "d450d47c2b06efd01c7f9911e2ec0c73d0e716da",
+    "checkpoint_path": "results/learned_utility/checkpoints/two_head_mlp_seed_42.pt",
+    "checkpoint_sha256": "f86001291b567ea759561f2e58661be59c3c0bee7c0f43f9751d653c35fad9db",
+    "seed_list": [
+      42,
+      43,
+      44,
+      45,
+      46
+    ],
+    "config_sha256": "636f68b98cc49075d0541e5fb6da04083a660de605f6555cee4360ff2267805e"
+  }
 }

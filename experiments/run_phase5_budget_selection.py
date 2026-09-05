@@ -305,8 +305,8 @@ def run_stage_b_online_trajectory(
                 "depth_l1": float(m['depth_l1']),
                 "opt_time_ms": opt_time,
                 "cumulative_compute_ms": cumulative_compute_ms,
-                "quality_per_compute": psnr_val / max(cumulative_compute_ms, 1e-6),
-                "delta_quality_per_compute": (psnr_val - initial_psnr) / max(cumulative_compute_ms, 1e-6),
+                "quality_per_compute": float(psnr_val / (cumulative_compute_ms / 1000.0)) if cumulative_compute_ms > 1.0 else 0.0,
+                "delta_quality_per_compute": float((psnr_val - initial_psnr) / (cumulative_compute_ms / 1000.0)) if cumulative_compute_ms > 1.0 else 0.0,
                 "n_gaussians": int(m.get('n_gaussians', 0)),
                 "is_violation": is_viol,
                 "churn": ext_churn["selection_churn"],
@@ -324,8 +324,11 @@ def run_stage_b_online_trajectory(
             frame_logs[-1]['mem_allocated_mb'] = mem_allocated
             frame_logs[-1]['mem_reserved_mb'] = mem_reserved
 
+        total_sec = cumulative_compute_ms / 1000.0
+        mean_p = float(np.mean([r["psnr"] for r in frame_logs]))
+        last_p = float(frame_logs[-1]["psnr"]) if frame_logs else 0.0
         traj_summary[pol] = {
-            "mean_psnr": float(np.mean([r["psnr"] for r in frame_logs])),
+            "mean_psnr": mean_p,
             "mean_ssim": float(np.mean([r["ssim"] for r in frame_logs])),
             "mean_depth_l1": float(np.mean([r["depth_l1"] for r in frame_logs])),
             "mean_opt_time_ms": float(np.mean([r["opt_time_ms"] for r in frame_logs])),
@@ -337,8 +340,8 @@ def run_stage_b_online_trajectory(
             "total_compute_ms": cumulative_compute_ms,
             "mean_n_gaussians": float(np.mean([r.get('n_gaussians', 0) for r in frame_logs])),
             "final_n_gaussians": int(frame_logs[-1].get('n_gaussians', 0)) if frame_logs else 0,
-            "mean_quality_per_compute": float(np.mean([r.get('quality_per_compute', 0) for r in frame_logs])),
-            "mean_delta_quality_per_compute": float(np.mean([r.get('delta_quality_per_compute', 0) for r in frame_logs])),
+            "mean_quality_per_compute": float(mean_p / total_sec) if total_sec > 0.001 else 0.0,
+            "mean_delta_quality_per_compute": float((last_p - initial_psnr) / total_sec) if total_sec > 0.001 else 0.0,
             "frame_logs": frame_logs,
         }
 
@@ -420,7 +423,9 @@ def main():
     except Exception:
         commit_sha = "unknown"
 
-    ckpt_path = os.path.join(repo_root, "checkpoints", "best_utility_model.pt")
+    ckpt_path = os.path.join(repo_root, "results", "learned_utility", "checkpoints", f"two_head_mlp_seed_{seeds[0]}.pt")
+    if not os.path.exists(ckpt_path):
+        ckpt_path = os.path.join(repo_root, "checkpoints", "best_utility_model.pt")
     ckpt_hash = None
     if os.path.exists(ckpt_path):
         with open(ckpt_path, "rb") as f:
@@ -440,7 +445,7 @@ def main():
         "device": device,
         "provenance": {
             "git_commit": commit_sha,
-            "checkpoint_path": "checkpoints/best_utility_model.pt",
+            "checkpoint_path": os.path.relpath(ckpt_path, repo_root) if os.path.exists(ckpt_path) else "checkpoints/best_utility_model.pt",
             "checkpoint_sha256": ckpt_hash,
             "seed_list": seeds,
         },
