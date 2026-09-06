@@ -496,10 +496,10 @@ def main():
         # Build fresh pipeline for each seed
         print(f"[2/4] Building pipeline and warming up to frame {warmup_frames}...")
         pipeline = build_pipeline(H, W, device)
-        pipeline.initialize(frames[0])
+        pipeline.initialize(frames[0]['rgb'], frames[0]['depth'], intrinsics, frames[0]['pose'])
 
         for fi in range(1, min(warmup_frames, len(frames))):
-            pipeline.process_frame(frames[fi])
+            pipeline.process_frame(frames[fi]['rgb'], frames[fi]['depth'], frames[fi]['pose'])
 
         N = pipeline.gaussian_model.num_gaussians
         print(f"  Active Gaussians: N = {N}")
@@ -520,13 +520,15 @@ def main():
               f"contrib_weights={contrib_weights.shape}")
         print(f"  Feature extraction time: {t_feat_ms:.1f}ms")
 
-        # Sample candidate Gaussians
-        n_cand = min(args.n_candidates, N)
+        # Sample candidate Gaussians from visible set
+        valid_attr = contrib_weights > 0.01
+        visible_pool = contrib_indices[valid_attr].unique().tolist() if valid_attr.any() else list(range(N))
+        n_cand = min(args.n_candidates, len(visible_pool))
         if args.quick:
-            n_cand = min(10, N)
+            n_cand = min(10, len(visible_pool))
 
         rng = np.random.default_rng(seed)
-        candidate_indices = rng.choice(N, size=n_cand, replace=False).tolist()
+        candidate_indices = rng.choice(visible_pool, size=n_cand, replace=False).tolist()
 
         # Build candidates with real oracle measurements
         print(f"  Building {n_cand} candidates with real oracle measurements...")
@@ -565,11 +567,11 @@ def main():
         oracle_ref_gain = oracle_ref_res["delta_q_realized"]
         print(f"  Oracle reference ΔQ (full pool): {oracle_ref_gain:.6e}")
 
-        # Create evaluator
+        # Create evaluator with unified cost semantics across all policies
         evaluator = Phase6Evaluator(
             p6_predictor=p6_predictor,
             safety_factor=1.10,
-            use_predicted_cost=True,
+            use_predicted_cost=False,  # UNIFIED BUDGET SEMANTICS: all policies use measured_trial_cost_ms
             device=device,
         )
 
@@ -600,9 +602,11 @@ def main():
         )
 
         # ─── Experiment B: Wall-Clock Budget Sweep ───
-        wall_budgets = [10.0, 15.0, 20.0, 33.3]
+        mean_unit_cost = total_cost / max(len(candidates), 1)
         if args.quick:
-            wall_budgets = [10.0, 20.0]
+            wall_budgets = [float(round(mean_unit_cost * k)) for k in [2, 4]]
+        else:
+            wall_budgets = [float(round(mean_unit_cost * k)) for k in [1, 2, 4, 8]]
 
         print(f"\n  Wall-Clock Budget Sweep: {wall_budgets} ms")
         wall_results = run_budget_sweep(

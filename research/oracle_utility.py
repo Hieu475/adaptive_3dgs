@@ -347,10 +347,10 @@ class OracleUtilityExperiment:
                 loss_depth = (comp_out['depth'][valid_d] - depth[valid_d]).abs().mean() if valid_d.any() else 0.0
                 
             total_loss = self.w_rgb * loss_rgb + self.w_depth * loss_depth
-            total_loss.backward()
-            
-            # True Selective Optimizer step (O(M))
-            trial_opt.step(active_idx=active_subset['indices'])
+            if total_loss.requires_grad:
+                total_loss.backward()
+                # True Selective Optimizer step (O(M))
+                trial_opt.step(active_idx=active_subset['indices'])
             
         if device.type == 'cuda':
             torch.cuda.synchronize()

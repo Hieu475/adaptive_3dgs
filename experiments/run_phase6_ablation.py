@@ -80,6 +80,7 @@ def train_and_eval_variant(
 
     # C4 FIX: Use prepare_phase6_splits which fits normalizer on TRAIN ONLY
     # Old code had: normalizer.fit(all_feats) BEFORE split → data leakage
+    mask = _get_variant_mask(variant)
     norm_path = os.path.join(output_dir, f"norm_{variant}.json")
 
     train_ds, val_ds, test_ds, normalizer = prepare_phase6_splits(

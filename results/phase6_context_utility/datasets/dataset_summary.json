@@ -2,7 +2,7 @@
   "phase": "Phase 6 \u2014 Conditional Oracle Dataset",
   "scene": "tum_fr2_xyz",
   "seed": 42,
-  "total_samples": 100,
+  "total_samples": 800,
   "feature_dim": 32,
   "feature_names": [
     "rgb_error",
@@ -41,49 +41,49 @@
   "frame_stats": [
     {
       "frame": 10,
-      "n_candidates": 10,
-      "n_samples": 50,
+      "n_candidates": 15,
+      "n_samples": 75,
       "n_gaussians": 4887,
       "state_integrity": true,
-      "time_s": 92.129195608999,
-      "delta_q_mean": 8.59057525427969e-06,
-      "delta_q_std": 1.2889850293905925e-05,
-      "delta_q_min": -5.013168245193736e-05,
-      "delta_q_max": 3.2726719403998204e-05,
-      "utility_mean": 3.7965010190704816e-06,
-      "utility_std": 8.787191590310056e-06,
-      "positive_utility_frac": 0.74,
+      "time_s": 123.6240589370027,
+      "delta_q_mean": 6.037231179720477e-06,
+      "delta_q_std": 1.3066604899485553e-05,
+      "delta_q_min": -2.4926291921249704e-05,
+      "delta_q_max": 4.8601629745494796e-05,
+      "utility_mean": 6.7537939320311226e-06,
+      "utility_std": 3.701949411727368e-05,
+      "positive_utility_frac": 0.8,
       "context_size_distribution": {
-        "0": 10,
-        "1": 10,
-        "4": 20,
-        "8": 10
+        "0": 15,
+        "1": 15,
+        "4": 30,
+        "8": 15
       }
     },
     {
       "frame": 20,
-      "n_candidates": 10,
-      "n_samples": 50,
+      "n_candidates": 15,
+      "n_samples": 75,
       "n_gaussians": 4887,
       "state_integrity": true,
-      "time_s": 87.93230957400374,
-      "delta_q_mean": 3.6564233184487885e-06,
-      "delta_q_std": 2.5590787076793934e-06,
-      "delta_q_min": -5.939903914860251e-07,
-      "delta_q_max": 1.1239066161491542e-05,
-      "utility_mean": 2.16811461211313e-06,
-      "utility_std": 3.7852238956439942e-06,
-      "positive_utility_frac": 0.96,
+      "time_s": 126.66616740300014,
+      "delta_q_mean": 1.2439415611520492e-05,
+      "delta_q_std": 1.8808343093280237e-05,
+      "delta_q_min": -1.034608591281244e-05,
+      "delta_q_max": 7.44876681711409e-05,
+      "utility_mean": 7.722486493834143e-06,
+      "utility_std": 3.513840764463702e-05,
+      "positive_utility_frac": 0.7866666666666666,
       "context_size_distribution": {
-        "0": 10,
-        "1": 10,
-        "4": 20,
-        "8": 10
+        "0": 15,
+        "1": 15,
+        "4": 30,
+        "8": 15
       }
     }
   ],
   "verification": {
-    "total_samples": 100,
+    "total_samples": 800,
     "frames_evaluated": [
       10,
       20

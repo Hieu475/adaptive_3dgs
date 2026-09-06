@@ -177,6 +177,9 @@ def main():
     parser.add_argument("--phase4-ckpt", type=str, default=None,
                         help="Path to Phase 4 checkpoint.")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--split", type=str, default="cross_scene_test",
+                        choices=["cross_scene_test", "train", "validation", "all"],
+                        help="Dataset split to evaluate on (default: cross_scene_test for clean test evaluation)")
     parser.add_argument("--output-dir", type=str, default=None)
     args = parser.parse_args()
 
@@ -195,12 +198,16 @@ def main():
     print("  PHASE 6: RQ4 COMPREHENSIVE MODEL EVALUATION")
     print("=" * 80)
     print(f"  Dataset: {dataset_path}")
+    print(f"  Split filter: {args.split}")
 
     with open(dataset_path, "r") as f:
         samples = json.load(f)
 
+    if args.split != "all":
+        samples = [s for s in samples if s.get("split") == args.split]
+
     N = len(samples)
-    print(f"  Total conditional evaluation samples: {N}")
+    print(f"  Total conditional evaluation samples ({args.split}): {N}")
 
     # Extract target values
     oracle_u = np.array([s["utility_conditional"] for s in samples], dtype=np.float32)

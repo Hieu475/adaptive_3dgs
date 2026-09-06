@@ -216,20 +216,24 @@ def extract_all_features(pipeline, rgb, depth) -> np.ndarray:
     return features
 
 
-def sample_candidates(pipeline, n_candidates, seed=42):
-    """Sample candidate Gaussian indices using geometry-stratified sampling.
-
-    Falls back to uniform random if not enough visible Gaussians.
-    """
+def sample_candidates(pipeline, n_candidates, visible_indices=None, seed=42):
+    """Sample candidate Gaussian indices from visible Gaussians if available."""
     model = pipeline.gaussian_model
     N = model.num_gaussians
-    n_sample = min(n_candidates, N)
 
+    if visible_indices is not None and len(visible_indices) > 0:
+        pool = [int(i) for i in visible_indices if 0 <= int(i) < N]
+        if len(pool) == 0:
+            pool = list(range(N))
+    else:
+        pool = list(range(N))
+
+    n_sample = min(n_candidates, len(pool))
     if n_sample <= 0:
         return []
 
     rng = np.random.default_rng(seed)
-    return rng.choice(N, size=n_sample, replace=False).tolist()
+    return rng.choice(pool, size=n_sample, replace=False).tolist()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -253,6 +257,10 @@ def main():
     parser.add_argument("--protocol-splits", action="store_true",
                         help="Generate ALL protocol splits: tum_fr1_desk (train 0-40, val 41-60) "
                              "AND tum_fr2_xyz (test). Overrides --scene and --frames.")
+    parser.add_argument("--append", action="store_true", default=False,
+                        help="Append samples to existing dataset file if it exists, merging without overwriting.")
+    parser.add_argument("--output-filename", type=str, default=None,
+                        help="Custom filename for the output json dataset.")
     parser.add_argument("--output-dir", type=str, default=None,
                         help="Output directory (default: results/phase6_context_utility/datasets)")
     args = parser.parse_args()
@@ -419,9 +427,13 @@ def main():
         contrib_indices = attr_out['contrib_indices']
         contrib_weights = attr_out['contrib_weights']
 
-        # Sample candidates
-        candidates = sample_candidates(pipeline, max_candidates, seed=seed + frame_idx)
-        print(f"  Candidates: {len(candidates)}")
+        # Extract visible indices from attribution
+        valid_attr = contrib_weights > 0.01
+        visible_indices = contrib_indices[valid_attr].unique().tolist() if valid_attr.any() else None
+
+        # Sample candidates from visible Gaussians
+        candidates = sample_candidates(pipeline, max_candidates, visible_indices=visible_indices, seed=seed + frame_idx)
+        print(f"  Candidates: {len(candidates)} (sampled from {len(visible_indices) if visible_indices else N} visible)")
 
         # Determine split
         if scene_name == "tum_fr2_xyz":
@@ -488,10 +500,22 @@ def main():
         all_samples.extend(frame_samples)
 
     # ─── Save dataset ───
-    dataset_path = os.path.join(output_dir, f"conditional_oracle_seed_{seed}.json")
-    print(f"\n[Save] Writing {len(all_samples)} samples to {dataset_path}")
-    with open(dataset_path, 'w') as f:
-        json.dump(all_samples, f, indent=2, default=str)
+    fname = args.output_filename or f"conditional_oracle_seed_{seed}.json"
+    dataset_path = os.path.join(output_dir, fname)
+
+    if args.append and os.path.exists(dataset_path):
+        with open(dataset_path, 'r') as f:
+            existing_samples = json.load(f)
+        print(f"\n[Append] Found {len(existing_samples)} existing samples in {dataset_path}")
+        combined_samples = existing_samples + all_samples
+        print(f"[Save] Writing total {len(combined_samples)} samples ({len(existing_samples)} existing + {len(all_samples)} new) to {dataset_path}")
+        with open(dataset_path, 'w') as f:
+            json.dump(combined_samples, f, indent=2, default=str)
+        all_samples = combined_samples
+    else:
+        print(f"\n[Save] Writing {len(all_samples)} samples to {dataset_path}")
+        with open(dataset_path, 'w') as f:
+            json.dump(all_samples, f, indent=2, default=str)
 
     # ─── Verification checks ───
     print(f"\n{'='*60}")

@@ -254,3 +254,111 @@ class TestUnifiedDispatch:
         )
         assert res.policy == "phase6_static"
         assert res.scheduled_cost <= 10.0 + 1e-6
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5. Controlled Adaptivity Verification: Static != Adaptive
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestAdaptiveVsStaticControlled:
+    def test_adaptive_reranking_diverges_from_static(self):
+        """Controlled test: presence of candidate in selected set degrades
+        utility of co-located candidate, causing adaptive to pick a different
+        Gaussian than static 1-pass selection."""
+        class ContextSensitiveMockPredictor:
+            """Predictor where selected context features penalize utility."""
+            def __init__(self):
+                self.device = "cpu"
+
+            def predict(self, x: torch.Tensor):
+                # x is (N, 32)
+                # Feature slices: self(0:11), neighbor(11:19), overlap(19:24), selected(24:32)
+                # If selected features (e.g. selected overlap or density) are > 0, penalize utility
+                # candidate 0: base utility 10.0
+                # candidate 1: base utility 9.0 (co-located with 0, penalty if 0 is selected)
+                # candidate 2: base utility 8.0 (distant from 0, no penalty)
+                N = x.shape[0]
+                delta_q = torch.zeros(N)
+                delta_t = torch.ones(N)
+
+                # Selected features: index 24 is candidate_selected_overlap
+                # or index 26 is min_dist_to_selected
+                for i in range(N):
+                    # Check if selected set is non-empty (budget_fraction > 0 at index 24)
+                    selected_active = x[i, 24] > 0 or x[i, 28] > 0 or x[i, 29] > 0
+                    base_u = x[i, 0]  # rgb_error encodes base quality
+
+                    if selected_active and x[i, 1] > 0.5:
+                        # Heavy penalty if neighbor is selected
+                        u = base_u * 0.1
+                    else:
+                        u = base_u
+
+                    delta_q[i] = u
+                    delta_t[i] = 1.0
+
+                return {
+                    "delta_q": delta_q,
+                    "delta_t": delta_t,
+                    "utility": delta_q / delta_t,
+                }
+
+        predictor = ContextSensitiveMockPredictor()
+
+        # 3 candidates:
+        # Cand 0: high utility (10), at (0, 0, 0)
+        # Cand 1: high initial utility (9), co-located at (0.01, 0, 0) -> subject to penalty
+        # Cand 2: moderate utility (8), far away at (10, 10, 0) -> no penalty
+        positions = torch.tensor([
+            [0.0, 0.0, 0.0],
+            [0.01, 0.0, 0.0],
+            [10.0, 10.0, 0.0],
+        ], dtype=torch.float32)
+
+        # Feature col 0: rgb_error (base utility), col 1: co-location flag
+        all_features = np.zeros((3, 11), dtype=np.float32)
+        all_features[0, 0] = 10.0
+        all_features[1, 0] = 9.0
+        all_features[1, 1] = 1.0  # flagged for overlap penalty
+        all_features[2, 0] = 8.0
+        all_features[2, 1] = 0.0  # distant, no penalty
+
+        candidates = [
+            {"gaussian_id": 0, "persistent_id": 0, "measured_trial_cost_ms": 1.0, "predicted_delta_t": 1.0, "predicted_importance": 10.0},
+            {"gaussian_id": 1, "persistent_id": 1, "measured_trial_cost_ms": 1.0, "predicted_delta_t": 1.0, "predicted_importance": 9.0},
+            {"gaussian_id": 2, "persistent_id": 2, "measured_trial_cost_ms": 1.0, "predicted_delta_t": 1.0, "predicted_importance": 8.0},
+        ]
+
+        # Budget allows picking exactly 2 candidates (B = 2.0, cost = 1.0 each)
+        budget = 2.0
+
+        # Static 1-pass: evaluates S=∅ for all, ranks [0 (u=10), 1 (u=9), 2 (u=8)] -> picks {0, 1}
+        res_static = static_context_select(
+            candidates=candidates,
+            positions=positions,
+            all_features=all_features,
+            predictor=predictor,
+            budget=budget,
+            safety_factor=1.0,
+            use_predicted_cost=False,
+        )
+
+        # Adaptive Greedy:
+        # Step 1: picks 0 (u=10). S = {0}.
+        # Step 2: re-evaluates remaining {1, 2} with S={0}.
+        #         Cand 1 penalty triggers -> u drops to 0.9!
+        #         Cand 2 has u=8.0 > 0.9!
+        #         Adaptive picks 2! -> picks {0, 2}
+        res_adaptive = adaptive_greedy_select(
+            candidates=candidates,
+            positions=positions,
+            all_features=all_features,
+            predictor=predictor,
+            budget=budget,
+            safety_factor=1.0,
+            use_predicted_cost=False,
+        )
+
+        assert res_static.selected_indices == [0, 1], f"Static should pick [0, 1], got {res_static.selected_indices}"
+        assert res_adaptive.selected_indices == [0, 2], f"Adaptive should pick [0, 2], got {res_adaptive.selected_indices}"
+        assert res_static.selected_indices != res_adaptive.selected_indices, "Static and Adaptive must strictly diverge under context shift!"

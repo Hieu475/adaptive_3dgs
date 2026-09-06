@@ -261,24 +261,32 @@ class ContextAwareTwoHeadMLP(nn.Module):
 class Phase6Loss(nn.Module):
     """Composite loss for Phase 6 context-aware utility training.
 
-    L = λ_Q · SmoothL1(ΔQ_hat, ΔQ*) + λ_C · SmoothL1(ΔT_hat, ΔT*) + λ_R · MarginRankingLoss
+    L = λ_Q · SmoothL1(scale_q · ΔQ_hat, scale_q · ΔQ*)
+      + λ_C · SmoothL1(scale_t · ΔT_hat, scale_t · ΔT*)
+      + λ_R · MarginRankingLoss(scale_u · U_hat, scale_u · U*)
 
-    The margin ranking loss encourages the model to correctly rank candidates
-    by utility: if U*(i) > U*(j), then U_hat(i) should be > U_hat(j).
+    Scaling balances gradients across targets of wildly different magnitudes:
+    ΔQ ~ 1e-5, ΔT ~ 20ms, U ~ 1e-5.
     """
 
     def __init__(
         self,
-        lambda_q: float = 1.0,
+        lambda_q: float = 2.0,
         lambda_c: float = 0.5,
-        lambda_r: float = 0.1,
+        lambda_r: float = 2.0,
         margin: float = 0.0,
+        scale_q: float = 1e4,
+        scale_t: float = 0.05,
+        scale_u: float = 1e4,
     ):
         super().__init__()
         self.lambda_q = lambda_q
         self.lambda_c = lambda_c
         self.lambda_r = lambda_r
         self.margin = margin
+        self.scale_q = scale_q
+        self.scale_t = scale_t
+        self.scale_u = scale_u
         self.smooth_l1 = nn.SmoothL1Loss()
         self.margin_loss = nn.MarginRankingLoss(margin=margin)
 
@@ -291,42 +299,25 @@ class Phase6Loss(nn.Module):
         target_t: torch.Tensor,
         target_u: torch.Tensor,
     ) -> Dict[str, torch.Tensor]:
-        """Compute composite loss.
-
-        Args:
-            pred_q: Predicted ΔQ (N,)
-            pred_t: Predicted ΔT (N,)
-            pred_u: Predicted utility (N,)
-            target_q: Oracle ΔQ* (N,)
-            target_t: Oracle ΔT* (N,)
-            target_u: Oracle U* (N,)
-
-        Returns:
-            Dict with 'total', 'loss_q', 'loss_t', 'loss_r' keys.
-        """
-        loss_q = self.smooth_l1(pred_q, target_q)
-        loss_t = self.smooth_l1(pred_t, target_t)
+        loss_q = self.smooth_l1(pred_q * self.scale_q, target_q * self.scale_q)
+        loss_t = self.smooth_l1(pred_t * self.scale_t, target_t * self.scale_t)
 
         # Margin ranking loss on utility pairs
         loss_r = torch.tensor(0.0, device=pred_u.device)
         N = pred_u.shape[0]
         if N >= 2 and self.lambda_r > 0:
-            # Sample random pairs for efficiency
-            n_pairs = min(N * 2, N * (N - 1) // 2)
+            n_pairs = min(N * 4, N * (N - 1) // 2)
             idx_i = torch.randint(0, N, (n_pairs,), device=pred_u.device)
             idx_j = torch.randint(0, N, (n_pairs,), device=pred_u.device)
-            # Ensure i != j
             different = idx_i != idx_j
             idx_i = idx_i[different]
             idx_j = idx_j[different]
 
             if len(idx_i) > 0:
-                u_i = pred_u[idx_i]
-                u_j = pred_u[idx_j]
+                u_i = pred_u[idx_i] * self.scale_u
+                u_j = pred_u[idx_j] * self.scale_u
                 target_sign = torch.sign(target_u[idx_i] - target_u[idx_j])
-                # MarginRankingLoss expects target in {-1, 1}
                 target_sign = target_sign.clamp(-1, 1)
-                # Replace zeros with 1 (tie → prefer i)
                 target_sign[target_sign == 0] = 1.0
                 loss_r = self.margin_loss(u_i, u_j, target_sign)
 
