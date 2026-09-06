@@ -426,7 +426,7 @@ def main():
 
     # Load protocol
     protocol = load_protocol()
-    H, W = get_resolution(protocol, args.scene)
+    H, W = get_resolution(args.scene, protocol)
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     warmup_frames = args.warmup_frames if args.warmup_frames is not None else args.frame
@@ -474,8 +474,8 @@ def main():
         all_policies.extend(["phase6_static", "phase6_adaptive"])
 
     # Load scene data
-    scene_cfg = get_dataset_config(protocol, args.scene)
-    data_path = scene_cfg['path']
+    scene_cfg = get_dataset_config(args.scene, protocol)
+    data_path = scene_cfg.get('full_path', scene_cfg['path'])
     camera = scene_cfg.get('camera', 'freiburg1')
 
     print(f"\n[1/4] Loading {args.scene} ({n_frames_to_load} frames)...")
