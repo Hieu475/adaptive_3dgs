@@ -183,6 +183,8 @@ def run_policy_online_trajectory(
         X = extract_online_canonical_features(pipeline_obj, N_gaussians)
 
         # Predict costs using Phase 4 predictor (unified cost baseline)
+        # CRITICAL: Phase 4 predictor gives GPU-calibrated costs (~1ms)
+        # Phase 6 cost head was trained on CPU measurements (~45ms) → zero selections
         res_p4 = p4_predictor.predict_features(X)
         pred_t = res_p4["predicted_delta_t"]
         pred_u_p4 = res_p4["predicted_utility"]
@@ -190,6 +192,24 @@ def run_policy_online_trajectory(
         est = pipeline_obj.importance_estimator
         imp_scores = est.compute_importance()[:N_gaussians].detach().cpu().numpy()
         pids = getattr(pipeline_obj.gaussian_model, "persistent_ids", None)
+
+        # Extract REAL attribution for context computation (C3 FIX)
+        model = pipeline_obj.gaussian_model
+        from research.attribution import render_with_attribution
+        attr_out = render_with_attribution(
+            means3D=model.positions,
+            cov3D=model.build_covariance(),
+            colors=model.get_colors(),
+            opacities=model.opacities.squeeze(-1),
+            extrinsics=pipeline_obj.current_pose,
+            intrinsics=pipeline_obj.intrinsics,
+            image_width=W,
+            image_height=H,
+            tile_size=pipeline_obj.config.get('rendering', {}).get('tile_size', 16),
+            top_k=pipeline_obj.config.get('rendering', {}).get('attribution_top_k', 4),
+        )
+        contrib_indices_local = attr_out['contrib_indices']
+        contrib_weights_local = attr_out['contrib_weights']
 
         # Build candidate representations (subsample visible pool if large for speed)
         cand_list = []
@@ -207,6 +227,7 @@ def run_policy_online_trajectory(
                     "influence_mass": float(X[idx, 4]),
                 },
                 "predicted_importance": float(imp_scores[idx]),
+                # Use Phase 4 GPU-calibrated cost for packing (FIX for zero-selection)
                 "measured_trial_cost_ms": float(pred_t[idx]),
                 "predicted_delta_t": float(pred_t[idx]),
                 "predicted_utility": float(pred_u_p4[idx]),
@@ -215,6 +236,9 @@ def run_policy_online_trajectory(
 
         positions = pipeline_obj.gaussian_model.positions
 
+        # CRITICAL FIX: use_predicted_cost=False → uses measured_trial_cost_ms
+        # (from Phase 4 predictor, GPU-calibrated) instead of Phase 6 cost head
+        # (trained on CPU trial costs ~45ms which exceeds any reasonable budget)
         sel_res = select_phase6_subset(
             candidates=cand_list,
             policy=policy,
@@ -222,16 +246,27 @@ def run_policy_online_trajectory(
             seed=seed + pipeline_obj.frame_count,
             safety_factor=safety_factor,
             reject_negative=False,
-            use_predicted_cost=True,
+            use_predicted_cost=False,  # FIX: Use measured_trial_cost_ms
             positions=positions,
             all_features=X,
             phase6_predictor=p6_predictor,
+            contrib_indices=contrib_indices_local,
+            contrib_weights=contrib_weights_local,
         )
 
+        n_selected = 0
         for s_idx in sel_res.selected_indices:
             act_idx = map_candidate_to_active_index(cand_list[s_idx], pipeline_obj.gaussian_model)
             if act_idx is not None and 0 <= act_idx < N_gaussians:
                 mask[act_idx] = True
+                n_selected += 1
+
+        # Diagnostic: detect zero-selection
+        if n_selected == 0 and policy not in ("no_op",):
+            print(f"    [DIAG] {policy} selected 0/{len(cand_list)} candidates "
+                  f"at frame {pipeline_obj.frame_count}, budget={budget_ms:.1f}ms, "
+                  f"scheduled_cost={sel_res.scheduled_cost:.1f}ms, "
+                  f"rejected_neg={sel_res.rejected_negative_count}")
 
         return mask
 

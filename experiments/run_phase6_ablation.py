@@ -78,31 +78,48 @@ def train_and_eval_variant(
     torch.manual_seed(seed)
     np.random.seed(seed)
 
-    all_feats, all_dq, all_dt, all_u, samples = load_phase6_dataset(dataset_path)
-    N = len(all_feats)
-
-    # Fit normalizer on all_feats
+    # C4 FIX: Use prepare_phase6_splits which fits normalizer on TRAIN ONLY
+    # Old code had: normalizer.fit(all_feats) BEFORE split → data leakage
     norm_path = os.path.join(output_dir, f"norm_{variant}.json")
-    normalizer = Phase6FeatureNormalizer()
-    normalizer.fit(all_feats)
-    normalizer.save_json(norm_path)
 
-    feats_norm = normalizer.transform(all_feats)
-    mask = _get_variant_mask(variant)
-    feats_variant = feats_norm[:, mask]
+    train_ds, val_ds, test_ds, normalizer = prepare_phase6_splits(
+        dataset_paths=[dataset_path],
+        normalizer_save_path=norm_path,
+        variant=variant,
+    )
 
-    # Split 70/15/15
-    perm = np.random.permutation(N)
-    n_train = max(1, int(0.7 * N))
-    n_val = max(1, int(0.15 * N))
+    if len(train_ds) == 0:
+        # Fall back to scene-based split if all samples are from same scene
+        all_feats, all_dq, all_dt, all_u, samples = load_phase6_dataset(dataset_path)
+        N = len(all_feats)
 
-    idx_tr = perm[:n_train]
-    idx_val = perm[n_train:n_train + n_val]
-    idx_te = perm[n_train + n_val:]
+        # Fit normalizer on first 70% (deterministic, not random)
+        normalizer = Phase6FeatureNormalizer()
+        n_train = max(1, int(0.7 * N))
+        normalizer.fit(all_feats[:n_train])  # FIT ON TRAIN PORTION ONLY
+        normalizer.save_json(norm_path)
 
-    train_ds = Phase6UtilityDataset(feats_variant[idx_tr], all_dq[idx_tr], all_dt[idx_tr], all_u[idx_tr])
-    val_ds = Phase6UtilityDataset(feats_variant[idx_val], all_dq[idx_val], all_dt[idx_val], all_u[idx_val])
-    test_ds = Phase6UtilityDataset(feats_variant[idx_te], all_dq[idx_te], all_dt[idx_te], all_u[idx_te])
+        feats_norm = normalizer.transform(all_feats)
+        mask = _get_variant_mask(variant)
+        feats_variant = feats_norm[:, mask]
+
+        n_val = max(1, int(0.15 * N))
+        train_ds = Phase6UtilityDataset(
+            feats_variant[:n_train], all_dq[:n_train], all_dt[:n_train], all_u[:n_train],
+        )
+        val_ds = Phase6UtilityDataset(
+            feats_variant[n_train:n_train + n_val],
+            all_dq[n_train:n_train + n_val],
+            all_dt[n_train:n_train + n_val],
+            all_u[n_train:n_train + n_val],
+        )
+        test_ds = Phase6UtilityDataset(
+            feats_variant[n_train + n_val:],
+            all_dq[n_train + n_val:],
+            all_dt[n_train + n_val:],
+            all_u[n_train + n_val:],
+        )
+        print(f"  [C4 FIX] Normalizer fit on train only (first {n_train}/{N} samples)")
 
     train_loader = torch.utils.data.DataLoader(train_ds, batch_size=16, shuffle=True)
     val_loader = torch.utils.data.DataLoader(val_ds, batch_size=16, shuffle=False)

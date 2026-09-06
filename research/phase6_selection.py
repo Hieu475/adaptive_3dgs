@@ -170,6 +170,8 @@ def adaptive_greedy_select(
                 all_features=all_features,
                 total_budget=budget,
                 current_cost=cur_scheduled_cost,
+                contrib_indices=contrib_indices,
+                contrib_weights=contrib_weights,
             )
             # Combine static 24 + dynamic 8 = 32
             sel_vec = np.array([sel_ctx[name] for name in [

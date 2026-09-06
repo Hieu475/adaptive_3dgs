@@ -233,41 +233,21 @@ def main():
     print(f"  Test:  {len(test_ds)} samples")
 
     if len(train_ds) == 0:
-        print("[WARN] No training data! Using all data for training (prototype mode).")
-        # In prototype mode (cross_scene_test only), use all data for training
-        all_feats, all_dq, all_dt, all_u, all_raw = load_phase6_dataset(dataset_paths[0])
-        normalizer = Phase6FeatureNormalizer()
-        normalizer.fit(all_feats)
-        all_feats_norm = normalizer.transform(all_feats)
-        normalizer.save_json(normalizer_path)
-
-        from research.phase6_dataset import _get_variant_mask
-        mask = _get_variant_mask(args.variant)
-        all_feats_norm = all_feats_norm[:, mask]
-
-        # 70/15/15 random split
-        N = len(all_feats_norm)
-        perm = np.random.permutation(N)
-        n_train = max(1, int(0.7 * N))
-        n_val = max(1, int(0.15 * N))
-
-        train_ds = Phase6UtilityDataset(
-            all_feats_norm[perm[:n_train]],
-            all_dq[perm[:n_train]], all_dt[perm[:n_train]], all_u[perm[:n_train]],
+        print("[ERROR] No training data found!")
+        print("  This means the dataset only contains 'cross_scene_test' samples.")
+        print("  You must generate proper train/val splits first:")
+        print("    - Train: tum_fr1_desk frames 0-40")
+        print("    - Val:   tum_fr1_desk frames 41-60")
+        print("    - Test:  tum_fr2_xyz")
+        print()
+        print("  Run: python experiments/build_phase6_dataset.py --scene tum_fr1_desk")
+        print("  Then: python experiments/build_phase6_dataset.py --scene tum_fr2_xyz")
+        raise RuntimeError(
+            "C4 FIX: Refusing to train with data leakage. "
+            "No training data found — generate proper splits first. "
+            "The old prototype fallback (fit normalizer on ALL data including test, "
+            "then random 70/15/15 split) has been removed to prevent data leakage."
         )
-        val_ds = Phase6UtilityDataset(
-            all_feats_norm[perm[n_train:n_train+n_val]],
-            all_dq[perm[n_train:n_train+n_val]],
-            all_dt[perm[n_train:n_train+n_val]],
-            all_u[perm[n_train:n_train+n_val]],
-        )
-        test_ds = Phase6UtilityDataset(
-            all_feats_norm[perm[n_train+n_val:]],
-            all_dq[perm[n_train+n_val:]],
-            all_dt[perm[n_train+n_val:]],
-            all_u[perm[n_train+n_val:]],
-        )
-        print(f"  [Prototype split] Train: {len(train_ds)}, Val: {len(val_ds)}, Test: {len(test_ds)}")
 
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, drop_last=False)
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False)

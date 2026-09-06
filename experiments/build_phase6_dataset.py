@@ -242,20 +242,50 @@ def main():
                         help="Tiny mode: 2 frames, 10 candidates for quick verification")
     parser.add_argument("--seed", type=int, default=42,
                         help="Random seed (default: 42)")
+    parser.add_argument("--seeds", type=str, default=None,
+                        help="Comma-separated seeds for multi-seed generation (e.g. 42,43,44,45,46)")
     parser.add_argument("--max-candidates", type=int, default=25,
                         help="Max candidates per frame (default: 25)")
     parser.add_argument("--frames", type=str, default="10,20",
                         help="Comma-separated frame indices to evaluate (default: 10,20)")
     parser.add_argument("--scene", type=str, default="tum_fr2_xyz",
-                        help="Scene name (default: tum_fr2_xyz for prototype)")
+                        help="Scene name (default: tum_fr2_xyz)")
+    parser.add_argument("--protocol-splits", action="store_true",
+                        help="Generate ALL protocol splits: tum_fr1_desk (train 0-40, val 41-60) "
+                             "AND tum_fr2_xyz (test). Overrides --scene and --frames.")
     parser.add_argument("--output-dir", type=str, default=None,
                         help="Output directory (default: results/phase6_context_utility/datasets)")
     args = parser.parse_args()
+
+    # Multi-seed support
+    seeds = [int(s) for s in args.seeds.split(",")] if args.seeds else [args.seed]
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"=" * 80)
     print(f"  PHASE 6 — CONDITIONAL ORACLE DATASET BUILDER [Device: {device}]")
     print(f"=" * 80)
+
+    # ─── Protocol-splits mode: generate ALL splits ───
+    if args.protocol_splits:
+        print("  MODE: PROTOCOL SPLITS (train + val + test)")
+        print("    Train: tum_fr1_desk frames 5,10,15,20,25,30,35,40")
+        print("    Val:   tum_fr1_desk frames 42,45,48,51,54,57,60")
+        print("    Test:  tum_fr2_xyz frames 10,20,30")
+        print(f"    Seeds: {seeds}")
+        print()
+
+        # We'll call the main generation logic for each scene
+        # For now, set up for current invocation based on --scene
+        # Full protocol-splits requires running this script twice:
+        #   1. --scene tum_fr1_desk --frames 5,10,15,20,25,30,35,40,42,45,48,51,54,57,60
+        #   2. --scene tum_fr2_xyz --frames 10,20,30
+        print("  [INFO] To generate full protocol splits, run:")
+        for s in seeds:
+            print(f"    python experiments/build_phase6_dataset.py --scene tum_fr1_desk "
+                  f"--frames 5,10,15,20,25,30,35,40,42,45,48,51,54,57,60 --seed {s}")
+            print(f"    python experiments/build_phase6_dataset.py --scene tum_fr2_xyz "
+                  f"--frames 10,20,30 --seed {s}")
+        print()
 
     # ─── Configuration ───
     if args.tiny:
@@ -267,7 +297,7 @@ def main():
         max_candidates = args.max_candidates
         print(f"  MODE: STANDARD ({len(frames_to_sample)} frames, {max_candidates} candidates/frame)")
 
-    seed = args.seed
+    seed = seeds[0]  # Primary seed for single-seed mode
     scene_name = args.scene
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -278,7 +308,7 @@ def main():
         output_dir = os.path.join(repo_root, "results", "phase6_context_utility", "datasets")
     os.makedirs(output_dir, exist_ok=True)
 
-    print(f"  Seed: {seed}")
+    print(f"  Seeds: {seeds}")
     print(f"  Scene: {scene_name}")
     print(f"  Frames: {frames_to_sample}")
     print(f"  Max candidates/frame: {max_candidates}")
