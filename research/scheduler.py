@@ -228,7 +228,7 @@ class BudgetScheduler:
         cost_estimates: Optional[torch.Tensor] = None,
         error_scores: Optional[torch.Tensor] = None,
         error_influence_scores: Optional[torch.Tensor] = None,
-        ratio: float = 0.5,
+        ratio: Optional[float] = None,
         top_k: Optional[int] = None,
         frame_idx: int = 0,
         binary_threshold: float = 0.5,
@@ -266,6 +266,7 @@ class BudgetScheduler:
         else:
             budget_us = float(self.gpu_budget_ms * 1000.0 * self.budget_allocation['optimize'] * self.budget_scale_factor)
             
+        cost_estimates_provided = cost_estimates is not None
         if cost_estimates is None:
             cost_estimates = torch.full((N,), self.cost_per_gaussian_us, device=device)
 
@@ -278,6 +279,7 @@ class BudgetScheduler:
             max_budget: float,
             reject_neg: bool = False,
             safety: float = 1.0,
+            max_k: Optional[int] = None,
         ) -> torch.Tensor:
             mask = torch.zeros(N, dtype=torch.bool, device=device)
             if reject_neg:
@@ -289,6 +291,8 @@ class BudgetScheduler:
                 sub_order = torch.argsort(sub_scores, descending=True)
                 cum_costs = torch.cumsum(sub_costs[sub_order], dim=0)
                 selected_sub = sub_order[cum_costs <= max_budget + 1e-7]
+                if max_k is not None:
+                    selected_sub = selected_sub[:max_k]
                 mask[valid_idx[selected_sub]] = True
                 return mask
             else:
@@ -296,6 +300,8 @@ class BudgetScheduler:
                 order = torch.argsort(scores, descending=True)
                 cum_costs = torch.cumsum(sub_costs[order], dim=0)
                 selected = order[cum_costs <= max_budget + 1e-7]
+                if max_k is not None:
+                    selected = selected[:max_k]
                 mask[selected] = True
                 return mask
 
@@ -307,20 +313,31 @@ class BudgetScheduler:
                 perm = torch.randperm(N, generator=g, device=device)
             except Exception:
                 perm = torch.randperm(N, device=device)
+
+            if ratio is not None and not cost_estimates_provided and budget_override_us is None:
+                k = int(round(N * ratio))
+                mask[perm[:k]] = True
+                return mask
+            if top_k is not None and not cost_estimates_provided and budget_override_us is None:
+                mask[perm[:min(top_k, N)]] = True
+                return mask
+
             cum_cost = torch.cumsum(cost_estimates[perm], dim=0)
             selected = perm[cum_cost <= budget_us + 1e-7]
+            if top_k is not None:
+                selected = selected[:top_k]
             mask[selected] = True
             return mask
 
         elif policy_str in ("error_only", OptimizationPolicy.ERROR_ONLY.value):
             score_tensor = error_scores if error_scores is not None else importance_scores
-            return _pack_by_scores(score_tensor, cost_estimates, budget_us)
+            return _pack_by_scores(score_tensor, cost_estimates, budget_us, max_k=top_k)
 
         elif policy_str in ("error_influence", OptimizationPolicy.ERROR_INFLUENCE.value):
             score_tensor = error_influence_scores if error_influence_scores is not None else (
                 (error_scores if error_scores is not None else importance_scores) * importance_scores
             )
-            return _pack_by_scores(score_tensor, cost_estimates, budget_us)
+            return _pack_by_scores(score_tensor, cost_estimates, budget_us, max_k=top_k)
 
         elif policy_str in ("binary", OptimizationPolicy.BINARY.value):
             mask = torch.zeros(N, dtype=torch.bool, device=device)
@@ -339,21 +356,26 @@ class BudgetScheduler:
             order = torch.argsort(elig_scores, descending=True)
             cum_cost = torch.cumsum(elig_costs[order], dim=0)
             selected = order[cum_cost <= budget_us + 1e-7]
+            if top_k is not None:
+                selected = selected[:top_k]
             mask[elig_idx[selected]] = True
             return mask
 
         elif policy_str in ("top_k", OptimizationPolicy.TOP_K.value):
-            if top_k is not None and budget_override_us is None:
+            effective_k = top_k
+            if effective_k is None and ratio is not None and (not cost_estimates_provided or budget_override_us is None):
+                effective_k = int(round(N * ratio))
+            if effective_k is not None and budget_override_us is None:
                 mask = torch.zeros(N, dtype=torch.bool, device=device)
-                _, top_indices = torch.topk(importance_scores, min(top_k, N))
+                _, top_indices = torch.topk(importance_scores, min(effective_k, N))
                 mask[top_indices] = True
                 return mask
-            return _pack_by_scores(importance_scores, cost_estimates, budget_us)
+            return _pack_by_scores(importance_scores, cost_estimates, budget_us, max_k=top_k)
 
         elif policy_str in ("budget_aware", "ours", "heuristic", OptimizationPolicy.BUDGET_AWARE.value, OptimizationPolicy.OURS.value):
             # Knapsack heuristic value density: importance / cost
             density = importance_scores / (cost_estimates + 1e-6)
-            return _pack_by_scores(density, cost_estimates, budget_us)
+            return _pack_by_scores(density, cost_estimates, budget_us, max_k=top_k)
 
         elif policy_str in ("learned_utility", OptimizationPolicy.LEARNED_UTILITY.value):
             eff = utility_scores if utility_scores is not None else (importance_scores / (cost_estimates + 1e-6))
@@ -363,6 +385,7 @@ class BudgetScheduler:
                 max_budget=budget_us,
                 reject_neg=reject_negative,
                 safety=safety_factor,
+                max_k=top_k,
             )
 
         elif policy_str in ("oracle", OptimizationPolicy.ORACLE.value):
@@ -375,6 +398,7 @@ class BudgetScheduler:
                 max_budget=budget_us,
                 reject_neg=reject_negative,
                 safety=1.0,
+                max_k=top_k,
             )
 
         else:
