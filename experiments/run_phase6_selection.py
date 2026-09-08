@@ -419,8 +419,9 @@ def compute_multi_seed_per_budget_stats(
     first_sweep = all_seed_results[0].get(sweep_key, [])
     budget_strs = []
     for r in first_sweep:
-        if r["budget_str"] not in budget_strs:
-            budget_strs.append(r["budget_str"])
+        b_key = r.get("budget_pct_str", str(r.get("budget_val")))
+        if b_key not in budget_strs:
+            budget_strs.append(b_key)
 
     per_budget_stats = {}
     all_diffs_combined = []
@@ -430,8 +431,8 @@ def compute_multi_seed_per_budget_stats(
         base_vals = []
         for seed_art in all_seed_results:
             sweep = seed_art.get(sweep_key, [])
-            r_t = next((r for r in sweep if r["budget_str"] == b_str and r["policy"] == target_policy), None)
-            r_b = next((r for r in sweep if r["budget_str"] == b_str and r["policy"] == baseline_policy), None)
+            r_t = next((r for r in sweep if r.get("budget_pct_str", str(r.get("budget_val"))) == b_str and r["policy"] == target_policy), None)
+            r_b = next((r for r in sweep if r.get("budget_pct_str", str(r.get("budget_val"))) == b_str and r["policy"] == baseline_policy), None)
             if r_t and r_b:
                 target_vals.append(float(r_t["actual_delta_q"]))
                 base_vals.append(float(r_b["actual_delta_q"]))
