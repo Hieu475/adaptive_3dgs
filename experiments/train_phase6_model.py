@@ -56,10 +56,10 @@ def train_epoch(
     loss_fn: Phase6Loss,
     device: torch.device,
 ) -> Dict[str, float]:
-    """Train for one epoch.
+    """Train for one epoch with group-aware listwise ranking and residual loss (P0).
 
     Returns:
-        Dict with 'loss', 'loss_q', 'loss_t', 'loss_r' averages.
+        Dict with 'loss', 'loss_q', 'loss_t', 'loss_r', 'loss_list', 'loss_res', 'loss_zero' averages.
     """
     model.train()
     if hasattr(model, 'p4_model'):
@@ -68,26 +68,59 @@ def train_epoch(
     total_lq = 0.0
     total_lt = 0.0
     total_lr = 0.0
+    total_ll = 0.0
+    total_lres = 0.0
+    total_lzero = 0.0
     n_batches = 0
+
+    is_residual = hasattr(model, 'context_fusion')
 
     for batch in loader:
         x = batch['features'].to(device)
         tgt_q = batch['delta_q'].to(device)
         tgt_t = batch['delta_t'].to(device)
         tgt_u = batch['utility'].to(device)
+        tgt_r = batch.get('target_r')
+        if tgt_r is not None:
+            tgt_r = tgt_r.to(device)
+        is_empty = batch.get('is_empty')
+        if is_empty is not None:
+            is_empty = is_empty.to(device)
+        group_ids = batch.get('group_id')
+        if group_ids is not None:
+            group_ids = group_ids.to(device)
 
         optimizer.zero_grad()
-        pred_q, pred_t, pred_u = model(x)
+        if is_residual:
+            pred_q, pred_t, pred_u, pred_r = model(x, return_residual=True)
+        else:
+            pred_q, pred_t, pred_u = model(x)
+            pred_r = None
 
-        losses = loss_fn(pred_q, pred_t, pred_u, tgt_q, tgt_t, tgt_u)
+        losses = loss_fn(
+            pred_q=pred_q,
+            pred_t=pred_t,
+            pred_u=pred_u,
+            target_q=tgt_q,
+            target_t=tgt_t,
+            target_u=tgt_u,
+            group_ids=group_ids,
+            pred_r=pred_r,
+            target_r=tgt_r,
+            is_empty=is_empty,
+        )
         losses['total'].backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        clip_params = model.context_parameters() if hasattr(model, 'context_parameters') else model.parameters()
+        torch.nn.utils.clip_grad_norm_(clip_params, max_norm=1.0)
         optimizer.step()
 
         total_loss += losses['total'].item()
         total_lq += losses['loss_q'].item()
         total_lt += losses['loss_t'].item()
         total_lr += losses['loss_r'].item()
+        total_ll += losses['loss_list'].item()
+        total_lres += losses['loss_res'].item()
+        total_lzero += losses['loss_zero'].item()
         n_batches += 1
 
     return {
@@ -95,6 +128,9 @@ def train_epoch(
         'loss_q': total_lq / max(n_batches, 1),
         'loss_t': total_lt / max(n_batches, 1),
         'loss_r': total_lr / max(n_batches, 1),
+        'loss_list': total_ll / max(n_batches, 1),
+        'loss_res': total_lres / max(n_batches, 1),
+        'loss_zero': total_lzero / max(n_batches, 1),
     }
 
 
@@ -105,7 +141,7 @@ def evaluate(
     loss_fn: Phase6Loss,
     device: torch.device,
 ) -> Dict[str, float]:
-    """Evaluate model on a dataset.
+    """Evaluate model on a dataset with group-aware listwise ranking and residual loss.
 
     Returns:
         Dict with loss averages + correlation metrics.
@@ -123,15 +159,41 @@ def evaluate(
     all_pred_q = []
     all_tgt_q = []
 
+    is_residual = hasattr(model, 'context_fusion')
+
     for batch in loader:
         x = batch['features'].to(device)
         tgt_q = batch['delta_q'].to(device)
         tgt_t = batch['delta_t'].to(device)
         tgt_u = batch['utility'].to(device)
+        tgt_r = batch.get('target_r')
+        if tgt_r is not None:
+            tgt_r = tgt_r.to(device)
+        is_empty = batch.get('is_empty')
+        if is_empty is not None:
+            is_empty = is_empty.to(device)
+        group_ids = batch.get('group_id')
+        if group_ids is not None:
+            group_ids = group_ids.to(device)
 
-        pred_q, pred_t, pred_u = model(x)
+        if is_residual:
+            pred_q, pred_t, pred_u, pred_r = model(x, return_residual=True)
+        else:
+            pred_q, pred_t, pred_u = model(x)
+            pred_r = None
 
-        losses = loss_fn(pred_q, pred_t, pred_u, tgt_q, tgt_t, tgt_u)
+        losses = loss_fn(
+            pred_q=pred_q,
+            pred_t=pred_t,
+            pred_u=pred_u,
+            target_q=tgt_q,
+            target_t=tgt_t,
+            target_u=tgt_u,
+            group_ids=group_ids,
+            pred_r=pred_r,
+            target_r=tgt_r,
+            is_empty=is_empty,
+        )
         total_loss += losses['total'].item()
         total_lq += losses['loss_q'].item()
         total_lt += losses['loss_t'].item()
@@ -257,9 +319,14 @@ def main():
             "then random 70/15/15 split) has been removed to prevent data leakage."
         )
 
-    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, drop_last=False)
-    val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False)
-    test_loader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False)
+    from research.phase6_dataset import GroupedBatchSampler
+    train_sampler = GroupedBatchSampler(train_ds.group_ids, shuffle=True, seed=args.seed)
+    val_sampler = GroupedBatchSampler(val_ds.group_ids, shuffle=False)
+    test_sampler = GroupedBatchSampler(test_ds.group_ids, shuffle=False)
+
+    train_loader = DataLoader(train_ds, batch_sampler=train_sampler)
+    val_loader = DataLoader(val_ds, batch_sampler=val_sampler)
+    test_loader = DataLoader(test_ds, batch_sampler=test_sampler)
 
     # ─── Build model ───
     config = create_ablation_variant(args.variant)
@@ -279,35 +346,59 @@ def main():
 
     if args.architecture == "residual":
         p4_ckpt = os.path.join(repo_root, "results", "learned_utility", "checkpoints", f"two_head_mlp_seed_{args.seed}.pt")
-        p4_model = None
-        if os.path.exists(p4_ckpt):
-            from research.utility_models import TwoHeadMLP
-            p4_net = TwoHeadMLP(in_features=11)
-            ckpt_data = torch.load(p4_ckpt, map_location="cpu", weights_only=False)
-            p4_net.load_state_dict(ckpt_data.get("model_state", ckpt_data))
-            p4_model = p4_net
-            print(f"  [Residual] Loaded pre-trained Phase 4 weights from {p4_ckpt}")
-        model = ResidualContextModel(config, p4_model=p4_model).to(device)
+        if not os.path.exists(p4_ckpt):
+            p4_ckpt = os.path.join(repo_root, "results", "learned_utility", "checkpoints", "two_head_mlp_seed_42.pt")
+        if not os.path.exists(p4_ckpt):
+            raise FileNotFoundError(f"P0.2 REQUIREMENT: Pretrained Phase 4 checkpoint required at {p4_ckpt}")
+
+        from research.utility_models import TwoHeadMLP
+        p4_net = TwoHeadMLP(in_features=11)
+        ckpt_data = torch.load(p4_ckpt, map_location="cpu", weights_only=False)
+        p4_net.load_state_dict(ckpt_data.get("model_state", ckpt_data))
+        p4_net.eval()
+        for p in p4_net.parameters():
+            p.requires_grad = False
+        print(f"  [Residual] Loaded and strictly froze pre-trained Phase 4 weights from {p4_ckpt}")
+
+        model = ResidualContextModel(config, p4_model=p4_net).to(device)
+        trainable_params = model.context_parameters()
     else:
         model = ContextAwareTwoHeadMLP(config).to(device)
+        trainable_params = list(model.parameters())
 
     n_params = sum(p.numel() for p in model.parameters())
+    n_trainable = sum(p.numel() for p in trainable_params)
     print(f"\n[Model] Architecture: {args.architecture} ({config.variant_name})")
-    print(f"  Input dim:  {input_dim}")
-    print(f"  Parameters: {n_params:,}")
-    print(f"  Config:     neighbor={config.use_neighbor}, overlap={config.use_overlap}, selected={config.use_selected}")
+    print(f"  Input dim:          {input_dim}")
+    print(f"  Total parameters:   {n_params:,}")
+    print(f"  Trainable params:   {n_trainable:,} (P4 backbone strictly frozen)")
 
     # ─── Training ───
-    trainable_params = model.context_parameters() if hasattr(model, 'context_parameters') else model.parameters()
-    optimizer = torch.optim.Adam(trainable_params, lr=args.lr, weight_decay=1e-5)
+    if args.architecture == "residual":
+        train_lr = args.lr if args.lr != 1e-3 else 2e-4
+        loss_fn = Phase6Loss(
+            lambda_q=0.0,
+            lambda_c=0.0,
+            lambda_r=args.lambda_r if args.lambda_r != 0.1 else 1.0,
+            lambda_list=args.lambda_list,
+            lambda_res=1.0,
+            lambda_zero=0.5,
+            scale_u=1.0,
+        )
+    else:
+        train_lr = args.lr
+        loss_fn = Phase6Loss(
+            lambda_q=args.lambda_q,
+            lambda_c=args.lambda_c,
+            lambda_r=args.lambda_r,
+            lambda_list=args.lambda_list,
+            lambda_res=0.0,
+            lambda_zero=0.0,
+        )
+
+    optimizer = torch.optim.Adam(trainable_params, lr=train_lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode='min', factor=0.5, patience=15, min_lr=1e-6
-    )
-    loss_fn = Phase6Loss(
-        lambda_q=args.lambda_q,
-        lambda_c=args.lambda_c,
-        lambda_r=args.lambda_r,
-        lambda_list=args.lambda_list,
     )
 
     best_val_loss = float('inf')
@@ -319,6 +410,7 @@ def main():
     t_start = time.perf_counter()
 
     for epoch in range(1, args.epochs + 1):
+        train_sampler.set_epoch(epoch)
         train_metrics = train_epoch(model, train_loader, optimizer, loss_fn, device)
         val_metrics = evaluate(model, val_loader, loss_fn, device) if len(val_ds) > 0 else train_metrics
 
@@ -427,7 +519,15 @@ def main():
         },
         'metadata': {
             'phase': 'phase6',
+            'model_type': 'residual_context' if args.architecture == 'residual' else 'direct_context',
+            'phase4_checkpoint': p4_ckpt if args.architecture == 'residual' else None,
+            'phase4_frozen': True if args.architecture == 'residual' else False,
+            'seed': args.seed,
             'variant': args.variant,
+            'feature_variant': args.variant,
+            'protocol': 'v1',
+            'normalizer': f"normalization_{args.variant}.json",
+            'git_commit': _get_git_commit(),
             'input_dim': input_dim,
             'dataset_paths': [str(p) for p in dataset_paths],
         },
@@ -448,6 +548,14 @@ def main():
             'history': history,
         }, f, indent=2)
     print(f"[Save] Training log: {log_path}")
+
+
+def _get_git_commit() -> str:
+    try:
+        import subprocess
+        return subprocess.check_output(['git', 'rev-parse', 'HEAD'], stderr=subprocess.DEVNULL).decode().strip()
+    except Exception:
+        return "unknown"
 
 
 def _count_variant_dims(variant: str) -> Dict[str, int]:

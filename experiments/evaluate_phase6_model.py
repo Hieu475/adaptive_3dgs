@@ -376,10 +376,12 @@ def main():
         }
     }
 
-    report_path = os.path.join(output_dir, f"model_evaluation_rq4_seed_{args.seed}.json")
-    with open(report_path, "w") as f:
-        json.dump(report, f, indent=2)
-    print(f"\n[Saved] Evaluation Report: {report_path}")
+    report_path_residual = os.path.join(output_dir, f"model_evaluation_residual_v11_seed_{args.seed}.json")
+    report_path_rq4 = os.path.join(output_dir, f"model_evaluation_rq4_seed_{args.seed}.json")
+    for rpath in [report_path_residual, report_path_rq4]:
+        with open(rpath, "w") as f:
+            json.dump(report, f, indent=2)
+    print(f"\n[Saved] Evaluation Report: {report_path_residual}")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,19 @@
+{
+  "bundle_version": "1.0.0",
+  "architecture": "ResidualContextModel (V11 / P6-E)",
+  "git_commit": "62064130ef3f047af6c6ec6cb1dd337844d86580",
+  "protocol_version": "1.0.0",
+  "seed": 42,
+  "input_dim": 32,
+  "feature_schema": [
+    "self (11 canonical)",
+    "neighbor (8 KNN)",
+    "overlap (5 attribution IoU)",
+    "selected (8 dynamic set context)"
+  ],
+  "files": {
+    "model": "model.pt",
+    "normalizer": "normalizer.json",
+    "manifest": "manifest.json"
+  }
+}
