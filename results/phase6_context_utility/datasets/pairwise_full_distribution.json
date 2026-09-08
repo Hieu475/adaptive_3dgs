@@ -1,0 +1,61 @@
+{
+  "overall": {
+    "n_pairs": 26,
+    "mean_interaction": -1.0583870010297834e-06,
+    "std_interaction": 5.279384818611439e-06,
+    "median_interaction": -1.960830723568314e-07,
+    "q25_interaction": -2.0478588337902694e-06,
+    "q75_interaction": 4.128205756463921e-09,
+    "fraction_sub_additive": 0.6923076923076923,
+    "fraction_super_additive": 0.3076923076923077,
+    "mean_iou": 0.16371123636526116,
+    "median_iou": 0.16265060240963855
+  },
+  "by_bin": {
+    "low": {
+      "n_pairs": 10,
+      "mean_interaction": -2.3453163854828234e-06,
+      "std_interaction": 4.728768168110699e-06,
+      "median_interaction": -4.347857421485211e-08,
+      "q25_interaction": -1.3847119985884213e-07,
+      "q75_interaction": 4.128205756463921e-09,
+      "fraction_sub_additive": 0.6,
+      "fraction_super_additive": 0.4,
+      "mean_iou": 0.0,
+      "median_iou": 0.0
+    },
+    "medium": {
+      "n_pairs": 10,
+      "mean_interaction": 1.231400031903455e-06,
+      "std_interaction": 6.246772131385752e-06,
+      "median_interaction": -1.8709858850640102e-07,
+      "q25_interaction": -8.746968550122265e-07,
+      "q75_interaction": 1.6123183723165971e-07,
+      "fraction_sub_additive": 0.6,
+      "fraction_super_additive": 0.4,
+      "mean_iou": 0.20705072970119417,
+      "median_iou": 0.22099447513812154
+    },
+    "high": {
+      "n_pairs": 6,
+      "mean_interaction": -2.729816415163446e-06,
+      "std_interaction": 2.0445139788995936e-06,
+      "median_interaction": -1.9866375277081535e-06,
+      "q25_interaction": -3.875487814133568e-06,
+      "q75_interaction": -1.2464409157611624e-06,
+      "fraction_sub_additive": 1.0,
+      "fraction_super_additive": 0.0,
+      "mean_iou": 0.3643308080808081,
+      "median_iou": 0.3696969696969697
+    },
+    "very_high": {
+      "n_pairs": 0
+    }
+  },
+  "correlation_iou_vs_magnitude": {
+    "spearman_rho": 0.5357429169545639,
+    "spearman_p": 0.004791062511208669,
+    "pearson_r": 0.10174172457652429,
+    "pearson_p": 0.620914040041374
+  }
+}
