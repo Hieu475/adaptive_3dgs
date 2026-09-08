@@ -26,7 +26,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, Union
 
 from .phase6_context import (
     PHASE6_FEATURE_DIM,
@@ -276,6 +276,8 @@ class Phase6Loss(nn.Module):
         lambda_c: float = 0.5,
         lambda_r: float = 2.0,
         lambda_list: float = 0.5,
+        lambda_res: float = 1.0,
+        lambda_zero: float = 0.5,
         margin: float = 0.0,
         scale_q: float = 1e4,
         scale_t: float = 0.05,
@@ -287,6 +289,8 @@ class Phase6Loss(nn.Module):
         self.lambda_c = lambda_c
         self.lambda_r = lambda_r
         self.lambda_list = lambda_list
+        self.lambda_res = lambda_res
+        self.lambda_zero = lambda_zero
         self.margin = margin
         self.scale_q = scale_q
         self.scale_t = scale_t
@@ -303,6 +307,9 @@ class Phase6Loss(nn.Module):
         target_q: torch.Tensor,
         target_t: torch.Tensor,
         target_u: torch.Tensor,
+        pred_r: Optional[torch.Tensor] = None,
+        target_r: Optional[torch.Tensor] = None,
+        is_empty: Optional[torch.Tensor] = None,
         group_ids: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
         loss_q = self.smooth_l1(pred_q * self.scale_q, target_q * self.scale_q)
@@ -366,11 +373,25 @@ class Phase6Loss(nn.Module):
         loss_r = torch.mean(torch.stack(loss_r_list)) if loss_r_list else torch.tensor(0.0, device=device)
         loss_list = torch.mean(torch.stack(loss_list_list)) if loss_list_list else torch.tensor(0.0, device=device)
 
+        # ─── Residual Target Loss (P0.4) ───
+        loss_res = torch.tensor(0.0, device=device)
+        if pred_r is not None and target_r is not None and self.lambda_res > 0:
+            loss_res = self.smooth_l1(pred_r * self.scale_u, target_r * self.scale_u)
+
+        # ─── Empty Context Zero Regularization (P0.4): r(∅) ≈ 0 ───
+        loss_zero = torch.tensor(0.0, device=device)
+        if pred_r is not None and is_empty is not None and self.lambda_zero > 0:
+            empty_mask = (is_empty > 0.5)
+            if empty_mask.any():
+                loss_zero = self.smooth_l1(pred_r[empty_mask] * self.scale_u, torch.zeros_like(pred_r[empty_mask]))
+
         total = (
             self.lambda_q * loss_q
             + self.lambda_c * loss_t
             + self.lambda_r * loss_r
             + self.lambda_list * loss_list
+            + self.lambda_res * loss_res
+            + self.lambda_zero * loss_zero
         )
 
         return {
@@ -379,6 +400,8 @@ class Phase6Loss(nn.Module):
             'loss_t': loss_t.detach(),
             'loss_r': loss_r.detach() if isinstance(loss_r, torch.Tensor) else torch.tensor(0.0),
             'loss_list': loss_list.detach() if isinstance(loss_list, torch.Tensor) else torch.tensor(0.0),
+            'loss_res': loss_res.detach() if isinstance(loss_res, torch.Tensor) else torch.tensor(0.0),
+            'loss_zero': loss_zero.detach() if isinstance(loss_zero, torch.Tensor) else torch.tensor(0.0),
         }
 
 
@@ -463,12 +486,9 @@ class ResidualContextModel(nn.Module):
             nn.Linear(32, 1),
         )
 
-        # Residual Delta Q Head: predicts delta_q_res
-        self.head_residual_q = nn.Sequential(
-            nn.Linear(c.head_hidden, 32),
-            nn.LeakyReLU(0.1),
-            nn.Linear(32, 1),
-        )
+        # Zero-initialize residual projection so initial state is exact P4 baseline: r_i(x) = 0
+        nn.init.zeros_(self.head_residual_u[-1].weight)
+        nn.init.zeros_(self.head_residual_u[-1].bias)
 
     def context_parameters(self) -> List[nn.Parameter]:
         """Returns only trainable context parameters, strictly excluding frozen P4 (P0.2)."""
@@ -477,7 +497,8 @@ class ResidualContextModel(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        return_residual: bool = False,
+    ) -> Union[Tuple[torch.Tensor, torch.Tensor, torch.Tensor], Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]]:
         c = self.config
 
         # 1. Compute Phase 4 baseline from self features x[:, :c.self_dim]
@@ -508,13 +529,14 @@ class ResidualContextModel(nn.Module):
 
         # 3. Residual prediction
         r_u = self.head_residual_u(h_ctx).squeeze(-1)
-        r_q = self.head_residual_q(h_ctx).squeeze(-1)
 
         # 4. Additive residual combination
         final_u = p4_u + r_u
-        final_dq = p4_dq + r_q
         final_dt = p4_dt
+        final_dq = p4_dq
 
+        if return_residual:
+            return final_dq, final_dt, final_u, r_u
         return final_dq, final_dt, final_u
 
 

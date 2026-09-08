@@ -45,11 +45,13 @@ class Phase6FeatureNormalizer:
         self.feature_names: List[str] = list(PHASE6_FEATURE_NAMES)
         self.n_samples_fit: int = 0
 
-    def fit(self, X: Union[np.ndarray, torch.Tensor]) -> "Phase6FeatureNormalizer":
+    def fit(self, X: Union[np.ndarray, torch.Tensor], anchor_p4: bool = True) -> "Phase6FeatureNormalizer":
         """Fit normalization parameters on training data.
 
         Args:
             X: (N, 32) feature matrix.
+            anchor_p4: If True, anchors the 11 self-features to the frozen Phase 4
+                       normalizer to preserve exact numerical consistency.
 
         Returns:
             Self for chaining.
@@ -62,6 +64,20 @@ class Phase6FeatureNormalizer:
         raw_std[raw_std < 1e-4] = 1.0
         self.std = raw_std
         self.n_samples_fit = len(X)
+
+        if anchor_p4:
+            repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            p4_norm_path = os.path.join(repo_root, "results", "learned_utility", "normalization.json")
+            if os.path.exists(p4_norm_path):
+                import json
+                with open(p4_norm_path, "r") as f:
+                    p4_data = json.load(f)
+                p4_feats = p4_data.get("features", {})
+                for idx, name in enumerate(self.feature_names[:11]):
+                    if name in p4_feats:
+                        self.mean[idx] = float(p4_feats[name]["mean"])
+                        self.std[idx] = float(p4_feats[name]["std"])
+
         return self
 
     def transform(self, X: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:
@@ -133,10 +149,13 @@ class Phase6UtilityDataset(Dataset):
     """PyTorch Dataset for Phase 6 conditional utility training.
 
     Each sample contains:
-        - features: (32,) normalized Phase 6 feature vector
+        - features: (D,) normalized Phase 6 feature vector (D <= 32 based on variant)
         - delta_q: scalar conditional quality gain ΔQ(i|S)
         - delta_t: scalar conditional cost ΔT(i|S) in ms
         - utility: scalar conditional utility U*(i|S)
+        - target_r: scalar residual target r* = U*(i|S) - U*(i|∅) (P0.4)
+        - is_empty: float scalar (1.0 if S=∅ else 0.0) for empty context penalty (P0.4)
+        - group_id: int scalar identifying context group (P0.1)
         - context_size: int, size of context set |S|
     """
 
@@ -146,27 +165,28 @@ class Phase6UtilityDataset(Dataset):
         delta_q: np.ndarray,
         delta_t: np.ndarray,
         utility: np.ndarray,
+        target_r: Optional[np.ndarray] = None,
+        is_empty: Optional[np.ndarray] = None,
         group_ids: Optional[np.ndarray] = None,
         context_sizes: Optional[np.ndarray] = None,
         metadata: Optional[List[Dict]] = None,
     ):
-        """Initialize dataset.
-
-        Args:
-            features: (N, 32) feature matrix.
-            delta_q: (N,) conditional quality gains.
-            delta_t: (N,) conditional costs in ms.
-            utility: (N,) conditional utilities.
-            group_ids: (N,) context group IDs for group-aware ranking loss (P0.1).
-            context_sizes: (N,) context set sizes.
-            metadata: Optional list of sample metadata dicts.
-        """
         self.features = torch.tensor(features, dtype=torch.float32)
         self.delta_q = torch.tensor(delta_q, dtype=torch.float32)
         self.delta_t = torch.tensor(delta_t, dtype=torch.float32)
         self.utility = torch.tensor(utility, dtype=torch.float32)
 
         N = len(features)
+        if target_r is not None:
+            self.target_r = torch.tensor(target_r, dtype=torch.float32)
+        else:
+            self.target_r = torch.zeros(N, dtype=torch.float32)
+
+        if is_empty is not None:
+            self.is_empty = torch.tensor(is_empty, dtype=torch.float32)
+        else:
+            self.is_empty = torch.zeros(N, dtype=torch.float32)
+
         if group_ids is not None:
             self.group_ids = torch.tensor(group_ids, dtype=torch.long)
         else:
@@ -174,6 +194,11 @@ class Phase6UtilityDataset(Dataset):
 
         self.context_sizes = context_sizes
         self.metadata = metadata
+
+        # Explicit target fields (P0.4)
+        self.utility_conditional = self.utility
+        self.utility_residual = self.target_r
+        self.utility_empty = self.utility - self.target_r
 
     def __len__(self) -> int:
         return len(self.features)
@@ -184,15 +209,20 @@ class Phase6UtilityDataset(Dataset):
             'delta_q': self.delta_q[idx],
             'delta_t': self.delta_t[idx],
             'utility': self.utility[idx],
+            'target_r': self.target_r[idx],
+            'is_empty': self.is_empty[idx],
             'group_id': self.group_ids[idx],
+            'utility_conditional': self.utility[idx],
+            'utility_residual': self.target_r[idx],
+            'utility_empty': self.utility[idx] - self.target_r[idx],
         }
 
 
 class GroupedBatchSampler:
-    """Batch sampler that yields all sample indices belonging to the same context group.
+    """Yields batches where all samples belong to the exact same context group (P0.1).
 
-    Ensures that ranking and listwise losses operate strictly within candidates
-    evaluated under the exact same scene, frame, and context set condition g = (scene, frame, S_t) (P0.1).
+    Guarantees that listwise KL and pairwise ranking are always evaluated
+    within a coherent candidate set C_t under the exact same context S_t.
     """
 
     def __init__(
@@ -231,7 +261,6 @@ class GroupedBatchSampler:
 
     def set_epoch(self, epoch: int):
         self.epoch = epoch
-
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -284,22 +313,31 @@ def prepare_phase6_splits(
     normalizer_save_path: Optional[str] = None,
     variant: str = "V11",
 ) -> Tuple[Phase6UtilityDataset, Phase6UtilityDataset, Phase6UtilityDataset, Phase6FeatureNormalizer]:
-    """Load, normalize, and split Phase 6 dataset.
+    """Load, normalize, and split Phase 6 dataset with group-awareness (P0.1) and residual targets (P0.4).
 
     Normalization is fitted strictly on train split only.
-
-    Args:
-        dataset_paths: List of paths to conditional oracle JSON files
-            (multiple seeds can be merged).
-        normalizer_save_path: Optional path to save normalizer JSON.
-        variant: Ablation variant for feature subsetting.
+    Computes ground truth residual targets r* = U*(i|S) - U*(i|∅) and empty context indicator.
 
     Returns:
         Tuple of (train_dataset, val_dataset, test_dataset, normalizer).
     """
-    all_train_feats, all_train_dq, all_train_dt, all_train_u, train_gids = [], [], [], [], []
-    all_val_feats, all_val_dq, all_val_dt, all_val_u, val_gids = [], [], [], [], []
-    all_test_feats, all_test_dq, all_test_dt, all_test_u, test_gids = [], [], [], [], []
+    all_train_feats, all_train_dq, all_train_dt, all_train_u = [], [], [], []
+    all_val_feats, all_val_dq, all_val_dt, all_val_u = [], [], [], []
+    all_test_feats, all_test_dq, all_test_dt, all_test_u = [], [], [], []
+
+    train_r, train_empty, train_gids = [], [], []
+    val_r, val_empty, val_gids = [], [], []
+    test_r, test_empty, test_gids = [], [], []
+
+    # 1. Pre-pass across all loaded files: map (scene, frame, candidate_id) -> utility(empty)
+    empty_utils: Dict[Tuple[str, int, int], float] = {}
+    for path in dataset_paths:
+        with open(path, 'r') as f:
+            samples = json.load(f)
+        for s in samples:
+            if s.get("context_size", 0) == 0 or s.get("context_type") == "empty":
+                k = (str(s["scene"]), int(s["frame"]), int(s["candidate_id"]))
+                empty_utils[k] = float(s["utility_conditional"])
 
     group_key_to_id: Dict[str, int] = {}
 
@@ -313,6 +351,13 @@ def prepare_phase6_splits(
             dt = float(s["delta_t_conditional_ms"])
             u = float(s["utility_conditional"])
 
+            # Compute residual target r* = U*(i|S) - U*(i|∅) (P0.4)
+            cand_key = (str(s["scene"]), int(s["frame"]), int(s["candidate_id"]))
+            u_empty = empty_utils.get(cand_key, u)
+            r_target = u - u_empty
+            assert abs(r_target - (u - u_empty)) < 1e-8, "Residual target definition must satisfy r* = U*(i|S) - U*(i|∅)"
+            is_empty_val = 1.0 if (s.get("context_size", 0) == 0 or s.get("context_type") == "empty") else 0.0
+
             # Compute group ID (P0.1)
             g_key = f"{s['scene']}_f{s['frame']}_{s.get('context_type', 'default')}_size{s.get('context_size', 0)}"
             gid = group_key_to_id.setdefault(g_key, len(group_key_to_id))
@@ -323,24 +368,32 @@ def prepare_phase6_splits(
                 all_train_dq.append(dq)
                 all_train_dt.append(dt)
                 all_train_u.append(u)
+                train_r.append(r_target)
+                train_empty.append(is_empty_val)
                 train_gids.append(gid)
             elif split == "validation":
                 all_val_feats.append(feat)
                 all_val_dq.append(dq)
                 all_val_dt.append(dt)
                 all_val_u.append(u)
+                val_r.append(r_target)
+                val_empty.append(is_empty_val)
                 val_gids.append(gid)
             else:
                 all_test_feats.append(feat)
                 all_test_dq.append(dq)
                 all_test_dt.append(dt)
                 all_test_u.append(u)
+                test_r.append(r_target)
+                test_empty.append(is_empty_val)
                 test_gids.append(gid)
 
-    def _to_arrays(feats, dq, dt, u, gids):
+    def _to_arrays(feats, dq, dt, u, r, empty, gids):
         if not feats:
             return (
                 np.zeros((0, PHASE6_FEATURE_DIM), dtype=np.float32),
+                np.zeros(0, dtype=np.float32),
+                np.zeros(0, dtype=np.float32),
                 np.zeros(0, dtype=np.float32),
                 np.zeros(0, dtype=np.float32),
                 np.zeros(0, dtype=np.float32),
@@ -351,17 +404,19 @@ def prepare_phase6_splits(
             np.array(dq, dtype=np.float32),
             np.array(dt, dtype=np.float32),
             np.array(u, dtype=np.float32),
+            np.array(r, dtype=np.float32),
+            np.array(empty, dtype=np.float32),
             np.array(gids, dtype=np.int64),
         )
 
-    X_train, dq_train, dt_train, u_train, gids_train = _to_arrays(
-        all_train_feats, all_train_dq, all_train_dt, all_train_u, train_gids
+    X_train, dq_train, dt_train, u_train, r_train, empty_train, gids_train = _to_arrays(
+        all_train_feats, all_train_dq, all_train_dt, all_train_u, train_r, train_empty, train_gids
     )
-    X_val, dq_val, dt_val, u_val, gids_val = _to_arrays(
-        all_val_feats, all_val_dq, all_val_dt, all_val_u, val_gids
+    X_val, dq_val, dt_val, u_val, r_val, empty_val, gids_val = _to_arrays(
+        all_val_feats, all_val_dq, all_val_dt, all_val_u, val_r, val_empty, val_gids
     )
-    X_test, dq_test, dt_test, u_test, gids_test = _to_arrays(
-        all_test_feats, all_test_dq, all_test_dt, all_test_u, test_gids
+    X_test, dq_test, dt_test, u_test, r_test, empty_test, gids_test = _to_arrays(
+        all_test_feats, all_test_dq, all_test_dt, all_test_u, test_r, test_empty, test_gids
     )
 
     # Fit normalizer on train split ONLY
@@ -383,16 +438,22 @@ def prepare_phase6_splits(
     train_ds = Phase6UtilityDataset(
         X_train[:, feature_mask] if len(X_train) > 0 else X_train,
         dq_train, dt_train, u_train,
+        target_r=r_train,
+        is_empty=empty_train,
         group_ids=gids_train,
     )
     val_ds = Phase6UtilityDataset(
         X_val[:, feature_mask] if len(X_val) > 0 else X_val,
         dq_val, dt_val, u_val,
+        target_r=r_val,
+        is_empty=empty_val,
         group_ids=gids_val,
     )
     test_ds = Phase6UtilityDataset(
         X_test[:, feature_mask] if len(X_test) > 0 else X_test,
         dq_test, dt_test, u_test,
+        target_r=r_test,
+        is_empty=empty_test,
         group_ids=gids_test,
     )
 

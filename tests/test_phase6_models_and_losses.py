@@ -120,6 +120,28 @@ class TestPhase6LossReformed:
         assert out["loss_r"].item() > 0.0
         assert out["loss_list"].item() > 0.0
 
+    def test_empty_context_regularization(self):
+        """Verify L_0 empty context regularization penalizes non-zero residual predictions."""
+        loss_fn = Phase6Loss(lambda_q=0.0, lambda_c=0.0, lambda_r=0.0, lambda_list=0.0, lambda_res=0.0, lambda_zero=2.0)
+
+        pred_q = torch.zeros(4)
+        pred_t = torch.ones(4)
+        pred_u = torch.ones(4)
+        target_q = torch.zeros(4)
+        target_t = torch.ones(4)
+        target_u = torch.ones(4)
+
+        pred_r = torch.tensor([0.5, 0.0, 0.0, 0.0])
+        is_empty = torch.tensor([1.0, 0.0, 0.0, 0.0])  # Only index 0 is empty context
+
+        out = loss_fn(
+            pred_q, pred_t, pred_u, target_q, target_t, target_u,
+            pred_r=pred_r, is_empty=is_empty
+        )
+        assert out["loss_zero"].item() > 0.0
+        assert torch.isclose(out["total"], 2.0 * out["loss_zero"])
+
+
 
 class TestP0Invariants:
     def test_phase4_backbone_is_frozen(self):
