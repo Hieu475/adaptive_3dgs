@@ -1,52 +1,101 @@
 {
+  "architecture": "residual",
   "ablation_ladder": [
     {
-      "variant": "V8",
+      "variant": "self_only",
       "features_dim": 11,
-      "spearman_rho": 0.24180196443339108,
-      "pearson_r": 0.0638082901107419,
-      "ndcg_5": 0.07454666963110179,
-      "mae_utility": 1.6754585638019866e-05,
-      "val_loss": 0.43460324257612226,
-      "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_V8.pt",
-      "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_V8.json",
-      "train_time_s": 5.473909278996871
+      "spearman_rho": -0.047449644324572084,
+      "pearson_r": -0.03674040082813063,
+      "ndcg_5": 0.06125994751972655,
+      "mae_utility": 0.004194405835777927,
+      "val_loss": 12.9426988363266,
+      "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_self_only.pt",
+      "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_self_only.json",
+      "train_time_s": 11.474822730999676
     },
     {
-      "variant": "V9",
+      "variant": "self_neighbor",
       "features_dim": 19,
-      "spearman_rho": 0.20978346029684758,
-      "pearson_r": 0.017546277850056267,
-      "ndcg_5": 0.06351663304809418,
-      "mae_utility": 1.331924057661027e-05,
-      "val_loss": 0.47473239004611967,
-      "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_V9.pt",
-      "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_V9.json",
-      "train_time_s": 5.354878592999739
+      "spearman_rho": -0.026619828577965184,
+      "pearson_r": 0.05904250260031082,
+      "ndcg_5": 0.07164934011049263,
+      "mae_utility": 0.1624793890609447,
+      "val_loss": 17.75006275177002,
+      "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_self_neighbor.pt",
+      "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_self_neighbor.json",
+      "train_time_s": 10.554187053999613
     },
     {
-      "variant": "V10",
+      "variant": "self_overlap",
+      "features_dim": 16,
+      "spearman_rho": 0.11570242230897061,
+      "pearson_r": 0.0496386593883672,
+      "ndcg_5": 0.07164934011049263,
+      "mae_utility": 0.02096450829198997,
+      "val_loss": 17.81475977897644,
+      "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_self_overlap.pt",
+      "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_self_overlap.json",
+      "train_time_s": 10.643736143000297
+    },
+    {
+      "variant": "self_selected",
+      "features_dim": 19,
+      "spearman_rho": 0.3036214150544111,
+      "pearson_r": 0.11081469493313047,
+      "ndcg_5": 0.06333570107470925,
+      "mae_utility": 0.2099218563729628,
+      "val_loss": 19.909553360939025,
+      "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_self_selected.pt",
+      "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_self_selected.json",
+      "train_time_s": 10.548084259999996
+    },
+    {
+      "variant": "self_neighbor_overlap",
       "features_dim": 24,
-      "spearman_rho": 0.25227913050918227,
-      "pearson_r": 0.1258198719983348,
-      "ndcg_5": 0.07454666963110179,
-      "mae_utility": 8.676566029427827e-06,
-      "val_loss": 0.4042343571782112,
-      "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_V10.pt",
-      "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_V10.json",
-      "train_time_s": 4.854209453002113
+      "spearman_rho": -0.07854316945272655,
+      "pearson_r": 0.04476497470778656,
+      "ndcg_5": 0.0626307259799321,
+      "mae_utility": 0.05932265256783406,
+      "val_loss": 16.9959734916687,
+      "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_self_neighbor_overlap.pt",
+      "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_self_neighbor_overlap.json",
+      "train_time_s": 10.900620839000112
     },
     {
-      "variant": "V11",
+      "variant": "self_neighbor_selected",
+      "features_dim": 27,
+      "spearman_rho": 0.4164551752230691,
+      "pearson_r": 0.2561107941807715,
+      "ndcg_5": 0.06378671630676164,
+      "mae_utility": 0.0626702620828255,
+      "val_loss": 18.691990756988524,
+      "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_self_neighbor_selected.pt",
+      "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_self_neighbor_selected.json",
+      "train_time_s": 10.952269191999676
+    },
+    {
+      "variant": "self_overlap_selected",
+      "features_dim": 24,
+      "spearman_rho": 0.3863737580539755,
+      "pearson_r": 0.16164353206573767,
+      "ndcg_5": 0.0650501319526058,
+      "mae_utility": 0.03532420195580563,
+      "val_loss": 15.333513355255127,
+      "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_self_overlap_selected.pt",
+      "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_self_overlap_selected.json",
+      "train_time_s": 10.921109446999708
+    },
+    {
+      "variant": "all_features",
       "features_dim": 32,
-      "spearman_rho": 0.1897367700554491,
-      "pearson_r": 0.08311129688139642,
-      "ndcg_5": 0.06572218280293367,
-      "mae_utility": 8.851972041898174e-06,
-      "val_loss": 0.3889387458562851,
-      "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_V11.pt",
-      "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_V11.json",
-      "train_time_s": 5.155760376001126
+      "spearman_rho": 0.1856320214493141,
+      "pearson_r": 0.11725885122883936,
+      "ndcg_5": 0.06176917081086167,
+      "mae_utility": 0.10187803034922521,
+      "val_loss": 12.852097821235656,
+      "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_all_features.pt",
+      "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_all_features.json",
+      "train_time_s": 11.144259598999724
     }
   ],
   "interaction_analysis": {
@@ -70,6 +119,29 @@
       "sub_additive_fraction": 0.0,
       "mean_additivity_ratio": 1.0,
       "median_additivity_ratio": 1.0
+    }
+  },
+  "shuffle_test": {
+    "baseline_rho": 0.1856320214493141,
+    "groups": {
+      "neighbor": {
+        "shuffled_rho": 0.1445202008978177,
+        "delta_rho": 0.0411118205514964,
+        "actively_used": true,
+        "positive_contribution": true
+      },
+      "overlap": {
+        "shuffled_rho": 0.1692999688875061,
+        "delta_rho": 0.016332052561808003,
+        "actively_used": true,
+        "positive_contribution": true
+      },
+      "selected": {
+        "shuffled_rho": -0.04938761069779933,
+        "delta_rho": 0.2350196321471134,
+        "actively_used": true,
+        "positive_contribution": true
+      }
     }
   },
   "thesis_confirmed": false

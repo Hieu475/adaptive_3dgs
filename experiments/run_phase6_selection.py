@@ -287,6 +287,7 @@ def run_budget_sweep(
     reject_negative: bool = False,
     oracle_reference_gain: Optional[float] = None,
     policies: Optional[List[str]] = None,
+    budget_labels: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     """Evaluates all policies across budget levels with ACTUAL joint optimization."""
     if policies is None:
@@ -298,14 +299,15 @@ def run_budget_sweep(
         ]
 
     results = []
-    for b in budgets:
+    for b_idx, b in enumerate(budgets):
+        pct_str = budget_labels[b_idx] if budget_labels and b_idx < len(budget_labels) else (
+            f"{b:.1f}ms" if budget_type == "wall_clock" else f"{b:.1f}"
+        )
         for pol in policies:
             do_reject = reject_negative if pol in (
                 "phase4_learned", "phase6_static", "phase6_adaptive",
                 "oracle_reference",
             ) else False
-
-            pct_str = f"{b:.1f}ms" if budget_type == "wall_clock" else f"{b:.1f}"
 
             res = evaluator.evaluate_policy(
                 policy=pol,
@@ -662,9 +664,34 @@ def main():
         oracle_ref_gain = oracle_ref_res["delta_q_realized"]
         print(f"  Oracle reference ΔQ (full pool): {oracle_ref_gain:.6e}")
 
+        # Populate candidate predictions with actual Phase 4 learned model (TwoHeadMLP)
+        try:
+            p4_pred = FrozenUtilityPredictor(seed=seed, device=device)
+            cand_feats = np.stack([all_features[c["gaussian_id"]] for c in candidates])
+            p4_out = p4_pred.predict_features(cand_feats)
+            for ci, c in enumerate(candidates):
+                c["predicted_utility"] = float(p4_out["predicted_utility"][ci])
+                c["predicted_delta_q"] = float(p4_out["predicted_delta_q"][ci])
+                c["predicted_delta_t"] = float(p4_out["predicted_delta_t"][ci])
+            print(f"  Populated Phase 4 predictions using seed {seed} checkpoint.")
+        except Exception as e:
+            print(f"  [NOTE] Using fallback predictions for Phase 4: {e}")
+
+        # Check for seed-specific Phase 6 checkpoint
+        seed_p6_ckpt = os.path.join(
+            repo_root, "results", "phase6_context_utility", "checkpoints",
+            f"context_mlp_V11_seed_{seed}.pt"
+        )
+        current_p6_predictor = p6_predictor
+        if os.path.exists(seed_p6_ckpt) and os.path.exists(p6_norm):
+            current_p6_predictor = FrozenContextPredictor(seed_p6_ckpt, p6_norm, device=device)
+            print(f"  Using seed-matched Phase 6 predictor: {seed_p6_ckpt}")
+        else:
+            print(f"  Using default Phase 6 predictor: {p6_ckpt}")
+
         # Create evaluator with unified cost semantics across all policies
         evaluator = Phase6Evaluator(
-            p6_predictor=p6_predictor,
+            p6_predictor=current_p6_predictor,
             safety_factor=1.10,
             use_predicted_cost=False,  # UNIFIED BUDGET SEMANTICS: all policies use measured_trial_cost_ms
             device=device,
@@ -675,6 +702,7 @@ def main():
         if args.quick:
             rel_fractions = [0.20, 0.50, 0.80]
         rel_budgets = [f * total_cost for f in rel_fractions]
+        rel_labels = [f"{f*100:.0f}%" for f in rel_fractions]
 
         print(f"\n[4/4] Running Relative Budget Sweep: {rel_fractions}")
         rel_results = run_budget_sweep(
@@ -694,14 +722,14 @@ def main():
             reject_negative=args.reject_negative,
             oracle_reference_gain=oracle_ref_gain,
             policies=all_policies,
+            budget_labels=rel_labels,
         )
 
         # ─── Experiment B: Wall-Clock Budget Sweep ───
         mean_unit_cost = total_cost / max(len(candidates), 1)
-        if args.quick:
-            wall_budgets = [float(round(mean_unit_cost * k)) for k in [2, 4]]
-        else:
-            wall_budgets = [float(round(mean_unit_cost * k)) for k in [1, 2, 4, 8]]
+        k_multipliers = [2, 4] if args.quick else [1, 2, 4, 8]
+        wall_budgets = [float(round(mean_unit_cost * k)) for k in k_multipliers]
+        wall_labels = [f"k={k}" for k in k_multipliers]
 
         print(f"\n  Wall-Clock Budget Sweep: {wall_budgets} ms")
         wall_results = run_budget_sweep(
@@ -721,6 +749,7 @@ def main():
             reject_negative=args.reject_negative,
             oracle_reference_gain=oracle_ref_gain,
             policies=all_policies,
+            budget_labels=wall_labels,
         )
 
         # ─── Statistical Tests ───
