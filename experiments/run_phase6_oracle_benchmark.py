@@ -156,11 +156,11 @@ def extract_features(model, pipeline, rgb, depth, H, W):
     store = getattr(model, 'state_store', None)
     feats = np.zeros((N, 11), dtype=np.float32)
     for i in range(N):
-        feats[i, 0] = float(stats['color_error'][i])
-        feats[i, 1] = float(stats['depth_error'][i])
-        feats[i, 2] = float((stats['color_error'][i] + stats['depth_error'][i]) * stats['influence_mass'][i])
-        feats[i, 3] = float(stats['pixel_count'][i])
-        feats[i, 4] = float(stats['influence_mass'][i])
+        feats[i, 0] = float(stats['color_error'][i].detach().cpu())
+        feats[i, 1] = float(stats['depth_error'][i].detach().cpu())
+        feats[i, 2] = float(((stats['color_error'][i] + stats['depth_error'][i]) * stats['influence_mass'][i]).detach().cpu())
+        feats[i, 3] = float(stats['pixel_count'][i].detach().cpu())
+        feats[i, 4] = float(stats['influence_mass'][i].detach().cpu())
         if store is not None and i < len(store.position_drift):
             feats[i, 5] = float(store.position_drift[i].item())
             feats[i, 6] = float(store.residual_drift_ema[i].item())
@@ -168,7 +168,7 @@ def extract_features(model, pipeline, rgb, depth, H, W):
             age = max(1, int(store.ages[i].item()))
             feats[i, 9] = float(store.update_counts[i].item()) / age
             feats[i, 10] = float(store.ages[i].item())
-        feats[i, 8] = float(stats['projected_area'][i])
+        feats[i, 8] = float(stats['projected_area'][i].detach().cpu())
 
     return feats, attr_out
 
@@ -346,8 +346,8 @@ def main():
             )
             t_pol = time.perf_counter() - t_pol_start
 
-            dq_realized = res["delta_q_realized"]
-            n_sel = res["n_selected"]
+            dq_realized = res.get("actual_delta_q", res.get("delta_q_realized", 0.0))
+            n_sel = res.get("k_count", res.get("n_selected", 0))
             print(f"  {pol_label:<22s} | K={n_sel:2d} | ΔQ_realized={dq_realized*1e5:6.2f}e-5 | {t_pol:.1f}s")
 
             benchmark_results[b_str][pol_label] = {

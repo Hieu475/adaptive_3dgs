@@ -393,9 +393,10 @@ def oracle_conditional_greedy_select(
             is_scheduled_violation=False,
         )
 
-    active_indices = [
-        map_candidate_to_active_index(c, i) for i, c in enumerate(candidates)
-    ]
+    active_indices = []
+    for i, c in enumerate(candidates):
+        gid = c.get("gaussian_id", c.get("candidate_id", c.get("active_index", c.get("id", i))))
+        active_indices.append(int(gid) if gid is not None else i)
     nom_costs = [float(c.get(cost_key, 1.0)) for c in candidates]
 
     selected_cand_indices: List[int] = []

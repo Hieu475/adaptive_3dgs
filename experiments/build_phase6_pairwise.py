@@ -432,14 +432,14 @@ def main():
                     "distance_3d": result["distance_3d"],
 
                     # Per-Gaussian statistics
-                    "influence_mass_i": float(stats_i['influence_mass'][idx_i]),
-                    "influence_mass_j": float(stats_i['influence_mass'][idx_j]),
-                    "rgb_error_i": float(stats_i['color_error'][idx_i]),
-                    "rgb_error_j": float(stats_i['color_error'][idx_j]),
-                    "depth_error_i": float(stats_i['depth_error'][idx_i]) if 'depth_error' in stats_i else 0.0,
-                    "depth_error_j": float(stats_i['depth_error'][idx_j]) if 'depth_error' in stats_i else 0.0,
-                    "pixel_count_i": int(stats_i['pixel_count'][idx_i]),
-                    "pixel_count_j": int(stats_i['pixel_count'][idx_j]),
+                    "influence_mass_i": float(stats_i['influence_mass'][idx_i].detach().cpu()),
+                    "influence_mass_j": float(stats_i['influence_mass'][idx_j].detach().cpu()),
+                    "rgb_error_i": float(stats_i['color_error'][idx_i].detach().cpu()),
+                    "rgb_error_j": float(stats_i['color_error'][idx_j].detach().cpu()),
+                    "depth_error_i": float(stats_i['depth_error'][idx_i].detach().cpu()) if 'depth_error' in stats_i else 0.0,
+                    "depth_error_j": float(stats_i['depth_error'][idx_j].detach().cpu()) if 'depth_error' in stats_i else 0.0,
+                    "pixel_count_i": int(stats_i['pixel_count'][idx_i].detach().cpu()),
+                    "pixel_count_j": int(stats_i['pixel_count'][idx_j].detach().cpu()),
 
                     # Co-visibility features
                     "pixel_intersection": int(
