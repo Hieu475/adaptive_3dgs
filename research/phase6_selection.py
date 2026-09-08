@@ -351,6 +351,117 @@ def static_context_select(
     )
 
 
+def oracle_conditional_greedy_select(
+    candidates: List[Dict[str, Any]],
+    cond_oracle: Any,
+    rgb_gt: torch.Tensor,
+    depth_gt: torch.Tensor,
+    contrib_indices: torch.Tensor,
+    contrib_weights: torch.Tensor,
+    budget: float,
+    safety_factor: float = 1.0,
+    reject_negative: bool = True,
+    cost_key: str = "measured_trial_cost_ms",
+) -> SelectionResult:
+    """True Oracle Conditional Greedy selection.
+
+    At each greedy step t:
+      S_t is the set of currently selected Gaussian IDs.
+      For each remaining candidate i, directly evaluates ground truth:
+        U*(i | S_t) = (Q(S_t ∪ {i}) - Q(S_t)) / (T(S_t ∪ {i}) - T(S_t) + eps)
+      Selects i* = argmax U*(i | S_t).
+      Terminates when budget exhausted or U*(i*) <= 0.
+    """
+    t0 = time.perf_counter()
+    n = len(candidates)
+    policy_str = Phase6PolicyName.ORACLE_CONDITIONAL.value
+
+    if n == 0 or budget <= 0:
+        return SelectionResult(
+            policy=policy_str,
+            selected_indices=[],
+            selected_gaussian_ids=[],
+            k_count=0,
+            predicted_cost=0.0,
+            scheduled_cost=0.0,
+            nominal_cost=0.0,
+            budget=float(budget),
+            safety_factor=float(safety_factor),
+            selection_time_ms=0.0,
+            rejected_negative_count=0,
+            scheduled_budget_violation=0.0,
+            is_scheduled_violation=False,
+        )
+
+    active_indices = [
+        map_candidate_to_active_index(c, i) for i, c in enumerate(candidates)
+    ]
+    nom_costs = [float(c.get(cost_key, 1.0)) for c in candidates]
+
+    selected_cand_indices: List[int] = []
+    selected_gaussian_ids: List[int] = []
+    remaining_pool = list(range(n))
+    cur_scheduled_cost = 0.0
+    cur_nom_cost = 0.0
+    rejected_neg = 0
+
+    while remaining_pool and cur_scheduled_cost < budget:
+        # Measure oracle conditional utility for all remaining candidates given current S_t
+        scores = []
+        for c_idx in remaining_pool:
+            g_id = active_indices[c_idx]
+            m = cond_oracle.measure_conditional_utility(
+                candidate_idx=g_id,
+                context_indices=selected_gaussian_ids,
+                rgb_gt=rgb_gt,
+                depth_gt=depth_gt,
+                contrib_indices=contrib_indices,
+                contrib_weights=contrib_weights,
+            )
+            scores.append(m["utility_conditional"])
+
+        scores = np.array(scores, dtype=np.float32)
+        sorted_order = np.argsort(-scores)
+        best_pos = sorted_order[0]
+        best_cand_idx = remaining_pool[best_pos]
+        best_u = scores[best_pos]
+
+        if reject_negative and best_u <= 0.0:
+            rejected_neg += len(remaining_pool)
+            break
+
+        unit_cost = nom_costs[best_cand_idx]
+        scheduled_cost = unit_cost * float(safety_factor)
+
+        if cur_scheduled_cost + scheduled_cost <= budget + 1e-7:
+            selected_cand_indices.append(best_cand_idx)
+            selected_gaussian_ids.append(active_indices[best_cand_idx])
+            cur_scheduled_cost += scheduled_cost
+            cur_nom_cost += nom_costs[best_cand_idx]
+            remaining_pool.pop(best_pos)
+        else:
+            remaining_pool.pop(best_pos)
+
+    sel_time_ms = (time.perf_counter() - t0) * 1000.0
+    scheduled_violation = max(0.0, cur_scheduled_cost - budget)
+
+    return SelectionResult(
+        policy=policy_str,
+        selected_indices=selected_cand_indices,
+        selected_gaussian_ids=selected_gaussian_ids,
+        k_count=len(selected_cand_indices),
+        predicted_cost=float(cur_nom_cost),
+        scheduled_cost=float(cur_scheduled_cost),
+        nominal_cost=float(cur_nom_cost),
+        budget=float(budget),
+        safety_factor=float(safety_factor),
+        selection_time_ms=float(sel_time_ms),
+        rejected_negative_count=int(rejected_neg),
+        scheduled_budget_violation=float(scheduled_violation),
+        is_scheduled_violation=bool(scheduled_violation > 1e-5),
+    )
+
+
 def select_phase6_subset(
     candidates: List[Dict[str, Any]],
     policy: Union[str, Phase6PolicyName],
@@ -364,6 +475,9 @@ def select_phase6_subset(
     phase6_predictor: Optional[FrozenContextPredictor] = None,
     contrib_indices: Optional[torch.Tensor] = None,
     contrib_weights: Optional[torch.Tensor] = None,
+    cond_oracle: Optional[Any] = None,
+    rgb_gt: Optional[torch.Tensor] = None,
+    depth_gt: Optional[torch.Tensor] = None,
     cost_key: str = "measured_trial_cost_ms",
     pred_cost_key: str = "predicted_delta_t",
     pred_utility_key: str = "predicted_utility",
@@ -374,6 +488,7 @@ def select_phase6_subset(
     Dispatches to:
       - Phase 6 Adaptive Greedy if policy is 'phase6_adaptive'
       - Phase 6 Static Context if policy is 'phase6_static'
+      - Oracle Conditional Greedy if policy is 'oracle_conditional' (with cond_oracle)
       - Phase 5 standard selection for all baseline policies
     """
     p_str = str(policy.value if hasattr(policy, "value") else policy).lower()
@@ -417,11 +532,28 @@ def select_phase6_subset(
             contrib_weights=contrib_weights,
         )
 
+    elif p_str == Phase6PolicyName.ORACLE_CONDITIONAL.value and cond_oracle is not None and rgb_gt is not None and depth_gt is not None:
+        return oracle_conditional_greedy_select(
+            candidates=candidates,
+            cond_oracle=cond_oracle,
+            rgb_gt=rgb_gt,
+            depth_gt=depth_gt,
+            contrib_indices=contrib_indices,
+            contrib_weights=contrib_weights,
+            budget=budget,
+            safety_factor=safety_factor,
+            reject_negative=reject_negative,
+            cost_key=cost_key,
+        )
+
     else:
         # Map phase4_learned to learned_utility for Phase 5 selection
         p5_policy = p_str
         if p_str == "phase4_learned":
             p5_policy = "learned_utility"
+        elif p_str == "oracle_conditional":
+            # Fall back to oracle_reference if cond_oracle not provided
+            p5_policy = "oracle_reference"
 
         return select_phase5_subset(
             candidates=candidates,

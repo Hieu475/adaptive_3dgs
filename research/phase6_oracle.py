@@ -78,12 +78,13 @@ class ConditionalOracleConfig:
         overlap_threshold: IoU threshold for "high overlap" neighbors.
     """
     n_opt_steps: int = 5
-    context_sizes: List[int] = field(default_factory=lambda: [0, 1, 4, 8])
+    context_sizes: List[int] = field(default_factory=lambda: [0, 1, 2, 4, 8, 16])
     context_size_weights: List[float] = field(
-        default_factory=lambda: [0.30, 0.25, 0.25, 0.20]
+        default_factory=lambda: [0.20, 0.15, 0.10, 0.20, 0.20, 0.15]
     )
     context_types: List[str] = field(default_factory=lambda: [
-        "empty", "spatial_knn", "overlap_top", "random"
+        "empty", "spatial_knn", "overlap_top", "random",
+        "high_utility", "low_utility", "high_overlap", "mixed"
     ])
     k_neighbors: int = 8
     epsilon: float = 1e-6
@@ -398,18 +399,21 @@ class ConditionalOracleExperiment:
         contrib_indices: Optional[torch.Tensor] = None,
         contrib_weights: Optional[torch.Tensor] = None,
         seed: int = 42,
+        all_features: Optional[np.ndarray] = None,
     ) -> List[int]:
         """Sample a context set S for candidate i.
 
         Args:
             candidate_idx: Active tensor index of the candidate.
-            context_type: One of "empty", "spatial_knn", "overlap_top", "random".
+            context_type: One of "empty", "spatial_knn", "overlap_top", "random",
+                "high_utility", "low_utility", "high_overlap", "mixed".
             context_size: Target size |S|.
             candidate_pool: List of all candidate indices (to sample from for "random").
             positions: (N, 3) tensor of all Gaussian positions.
             contrib_indices: Optional (H,W,K_top) for overlap-based context.
             contrib_weights: Optional (H,W,K_top) for overlap-based context.
             seed: Random seed for reproducibility.
+            all_features: Optional (N, 11) canonical features for utility-based sampling.
 
         Returns:
             List of active tensor indices forming the context set S.
@@ -445,6 +449,63 @@ class ConditionalOracleExperiment:
             n_sample = min(context_size, len(pool))
             chosen = rng.choice(pool, size=n_sample, replace=False)
             return chosen.tolist()
+
+        elif context_type == "high_utility":
+            # Select context from candidates with highest error (proxy for utility)
+            pool = [i for i in candidate_pool if i != candidate_idx and 0 <= i < N]
+            if len(pool) == 0:
+                return []
+            scores = []
+            for idx in pool:
+                if all_features is not None and idx < len(all_features):
+                    # rgb_error(0) + depth_error(1) as proxy for utility
+                    scores.append((idx, float(all_features[idx, 0] + all_features[idx, 1])))
+                else:
+                    scores.append((idx, 0.0))
+            scores.sort(key=lambda x: x[1], reverse=True)
+            return [idx for idx, _ in scores[:context_size]]
+
+        elif context_type == "low_utility":
+            # Select context from candidates with lowest error (proxy for low utility)
+            pool = [i for i in candidate_pool if i != candidate_idx and 0 <= i < N]
+            if len(pool) == 0:
+                return []
+            scores = []
+            for idx in pool:
+                if all_features is not None and idx < len(all_features):
+                    scores.append((idx, float(all_features[idx, 0] + all_features[idx, 1])))
+                else:
+                    scores.append((idx, 0.0))
+            scores.sort(key=lambda x: x[1], reverse=False)
+            return [idx for idx, _ in scores[:context_size]]
+
+        elif context_type == "high_overlap":
+            # Intentionally search for highest-overlap neighbors with wider search
+            if contrib_indices is not None and contrib_weights is not None:
+                return self._sample_by_overlap(
+                    candidate_idx, context_size, positions,
+                    contrib_indices, contrib_weights
+                )
+            else:
+                neighbors = _get_knn_indices(positions, candidate_idx, k=context_size)
+                return neighbors[:context_size]
+
+        elif context_type == "mixed":
+            # 50% spatial KNN + 50% random
+            half = max(1, context_size // 2)
+            spatial_part = _get_knn_indices(positions, candidate_idx, k=half)
+            remaining = context_size - len(spatial_part)
+            if remaining > 0:
+                exclude = set(spatial_part) | {candidate_idx}
+                pool = [i for i in candidate_pool if i not in exclude and 0 <= i < N]
+                if len(pool) > 0:
+                    n_rand = min(remaining, len(pool))
+                    random_part = rng.choice(pool, size=n_rand, replace=False).tolist()
+                else:
+                    random_part = []
+            else:
+                random_part = []
+            return spatial_part + random_part
 
         else:
             raise ValueError(f"Unknown context_type: {context_type}")
@@ -556,6 +617,25 @@ class ConditionalOracleExperiment:
         # Build context size/type schedule
         schedule = self._build_context_schedule(len(pool), rng)
 
+        # Pre-pass: measure single-Gaussian (unconditional) utility for each candidate
+        # This is U*(i|∅) and will be included in every sample for that candidate
+        single_measurements: Dict[int, Dict[str, float]] = {}
+        for cand_idx in pool:
+            m_single = self.measure_conditional_utility(
+                candidate_idx=cand_idx,
+                context_indices=[],
+                rgb_gt=rgb_gt,
+                depth_gt=depth_gt,
+                contrib_indices=contrib_indices,
+                contrib_weights=contrib_weights,
+            )
+            single_measurements[cand_idx] = {
+                "delta_q_single": m_single["delta_q_conditional"],
+                "delta_t_single": m_single["delta_t_conditional_ms"],
+                "utility_single": m_single["utility_conditional"],
+                "q_single_psnr": m_single["q_si_psnr"],
+            }
+
         results: List[Dict[str, Any]] = []
         sample_idx = 0
 
@@ -579,6 +659,7 @@ class ConditionalOracleExperiment:
                     contrib_indices=contrib_indices,
                     contrib_weights=contrib_weights,
                     seed=seed + sample_idx,
+                    all_features=all_features,
                 )
 
                 # Measure conditional utility
@@ -633,6 +714,12 @@ class ConditionalOracleExperiment:
                     "t_si_ms": measurement["t_si_ms"],
                     "delta_t_conditional_ms": measurement["delta_t_conditional_ms"],
                     "utility_conditional": measurement["utility_conditional"],
+
+                    # Single-Gaussian (unconditional) measurements
+                    "delta_q_single": single_measurements[cand_idx]["delta_q_single"],
+                    "delta_t_single": single_measurements[cand_idx]["delta_t_single"],
+                    "utility_single": single_measurements[cand_idx]["utility_single"],
+                    "q_single_psnr": single_measurements[cand_idx]["q_single_psnr"],
                 }
 
                 results.append(sample)
@@ -650,21 +737,28 @@ class ConditionalOracleExperiment:
         Returns a list of (context_type, context_size) tuples representing
         the different context conditions each candidate will be evaluated under.
 
-        Default schedule per candidate:
-            1× empty (S = ∅)
+        Expanded schedule per candidate (8 samples):
+            1× empty (S = ∅) — recovers Phase 4 marginal utility
             1× spatial_knn, |S| = 1
             1× spatial_knn, |S| = 4
             1× overlap_top, |S| = 4
+            1× high_overlap, |S| = 2
             1× random, |S| = 8
+            1× high_utility, |S| = 4
+            1× mixed, |S| = 8
 
-        This gives ~5 samples per candidate, covering all context types and sizes.
+        This gives 8 samples per candidate, covering all context types/sizes
+        and ensuring rich diversity for learning context effects.
         """
         schedule = [
             ("empty", 0),
             ("spatial_knn", 1),
             ("spatial_knn", 4),
             ("overlap_top", 4),
+            ("high_overlap", 2),
             ("random", 8),
+            ("high_utility", 4),
+            ("mixed", 8),
         ]
         return schedule
 

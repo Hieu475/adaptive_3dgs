@@ -248,10 +248,10 @@ def main():
                         help="Random seed (default: 42)")
     parser.add_argument("--seeds", type=str, default=None,
                         help="Comma-separated seeds for multi-seed generation (e.g. 42,43,44,45,46)")
-    parser.add_argument("--max-candidates", type=int, default=25,
-                        help="Max candidates per frame (default: 25)")
-    parser.add_argument("--frames", type=str, default="10,20",
-                        help="Comma-separated frame indices to evaluate (default: 10,20)")
+    parser.add_argument("--max-candidates", type=int, default=30,
+                        help="Max candidates per frame (default: 30)")
+    parser.add_argument("--frames", type=str, default="10,15,20,25,30",
+                        help="Comma-separated frame indices to evaluate (default: 10,15,20,25,30)")
     parser.add_argument("--scene", type=str, default="tum_fr2_xyz",
                         help="Scene name (default: tum_fr2_xyz)")
     parser.add_argument("--protocol-splits", action="store_true",
@@ -278,7 +278,7 @@ def main():
         print("  MODE: PROTOCOL SPLITS (train + val + test)")
         print("    Train: tum_fr1_desk frames 5,10,15,20,25,30,35,40")
         print("    Val:   tum_fr1_desk frames 42,45,48,51,54,57,60")
-        print("    Test:  tum_fr2_xyz frames 10,20,30")
+        print("    Test:  tum_fr2_xyz frames 10,15,20,25,30")
         print(f"    Seeds: {seeds}")
         print()
 
@@ -290,9 +290,9 @@ def main():
         print("  [INFO] To generate full protocol splits, run:")
         for s in seeds:
             print(f"    python experiments/build_phase6_dataset.py --scene tum_fr1_desk "
-                  f"--frames 5,10,15,20,25,30,35,40,42,45,48,51,54,57,60 --seed {s}")
+                  f"--frames 5,10,15,20,25,30,35,40,42,45,48,51,54,57,60 --seed {s} --max-candidates 30")
             print(f"    python experiments/build_phase6_dataset.py --scene tum_fr2_xyz "
-                  f"--frames 10,20,30 --seed {s}")
+                  f"--frames 10,15,20,25,30 --seed {s} --max-candidates 30")
         print()
 
     # ─── Configuration ───
@@ -491,6 +491,11 @@ def main():
                 "utility_mean": float(np.mean(utils)),
                 "utility_std": float(np.std(utils)),
                 "positive_utility_frac": float(np.mean([u > 0 for u in utils])),
+                "delta_q_single_mean": float(np.mean([s.get("delta_q_single", 0) for s in frame_samples])),
+                "delta_q_single_std": float(np.std([s.get("delta_q_single", 0) for s in frame_samples])),
+                "utility_single_mean": float(np.mean([s.get("utility_single", 0) for s in frame_samples])),
+                "n_context_types": len(set(s["context_type"] for s in frame_samples)),
+                "context_types_seen": sorted(list(set(s["context_type"] for s in frame_samples))),
                 "context_size_distribution": {
                     str(s): int(context_sizes.count(s))
                     for s in sorted(set(context_sizes))
@@ -528,6 +533,14 @@ def main():
         "scene": scene_name,
         "seed": seed,
         "feature_dim": PHASE6_FEATURE_DIM,
+        "has_single_measurements": all("delta_q_single" in s for s in all_samples),
+        "has_utility_single": all("utility_single" in s for s in all_samples),
+        "context_types_used": sorted(list(set(s["context_type"] for s in all_samples))),
+        "context_sizes_used": sorted(list(set(s["context_size"] for s in all_samples))),
+        "samples_per_context_type": {
+            ct: sum(1 for s in all_samples if s["context_type"] == ct)
+            for ct in sorted(set(s["context_type"] for s in all_samples))
+        },
         "checks": {},
     }
 

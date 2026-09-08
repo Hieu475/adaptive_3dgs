@@ -332,24 +332,32 @@ def prepare_phase6_splits(
 def _get_variant_mask(variant: str) -> np.ndarray:
     """Get boolean feature mask for ablation variant.
 
-    Args:
-        variant: One of 'V8', 'V9', 'V10', 'V11'.
+    Supports both legacy ladder (V8-V11) and full 2-way combinatorial ablation:
+      - self_only (V8)
+      - self_neighbor (V9)
+      - self_overlap
+      - self_selected
+      - self_neighbor_overlap (V10)
+      - self_neighbor_selected
+      - self_overlap_selected
+      - all_features (V11)
 
     Returns:
         Boolean array of length 32.
     """
     mask = np.zeros(PHASE6_FEATURE_DIM, dtype=bool)
 
-    # Self features always included
+    # Self features always included (0:11)
     mask[:11] = True
 
-    if variant in ('V9', 'V10', 'V11'):
-        mask[11:19] = True   # Neighbor
+    v = variant.lower()
+    if v in ('v9', 'v10', 'v11', 'self_neighbor', 'self_neighbor_overlap', 'self_neighbor_selected', 'all_features'):
+        mask[11:19] = True   # Neighbor (11:19)
 
-    if variant in ('V10', 'V11'):
-        mask[19:24] = True   # Overlap
+    if v in ('v10', 'v11', 'self_overlap', 'self_neighbor_overlap', 'self_overlap_selected', 'all_features'):
+        mask[19:24] = True   # Overlap (19:24)
 
-    if variant == 'V11':
-        mask[24:32] = True   # Selected
+    if v in ('v11', 'self_selected', 'self_neighbor_selected', 'self_overlap_selected', 'all_features'):
+        mask[24:32] = True   # Selected (24:32)
 
     return mask

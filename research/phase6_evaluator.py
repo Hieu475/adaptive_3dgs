@@ -327,6 +327,15 @@ class Phase6Evaluator:
         self.sync_gpu()
         t_sel_0 = time.perf_counter()
 
+        cond_oracle = None
+        if p_str in ("oracle_conditional", "phase6_oracle_conditional"):
+            from research.phase6_oracle import ConditionalOracleExperiment, ConditionalOracleConfig
+            cond_oracle = ConditionalOracleExperiment(
+                pipeline=oracle_engine.pipeline,
+                config=ConditionalOracleConfig(n_opt_steps=n_opt_steps),
+                oracle_config={'n_opt_steps': n_opt_steps}
+            )
+
         sel_res = select_phase6_subset(
             candidates=candidates,
             policy=p_str,
@@ -340,6 +349,9 @@ class Phase6Evaluator:
             phase6_predictor=self.p6_predictor,
             contrib_indices=contrib_indices,
             contrib_weights=contrib_weights,
+            cond_oracle=cond_oracle,
+            rgb_gt=rgb_gt,
+            depth_gt=depth_gt,
             cost_key="measured_trial_cost_ms",
             pred_cost_key="predicted_delta_t",
             pred_utility_key="predicted_utility",

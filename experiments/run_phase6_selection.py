@@ -34,7 +34,7 @@ import sys
 import json
 import time
 import argparse
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 
 import numpy as np
 from scipy.stats import wilcoxon
@@ -391,6 +391,100 @@ def compute_paired_statistics(
     }
 
 
+def compute_bootstrap_ci(data: np.ndarray, n_boot: int = 2000, ci: float = 0.95) -> Tuple[float, float]:
+    """Compute bootstrap confidence interval for the mean."""
+    if len(data) == 0:
+        return 0.0, 0.0
+    rng = np.random.default_rng(42)
+    boot_means = [float(np.mean(rng.choice(data, size=len(data), replace=True))) for _ in range(n_boot)]
+    alpha = (1.0 - ci) / 2.0
+    return float(np.percentile(boot_means, alpha * 100)), float(np.percentile(boot_means, (1.0 - alpha) * 100))
+
+
+def compute_multi_seed_per_budget_stats(
+    all_seed_results: List[Dict[str, Any]],
+    target_policy: str = "phase6_adaptive",
+    baseline_policy: str = "phase4_learned",
+    sweep_key: str = "relative_sweep",
+) -> Dict[str, Any]:
+    """Compute proper paired statistics across seeds for EACH budget level independently.
+
+    Protocol (Phase 6 Reform):
+      - n = 5 seeds per budget level.
+      - Computes mean, std, median, 95% bootstrap CI, win rate, Wilcoxon p-value, Cohen's d.
+    """
+    if not all_seed_results:
+        return {}
+
+    first_sweep = all_seed_results[0].get(sweep_key, [])
+    budget_strs = []
+    for r in first_sweep:
+        if r["budget_str"] not in budget_strs:
+            budget_strs.append(r["budget_str"])
+
+    per_budget_stats = {}
+    all_diffs_combined = []
+
+    for b_str in budget_strs:
+        target_vals = []
+        base_vals = []
+        for seed_art in all_seed_results:
+            sweep = seed_art.get(sweep_key, [])
+            r_t = next((r for r in sweep if r["budget_str"] == b_str and r["policy"] == target_policy), None)
+            r_b = next((r for r in sweep if r["budget_str"] == b_str and r["policy"] == baseline_policy), None)
+            if r_t and r_b:
+                target_vals.append(float(r_t["actual_delta_q"]))
+                base_vals.append(float(r_b["actual_delta_q"]))
+
+        diffs = np.array(target_vals) - np.array(base_vals)
+        n = len(diffs)
+        if n == 0:
+            continue
+
+        all_diffs_combined.extend(diffs.tolist())
+
+        mean_diff = float(np.mean(diffs))
+        std_diff = float(np.std(diffs))
+        median_diff = float(np.median(diffs))
+        ci_lo, ci_hi = compute_bootstrap_ci(diffs)
+        win_rate = float(np.mean(diffs > 0))
+        cohen_d = float(mean_diff / (std_diff + 1e-8))
+
+        stat_val, p_val = 0.0, 1.0
+        if n >= 4 and not np.all(diffs == 0):
+            try:
+                stat, p = wilcoxon(diffs, alternative="greater")
+                stat_val, p_val = float(stat), float(p)
+            except Exception:
+                stat_val, p_val = 0.0, 1.0
+
+        per_budget_stats[b_str] = {
+            "n_seeds": n,
+            "mean_difference": mean_diff,
+            "std_difference": std_diff,
+            "median_difference": median_diff,
+            "ci_95": [ci_lo, ci_hi],
+            "win_rate": win_rate,
+            "cohen_d": cohen_d,
+            "wilcoxon_stat": stat_val,
+            "wilcoxon_pval": p_val,
+            "statistically_significant": bool(p_val < 0.05),
+        }
+
+    combined_diffs = np.array(all_diffs_combined)
+    combined_ci_lo, combined_ci_hi = compute_bootstrap_ci(combined_diffs) if len(combined_diffs) > 0 else (0.0, 0.0)
+
+    return {
+        "target_policy": target_policy,
+        "baseline_policy": baseline_policy,
+        "per_budget": per_budget_stats,
+        "overall_mean_diff": float(np.mean(combined_diffs)) if len(combined_diffs) > 0 else 0.0,
+        "overall_win_rate": float(np.mean(combined_diffs > 0)) if len(combined_diffs) > 0 else 0.0,
+        "overall_ci_95": [combined_ci_lo, combined_ci_hi],
+        "aggregate_effect_positive": bool(combined_ci_lo > 0),
+    }
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────────────────────────────────────────
@@ -720,6 +814,24 @@ def main():
         if device == "cuda":
             torch.cuda.empty_cache()
 
+    # ─── Compute Multi-Seed Per-Budget Statistics ───
+    multi_seed_stats_p4 = compute_multi_seed_per_budget_stats(
+        all_seed_results, target_policy="phase6_adaptive", baseline_policy="phase4_learned"
+    )
+    multi_seed_stats_heur = compute_multi_seed_per_budget_stats(
+        all_seed_results, target_policy="phase6_adaptive", baseline_policy="heuristic"
+    )
+
+    if multi_seed_stats_p4 and "per_budget" in multi_seed_stats_p4:
+        print("\n" + "=" * 80)
+        print("  MULTI-SEED PER-BUDGET STATISTICAL AUDIT (n=5 seeds/budget)")
+        print("=" * 80)
+        print(f"  {'Budget':<8s} | {'Mean Diff':<12s} | {'95% Bootstrap CI':<24s} | {'Win Rate':<8s} | {'Wilcoxon p':<10s} | {'Cohen d':<8s}")
+        print("  " + "-" * 78)
+        for b_str, s in multi_seed_stats_p4["per_budget"].items():
+            ci_str = f"[{s['ci_95'][0]:.2e}, {s['ci_95'][1]:.2e}]"
+            print(f"  {b_str:<8s} | {s['mean_difference']:+.2e}   | {ci_str:<24s} | {s['win_rate']*100:5.1f}%   | {s['wilcoxon_pval']:<10.4f} | {s['cohen_d']:+6.2f}")
+
     # ─── Save Combined Artifacts ───
     combined = {
         "benchmark": "Phase 6 RQ5 Budget-Constrained Selection (REFORMED)",
@@ -729,7 +841,12 @@ def main():
             "C1: actual joint group optimization via evaluate_selected_group",
             "C2: real model.positions from live pipeline",
             "C3: real attribution via render_with_attribution",
+            "C4: multi-seed per-budget statistical testing with bootstrap CI",
         ],
+        "multi_seed_statistics": {
+            "vs_phase4_learned": multi_seed_stats_p4,
+            "vs_heuristic": multi_seed_stats_heur,
+        },
         "per_seed_results": all_seed_results,
     }
 

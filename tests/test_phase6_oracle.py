@@ -57,7 +57,7 @@ class TestConditionalOracleConfig:
     def test_default_config(self):
         config = ConditionalOracleConfig()
         assert config.n_opt_steps == 5
-        assert config.context_sizes == [0, 1, 4, 8]
+        assert config.context_sizes == [0, 1, 2, 4, 8, 16]
         assert abs(sum(config.context_size_weights) - 1.0) < 1e-6
         assert len(config.context_sizes) == len(config.context_size_weights)
         assert config.k_neighbors == 8
@@ -65,7 +65,10 @@ class TestConditionalOracleConfig:
 
     def test_context_types_valid(self):
         config = ConditionalOracleConfig()
-        valid_types = {"empty", "spatial_knn", "overlap_top", "random"}
+        valid_types = {
+            "empty", "spatial_knn", "overlap_top", "random",
+            "high_utility", "low_utility", "high_overlap", "mixed"
+        }
         for ct in config.context_types:
             assert ct in valid_types, f"Invalid context type: {ct}"
 
