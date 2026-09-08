@@ -41,6 +41,7 @@ from research.phase6_context import (
 )
 from research.phase6_model import (
     ContextAwareTwoHeadMLP,
+    ResidualContextModel,
     Phase6ModelConfig,
     Phase6Loss,
     create_ablation_variant,
@@ -69,6 +70,7 @@ def train_and_eval_variant(
     variant: str,
     dataset_path: str,
     output_dir: str,
+    architecture: str = "residual",
     seed: int = 42,
     epochs: int = 100,
     lr: float = 1e-3,
@@ -129,7 +131,21 @@ def train_and_eval_variant(
     # Model config
     cfg = create_ablation_variant(variant)
     dev = torch.device(device)
-    model = ContextAwareTwoHeadMLP(cfg).to(dev)
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    if architecture == "residual":
+        p4_ckpt = os.path.join(repo_root, "results", "learned_utility", "checkpoints", f"two_head_mlp_seed_{seed}.pt")
+        p4_model = None
+        if os.path.exists(p4_ckpt):
+            from research.utility_models import TwoHeadMLP
+            p4_net = TwoHeadMLP(in_features=11)
+            ckpt_data = torch.load(p4_ckpt, map_location="cpu", weights_only=False)
+            p4_net.load_state_dict(ckpt_data.get("model_state", ckpt_data))
+            p4_model = p4_net
+        model = ResidualContextModel(cfg, p4_model=p4_model).to(dev)
+    else:
+        model = ContextAwareTwoHeadMLP(cfg).to(dev)
+
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
     loss_fn = Phase6Loss(lambda_q=1.0, lambda_c=0.5, lambda_r=0.1)
 
@@ -252,8 +268,62 @@ def analyze_interaction_residuals(samples: List[Dict[str, Any]]) -> Dict[str, An
             "mean_additivity_ratio": float(np.mean(ratio_arr)),
             "median_additivity_ratio": float(np.median(ratio_arr)),
         }
-
     return summary
+
+
+def run_shuffle_test(
+    model: torch.nn.Module,
+    test_ds: Phase6UtilityDataset,
+    device: str = "cpu",
+) -> Dict[str, Any]:
+    """Evaluates the contribution of each context group by shuffling features across test samples.
+
+    Section XXVIII Protocol:
+      - Keep s_i (0:11) fixed, but shuffle each context group across candidates.
+      - If delta_rho > 0: context group makes a positive contribution.
+      - If delta_rho <= 0: context group is not helping or is hurting prediction.
+    """
+    dev = torch.device(device)
+    model.eval()
+
+    X_test = test_ds.features.clone()
+    u_test = test_ds.utility.cpu().numpy()
+    N = len(X_test)
+    if N < 5:
+        return {}
+
+    with torch.no_grad():
+        _, _, base_pred_u = model(X_test.to(dev))
+        base_rho, _ = safe_spearmanr(base_pred_u.cpu().numpy(), u_test)
+
+    shuffle_results = {"baseline_rho": float(base_rho), "groups": {}}
+    rng = np.random.default_rng(42)
+
+    groups = {
+        "neighbor": slice(11, 19),
+        "overlap": slice(19, 24),
+        "selected": slice(24, 32),
+    }
+
+    for g_name, g_slice in groups.items():
+        if X_test.shape[1] >= g_slice.stop:
+            X_shuffled = X_test.clone()
+            perm = rng.permutation(N)
+            X_shuffled[:, g_slice] = X_test[perm, g_slice]
+
+            with torch.no_grad():
+                _, _, shuf_pred_u = model(X_shuffled.to(dev))
+                shuf_rho, _ = safe_spearmanr(shuf_pred_u.cpu().numpy(), u_test)
+
+            delta_rho = float(base_rho - shuf_rho)
+            shuffle_results["groups"][g_name] = {
+                "shuffled_rho": float(shuf_rho),
+                "delta_rho": delta_rho,
+                "actively_used": bool(abs(delta_rho) > 0.005),
+                "positive_contribution": bool(delta_rho > 0.0),
+            }
+
+    return shuffle_results
 
 
 def main():
@@ -262,6 +332,10 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--quick", action="store_true", default=False)
+    parser.add_argument("--architecture", type=str, default="residual", choices=["direct", "residual"],
+                        help="Model architecture: direct (ContextAwareTwoHeadMLP) or residual (ResidualContextModel)")
+    parser.add_argument("--combinatorial", action="store_true", default=False,
+                        help="Run full 8-variant 2-way combinatorial ablation")
     args = parser.parse_args()
 
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -275,22 +349,31 @@ def main():
     print("=" * 80)
     print("  PHASE 6: ABLATION STUDY & INTERACTION ANALYSIS (STEP 13)")
     print("=" * 80)
-    print(f"  Dataset: {ds_path}")
+    print(f"  Dataset:      {ds_path}")
+    print(f"  Architecture: {args.architecture}")
+    print(f"  Mode:         {'Combinatorial (8 variants)' if args.combinatorial else 'Ladder (V8-V11)'}")
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     epochs = 40 if args.quick else args.epochs
 
-    # 1. Train and Evaluate Feature Ladder Variants (V8, V9, V10, V11)
-    variants = ["V8", "V9", "V10", "V11"]
+    if args.combinatorial:
+        variants = [
+            "self_only", "self_neighbor", "self_overlap", "self_selected",
+            "self_neighbor_overlap", "self_neighbor_selected", "self_overlap_selected", "all_features"
+        ]
+    else:
+        variants = ["V8", "V9", "V10", "V11"]
+
     variant_results = []
 
-    print("\n[Part 1] Training and Evaluating Representation Ladder (V8 -> V11)...")
+    print(f"\n[Part 1] Training and Evaluating Representation ({len(variants)} variants)...")
     for var in variants:
         t0 = time.perf_counter()
         res = train_and_eval_variant(
             variant=var,
             dataset_path=ds_path,
             output_dir=output_dir,
+            architecture=args.architecture,
             seed=args.seed,
             epochs=epochs,
             device=device,
@@ -298,7 +381,7 @@ def main():
         elapsed = time.perf_counter() - t0
         res["train_time_s"] = elapsed
         variant_results.append(res)
-        print(f"  {var:<4} ({res['features_dim']:2d} dims) | Spearman rho: {res['spearman_rho']:+.4f} | NDCG@5: {res['ndcg_5']:.4f} | MAE: {res['mae_utility']:.2e} | Time: {elapsed:.1f}s")
+        print(f"  {var:<24} ({res['features_dim']:2d} dims) | Spearman rho: {res['spearman_rho']:+.4f} | NDCG@5: {res['ndcg_5']:.4f} | MAE: {res['mae_utility']:.2e} | Time: {elapsed:.1f}s")
 
     # 2. Pairwise Interaction Analysis
     print("\n[Part 2] Computing Interaction Residuals Stratified by Co-visibility Overlap...")
@@ -309,26 +392,43 @@ def main():
     for cat, vals in interaction_results.items():
         print(f"  {cat:<16} | N={vals['n_samples']:3d} | Sub-additive Frac: {vals['sub_additive_fraction']*100:5.1f}% | Additivity Ratio: {vals['mean_additivity_ratio']:.3f}")
 
-    # 3. Print Summary Table
+    # 3. Shuffle Sensitivity Test (Section XXVIII)
+    full_var = "all_features" if args.combinatorial else "V11"
+    best_model_path = os.path.join(output_dir, f"model_{full_var}.pt")
+    shuffle_results = {}
+    if os.path.exists(best_model_path):
+        cfg = create_ablation_variant(full_var)
+        if args.architecture == "residual":
+            full_model = ResidualContextModel(cfg).to(device)
+        else:
+            full_model = ContextAwareTwoHeadMLP(cfg).to(device)
+        ckpt = torch.load(best_model_path, map_location=device, weights_only=False)
+        state_dict = ckpt.get("model_state", ckpt)
+        full_model.load_state_dict(state_dict)
+        _, _, test_ds, _ = prepare_phase6_splits(dataset_paths=[ds_path], variant=full_var)
+        if len(test_ds) > 0:
+            shuffle_results = run_shuffle_test(full_model, test_ds, device=device)
+            print("\n[Part 3] Shuffle Sensitivity Audit (Section XXVIII)...")
+            print(f"  Baseline Test rho: {shuffle_results['baseline_rho']:+.4f}")
+            for g_name, g_info in shuffle_results.get("groups", {}).items():
+                print(f"  Shuffled {g_name:<8s} | rho={g_info['shuffled_rho']:+.4f} | delta_rho={g_info['delta_rho']:+.4f} | active={g_info['actively_used']}")
+
+    # 4. Print Summary Table
     print("\n" + "=" * 80)
-    print("  ABLATION LADDER SUMMARY TABLE")
+    print("  ABLATION SUMMARY TABLE")
     print("=" * 80)
-    print(f"{'Variant':<8} | {'Input Components':<35} | {'Dims':<5} | {'Spearman ρ':<11} | {'NDCG@5':<8}")
+    print(f"{'Variant':<24} | {'Dims':<5} | {'Spearman ρ':<11} | {'NDCG@5':<8}")
     print("-" * 80)
-    comp_map = {
-        "V8": "Self only (Phase 4 pointwise)",
-        "V9": "Self + Neighborhood",
-        "V10": "Self + Neighborhood + Overlap",
-        "V11": "Self + Neigh + Overlap + Selected",
-    }
     for r in variant_results:
-        print(f"{r['variant']:<8} | {comp_map.get(r['variant'], ''):<35} | {r['features_dim']:<5d} | {r['spearman_rho']:<+11.4f} | {r['ndcg_5']:<8.4f}")
+        print(f"{r['variant']:<24} | {r['features_dim']:<5d} | {r['spearman_rho']:<+11.4f} | {r['ndcg_5']:<8.4f}")
     print("=" * 80)
 
-    # 4. Save Artifacts
+    # 5. Save Artifacts
     artifact = {
+        "architecture": args.architecture,
         "ablation_ladder": variant_results,
         "interaction_analysis": interaction_results,
+        "shuffle_test": shuffle_results,
         "thesis_confirmed": bool(
             interaction_results.get("high_overlap", {}).get("sub_additive_fraction", 0.0) >= 0.5
         ),
