@@ -120,3 +120,54 @@ class TestPhase6LossReformed:
         assert out["loss_r"].item() > 0.0
         assert out["loss_list"].item() > 0.0
 
+
+class TestP0Invariants:
+    def test_phase4_backbone_is_frozen(self):
+        """P0.2: Verify Phase 4 backbone weights are completely frozen and invariant during training."""
+        import hashlib
+        from research.utility_models import TwoHeadMLP
+
+        p4_model = TwoHeadMLP(in_features=11, hidden_dim=64)
+        config = create_ablation_variant("V11")
+        model = ResidualContextModel(config, p4_model=p4_model)
+
+        # Hash weights before training
+        def hash_p4(m):
+            h = hashlib.sha256()
+            for p in m.p4_model.parameters():
+                h.update(p.detach().cpu().numpy().tobytes())
+            return h.hexdigest()
+
+        hash_before = hash_p4(model)
+
+        # Optimizer strictly over context_parameters()
+        opt = torch.optim.Adam(model.context_parameters(), lr=1e-3)
+        loss_fn = Phase6Loss(lambda_q=1.0, lambda_c=1.0, lambda_r=1.0, lambda_list=1.0)
+
+        # Run 5 training steps
+        for _ in range(5):
+            opt.zero_grad()
+            x = torch.randn(10, PHASE6_FEATURE_DIM)
+            target_q = torch.randn(10) * 1e-5
+            target_t = torch.rand(10) * 20.0 + 1.0
+            target_u = target_q / target_t
+            group_ids = torch.tensor([0, 0, 0, 0, 0, 1, 1, 1, 1, 1], dtype=torch.long)
+
+            dq, dt, u = model(x)
+            loss_dict = loss_fn(
+                dq, dt, u, target_q, target_t, target_u,
+                group_ids=group_ids
+            )
+            loss_dict["total"].backward()
+
+            # Verify no gradients on p4_model
+            for p in model.p4_model.parameters():
+                assert p.grad is None or (p.grad == 0).all()
+                assert not p.requires_grad
+
+            opt.step()
+
+        hash_after = hash_p4(model)
+        assert hash_before == hash_after, "Phase 4 backbone weights must remain invariant!"
+
+

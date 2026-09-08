@@ -414,6 +414,11 @@ class ResidualContextModel(nn.Module):
         else:
             self.p4_model = TwoHeadMLP(in_features=c.self_dim, hidden_dim=64, eps_cost=eps_cost)
 
+        # Strictly freeze Phase 4 backbone (P0.2)
+        self.p4_model.eval()
+        for p in self.p4_model.parameters():
+            p.requires_grad = False
+
         # Context Encoders
         self.self_encoder = nn.Sequential(
             nn.Linear(c.self_dim, c.self_hidden),
@@ -451,7 +456,7 @@ class ResidualContextModel(nn.Module):
             nn.LeakyReLU(0.1),
         )
 
-        # Residual Utility Correction Head: predicts r_i
+        # Residual Head: predicts residual utility correction r_i
         self.head_residual_u = nn.Sequential(
             nn.Linear(c.head_hidden, 32),
             nn.LeakyReLU(0.1),
@@ -465,6 +470,10 @@ class ResidualContextModel(nn.Module):
             nn.Linear(32, 1),
         )
 
+    def context_parameters(self) -> List[nn.Parameter]:
+        """Returns only trainable context parameters, strictly excluding frozen P4 (P0.2)."""
+        return [p for n, p in self.named_parameters() if not n.startswith("p4_model") and p.requires_grad]
+
     def forward(
         self,
         x: torch.Tensor,
@@ -472,11 +481,12 @@ class ResidualContextModel(nn.Module):
         c = self.config
 
         # 1. Compute Phase 4 baseline from self features x[:, :c.self_dim]
-        offset = 0
-        self_x = x[:, offset:offset + c.self_dim]
-        offset += c.self_dim
-
-        p4_dq, p4_dt, p4_u = self.p4_model(self_x)
+        # P4 backbone is strictly executed with no gradients (P0.2)
+        with torch.no_grad():
+            offset = 0
+            self_x = x[:, offset:offset + c.self_dim]
+            offset += c.self_dim
+            p4_dq, p4_dt, p4_u = self.p4_model(self_x)
 
         # 2. Compute Context Features
         parts = [self.self_encoder(self_x)]

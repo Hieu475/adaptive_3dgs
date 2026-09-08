@@ -62,6 +62,8 @@ def train_epoch(
         Dict with 'loss', 'loss_q', 'loss_t', 'loss_r' averages.
     """
     model.train()
+    if hasattr(model, 'p4_model'):
+        model.p4_model.eval()  # Strictly ensure frozen Phase 4 backbone remains in eval mode
     total_loss = 0.0
     total_lq = 0.0
     total_lt = 0.0
@@ -296,7 +298,8 @@ def main():
     print(f"  Config:     neighbor={config.use_neighbor}, overlap={config.use_overlap}, selected={config.use_selected}")
 
     # ─── Training ───
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-5)
+    trainable_params = model.context_parameters() if hasattr(model, 'context_parameters') else model.parameters()
+    optimizer = torch.optim.Adam(trainable_params, lr=args.lr, weight_decay=1e-5)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode='min', factor=0.5, patience=15, min_lr=1e-6
     )
