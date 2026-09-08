@@ -35,6 +35,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from research.phase6_model import (
     ContextAwareTwoHeadMLP,
+    ResidualContextModel,
     Phase6ModelConfig,
     Phase6Loss,
     create_ablation_variant,
@@ -49,7 +50,7 @@ from research.phase6_dataset import (
 
 
 def train_epoch(
-    model: ContextAwareTwoHeadMLP,
+    model: nn.Module,
     loader: DataLoader,
     optimizer: torch.optim.Optimizer,
     loss_fn: Phase6Loss,
@@ -97,7 +98,7 @@ def train_epoch(
 
 @torch.no_grad()
 def evaluate(
-    model: ContextAwareTwoHeadMLP,
+    model: nn.Module,
     loader: DataLoader,
     loss_fn: Phase6Loss,
     device: torch.device,
@@ -170,6 +171,11 @@ def main():
     parser.add_argument("--lambda-q", type=float, default=1.0)
     parser.add_argument("--lambda-c", type=float, default=0.5)
     parser.add_argument("--lambda-r", type=float, default=0.1)
+    parser.add_argument("--lambda-list", type=float, default=0.5,
+                        help="Listwise KL loss weight")
+    parser.add_argument("--architecture", type=str, default="residual",
+                        choices=["direct", "residual"],
+                        help="Model architecture: direct (ContextAwareTwoHeadMLP) or residual (ResidualContextModel, recommended)")
     parser.add_argument("--output-dir", type=str, default=None)
     args = parser.parse_args()
 
@@ -269,9 +275,22 @@ def main():
         use_selected=config.use_selected,
     )
 
-    model = ContextAwareTwoHeadMLP(config).to(device)
+    if args.architecture == "residual":
+        p4_ckpt = os.path.join(repo_root, "results", "learned_utility", "checkpoints", f"two_head_mlp_seed_{args.seed}.pt")
+        p4_model = None
+        if os.path.exists(p4_ckpt):
+            from research.utility_models import TwoHeadMLP
+            p4_net = TwoHeadMLP(in_features=11)
+            ckpt_data = torch.load(p4_ckpt, map_location="cpu", weights_only=False)
+            p4_net.load_state_dict(ckpt_data.get("model_state", ckpt_data))
+            p4_model = p4_net
+            print(f"  [Residual] Loaded pre-trained Phase 4 weights from {p4_ckpt}")
+        model = ResidualContextModel(config, p4_model=p4_model).to(device)
+    else:
+        model = ContextAwareTwoHeadMLP(config).to(device)
+
     n_params = sum(p.numel() for p in model.parameters())
-    print(f"\n[Model] {config.variant_name}")
+    print(f"\n[Model] Architecture: {args.architecture} ({config.variant_name})")
     print(f"  Input dim:  {input_dim}")
     print(f"  Parameters: {n_params:,}")
     print(f"  Config:     neighbor={config.use_neighbor}, overlap={config.use_overlap}, selected={config.use_selected}")
@@ -285,6 +304,7 @@ def main():
         lambda_q=args.lambda_q,
         lambda_c=args.lambda_c,
         lambda_r=args.lambda_r,
+        lambda_list=args.lambda_list,
     )
 
     best_val_loss = float('inf')
@@ -385,6 +405,7 @@ def main():
     torch.save({
         'model_state': model.state_dict(),
         'config': config_dict,
+        'architecture': args.architecture,
         'seed': args.seed,
         'variant': args.variant,
         'best_epoch': best_epoch,

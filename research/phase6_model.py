@@ -35,6 +35,7 @@ from .phase6_context import (
     OVERLAP_SLICE,
     SELECTED_SLICE,
 )
+from research.utility_models import TwoHeadMLP
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -386,22 +387,7 @@ class ResidualContextModel(nn.Module):
         if p4_model is not None:
             self.p4_model = p4_model
         else:
-            # Default TwoHeadMLP for Phase 4
-            self.p4_model = nn.Sequential(
-                nn.Linear(c.self_dim, 64),
-                nn.LeakyReLU(0.1),
-            )
-            self.p4_head_q = nn.Sequential(
-                nn.Linear(64, 32),
-                nn.LeakyReLU(0.1),
-                nn.Linear(32, 1),
-            )
-            self.p4_head_t = nn.Sequential(
-                nn.Linear(64, 32),
-                nn.LeakyReLU(0.1),
-                nn.Linear(32, 1),
-                nn.Softplus(),
-            )
+            self.p4_model = TwoHeadMLP(in_features=c.self_dim, hidden_dim=64, eps_cost=eps_cost)
 
         # Context Encoders
         self.self_encoder = nn.Sequential(
@@ -465,13 +451,7 @@ class ResidualContextModel(nn.Module):
         self_x = x[:, offset:offset + c.self_dim]
         offset += c.self_dim
 
-        if hasattr(self, 'p4_head_q'):
-            p4_feat = self.p4_model(self_x)
-            p4_dq = self.p4_head_q(p4_feat).squeeze(-1)
-            p4_dt = self.p4_head_t(p4_feat).squeeze(-1) + self.eps_cost
-            p4_u = p4_dq / p4_dt
-        else:
-            p4_dq, p4_dt, p4_u = self.p4_model(self_x)
+        p4_dq, p4_dt, p4_u = self.p4_model(self_x)
 
         # 2. Compute Context Features
         parts = [self.self_encoder(self_x)]
@@ -550,7 +530,11 @@ class FrozenContextPredictor:
             config = Phase6ModelConfig()
 
         self.config = config
-        self.model = ContextAwareTwoHeadMLP(config).to(self.device)
+        arch = ckpt.get('architecture', 'direct')
+        if arch == 'residual':
+            self.model = ResidualContextModel(config).to(self.device)
+        else:
+            self.model = ContextAwareTwoHeadMLP(config).to(self.device)
 
         state_dict = ckpt.get('model_state', ckpt.get('state_dict'))
         self.model.load_state_dict(state_dict)
