@@ -142,7 +142,6 @@ class TestPhase6LossReformed:
         assert torch.isclose(out["total"], 2.0 * out["loss_zero"])
 
 
-
 class TestP0Invariants:
     def test_phase4_backbone_is_frozen(self):
         """P0.2: Verify Phase 4 backbone weights are completely frozen and invariant during training."""
@@ -164,7 +163,7 @@ class TestP0Invariants:
 
         # Optimizer strictly over context_parameters()
         opt = torch.optim.Adam(model.context_parameters(), lr=1e-3)
-        loss_fn = Phase6Loss(lambda_q=1.0, lambda_c=1.0, lambda_r=1.0, lambda_list=1.0)
+        loss_fn = Phase6Loss(lambda_q=1.0, lambda_c=1.0, lambda_r=1.0, lambda_list=1.0, lambda_res=1.0, lambda_zero=1.0)
 
         # Run 5 training steps
         for _ in range(5):
@@ -173,11 +172,14 @@ class TestP0Invariants:
             target_q = torch.randn(10) * 1e-5
             target_t = torch.rand(10) * 20.0 + 1.0
             target_u = target_q / target_t
+            target_r = torch.randn(10) * 1e-6
+            is_empty = (torch.rand(10) > 0.5).float()
             group_ids = torch.tensor([0, 0, 0, 0, 0, 1, 1, 1, 1, 1], dtype=torch.long)
 
-            dq, dt, u = model(x)
+            dq, dt, u, r = model(x, return_residual=True)
             loss_dict = loss_fn(
                 dq, dt, u, target_q, target_t, target_u,
+                pred_r=r, target_r=target_r, is_empty=is_empty,
                 group_ids=group_ids
             )
             loss_dict["total"].backward()
@@ -192,4 +194,19 @@ class TestP0Invariants:
         hash_after = hash_p4(model)
         assert hash_before == hash_after, "Phase 4 backbone weights must remain invariant!"
 
+    def test_mathematical_consistency(self):
+        """P0.3: Verify Q_hat_P6 = U_hat_P6 * T_hat_P6 and T_hat_P6 == T_hat_P4."""
+        config = create_ablation_variant("V11")
+        model = ResidualContextModel(config)
+        x = torch.randn(8, PHASE6_FEATURE_DIM)
+
+        dq, dt, u, r = model(x, return_residual=True)
+
+        # Check Q_hat = U_hat * T_hat
+        expected_dq = u * dt
+        assert torch.allclose(dq, expected_dq, atol=1e-6), "Q_hat must strictly equal U_hat * T_hat"
+
+        # Check T_hat_P6 == T_hat_P4
+        _, p4_dt, _ = model.p4_model(x[:, :11])
+        assert torch.allclose(dt, p4_dt, atol=1e-6), "T_hat_P6 must strictly equal T_hat_P4"
 

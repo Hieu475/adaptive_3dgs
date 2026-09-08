@@ -530,10 +530,13 @@ class ResidualContextModel(nn.Module):
         # 3. Residual prediction
         r_u = self.head_residual_u(h_ctx).squeeze(-1)
 
-        # 4. Additive residual combination
+        # 4. Additive residual combination with mathematical consistency (P0.3):
+        # U_P6 = U_P4 + r_U
+        # T_P6 = T_P4
+        # Q_P6 = U_P6 * T_P6
         final_u = p4_u + r_u
         final_dt = p4_dt
-        final_dq = p4_dq
+        final_dq = final_u * final_dt
 
         if return_residual:
             return final_dq, final_dt, final_u, r_u
