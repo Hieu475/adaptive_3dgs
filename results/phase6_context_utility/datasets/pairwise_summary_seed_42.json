@@ -1,0 +1,148 @@
+{
+  "total_pairs": 26,
+  "scene": "tum_fr2_xyz",
+  "frames": [
+    10,
+    20
+  ],
+  "seed": 42,
+  "iou_bins": {
+    "low": [
+      0.0,
+      0.1
+    ],
+    "medium": [
+      0.1,
+      0.3
+    ],
+    "high": [
+      0.3,
+      0.5
+    ],
+    "very_high": [
+      0.5,
+      1.01
+    ]
+  },
+  "frame_summaries": [
+    {
+      "frame": 10,
+      "n_pairs_total": 13,
+      "state_integrity": true,
+      "time_iou_s": 0.08603622600003291,
+      "time_measure_s": 31.132267245999856,
+      "bins": {
+        "low": {
+          "n_pairs": 5,
+          "mean_interaction": -1.936031757526424e-06,
+          "std_interaction": 3.7133444505847193e-06,
+          "median_interaction": -6.961718366323644e-08,
+          "sub_additive_fraction": 1.0,
+          "mean_iou": 0.0,
+          "mean_additivity_ratio": 0.9724857051769045
+        },
+        "medium": {
+          "n_pairs": 5,
+          "mean_interaction": 3.2663249325295195e-06,
+          "std_interaction": 8.25680955284518e-06,
+          "median_interaction": -2.307436061229521e-07,
+          "sub_additive_fraction": 0.6,
+          "mean_iou": 0.20705072970119417,
+          "mean_additivity_ratio": 1.050714057953123
+        },
+        "high": {
+          "n_pairs": 3,
+          "mean_interaction": -3.173113468934294e-06,
+          "std_interaction": 2.302065278291174e-06,
+          "median_interaction": -2.1090801398723854e-06,
+          "sub_additive_fraction": 1.0,
+          "mean_iou": 0.3643308080808081,
+          "mean_additivity_ratio": 0.9723959000404339
+        },
+        "very_high": {
+          "n_pairs": 0
+        }
+      }
+    },
+    {
+      "frame": 20,
+      "n_pairs_total": 13,
+      "state_integrity": true,
+      "time_iou_s": 0.0890594790000705,
+      "time_measure_s": 32.89444254599994,
+      "bins": {
+        "low": {
+          "n_pairs": 5,
+          "mean_interaction": -2.754601013439224e-06,
+          "std_interaction": 5.531594883342677e-06,
+          "median_interaction": 5.332607180944015e-09,
+          "sub_additive_fraction": 0.2,
+          "mean_iou": 0.0,
+          "mean_additivity_ratio": 0.9564919864702766
+        },
+        "medium": {
+          "n_pairs": 5,
+          "mean_interaction": -8.035248687226092e-07,
+          "std_interaction": 1.2599926303688997e-06,
+          "median_interaction": -1.4345357088984994e-07,
+          "sub_additive_fraction": 0.6,
+          "mean_iou": 0.20705072970119417,
+          "mean_additivity_ratio": 0.9788174697750529
+        },
+        "high": {
+          "n_pairs": 3,
+          "mean_interaction": -2.2865193613925984e-06,
+          "std_interaction": 1.6332622932505513e-06,
+          "median_interaction": -1.8641949155439215e-06,
+          "sub_additive_fraction": 1.0,
+          "mean_iou": 0.3643308080808081,
+          "mean_additivity_ratio": 0.9735209885866315
+        },
+        "very_high": {
+          "n_pairs": 0
+        }
+      }
+    }
+  ],
+  "aggregate": {
+    "low": {
+      "n_pairs": 10,
+      "mean_interaction": -2.3453163854828234e-06,
+      "std_interaction": 4.728768168110699e-06,
+      "sub_additive_fraction": 0.6,
+      "super_additive_fraction": 0.4,
+      "mean_iou": 0.0,
+      "mean_distance_3d": 1.3951608389616013,
+      "mean_additivity_ratio": 0.9644888458235906,
+      "correlation_iou_vs_interaction": NaN
+    },
+    "medium": {
+      "n_pairs": 10,
+      "mean_interaction": 1.231400031903455e-06,
+      "std_interaction": 6.246772131385752e-06,
+      "sub_additive_fraction": 0.6,
+      "super_additive_fraction": 0.4,
+      "mean_iou": 0.20705072970119417,
+      "mean_distance_3d": 0.04607468172907829,
+      "mean_additivity_ratio": 1.014765763864088,
+      "correlation_iou_vs_interaction": 0.08982399479242209
+    },
+    "high": {
+      "n_pairs": 6,
+      "mean_interaction": -2.729816415163446e-06,
+      "std_interaction": 2.0445139788995936e-06,
+      "sub_additive_fraction": 1.0,
+      "super_additive_fraction": 0.0,
+      "mean_iou": 0.3643308080808081,
+      "mean_distance_3d": 0.038633995999892555,
+      "mean_additivity_ratio": 0.9729584443135327,
+      "correlation_iou_vs_interaction": 0.9529834923503634
+    },
+    "very_high": {
+      "n_pairs": 0
+    }
+  },
+  "overall_iou_interaction_spearman_rho": 0.5357429169545639,
+  "overall_iou_interaction_spearman_p": 0.004791062511208669,
+  "hypothesis_iou_drives_interaction": true
+}

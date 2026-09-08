@@ -23,3 +23,4 @@
 !phase5_budget_selection/*.csv
 !phase6_context_utility/*.json
 !phase6_context_utility/**/*.json
+phase6_context_utility/ablation/*.pt

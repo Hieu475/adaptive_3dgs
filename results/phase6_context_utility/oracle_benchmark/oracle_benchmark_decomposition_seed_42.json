@@ -1,0 +1,122 @@
+{
+  "scene": "tum_fr2_xyz",
+  "frame": 10,
+  "seed": 42,
+  "n_candidates": 10,
+  "benchmark_results": {
+    "30%": {
+      "Static Heuristic": {
+        "policy_key": "error_influence",
+        "delta_q_realized": 2.3056200858775722e-05,
+        "n_selected": 3,
+        "scheduled_cost_ms": 190.35678100585938,
+        "actual_cost_ms": 707.5026760001037,
+        "budget_violation_ms": 490.95047590012655,
+        "evaluation_time_s": 0.7273217199999635
+      },
+      "Phase 4 Learned": {
+        "policy_key": "phase4_learned",
+        "delta_q_realized": 0.00011698145356302063,
+        "n_selected": 3,
+        "scheduled_cost_ms": 144.18626403808594,
+        "actual_cost_ms": 679.4060330000775,
+        "budget_violation_ms": 462.8538329001003,
+        "evaluation_time_s": 0.7410717620000469
+      },
+      "Oracle Static": {
+        "policy_key": "oracle_reference",
+        "delta_q_realized": 0.00011698145356302063,
+        "n_selected": 3,
+        "scheduled_cost_ms": 144.18626403808594,
+        "actual_cost_ms": 674.7832700000345,
+        "budget_violation_ms": 458.23106990005726,
+        "evaluation_time_s": 0.695026869000003
+      },
+      "Oracle Conditional": {
+        "policy_key": "oracle_conditional",
+        "delta_q_realized": 0.00011698145356302063,
+        "n_selected": 3,
+        "scheduled_cost_ms": 144.186256500052,
+        "actual_cost_ms": 703.7703419998707,
+        "budget_violation_ms": 487.21814189989345,
+        "evaluation_time_s": 86.33235311199996
+      },
+      "Phase 6 Adaptive": {
+        "policy_key": "phase6_adaptive",
+        "delta_q_realized": 9.841853208180961e-05,
+        "n_selected": 3,
+        "scheduled_cost_ms": 214.5997314453125,
+        "actual_cost_ms": 769.9389399999745,
+        "budget_violation_ms": 553.3867398999973,
+        "evaluation_time_s": 0.8552062769999793
+      }
+    },
+    "60%": {
+      "Static Heuristic": {
+        "policy_key": "error_influence",
+        "delta_q_realized": 3.6141587400372055e-05,
+        "n_selected": 6,
+        "scheduled_cost_ms": 432.854736328125,
+        "actual_cost_ms": 878.2603219999601,
+        "budget_violation_ms": 445.1559218000057,
+        "evaluation_time_s": 0.9003112890000011
+      },
+      "Phase 4 Learned": {
+        "policy_key": "phase4_learned",
+        "delta_q_realized": 0.00012808974095009318,
+        "n_selected": 6,
+        "scheduled_cost_ms": 404.9565124511719,
+        "actual_cost_ms": 871.2661429999571,
+        "budget_violation_ms": 438.1617428000027,
+        "evaluation_time_s": 0.9327667579998433
+      },
+      "Oracle Static": {
+        "policy_key": "oracle_reference",
+        "delta_q_realized": 0.00012954503158689112,
+        "n_selected": 6,
+        "scheduled_cost_ms": 386.6842346191406,
+        "actual_cost_ms": 891.7725130002054,
+        "budget_violation_ms": 458.66811280025104,
+        "evaluation_time_s": 0.9187583169998561
+      },
+      "Oracle Conditional": {
+        "policy_key": "oracle_conditional",
+        "delta_q_realized": 0.00012954503158689112,
+        "n_selected": 6,
+        "scheduled_cost_ms": 386.6842199000075,
+        "actual_cost_ms": 930.1442999999381,
+        "budget_violation_ms": 497.0398997999837,
+        "evaluation_time_s": 92.15440891499998
+      },
+      "Phase 6 Adaptive": {
+        "policy_key": "phase6_adaptive",
+        "delta_q_realized": 0.00010625604394325097,
+        "n_selected": 5,
+        "scheduled_cost_ms": 378.4433898925781,
+        "actual_cost_ms": 910.1246779998746,
+        "budget_violation_ms": 477.0202777999202,
+        "evaluation_time_s": 0.9818005619999894
+      }
+    }
+  },
+  "diagnoses": {
+    "30%": {
+      "q_p4": 0.00011698145356302063,
+      "q_static_oracle": 0.00011698145356302063,
+      "q_cond_oracle": 0.00011698145356302063,
+      "q_p6": 9.841853208180961e-05,
+      "oracle_conditional_lift": 0.0,
+      "context_advantage": 0.0,
+      "diagnosis": "Case B: Hypothesis Failure (OracleConditional \u2248 P4; context-aware greedy has no benefit)"
+    },
+    "60%": {
+      "q_p4": 0.00012808974095009318,
+      "q_static_oracle": 0.00012954503158689112,
+      "q_cond_oracle": 0.00012954503158689112,
+      "q_p6": 0.00010625604394325097,
+      "oracle_conditional_lift": 1.4552906367979455e-06,
+      "context_advantage": 0.0,
+      "diagnosis": "Case C: Hypothesis Confirmed (OracleConditional > P4 and P6 > P4)"
+    }
+  }
+}
