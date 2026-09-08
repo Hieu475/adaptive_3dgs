@@ -100,3 +100,23 @@ class TestPhase6LossReformed:
         # Because all targets are identical, they should be filtered out by tau
         # meaning ranking loss should be 0.0
         assert out["loss_r"].item() == 0.0
+
+    def test_group_aware_ranking_loss(self):
+        """Verify ranking and listwise loss operate strictly within groups."""
+        loss_fn = Phase6Loss(lambda_q=0.0, lambda_c=0.0, lambda_r=1.0, lambda_list=1.0)
+
+        # 6 samples: group 0 has 3, group 1 has 3
+        group_ids = torch.tensor([0, 0, 0, 1, 1, 1], dtype=torch.long)
+        pred_q = torch.zeros(6)
+        pred_t = torch.ones(6)
+        # In group 0: targets are [1.0, 2.0, 3.0], pred is [1.0, 2.0, 3.0] (perfect rank)
+        # In group 1: targets are [10.0, 20.0, 30.0], pred is [30.0, 20.0, 10.0] (inverted rank)
+        target_u = torch.tensor([1.0, 2.0, 3.0, 10.0, 20.0, 30.0])
+        pred_u = torch.tensor([1.0, 2.0, 3.0, 30.0, 20.0, 10.0])
+        target_q = target_u
+        target_t = torch.ones(6)
+
+        out = loss_fn(pred_q, pred_t, pred_u, target_q, target_t, target_u, group_ids=group_ids)
+        assert out["loss_r"].item() > 0.0
+        assert out["loss_list"].item() > 0.0
+

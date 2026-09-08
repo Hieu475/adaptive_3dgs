@@ -146,6 +146,7 @@ class Phase6UtilityDataset(Dataset):
         delta_q: np.ndarray,
         delta_t: np.ndarray,
         utility: np.ndarray,
+        group_ids: Optional[np.ndarray] = None,
         context_sizes: Optional[np.ndarray] = None,
         metadata: Optional[List[Dict]] = None,
     ):
@@ -156,6 +157,7 @@ class Phase6UtilityDataset(Dataset):
             delta_q: (N,) conditional quality gains.
             delta_t: (N,) conditional costs in ms.
             utility: (N,) conditional utilities.
+            group_ids: (N,) context group IDs for group-aware ranking loss (P0.1).
             context_sizes: (N,) context set sizes.
             metadata: Optional list of sample metadata dicts.
         """
@@ -163,6 +165,13 @@ class Phase6UtilityDataset(Dataset):
         self.delta_q = torch.tensor(delta_q, dtype=torch.float32)
         self.delta_t = torch.tensor(delta_t, dtype=torch.float32)
         self.utility = torch.tensor(utility, dtype=torch.float32)
+
+        N = len(features)
+        if group_ids is not None:
+            self.group_ids = torch.tensor(group_ids, dtype=torch.long)
+        else:
+            self.group_ids = torch.zeros(N, dtype=torch.long)
+
         self.context_sizes = context_sizes
         self.metadata = metadata
 
@@ -175,7 +184,54 @@ class Phase6UtilityDataset(Dataset):
             'delta_q': self.delta_q[idx],
             'delta_t': self.delta_t[idx],
             'utility': self.utility[idx],
+            'group_id': self.group_ids[idx],
         }
+
+
+class GroupedBatchSampler:
+    """Batch sampler that yields all sample indices belonging to the same context group.
+
+    Ensures that ranking and listwise losses operate strictly within candidates
+    evaluated under the exact same scene, frame, and context set condition g = (scene, frame, S_t) (P0.1).
+    """
+
+    def __init__(
+        self,
+        group_ids: Union[np.ndarray, torch.Tensor],
+        shuffle: bool = True,
+        seed: int = 42,
+    ):
+        if isinstance(group_ids, torch.Tensor):
+            group_ids = group_ids.cpu().numpy()
+        self.group_ids = np.asarray(group_ids)
+        self.shuffle = shuffle
+        self.seed = seed
+        self.epoch = 0
+
+        # Group indices by group_id
+        self.group_to_indices: Dict[int, List[int]] = {}
+        for idx, gid in enumerate(self.group_ids):
+            gid = int(gid)
+            if gid not in self.group_to_indices:
+                self.group_to_indices[gid] = []
+            self.group_to_indices[gid].append(idx)
+
+        self.groups = sorted(list(self.group_to_indices.keys()))
+
+    def __iter__(self):
+        rng = np.random.default_rng(self.seed + self.epoch)
+        groups = list(self.groups)
+        if self.shuffle:
+            rng.shuffle(groups)
+        for g in groups:
+            yield self.group_to_indices[g]
+
+    def __len__(self):
+        return len(self.groups)
+
+    def set_epoch(self, epoch: int):
+        self.epoch = epoch
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -241,9 +297,11 @@ def prepare_phase6_splits(
     Returns:
         Tuple of (train_dataset, val_dataset, test_dataset, normalizer).
     """
-    all_train_feats, all_train_dq, all_train_dt, all_train_u = [], [], [], []
-    all_val_feats, all_val_dq, all_val_dt, all_val_u = [], [], [], []
-    all_test_feats, all_test_dq, all_test_dt, all_test_u = [], [], [], []
+    all_train_feats, all_train_dq, all_train_dt, all_train_u, train_gids = [], [], [], [], []
+    all_val_feats, all_val_dq, all_val_dt, all_val_u, val_gids = [], [], [], [], []
+    all_test_feats, all_test_dq, all_test_dt, all_test_u, test_gids = [], [], [], [], []
+
+    group_key_to_id: Dict[str, int] = {}
 
     for path in dataset_paths:
         with open(path, 'r') as f:
@@ -255,46 +313,55 @@ def prepare_phase6_splits(
             dt = float(s["delta_t_conditional_ms"])
             u = float(s["utility_conditional"])
 
+            # Compute group ID (P0.1)
+            g_key = f"{s['scene']}_f{s['frame']}_{s.get('context_type', 'default')}_size{s.get('context_size', 0)}"
+            gid = group_key_to_id.setdefault(g_key, len(group_key_to_id))
+
             split = s.get("split", "cross_scene_test")
             if split == "train":
                 all_train_feats.append(feat)
                 all_train_dq.append(dq)
                 all_train_dt.append(dt)
                 all_train_u.append(u)
+                train_gids.append(gid)
             elif split == "validation":
                 all_val_feats.append(feat)
                 all_val_dq.append(dq)
                 all_val_dt.append(dt)
                 all_val_u.append(u)
+                val_gids.append(gid)
             else:
                 all_test_feats.append(feat)
                 all_test_dq.append(dq)
                 all_test_dt.append(dt)
                 all_test_u.append(u)
+                test_gids.append(gid)
 
-    def _to_arrays(feats, dq, dt, u):
+    def _to_arrays(feats, dq, dt, u, gids):
         if not feats:
             return (
                 np.zeros((0, PHASE6_FEATURE_DIM), dtype=np.float32),
                 np.zeros(0, dtype=np.float32),
                 np.zeros(0, dtype=np.float32),
                 np.zeros(0, dtype=np.float32),
+                np.zeros(0, dtype=np.int64),
             )
         return (
             np.stack(feats),
             np.array(dq, dtype=np.float32),
             np.array(dt, dtype=np.float32),
             np.array(u, dtype=np.float32),
+            np.array(gids, dtype=np.int64),
         )
 
-    X_train, dq_train, dt_train, u_train = _to_arrays(
-        all_train_feats, all_train_dq, all_train_dt, all_train_u
+    X_train, dq_train, dt_train, u_train, gids_train = _to_arrays(
+        all_train_feats, all_train_dq, all_train_dt, all_train_u, train_gids
     )
-    X_val, dq_val, dt_val, u_val = _to_arrays(
-        all_val_feats, all_val_dq, all_val_dt, all_val_u
+    X_val, dq_val, dt_val, u_val, gids_val = _to_arrays(
+        all_val_feats, all_val_dq, all_val_dt, all_val_u, val_gids
     )
-    X_test, dq_test, dt_test, u_test = _to_arrays(
-        all_test_feats, all_test_dq, all_test_dt, all_test_u
+    X_test, dq_test, dt_test, u_test, gids_test = _to_arrays(
+        all_test_feats, all_test_dq, all_test_dt, all_test_u, test_gids
     )
 
     # Fit normalizer on train split ONLY
@@ -316,14 +383,17 @@ def prepare_phase6_splits(
     train_ds = Phase6UtilityDataset(
         X_train[:, feature_mask] if len(X_train) > 0 else X_train,
         dq_train, dt_train, u_train,
+        group_ids=gids_train,
     )
     val_ds = Phase6UtilityDataset(
         X_val[:, feature_mask] if len(X_val) > 0 else X_val,
         dq_val, dt_val, u_val,
+        group_ids=gids_val,
     )
     test_ds = Phase6UtilityDataset(
         X_test[:, feature_mask] if len(X_test) > 0 else X_test,
         dq_test, dt_test, u_test,
+        group_ids=gids_test,
     )
 
     return train_ds, val_ds, test_ds, normalizer

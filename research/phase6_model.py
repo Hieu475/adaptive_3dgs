@@ -303,44 +303,68 @@ class Phase6Loss(nn.Module):
         target_q: torch.Tensor,
         target_t: torch.Tensor,
         target_u: torch.Tensor,
+        group_ids: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
         loss_q = self.smooth_l1(pred_q * self.scale_q, target_q * self.scale_q)
         loss_t = self.smooth_l1(pred_t * self.scale_t, target_t * self.scale_t)
 
-        # ─── Filtered Pairwise Ranking Loss ───
-        loss_r = torch.tensor(0.0, device=pred_u.device)
+        device = pred_u.device
         N = pred_u.shape[0]
-        if N >= 2 and self.lambda_r > 0:
-            # Threshold: exclude pairs whose utility difference is within tau
-            u_std = target_u.std()
-            tau = float(self.tau_factor * u_std) if u_std > 1e-8 else 1e-7
 
-            n_pairs = min(N * 6, N * (N - 1) // 2)
-            idx_i = torch.randint(0, N, (n_pairs,), device=pred_u.device)
-            idx_j = torch.randint(0, N, (n_pairs,), device=pred_u.device)
+        # ─── Group-Aware Ranking & Listwise Losses (P0.1) ───
+        # Partition batch strictly by context group g = (scene, frame, S_t)
+        if group_ids is not None:
+            unique_groups = torch.unique(group_ids)
+        else:
+            unique_groups = torch.tensor([0], device=device)
+            group_ids = torch.zeros(N, dtype=torch.long, device=device)
 
-            diff_targets = target_u[idx_i] - target_u[idx_j]
-            meaningful = (idx_i != idx_j) & (torch.abs(diff_targets) > tau)
+        loss_r_list = []
+        loss_list_list = []
 
-            valid_i = idx_i[meaningful]
-            valid_j = idx_j[meaningful]
+        for g in unique_groups:
+            g_mask = (group_ids == g)
+            g_indices = torch.nonzero(g_mask, as_tuple=False).squeeze(-1)
+            g_n = len(g_indices)
 
-            if len(valid_i) > 0:
-                u_i = pred_u[valid_i] * self.scale_u
-                u_j = pred_u[valid_j] * self.scale_u
-                target_sign = torch.sign(target_u[valid_i] - target_u[valid_j]).clamp(-1, 1)
-                # No tie hack! Only genuinely distinct pairs are evaluated.
-                loss_r = self.margin_loss(u_i, u_j, target_sign)
+            if g_n < 2:
+                continue
 
-        # ─── Listwise Group Ranking Loss (KL Divergence) ───
-        loss_list = torch.tensor(0.0, device=pred_u.device)
-        if N >= 3 and self.lambda_list > 0:
-            tau_list = 1.0
-            t_std = target_u.std() + 1e-6
-            p_target = torch.softmax(target_u / t_std / tau_list, dim=0)
-            u_pred_std = pred_u.std() + 1e-6
-            log_p_pred = torch.log_softmax(pred_u / u_pred_std / tau_list, dim=0)
-            loss_list = torch.sum(p_target * (torch.log(p_target + 1e-9) - log_p_pred))
+            g_pred_u = pred_u[g_indices]
+            g_target_u = target_u[g_indices]
+
+            # 1. Pairwise ranking within group g
+            if self.lambda_r > 0:
+                u_std = g_target_u.std()
+                tau = float(self.tau_factor * u_std) if u_std > 1e-8 else 1e-7
+
+                n_pairs = min(g_n * 6, g_n * (g_n - 1) // 2)
+                sub_i = torch.randint(0, g_n, (n_pairs,), device=device)
+                sub_j = torch.randint(0, g_n, (n_pairs,), device=device)
+
+                diff_targets = g_target_u[sub_i] - g_target_u[sub_j]
+                meaningful = (sub_i != sub_j) & (torch.abs(diff_targets) > tau)
+
+                if meaningful.any():
+                    valid_i = sub_i[meaningful]
+                    valid_j = sub_j[meaningful]
+                    u_i = g_pred_u[valid_i] * self.scale_u
+                    u_j = g_pred_u[valid_j] * self.scale_u
+                    target_sign = torch.sign(g_target_u[valid_i] - g_target_u[valid_j]).clamp(-1, 1)
+                    loss_r_list.append(self.margin_loss(u_i, u_j, target_sign))
+
+            # 2. Listwise KL ranking within group g (P0.1)
+            if self.lambda_list > 0 and g_n >= 3:
+                tau_list = 1.0
+                t_std = g_target_u.std() + 1e-6
+                p_target = torch.softmax(g_target_u / t_std / tau_list, dim=0)
+                u_pred_std = g_pred_u.std() + 1e-6
+                log_p_pred = torch.log_softmax(g_pred_u / u_pred_std / tau_list, dim=0)
+                kl = torch.sum(p_target * (torch.log(p_target + 1e-9) - log_p_pred))
+                loss_list_list.append(kl)
+
+        loss_r = torch.mean(torch.stack(loss_r_list)) if loss_r_list else torch.tensor(0.0, device=device)
+        loss_list = torch.mean(torch.stack(loss_list_list)) if loss_list_list else torch.tensor(0.0, device=device)
 
         total = (
             self.lambda_q * loss_q
@@ -356,6 +380,7 @@ class Phase6Loss(nn.Module):
             'loss_r': loss_r.detach() if isinstance(loss_r, torch.Tensor) else torch.tensor(0.0),
             'loss_list': loss_list.detach() if isinstance(loss_list, torch.Tensor) else torch.tensor(0.0),
         }
+
 
 
 class ResidualContextModel(nn.Module):
