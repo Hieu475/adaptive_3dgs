@@ -30,13 +30,13 @@ Following the **Phase 6 Scientific Reform & Engineering Hardening** (P0, P1, P2)
 | **Gate 6B** (Prediction) | Conditional utility correlation across 5 seeds | $\rho(\hat{U}_{P6}, U^*) \approx \rho(\hat{U}_{P4}, U^*)$ | 5-seed distribution: $\bar{\rho} = -0.0023 \pm 0.3142$; within-group $\text{NDCG@5} = \mathbf{0.5370} \pm 0.1055$ (95% CI: $[0.406, 0.668]$), $\text{NDCG@10} = \mathbf{0.5864} \pm 0.1027$ | **✓ RECOVERED** |
 | **Gate 6C** (Decision) | Oracle benchmark failure decomposition | Oracle Conditional Greedy vs Static | Oracle Cond $\equiv$ Oracle Static ($\Delta Q = 11.70 \times 10^{-5}$ vs $11.70 \times 10^{-5}$, Context Advantage = $+0.00$) | **HONEST DIAGNOSIS (Case B)** |
 | **Gate 6D** (Sensitivity) | Dynamic context responsiveness & Invariance | Context shuffle drop $\Delta \rho > 0$, Order invariance | P6 sensitivity $>0$ across 5/5 seeds ($1.15 \times 10^{-5} - 4.69 \times 10^{-5}$); P4 strictly invariant ($0.00 \times 10^0$) | **✓ PASS** |
-| **Gate 6E** (Engineering) | Unit test suite & frozen P4 invariant | All unit & integration tests pass, hash invariant | **404 / 404 test suite passed (100%)** | **✓ PASS** |
+| **Gate 6E** (Engineering) | Unit test suite & frozen P4 invariant | All unit & integration tests pass, hash invariant | **417 / 417 test suite passed (100%)** | **✓ PASS** |
 
 > [!IMPORTANT]
 > **Core Scientific Finding (Failure Mode Diagnosis — Case 1 / Case B):**
 > By establishing the **5-Policy Oracle Decomposition Benchmark** ([`experiments/run_phase6_oracle_gap.py`](file:///home/nguyen_quoc_hieu/Documents/adaptive_3dgs/experiments/run_phase6_oracle_gap.py)) and **Context-Centric Rank Stability Analysis & Candidate Coverage Audit** ([`experiments/run_phase6_rank_stability.py`](file:///home/nguyen_quoc_hieu/Documents/adaptive_3dgs/experiments/run_phase6_rank_stability.py)), the empirical evidence demonstrates three distinct findings:
 > 1. **Context alters marginal utility**: $U^*(i|S_t) \neq U^*(i|\emptyset)$ (confirmed via sub-additivity and Gate 6D sensitivity).
-> 2. **Candidate rank remains substantially stable**: Measured strictly on 100% full-coverage groups ($|M_t| = |P_t| = 20$, zero missing candidates, zero synthetic baseline fill), rank stability is $\bar{\rho}_{\text{rank}} = \mathbf{0.9089} \pm \mathbf{0.1040}$ ($\bar{\tau} = \mathbf{0.8152}$, $\text{Overlap@5} = \mathbf{82.2\%}$).
+> 2. **Candidate rank remains substantially stable**: Measured strictly on 100% full-coverage groups ($|M_t| = |P_t| = 20$, zero missing candidates, zero synthetic baseline fill), rank stability is $\bar{\rho}_{\text{rank}} = \mathbf{0.8916} \pm \mathbf{0.1104}$ ($\bar{\tau} = \mathbf{0.8043}$, $\text{Overlap@5} = \mathbf{80.0\%}$).
 > 3. **Context-aware greedy yields near-identical selection to static greedy**: $Q(\text{OracleCond}) \equiv Q(\text{OracleStatic})$ (Context Advantage $= +0.00 \times 10^{-5}$), and online quality gain $Q(\pi_{P6}) - Q(\pi_{P4})$ shows no statistically significant improvement ($p > 0.30$, 95% bootstrap CI spans zero across all budget levels).
 
 ---
@@ -138,15 +138,16 @@ Evaluation of live GPU joint optimization across 26 candidate pairs stratified b
 ---
 
 ### D. Canonical Reduced Feature Models (P1.5)
-Evaluating reduced input spaces to establish whether full 32D context is required:
+Evaluating reduced input spaces to establish whether full 32D context is required (evaluating zero-shot cross-scene test split `tum_fr2_xyz`, $N=240$, strictly adhering to Single Source of Truth `results/phase6_context_utility/ablation/ablation_summary.json`):
 
-| Model Architecture | Name | Input Dim | Features Included | Test Spearman $\rho(U)$ |
-| :--- | :---: | :---: | :--- | :---: |
-| **P6-Selected** | `self_selected` | 19 | Self (11) + Selected $S_t$ (8) | **0.3343** |
-| **P6-D** | `self_neighbor_selected` | 27 | Self (11) + Neighbor (8) + Selected $S_t$ (8) | **0.2927** |
-| **P6-E (Full)** | `all_features` | 32 | Self (11) + Neighbor (8) + Overlap (5) + Selected (8) | **0.4850** |
+| Model Architecture | Name | Input Dim | Features Included | Test Spearman $\rho(U)$ | NDCG@5 | MAE ($U$) |
+| :--- | :---: | :---: | :--- | :---: | :---: | :---: |
+| **P6-Selected** | `self_selected` | 19 | Self (11) + Selected $S_t$ (8) | 0.1755 | 0.6652 | 0.0093 |
+| **P6-F (Primary)** | `self_neighbor_selected` | 27 | Self (11) + Neighbor (8) + Selected $S_t$ (8) | **0.2353** | **0.7681** | **0.0074** |
+| **P6-H (Full)** | `all_features` | 32 | Self (11) + Neighbor (8) + Overlap (5) + Selected (8) | 0.0780 | 0.7666 | 0.0096 |
 
-**Finding**: Dynamic context $S_t$ provides the primary contextual lift. Full context (P6-E) achieves the highest peak correlation ($\rho = 0.4850$) when combined with frozen Phase 4 normalization anchoring.
+> [!NOTE]
+> **Provenance & Reconciliation Note**: An earlier unhardened exploratory prototype without canonical context grouping reported unanchored values ($0.3343, 0.2927, 0.4850$). Those values are formally **deprecated**. The authoritative confirmatory ablation ladder is reported above and in Section 3, proving that spatial neighborhood and selected-set context provide the primary predictive signals ($\rho = 0.2353$, $\text{NDCG@5} = 0.7681$), whereas raw screen-overlap features in `all_features` (32D) introduce redundant noise and overfit under zero-shot transfer ($\rho = 0.0780$).
 
 ---
 

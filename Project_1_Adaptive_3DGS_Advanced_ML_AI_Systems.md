@@ -611,9 +611,55 @@ Một runtime C++/CUDA có **budget-aware scheduling, efficient tile-based raste
 
 Nếu phải cắt scope, giữ **1-3** và bỏ **5** trước.
 
+## 19. Empirical Realization & Scientific Freeze (Phases 1–6)
+
+Dự án đã được thực thi và nghiệm thu thực nghiệm qua chuỗi nghiên cứu có kiểm chứng khoa học nghiêm ngặt (Confirmatory Protocol v1, 5 random seeds `[42, 43, 44, 45, 46]`):
+
+### 19.1. Phân định rõ hai đóng góp cốt lõi
+
+```
+                    ┌────────────────────────────────────────────────────────┐
+                    │               ADVANCED MACHINE LEARNING                │
+                    │   Causal Marginal Utility & Representation Learning   │
+                    └──────────────────────────┬─────────────────────────────┘
+                                               │
+                                 s_i ──► [TwoHeadMLP] ──► U_hat_i
+                                               │
+                                               ▼
+                    ┌────────────────────────────────────────────────────────┐
+                    │                      AI SYSTEMS                        │
+                    │     Budgeted Scheduling & Selective Online Runtime     │
+                    └──────────────────────────┬─────────────────────────────┘
+                                               │
+               U_hat_i ──► [Knapsack Selection S_B] ──► [SelectiveAdam] ──► Q(t)
+```
+
+#### A. Advanced Machine Learning Contribution ($s_i \to \hat{U}_i$ và $\hat{U}_i(S)$)
+- **Counterfactual Intervention Oracle**: Đo lường chuẩn xác độ biến thiên chất lượng thực tế $\Delta Q_i$ chia cho thời gian can thiệp $C_i$ ($U_i^\star = \Delta Q_i / C_i \in \mathbb{R}$). Phát hiện **$20.5\%$** lượt tối ưu gây suy giảm chất lượng ($U_i^\star < 0$).
+- **Representation & Feature Design**: Xây dựng vector 11 đặc trưng quan sát tiền can thiệp ($s_i \in \mathbb{R}^{11}$) với chuẩn hóa độc lập (train-only normalizer).
+- **Two-Head Decoupled Architecture**: Tách rời dự đoán lợi ích $\widehat{\Delta Q}_i$ và chi phí $\widehat{C}_i$ với hàm phạt pairwise ranking có trọng số biên độ.
+- **Contextual Interaction & Non-Additivity**: Chứng minh bằng giải tích và đo lường trực tiếp rằng 3DGS có tính sub-additive mạnh do alpha-compositing ($R_{add} \ll 1.0$, correlation giữa IoU và sai số tương tác đạt $\rho = 0.5357, p = 0.0048$).
+- **Rank Stability (Case B)**: Đánh giá trên 27 nhóm ngữ cảnh với $100\%$ candidate pool coverage và không điền dữ liệu giả lập (zero synthetic fill), chứng minh độ ổn định thứ tự cực cao: $\bar{\rho}_{\text{rank}} = \mathbf{0.8916} \pm \mathbf{0.1104}$, Kendall $\bar{\tau} = \mathbf{0.8043}$, $\text{Overlap@5} = \mathbf{80.0\%}$.
+
+#### B. AI Systems Contribution ($\hat{U} \to S_B \to \text{SelectiveAdam} \to \text{Online Reconstruction}$)
+- **Budget Enforcement**: Lập lịch tối ưu knapsack đa tiêu chí dưới ngân sách phần cứng cứng $B_{\text{sched}} = 15.0\text{ ms}$, phân biệt rõ thời gian mô hình hóa và thời gian thực thi thực tế.
+- **SelectiveAdam & Background Cache**: Chỉ lan truyền gradient và cập nhật optimizer state cho tập $S_B$; đóng băng vùng nền bằng cache giúp triệt tiêu $33.6\%\text{–}51.0\%$ thời gian tối ưu mà vẫn giữ trọn vẹn chất lượng tái tạo ($100\%$ win rate trên 49/49 frame online).
+- **Systems Overhead vs Model Inference Insight**: Đo lường thực tế cho thấy bản thân suy luận mạng nơ-ron là cực kỳ rẻ ($T_{\text{MLP}} \approx 1.12\text{ ms}$, chiếm $0.1\%$ thời gian stage), nhưng trích xuất trạng thái ($225.79\text{ ms}$), xây dựng context ($66.84\text{ ms}$) và thuật toán chọn lọc lặp adaptive greedy ($76.36\text{ ms}$) là các nút thắt áp đảo:
+  $$T_{\text{total}} = 924.59\text{ ms} = 225.79 + 66.84 + 1.12 + 76.36 + 554.48\text{ ms}$$
+  *Insight hệ thống: Model inference is cheap; state construction and selection orchestration dominate the adaptive overhead.*
+
+### 19.2. Trạng thái đóng băng nghiên cứu (Research Freeze)
+- **Single Source of Truth**: Mọi số liệu được neo cố định tại `results/phase6_context_utility/manifest.json`.
+- **Authoritative Metrics**:
+  - Headroom tối ưu: $H = +0.000149 > 0$
+  - Gate 4 Latency Reduction: $67.8\text{ ms}$ vs $138.3\text{ ms}$ (Full)
+  - Phase 6 Rank Stability: $\rho = 0.8916$, Overlap@5 = $80.0\%$
+  - Oracle Context Advantage: $+0.00 \times 10^{-5}$ ($Q_{\text{OracleCond}} \equiv Q_{\text{OracleStatic}}$)
+  - Test suite: **417/417 PASS (100%)**
+
 ---
 
-## 19. References / Source Basis
+## 20. References / Source Basis
 
 1. Z. Peng, T. Shao, Y. Liu, J. Zhou, Y. Yang, J. Wang, K. Zhou. *RTG-SLAM: Real-time 3D Reconstruction at Scale using Gaussian Splatting*. SIGGRAPH Conference Papers 2024. arXiv:2404.19706v1. DOI: 10.1145/3641519.3657455.
 2. B. Kerbl, G. Kopanas, T. Leimkuehler, G. Drettakis. *3D Gaussian Splatting for Real-Time Radiance Field Rendering*. ACM TOG 42(4), 2023.
