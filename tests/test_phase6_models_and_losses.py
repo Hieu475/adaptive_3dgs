@@ -68,9 +68,10 @@ class TestPhase6LossReformed:
         target_q = torch.randn(10) * 1e-5
         target_t = torch.rand(10) * 20.0 + 1.0
         target_u = target_q / target_t
+        group_ids = torch.tensor([0, 0, 0, 0, 0, 1, 1, 1, 1, 1], dtype=torch.long)
 
         dq, dt, u = model(x)
-        out = loss_fn(dq, dt, u, target_q, target_t, target_u)
+        out = loss_fn(dq, dt, u, target_q, target_t, target_u, group_ids=group_ids)
 
         assert "total" in out
         assert "loss_q" in out
@@ -95,8 +96,9 @@ class TestPhase6LossReformed:
         target_q = torch.zeros(4)
         target_t = torch.ones(4)
         target_u = torch.ones(4)  # All targets equal!
+        group_ids = torch.zeros(4, dtype=torch.long)
 
-        out = loss_fn(pred_q, pred_t, pred_u, target_q, target_t, target_u)
+        out = loss_fn(pred_q, pred_t, pred_u, target_q, target_t, target_u, group_ids=group_ids)
         # Because all targets are identical, they should be filtered out by tau
         # meaning ranking loss should be 0.0
         assert out["loss_r"].item() == 0.0
@@ -119,6 +121,8 @@ class TestPhase6LossReformed:
         out = loss_fn(pred_q, pred_t, pred_u, target_q, target_t, target_u, group_ids=group_ids)
         assert out["loss_r"].item() > 0.0
         assert out["loss_list"].item() > 0.0
+        assert out["n_total_groups"] == 2
+        assert out["n_groups_used_pairwise"] == 2
 
     def test_empty_context_regularization(self):
         """Verify L_0 empty context regularization penalizes non-zero residual predictions."""
@@ -130,16 +134,31 @@ class TestPhase6LossReformed:
         target_q = torch.zeros(4)
         target_t = torch.ones(4)
         target_u = torch.ones(4)
+        group_ids = torch.zeros(4, dtype=torch.long)
 
         pred_r = torch.tensor([0.5, 0.0, 0.0, 0.0])
         is_empty = torch.tensor([1.0, 0.0, 0.0, 0.0])  # Only index 0 is empty context
 
         out = loss_fn(
             pred_q, pred_t, pred_u, target_q, target_t, target_u,
-            pred_r=pred_r, is_empty=is_empty
+            pred_r=pred_r, is_empty=is_empty, group_ids=group_ids
         )
         assert out["loss_zero"].item() > 0.0
         assert torch.isclose(out["total"], 2.0 * out["loss_zero"])
+
+    def test_loss_requires_group_ids(self):
+        """Sửa số 16: Verify Phase6Loss raises ValueError if group_ids is None when required."""
+        loss_fn = Phase6Loss(require_group_ids=True)
+        pred_q = torch.zeros(4)
+        pred_t = torch.ones(4)
+        pred_u = torch.ones(4)
+        target_q = torch.zeros(4)
+        target_t = torch.ones(4)
+        target_u = torch.ones(4)
+
+        with pytest.raises(ValueError, match="requires group_ids"):
+            loss_fn(pred_q, pred_t, pred_u, target_q, target_t, target_u, group_ids=None)
+
 
 
 class TestP0Invariants:
@@ -209,4 +228,23 @@ class TestP0Invariants:
         # Check T_hat_P6 == T_hat_P4
         _, p4_dt, _ = model.p4_model(x[:, :11])
         assert torch.allclose(dt, p4_dt, atol=1e-6), "T_hat_P6 must strictly equal T_hat_P4"
+
+    def test_empty_context_identity(self):
+        """Sửa số 22: Verify that when context is empty S=∅, U_hat_P6(i|∅) == U_hat_P4(i) within 1e-6."""
+        config = create_ablation_variant("V11")
+        model = ResidualContextModel(config)
+        model.eval()
+
+        # Input with arbitrary self features and zeros for context
+        x = torch.zeros(16, PHASE6_FEATURE_DIM)
+        x[:, :11] = torch.randn(16, 11)  # self features active
+
+        with torch.no_grad():
+            _, _, u_p4 = model.p4_model(x[:, :11])
+            _, _, u_p6, r = model(x, return_residual=True)
+
+        max_abs_error = (u_p6 - u_p4).abs().max().item()
+        assert max_abs_error < 1e-6, f"Empty context identity violated: max error = {max_abs_error}"
+        assert (r.abs().max().item() < 1e-6), f"Initial residual head should output zero: max r = {r.abs().max().item()}"
+
 

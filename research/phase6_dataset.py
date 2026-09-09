@@ -142,6 +142,7 @@ class Phase6FeatureNormalizer:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 # PyTorch Dataset
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -154,6 +155,7 @@ class Phase6UtilityDataset(Dataset):
         - delta_t: scalar conditional cost ΔT(i|S) in ms
         - utility: scalar conditional utility U*(i|S)
         - target_r: scalar residual target r* = U*(i|S) - U*(i|∅) (P0.4)
+        - residual_utility: identical to target_r for explicit semantic naming
         - is_empty: float scalar (1.0 if S=∅ else 0.0) for empty context penalty (P0.4)
         - group_id: int scalar identifying context group (P0.1)
         - context_size: int, size of context set |S|
@@ -169,6 +171,9 @@ class Phase6UtilityDataset(Dataset):
         is_empty: Optional[np.ndarray] = None,
         group_ids: Optional[np.ndarray] = None,
         context_sizes: Optional[np.ndarray] = None,
+        scene_ids: Optional[List[str]] = None,
+        frame_ids: Optional[np.ndarray] = None,
+        context_identities: Optional[List[Tuple[int, ...]]] = None,
         metadata: Optional[List[Dict]] = None,
     ):
         self.features = torch.tensor(features, dtype=torch.float32)
@@ -193,11 +198,15 @@ class Phase6UtilityDataset(Dataset):
             self.group_ids = torch.zeros(N, dtype=torch.long)
 
         self.context_sizes = context_sizes
+        self.scene_ids = scene_ids
+        self.frame_ids = frame_ids
+        self.context_identities = context_identities
         self.metadata = metadata
 
         # Explicit target fields (P0.4)
         self.utility_conditional = self.utility
         self.utility_residual = self.target_r
+        self.residual_utility = self.target_r
         self.utility_empty = self.utility - self.target_r
 
     def __len__(self) -> int:
@@ -210,6 +219,7 @@ class Phase6UtilityDataset(Dataset):
             'delta_t': self.delta_t[idx],
             'utility': self.utility[idx],
             'target_r': self.target_r[idx],
+            'residual_utility': self.target_r[idx],
             'is_empty': self.is_empty[idx],
             'group_id': self.group_ids[idx],
             'utility_conditional': self.utility[idx],
@@ -219,21 +229,24 @@ class Phase6UtilityDataset(Dataset):
 
 
 class GroupedBatchSampler:
-    """Yields batches where all samples belong to the exact same context group (P0.1).
+    """Yields batches where all samples belong to intact context groups (P0.1, Sửa số 3).
 
-    Guarantees that listwise KL and pairwise ranking are always evaluated
-    within a coherent candidate set C_t under the exact same context S_t.
+    Guarantees that a conditional candidate group g = (scene, frame, S_t) is
+    NEVER split across batches. Can pack multiple intact groups up to max_batch_size,
+    or yield 1 group per batch if max_batch_size is None or <= 1.
     """
 
     def __init__(
         self,
         group_ids: Union[np.ndarray, torch.Tensor],
+        max_batch_size: Optional[int] = None,
         shuffle: bool = True,
         seed: int = 42,
     ):
         if isinstance(group_ids, torch.Tensor):
             group_ids = group_ids.cpu().numpy()
         self.group_ids = np.asarray(group_ids)
+        self.max_batch_size = max_batch_size
         self.shuffle = shuffle
         self.seed = seed
         self.epoch = 0
@@ -253,11 +266,36 @@ class GroupedBatchSampler:
         groups = list(self.groups)
         if self.shuffle:
             rng.shuffle(groups)
-        for g in groups:
-            yield self.group_to_indices[g]
+
+        if self.max_batch_size is None or self.max_batch_size <= 1:
+            for g in groups:
+                yield self.group_to_indices[g]
+        else:
+            current_batch: List[int] = []
+            for g in groups:
+                g_indices = self.group_to_indices[g]
+                # If adding this group exceeds max_batch_size and current_batch is non-empty, yield current
+                if len(current_batch) > 0 and (len(current_batch) + len(g_indices) > self.max_batch_size):
+                    yield current_batch
+                    current_batch = []
+                current_batch.extend(g_indices)
+            if len(current_batch) > 0:
+                yield current_batch
 
     def __len__(self):
-        return len(self.groups)
+        if self.max_batch_size is None or self.max_batch_size <= 1:
+            return len(self.groups)
+        count = 0
+        cur_len = 0
+        for g in self.groups:
+            g_len = len(self.group_to_indices[g])
+            if cur_len > 0 and (cur_len + g_len > self.max_batch_size):
+                count += 1
+                cur_len = 0
+            cur_len += g_len
+        if cur_len > 0:
+            count += 1
+        return count
 
     def set_epoch(self, epoch: int):
         self.epoch = epoch
@@ -329,6 +367,10 @@ def prepare_phase6_splits(
     val_r, val_empty, val_gids = [], [], []
     test_r, test_empty, test_gids = [], [], []
 
+    train_scenes, val_scenes, test_scenes = [], [], []
+    train_frames, val_frames, test_frames = [], [], []
+    train_ctx_ids, val_ctx_ids, test_ctx_ids = [], [], []
+
     # 1. Pre-pass across all loaded files: map (scene, frame, candidate_id) -> utility(empty)
     empty_utils: Dict[Tuple[str, int, int], float] = {}
     for path in dataset_paths:
@@ -339,7 +381,7 @@ def prepare_phase6_splits(
                 k = (str(s["scene"]), int(s["frame"]), int(s["candidate_id"]))
                 empty_utils[k] = float(s["utility_conditional"])
 
-    group_key_to_id: Dict[str, int] = {}
+    group_key_to_id: Dict[Tuple[str, int, Tuple[int, ...]], int] = {}
 
     for path in dataset_paths:
         with open(path, 'r') as f:
@@ -358,9 +400,15 @@ def prepare_phase6_splits(
             assert abs(r_target - (u - u_empty)) < 1e-8, "Residual target definition must satisfy r* = U*(i|S) - U*(i|∅)"
             is_empty_val = 1.0 if (s.get("context_size", 0) == 0 or s.get("context_type") == "empty") else 0.0
 
-            # Compute group ID (P0.1)
-            g_key = f"{s['scene']}_f{s['frame']}_{s.get('context_type', 'default')}_size{s.get('context_size', 0)}"
+            # Canonical group key representing exact context identity (Sửa số 2 & 3)
+            # g = (scene_id, frame_id, tuple(sorted(selected_gaussian_ids)))
+            selected_ids = s.get("context_ids", []) or []
+            context_ident = tuple(sorted([int(x) for x in selected_ids]))
+            g_key = (str(s["scene"]), int(s["frame"]), context_ident)
             gid = group_key_to_id.setdefault(g_key, len(group_key_to_id))
+
+            scene_str = str(s["scene"])
+            frame_int = int(s["frame"])
 
             split = s.get("split", "cross_scene_test")
             if split == "train":
@@ -371,6 +419,9 @@ def prepare_phase6_splits(
                 train_r.append(r_target)
                 train_empty.append(is_empty_val)
                 train_gids.append(gid)
+                train_scenes.append(scene_str)
+                train_frames.append(frame_int)
+                train_ctx_ids.append(context_ident)
             elif split == "validation":
                 all_val_feats.append(feat)
                 all_val_dq.append(dq)
@@ -379,6 +430,9 @@ def prepare_phase6_splits(
                 val_r.append(r_target)
                 val_empty.append(is_empty_val)
                 val_gids.append(gid)
+                val_scenes.append(scene_str)
+                val_frames.append(frame_int)
+                val_ctx_ids.append(context_ident)
             else:
                 all_test_feats.append(feat)
                 all_test_dq.append(dq)
@@ -387,6 +441,9 @@ def prepare_phase6_splits(
                 test_r.append(r_target)
                 test_empty.append(is_empty_val)
                 test_gids.append(gid)
+                test_scenes.append(scene_str)
+                test_frames.append(frame_int)
+                test_ctx_ids.append(context_ident)
 
     def _to_arrays(feats, dq, dt, u, r, empty, gids):
         if not feats:
@@ -441,6 +498,9 @@ def prepare_phase6_splits(
         target_r=r_train,
         is_empty=empty_train,
         group_ids=gids_train,
+        scene_ids=train_scenes,
+        frame_ids=np.array(train_frames, dtype=np.int64),
+        context_identities=train_ctx_ids,
     )
     val_ds = Phase6UtilityDataset(
         X_val[:, feature_mask] if len(X_val) > 0 else X_val,
@@ -448,6 +508,9 @@ def prepare_phase6_splits(
         target_r=r_val,
         is_empty=empty_val,
         group_ids=gids_val,
+        scene_ids=val_scenes,
+        frame_ids=np.array(val_frames, dtype=np.int64),
+        context_identities=val_ctx_ids,
     )
     test_ds = Phase6UtilityDataset(
         X_test[:, feature_mask] if len(X_test) > 0 else X_test,
@@ -455,6 +518,9 @@ def prepare_phase6_splits(
         target_r=r_test,
         is_empty=empty_test,
         group_ids=gids_test,
+        scene_ids=test_scenes,
+        frame_ids=np.array(test_frames, dtype=np.int64),
+        context_identities=test_ctx_ids,
     )
 
     return train_ds, val_ds, test_ds, normalizer

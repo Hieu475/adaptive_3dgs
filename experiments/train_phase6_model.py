@@ -344,6 +344,7 @@ def main():
         use_selected=config.use_selected,
     )
 
+    p4_ckpt = None
     if args.architecture == "residual":
         p4_ckpt = os.path.join(repo_root, "results", "learned_utility", "checkpoints", f"two_head_mlp_seed_{args.seed}.pt")
         if not os.path.exists(p4_ckpt):
@@ -362,6 +363,8 @@ def main():
 
         model = ResidualContextModel(config, p4_model=p4_net).to(device)
         trainable_params = model.context_parameters()
+        assert all(not p.requires_grad for p in model.p4_model.parameters()), "P4 backbone parameters must be strictly frozen!"
+        p4_before = {k: v.clone().cpu() for k, v in model.p4_model.state_dict().items()}
     else:
         model = ContextAwareTwoHeadMLP(config).to(device)
         trainable_params = list(model.parameters())
@@ -460,6 +463,12 @@ def main():
     if best_state is not None:
         model.load_state_dict(best_state)
 
+    # Verify P4 backbone invariance (P0.2)
+    if args.architecture == "residual":
+        for k, v in model.p4_model.state_dict().items():
+            assert torch.equal(v.cpu(), p4_before[k]), f"P4 backbone weights changed for {k}!"
+        print("  [Verification] P4 backbone weights remained strictly invariant throughout training.")
+
     # ─── Final evaluation ───
     print(f"\n[Eval] Final evaluation (best epoch {best_epoch})...")
     if len(test_ds) > 0:
@@ -498,11 +507,17 @@ def main():
 
     ckpt_path = os.path.join(ckpt_dir, f"context_mlp_{args.variant}_seed_{args.seed}.pt")
     torch.save({
+        'schema_version': 'phase6-v2',
+        'architecture': 'residual_context' if args.architecture == 'residual' else 'direct_context',
+        'variant': args.variant,
+        'seed': args.seed,
+        'protocol_version': 'v1',
         'model_state': model.state_dict(),
         'config': config_dict,
-        'architecture': args.architecture,
-        'seed': args.seed,
-        'variant': args.variant,
+        'normalizer_path': f"normalization_{args.variant}.json",
+        'p4_checkpoint': p4_ckpt if args.architecture == 'residual' else None,
+        'p4_frozen': True if args.architecture == 'residual' else False,
+        'git_commit': _get_git_commit(),
         'best_epoch': best_epoch,
         'best_val_loss': best_val_loss,
         'n_params': n_params,
@@ -518,6 +533,7 @@ def main():
             'patience': args.patience,
         },
         'metadata': {
+            'schema_version': 'phase6-v2',
             'phase': 'phase6',
             'model_type': 'residual_context' if args.architecture == 'residual' else 'direct_context',
             'phase4_checkpoint': p4_ckpt if args.architecture == 'residual' else None,

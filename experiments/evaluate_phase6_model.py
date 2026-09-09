@@ -64,11 +64,28 @@ def evaluate_predictions(
     oracle_q: Optional[np.ndarray] = None,
     pred_t: Optional[np.ndarray] = None,
     oracle_t: Optional[np.ndarray] = None,
+    group_ids: Optional[np.ndarray] = None,
 ) -> Dict[str, float]:
-    """Compute complete prediction fidelity metrics."""
+    """Compute complete prediction fidelity metrics with group-wise NDCG."""
     rho_u, p_u = safe_spearmanr(pred_u, oracle_u)
     r_u, p_ru = safe_pearsonr(pred_u, oracle_u)
     mae_u = float(np.mean(np.abs(pred_u - oracle_u)))
+
+    if group_ids is not None:
+        ndcg_5_list, ndcg_10_list, ndcg_20_list = [], [], []
+        for gid in np.unique(group_ids):
+            m = (group_ids == gid)
+            if np.sum(m) >= 2:
+                ndcg_5_list.append(compute_ndcg_at_k(pred_u[m], oracle_u[m], k=5))
+                ndcg_10_list.append(compute_ndcg_at_k(pred_u[m], oracle_u[m], k=10))
+                ndcg_20_list.append(compute_ndcg_at_k(pred_u[m], oracle_u[m], k=20))
+        ndcg_5 = float(np.mean(ndcg_5_list)) if ndcg_5_list else float(compute_ndcg_at_k(pred_u, oracle_u, k=5))
+        ndcg_10 = float(np.mean(ndcg_10_list)) if ndcg_10_list else float(compute_ndcg_at_k(pred_u, oracle_u, k=10))
+        ndcg_20 = float(np.mean(ndcg_20_list)) if ndcg_20_list else float(compute_ndcg_at_k(pred_u, oracle_u, k=20))
+    else:
+        ndcg_5 = float(compute_ndcg_at_k(pred_u, oracle_u, k=5))
+        ndcg_10 = float(compute_ndcg_at_k(pred_u, oracle_u, k=10))
+        ndcg_20 = float(compute_ndcg_at_k(pred_u, oracle_u, k=20))
 
     res = {
         "spearman_rho": float(rho_u),
@@ -76,9 +93,9 @@ def evaluate_predictions(
         "pearson_r": float(r_u),
         "pearson_pval": float(p_ru),
         "mae_utility": mae_u,
-        "ndcg_5": compute_ndcg_at_k(pred_u, oracle_u, k=5),
-        "ndcg_10": compute_ndcg_at_k(pred_u, oracle_u, k=10),
-        "ndcg_20": compute_ndcg_at_k(pred_u, oracle_u, k=20),
+        "ndcg_5": ndcg_5,
+        "ndcg_10": ndcg_10,
+        "ndcg_20": ndcg_20,
     }
 
     if pred_q is not None and oracle_q is not None:
@@ -107,10 +124,10 @@ def evaluate_context_sensitivity(
         Delta U*(i | S) = U*(i | S) - U*(i | ∅)
         Delta U_hat(i | S) = U_hat(i | S) - U_hat(i | ∅)
     """
-    # Group by (frame, candidate_id)
-    cand_groups: Dict[Tuple[int, int], List[Tuple[int, Dict]]] = {}
+    # Group by canonical candidate identity: (scene, frame, candidate_id)
+    cand_groups: Dict[Tuple[str, int, int], List[Tuple[int, Dict]]] = {}
     for idx, s in enumerate(samples):
-        key = (s.get("frame", 0), s.get("candidate_id", 0))
+        key = (str(s.get("scene", "")), int(s.get("frame", 0)), int(s.get("candidate_id", 0)))
         cand_groups.setdefault(key, []).append((idx, s))
 
     p6_within_std = []
@@ -136,15 +153,15 @@ def evaluate_context_sensitivity(
         p4_within_std.append(float(np.std(u_p4)))
 
         # Find empty context sample in group
-        empty_sample = next((s for _, s in group if s.get("context_size", 0) == 0), None)
+        empty_sample = next((s for _, s in group if s.get("context_size", 0) == 0 or s.get("context_type") == "empty"), None)
         if empty_sample is not None:
-            empty_idx = next(idx for idx, s in group if s.get("context_size", 0) == 0)
+            empty_idx = next(idx for idx, s in group if s.get("context_size", 0) == 0 or s.get("context_type") == "empty")
             base_u_true = empty_sample["utility_conditional"]
             base_u_p6 = phase6_pred_u[empty_idx]
             base_u_p4 = phase4_pred_u[empty_idx]
 
             for idx, s in group:
-                if s.get("context_size", 0) > 0:
+                if s.get("context_size", 0) > 0 and s.get("context_type") != "empty":
                     true_deltas.append(s["utility_conditional"] - base_u_true)
                     p6_deltas.append(phase6_pred_u[idx] - base_u_p6)
                     p4_deltas.append(phase4_pred_u[idx] - base_u_p4)
@@ -216,6 +233,17 @@ def main():
     full_feats = np.array([s["full_feature_vector"] for s in samples], dtype=np.float32)
     self_feats = np.array([s["self_features"] for s in samples], dtype=np.float32)
 
+    # Build canonical group IDs for group-aware NDCG (P0.1)
+    group_key_to_id = {}
+    sample_gids = []
+    for s in samples:
+        selected_ids = s.get("context_ids", []) or []
+        context_ident = tuple(sorted([int(x) for x in selected_ids]))
+        g_key = (str(s.get("scene", "")), int(s.get("frame", 0)), context_ident)
+        gid = group_key_to_id.setdefault(g_key, len(group_key_to_id))
+        sample_gids.append(gid)
+    sample_gids = np.array(sample_gids, dtype=np.int64)
+
     # ─────────────────────────────────────────────────────────────────────────
     # 1. Evaluate Phase 6 Context-Aware Model
     # ─────────────────────────────────────────────────────────────────────────
@@ -234,7 +262,7 @@ def main():
     p6_q = p6_preds["delta_q"].detach().cpu().numpy()
     p6_t = p6_preds["delta_t"].detach().cpu().numpy()
 
-    p6_metrics = evaluate_predictions(p6_u, oracle_u, p6_q, oracle_q, p6_t, oracle_t)
+    p6_metrics = evaluate_predictions(p6_u, oracle_u, p6_q, oracle_q, p6_t, oracle_t, group_ids=sample_gids)
 
     # ─────────────────────────────────────────────────────────────────────────
     # 2. Evaluate Phase 4 Pointwise Model (Frozen baseline)
@@ -246,14 +274,14 @@ def main():
         p4_u = p4_res["predicted_utility"]
         p4_q = p4_res["predicted_delta_q"]
         p4_t = p4_res["predicted_delta_t"]
-        p4_metrics = evaluate_predictions(p4_u, oracle_u, p4_q, oracle_q, p4_t, oracle_t)
+        p4_metrics = evaluate_predictions(p4_u, oracle_u, p4_q, oracle_q, p4_t, oracle_t, group_ids=sample_gids)
         p4_available = True
     except Exception as e:
         print(f"  [WARN] Phase 4 predictor failed to load ({e}). Using mock/fallback.")
         p4_u = np.zeros(N, dtype=np.float32)
         p4_q = np.zeros(N, dtype=np.float32)
         p4_t = np.ones(N, dtype=np.float32)
-        p4_metrics = evaluate_predictions(p4_u, oracle_u, p4_q, oracle_q, p4_t, oracle_t)
+        p4_metrics = evaluate_predictions(p4_u, oracle_u, p4_q, oracle_q, p4_t, oracle_t, group_ids=sample_gids)
         p4_available = False
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -272,10 +300,10 @@ def main():
     b3_scores = err_sum * inf_mass
     b4_scores = (err_sum > np.median(err_sum)).astype(np.float32)
 
-    b1_metrics = evaluate_predictions(b1_scores, oracle_u)
-    b2_metrics = evaluate_predictions(b2_scores, oracle_u)
-    b3_metrics = evaluate_predictions(b3_scores, oracle_u)
-    b4_metrics = evaluate_predictions(b4_scores, oracle_u)
+    b1_metrics = evaluate_predictions(b1_scores, oracle_u, group_ids=sample_gids)
+    b2_metrics = evaluate_predictions(b2_scores, oracle_u, group_ids=sample_gids)
+    b3_metrics = evaluate_predictions(b3_scores, oracle_u, group_ids=sample_gids)
+    b4_metrics = evaluate_predictions(b4_scores, oracle_u, group_ids=sample_gids)
 
     # ─────────────────────────────────────────────────────────────────────────
     # 4. Context Sensitivity & Stratified Breakdowns

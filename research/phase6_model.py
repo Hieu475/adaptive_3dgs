@@ -22,6 +22,7 @@ Variants (for ablation):
 Loss:
     L = λ_Q · SmoothL1(ΔQ_hat, ΔQ*) + λ_C · SmoothL1(ΔT_hat, ΔT*) + λ_R · MarginRankingLoss
 """
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -283,6 +284,8 @@ class Phase6Loss(nn.Module):
         scale_t: float = 0.05,
         scale_u: float = 1e4,
         tau_factor: float = 0.05,
+        tau_list: float = 1.0,
+        require_group_ids: bool = True,
     ):
         super().__init__()
         self.lambda_q = lambda_q
@@ -296,6 +299,8 @@ class Phase6Loss(nn.Module):
         self.scale_t = scale_t
         self.scale_u = scale_u
         self.tau_factor = tau_factor
+        self.tau_list = tau_list
+        self.require_group_ids = require_group_ids
         self.smooth_l1 = nn.SmoothL1Loss()
         self.margin_loss = nn.MarginRankingLoss(margin=margin)
 
@@ -318,16 +323,26 @@ class Phase6Loss(nn.Module):
         device = pred_u.device
         N = pred_u.shape[0]
 
-        # ─── Group-Aware Ranking & Listwise Losses (P0.1) ───
-        # Partition batch strictly by context group g = (scene, frame, S_t)
-        if group_ids is not None:
-            unique_groups = torch.unique(group_ids)
-        else:
-            unique_groups = torch.tensor([0], device=device)
+        # ─── Group-Aware Ranking & Listwise Losses (P0.1, Sửa số 16) ───
+        # Strictly enforce context group partitioning g = (scene, frame, S_t)
+        if group_ids is None:
+            if self.require_group_ids:
+                raise ValueError(
+                    "Phase6Loss requires group_ids to partition ranking and listwise losses strictly by candidate context group. "
+                    "Set require_group_ids=False to allow un-grouped computation if explicitly intended."
+                )
             group_ids = torch.zeros(N, dtype=torch.long, device=device)
+        else:
+            group_ids = group_ids.to(device)
+
+        unique_groups = torch.unique(group_ids)
 
         loss_r_list = []
         loss_list_list = []
+        total_pairs_eval = 0
+        retained_pairs_eval = 0
+        n_groups_used_pairwise = 0
+        n_groups_used_listwise = 0
 
         for g in unique_groups:
             g_mask = (group_ids == g)
@@ -340,19 +355,30 @@ class Phase6Loss(nn.Module):
             g_pred_u = pred_u[g_indices]
             g_target_u = target_u[g_indices]
 
-            # 1. Pairwise ranking within group g
+            # 1. Pairwise ranking within group g (deterministic combinations if <= 30)
             if self.lambda_r > 0:
                 u_std = g_target_u.std()
                 tau = float(self.tau_factor * u_std) if u_std > 1e-8 else 1e-7
 
-                n_pairs = min(g_n * 6, g_n * (g_n - 1) // 2)
-                sub_i = torch.randint(0, g_n, (n_pairs,), device=device)
-                sub_j = torch.randint(0, g_n, (n_pairs,), device=device)
+                if g_n <= 30:
+                    comb_pairs = torch.combinations(torch.arange(g_n, device=device), r=2)
+                    sub_i = comb_pairs[:, 0]
+                    sub_j = comb_pairs[:, 1]
+                else:
+                    n_pairs = min(g_n * 6, g_n * (g_n - 1) // 2)
+                    rng = torch.Generator(device=device)
+                    rng.manual_seed(42 + int(g.item()))
+                    sub_i = torch.randint(0, g_n, (n_pairs,), generator=rng, device=device)
+                    sub_j = torch.randint(0, g_n, (n_pairs,), generator=rng, device=device)
 
                 diff_targets = g_target_u[sub_i] - g_target_u[sub_j]
                 meaningful = (sub_i != sub_j) & (torch.abs(diff_targets) > tau)
 
+                total_pairs_eval += len(sub_i)
+                retained_pairs_eval += int(meaningful.sum().item())
+
                 if meaningful.any():
+                    n_groups_used_pairwise += 1
                     valid_i = sub_i[meaningful]
                     valid_j = sub_j[meaningful]
                     u_i = g_pred_u[valid_i] * self.scale_u
@@ -360,18 +386,21 @@ class Phase6Loss(nn.Module):
                     target_sign = torch.sign(g_target_u[valid_i] - g_target_u[valid_j]).clamp(-1, 1)
                     loss_r_list.append(self.margin_loss(u_i, u_j, target_sign))
 
-            # 2. Listwise KL ranking within group g (P0.1)
+            # 2. Listwise KL ranking within group g (P0.1, Sửa số 20)
             if self.lambda_list > 0 and g_n >= 3:
-                tau_list = 1.0
-                t_std = g_target_u.std() + 1e-6
-                p_target = torch.softmax(g_target_u / t_std / tau_list, dim=0)
-                u_pred_std = g_pred_u.std() + 1e-6
-                log_p_pred = torch.log_softmax(g_pred_u / u_pred_std / tau_list, dim=0)
+                n_groups_used_listwise += 1
+                t_std = max(float(g_target_u.detach().std() + 1e-6), 1e-6)
+                p_target = torch.softmax(g_target_u / t_std / self.tau_list, dim=0)
+                u_pred_std = max(float(g_pred_u.detach().std() + 1e-6), 1e-6)
+                log_p_pred = torch.log_softmax(g_pred_u / u_pred_std / self.tau_list, dim=0)
                 kl = torch.sum(p_target * (torch.log(p_target + 1e-9) - log_p_pred))
                 loss_list_list.append(kl)
 
         loss_r = torch.mean(torch.stack(loss_r_list)) if loss_r_list else torch.tensor(0.0, device=device)
         loss_list = torch.mean(torch.stack(loss_list_list)) if loss_list_list else torch.tensor(0.0, device=device)
+
+        fraction_pairs_retained = (retained_pairs_eval / total_pairs_eval) if total_pairs_eval > 0 else 1.0
+        n_groups_skipped = len(unique_groups) - n_groups_used_pairwise
 
         # ─── Residual Target Loss (P0.4) ───
         loss_res = torch.tensor(0.0, device=device)
@@ -402,6 +431,11 @@ class Phase6Loss(nn.Module):
             'loss_list': loss_list.detach() if isinstance(loss_list, torch.Tensor) else torch.tensor(0.0),
             'loss_res': loss_res.detach() if isinstance(loss_res, torch.Tensor) else torch.tensor(0.0),
             'loss_zero': loss_zero.detach() if isinstance(loss_zero, torch.Tensor) else torch.tensor(0.0),
+            'n_total_groups': len(unique_groups),
+            'n_groups_used_pairwise': n_groups_used_pairwise,
+            'n_groups_used_listwise': n_groups_used_listwise,
+            'n_groups_skipped': n_groups_skipped,
+            'fraction_pairs_retained': fraction_pairs_retained,
         }
 
 
@@ -590,9 +624,21 @@ class FrozenContextPredictor:
             config = Phase6ModelConfig()
 
         self.config = config
-        arch = ckpt.get('architecture', 'direct')
-        if arch == 'residual':
-            self.model = ResidualContextModel(config).to(self.device)
+        arch = ckpt.get('architecture', ckpt.get('metadata', {}).get('model_type', 'direct'))
+        is_residual = arch in ('residual', 'residual_context') or ckpt.get('metadata', {}).get('model_type') == 'residual_context'
+
+        if is_residual:
+            p4_net = None
+            p4_ckpt = ckpt.get('p4_checkpoint') or ckpt.get('metadata', {}).get('phase4_checkpoint')
+            if p4_ckpt and os.path.exists(p4_ckpt):
+                from research.utility_models import TwoHeadMLP
+                p4_net = TwoHeadMLP(in_features=config.self_dim)
+                p4_data = torch.load(p4_ckpt, map_location="cpu", weights_only=False)
+                p4_net.load_state_dict(p4_data.get("model_state", p4_data))
+                p4_net.eval()
+                for p in p4_net.parameters():
+                    p.requires_grad = False
+            self.model = ResidualContextModel(config, p4_model=p4_net).to(self.device)
         else:
             self.model = ContextAwareTwoHeadMLP(config).to(self.device)
 

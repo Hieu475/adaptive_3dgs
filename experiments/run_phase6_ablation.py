@@ -52,6 +52,7 @@ from research.phase6_dataset import (
     prepare_phase6_splits,
     Phase6UtilityDataset,
     Phase6FeatureNormalizer,
+    GroupedBatchSampler,
     _get_variant_mask,
 )
 from research.phase6_selection import (
@@ -64,6 +65,14 @@ from research.utility_metrics import (
     safe_pearsonr,
     compute_ndcg_at_k,
 )
+
+
+def _get_git_commit() -> str:
+    try:
+        import subprocess
+        return subprocess.check_output(['git', 'rev-parse', 'HEAD'], stderr=subprocess.DEVNULL).decode().strip()
+    except Exception:
+        return "unknown"
 
 
 def train_and_eval_variant(
@@ -81,7 +90,6 @@ def train_and_eval_variant(
     np.random.seed(seed)
 
     # C4 FIX: Use prepare_phase6_splits which fits normalizer on TRAIN ONLY
-    # Old code had: normalizer.fit(all_feats) BEFORE split → data leakage
     mask = _get_variant_mask(variant)
     norm_path = os.path.join(output_dir, f"norm_{variant}.json")
 
@@ -106,64 +114,166 @@ def train_and_eval_variant(
         mask = _get_variant_mask(variant)
         feats_variant = feats_norm[:, mask]
 
+        # Pre-pass empty utils
+        empty_utils = {}
+        for s in samples:
+            if s.get("context_size", 0) == 0 or s.get("context_type") == "empty":
+                k = (str(s["scene"]), int(s["frame"]), int(s["candidate_id"]))
+                empty_utils[k] = float(s["utility_conditional"])
+
+        target_r_list, empty_list, sample_gids = [], [], []
+        group_key_to_id = {}
+        for s in samples:
+            k = (str(s["scene"]), int(s["frame"]), int(s["candidate_id"]))
+            u = float(s["utility_conditional"])
+            u_empty = empty_utils.get(k, u)
+            target_r_list.append(u - u_empty)
+            empty_list.append(1.0 if (s.get("context_size", 0) == 0 or s.get("context_type") == "empty") else 0.0)
+
+            selected_ids = s.get("context_ids", []) or []
+            context_ident = tuple(sorted([int(x) for x in selected_ids]))
+            g_key = (str(s["scene"]), int(s["frame"]), context_ident)
+            gid = group_key_to_id.setdefault(g_key, len(group_key_to_id))
+            sample_gids.append(gid)
+
+        target_r_arr = np.array(target_r_list, dtype=np.float32)
+        empty_arr = np.array(empty_list, dtype=np.float32)
+        sample_gids_arr = np.array(sample_gids, dtype=np.int64)
+
         n_val = max(1, int(0.15 * N))
         train_ds = Phase6UtilityDataset(
             feats_variant[:n_train], all_dq[:n_train], all_dt[:n_train], all_u[:n_train],
+            target_r=target_r_arr[:n_train], is_empty=empty_arr[:n_train], group_ids=sample_gids_arr[:n_train],
         )
         val_ds = Phase6UtilityDataset(
             feats_variant[n_train:n_train + n_val],
             all_dq[n_train:n_train + n_val],
             all_dt[n_train:n_train + n_val],
             all_u[n_train:n_train + n_val],
+            target_r=target_r_arr[n_train:n_train + n_val],
+            is_empty=empty_arr[n_train:n_train + n_val],
+            group_ids=sample_gids_arr[n_train:n_train + n_val],
         )
         test_ds = Phase6UtilityDataset(
             feats_variant[n_train + n_val:],
             all_dq[n_train + n_val:],
             all_dt[n_train + n_val:],
             all_u[n_train + n_val:],
+            target_r=target_r_arr[n_train + n_val:],
+            is_empty=empty_arr[n_train + n_val:],
+            group_ids=sample_gids_arr[n_train + n_val:],
         )
         print(f"  [C4 FIX] Normalizer fit on train only (first {n_train}/{N} samples)")
 
-    train_loader = torch.utils.data.DataLoader(train_ds, batch_size=16, shuffle=True)
-    val_loader = torch.utils.data.DataLoader(val_ds, batch_size=16, shuffle=False)
-    test_loader = torch.utils.data.DataLoader(test_ds, batch_size=16, shuffle=False)
+    train_sampler = GroupedBatchSampler(train_ds.group_ids, max_batch_size=16, shuffle=True, seed=seed)
+    val_sampler = GroupedBatchSampler(val_ds.group_ids, max_batch_size=16, shuffle=False)
+    test_sampler = GroupedBatchSampler(test_ds.group_ids, max_batch_size=16, shuffle=False)
+
+    train_loader = torch.utils.data.DataLoader(train_ds, batch_sampler=train_sampler)
+    val_loader = torch.utils.data.DataLoader(val_ds, batch_sampler=val_sampler)
+    test_loader = torch.utils.data.DataLoader(test_ds, batch_sampler=test_sampler)
 
     # Model config
     cfg = create_ablation_variant(variant)
     dev = torch.device(device)
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+    p4_ckpt = None
     if architecture == "residual":
         p4_ckpt = os.path.join(repo_root, "results", "learned_utility", "checkpoints", f"two_head_mlp_seed_{seed}.pt")
-        p4_model = None
-        if os.path.exists(p4_ckpt):
-            from research.utility_models import TwoHeadMLP
-            p4_net = TwoHeadMLP(in_features=11)
-            ckpt_data = torch.load(p4_ckpt, map_location="cpu", weights_only=False)
-            p4_net.load_state_dict(ckpt_data.get("model_state", ckpt_data))
-            p4_model = p4_net
-        model = ResidualContextModel(cfg, p4_model=p4_model).to(dev)
+        if not os.path.exists(p4_ckpt):
+            p4_ckpt = os.path.join(repo_root, "results", "learned_utility", "checkpoints", "two_head_mlp_seed_42.pt")
+        if not os.path.exists(p4_ckpt):
+            raise FileNotFoundError(f"P0.2 REQUIREMENT: Pretrained Phase 4 checkpoint required at {p4_ckpt}")
+
+        from research.utility_models import TwoHeadMLP
+        p4_net = TwoHeadMLP(in_features=11)
+        ckpt_data = torch.load(p4_ckpt, map_location="cpu", weights_only=False)
+        p4_net.load_state_dict(ckpt_data.get("model_state", ckpt_data))
+        p4_net.eval()
+        for p in p4_net.parameters():
+            p.requires_grad = False
+        print(f"  [Residual] Loaded and strictly froze pre-trained Phase 4 weights from {p4_ckpt}")
+
+        model = ResidualContextModel(cfg, p4_model=p4_net).to(dev)
+        trainable_params = model.context_parameters()
+        assert all(not p.requires_grad for p in model.p4_model.parameters()), "P4 parameters must not require grad!"
+        p4_before = {k: v.clone().cpu() for k, v in model.p4_model.state_dict().items()}
     else:
         model = ContextAwareTwoHeadMLP(cfg).to(dev)
+        trainable_params = list(model.parameters())
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
-    loss_fn = Phase6Loss(lambda_q=1.0, lambda_c=0.5, lambda_r=0.1)
+    train_lr = lr if architecture != "residual" else (lr if lr != 1e-3 else 2e-4)
+    optimizer = torch.optim.Adam(trainable_params, lr=train_lr, weight_decay=1e-5)
+
+    if architecture == "residual":
+        loss_fn = Phase6Loss(
+            lambda_q=0.0,
+            lambda_c=0.0,
+            lambda_r=1.0,
+            lambda_list=0.5,
+            lambda_res=1.0,
+            lambda_zero=0.5,
+            scale_u=1.0,
+            require_group_ids=True,
+        )
+    else:
+        loss_fn = Phase6Loss(
+            lambda_q=1.0,
+            lambda_c=0.5,
+            lambda_r=0.1,
+            lambda_list=0.5,
+            lambda_res=0.0,
+            lambda_zero=0.0,
+            require_group_ids=True,
+        )
 
     best_loss = float("inf")
     best_state = None
 
     for epoch in range(1, epochs + 1):
+        train_sampler.set_epoch(epoch)
         model.train()
+        if hasattr(model, 'p4_model'):
+            model.p4_model.eval()
+
         for batch in train_loader:
             x = batch['features'].to(dev)
             t_q = batch['delta_q'].to(dev)
             t_t = batch['delta_t'].to(dev)
             t_u = batch['utility'].to(dev)
+            t_r = batch.get('target_r')
+            if t_r is not None:
+                t_r = t_r.to(dev)
+            is_empty = batch.get('is_empty')
+            if is_empty is not None:
+                is_empty = is_empty.to(dev)
+            group_ids = batch.get('group_id')
+            if group_ids is not None:
+                group_ids = group_ids.to(dev)
 
             optimizer.zero_grad()
-            p_q, p_t, p_u = model(x)
-            losses = loss_fn(p_q, p_t, p_u, t_q, t_t, t_u)
+            if hasattr(model, 'context_fusion'):
+                p_q, p_t, p_u, p_r = model(x, return_residual=True)
+            else:
+                p_q, p_t, p_u = model(x)
+                p_r = None
+
+            losses = loss_fn(
+                pred_q=p_q,
+                pred_t=p_t,
+                pred_u=p_u,
+                target_q=t_q,
+                target_t=t_t,
+                target_u=t_u,
+                group_ids=group_ids,
+                pred_r=p_r,
+                target_r=t_r,
+                is_empty=is_empty,
+            )
             losses['total'].backward()
+            clip_params = model.context_parameters() if hasattr(model, 'context_parameters') else model.parameters()
+            torch.nn.utils.clip_grad_norm_(clip_params, max_norm=1.0)
             optimizer.step()
 
         model.eval()
@@ -172,8 +282,37 @@ def train_and_eval_variant(
         with torch.no_grad():
             for batch in val_loader:
                 x = batch['features'].to(dev)
-                p_q, p_t, p_u = model(x)
-                losses = loss_fn(p_q, p_t, p_u, batch['delta_q'].to(dev), batch['delta_t'].to(dev), batch['utility'].to(dev))
+                t_q = batch['delta_q'].to(dev)
+                t_t = batch['delta_t'].to(dev)
+                t_u = batch['utility'].to(dev)
+                t_r = batch.get('target_r')
+                if t_r is not None:
+                    t_r = t_r.to(dev)
+                is_empty = batch.get('is_empty')
+                if is_empty is not None:
+                    is_empty = is_empty.to(dev)
+                group_ids = batch.get('group_id')
+                if group_ids is not None:
+                    group_ids = group_ids.to(dev)
+
+                if hasattr(model, 'context_fusion'):
+                    p_q, p_t, p_u, p_r = model(x, return_residual=True)
+                else:
+                    p_q, p_t, p_u = model(x)
+                    p_r = None
+
+                losses = loss_fn(
+                    pred_q=p_q,
+                    pred_t=p_t,
+                    pred_u=p_u,
+                    target_q=t_q,
+                    target_t=t_t,
+                    target_u=t_u,
+                    group_ids=group_ids,
+                    pred_r=p_r,
+                    target_r=t_r,
+                    is_empty=is_empty,
+                )
                 val_loss += losses['total'].item()
                 n_b += 1
         val_loss /= max(1, n_b)
@@ -182,6 +321,12 @@ def train_and_eval_variant(
             best_loss = val_loss
             best_state = {k: v.clone() for k, v in model.state_dict().items()}
 
+    # Verify P4 backbone invariance (P0.2)
+    if architecture == "residual":
+        for k, v in model.p4_model.state_dict().items():
+            assert torch.equal(v.cpu(), p4_before[k]), f"P4 backbone weights changed for {k}!"
+        print(f"  [Verification] P4 backbone weights remained strictly invariant for {variant}.")
+
     if best_state is not None:
         model.load_state_dict(best_state)
 
@@ -189,6 +334,7 @@ def train_and_eval_variant(
     model.eval()
     all_pred_u, all_true_u = [], []
     all_pred_q, all_true_q = [], []
+    all_test_gids = []
     with torch.no_grad():
         for batch in test_loader:
             x = batch['features'].to(dev)
@@ -197,21 +343,51 @@ def train_and_eval_variant(
             all_true_u.extend(batch['utility'].numpy().tolist())
             all_pred_q.extend(p_q.cpu().numpy().tolist())
             all_true_q.extend(batch['delta_q'].numpy().tolist())
+            all_test_gids.extend(batch['group_id'].cpu().numpy().tolist())
 
-    rho_u, _ = safe_spearmanr(np.array(all_pred_u), np.array(all_true_u))
-    r_u, _ = safe_pearsonr(np.array(all_pred_u), np.array(all_true_u))
-    ndcg_5 = compute_ndcg_at_k(np.array(all_pred_u), np.array(all_true_u), k=5)
-    mae_u = float(np.mean(np.abs(np.array(all_pred_u) - np.array(all_true_u))))
+    arr_pred_u = np.array(all_pred_u)
+    arr_true_u = np.array(all_true_u)
+    arr_test_gids = np.array(all_test_gids)
+
+    rho_u, _ = safe_spearmanr(arr_pred_u, arr_true_u)
+    r_u, _ = safe_pearsonr(arr_pred_u, arr_true_u)
+    mae_u = float(np.mean(np.abs(arr_pred_u - arr_true_u)))
+
+    # Compute Group-wise NDCG@5
+    ndcg_list = []
+    for gid in np.unique(arr_test_gids):
+        m = (arr_test_gids == gid)
+        if np.sum(m) >= 2:
+            ndcg_list.append(compute_ndcg_at_k(arr_pred_u[m], arr_true_u[m], k=5))
+    macro_ndcg_5 = float(np.mean(ndcg_list)) if ndcg_list else float(compute_ndcg_at_k(arr_pred_u, arr_true_u, k=5))
 
     ckpt_path = os.path.join(output_dir, f"model_{variant}.pt")
-    torch.save({"model_state": model.state_dict(), "config": cfg.__dict__}, ckpt_path)
+    torch.save({
+        "schema_version": "phase6-v2",
+        "architecture": "residual_context" if architecture == "residual" else "direct_context",
+        "variant": variant,
+        "seed": seed,
+        "protocol_version": "v1",
+        "model_state": model.state_dict(),
+        "config": cfg.__dict__,
+        "normalizer_path": norm_path,
+        "p4_checkpoint": p4_ckpt if architecture == "residual" else None,
+        "p4_frozen": True if architecture == "residual" else False,
+        "git_commit": _get_git_commit(),
+        "test_metrics": {
+            "spearman_rho": float(rho_u),
+            "pearson_r": float(r_u),
+            "ndcg_5": float(macro_ndcg_5),
+            "mae_utility": float(mae_u),
+        },
+    }, ckpt_path)
 
     return {
         "variant": variant,
         "features_dim": int(np.sum(mask)),
         "spearman_rho": float(rho_u),
         "pearson_r": float(r_u),
-        "ndcg_5": float(ndcg_5),
+        "ndcg_5": float(macro_ndcg_5),
         "mae_utility": float(mae_u),
         "val_loss": float(best_loss),
         "ckpt_path": ckpt_path,
@@ -399,7 +575,17 @@ def main():
     if os.path.exists(best_model_path):
         cfg = create_ablation_variant(full_var)
         if args.architecture == "residual":
-            full_model = ResidualContextModel(cfg).to(device)
+            p4_ckpt = os.path.join(repo_root, "results", "learned_utility", "checkpoints", f"two_head_mlp_seed_{args.seed}.pt")
+            if not os.path.exists(p4_ckpt):
+                p4_ckpt = os.path.join(repo_root, "results", "learned_utility", "checkpoints", "two_head_mlp_seed_42.pt")
+            from research.utility_models import TwoHeadMLP
+            p4_net = TwoHeadMLP(in_features=11)
+            ckpt_data = torch.load(p4_ckpt, map_location="cpu", weights_only=False)
+            p4_net.load_state_dict(ckpt_data.get("model_state", ckpt_data))
+            p4_net.eval()
+            for p in p4_net.parameters():
+                p.requires_grad = False
+            full_model = ResidualContextModel(cfg, p4_model=p4_net).to(device)
         else:
             full_model = ContextAwareTwoHeadMLP(cfg).to(device)
         ckpt = torch.load(best_model_path, map_location=device, weights_only=False)
