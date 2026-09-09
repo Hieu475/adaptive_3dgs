@@ -5,3 +5,5 @@ opencv-python
 tqdm
 pytest
 scikit-image
+scipy
+matplotlib

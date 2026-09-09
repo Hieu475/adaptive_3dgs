@@ -86,7 +86,7 @@ The empirical trajectory across Phases 1 through 6 establishes a coherent, non-t
 
 $$\begin{aligned}
 \text{Co-visibility \& alpha-compositing interaction} &\implies U^*(i \mid S) \neq U^*(i \mid \emptyset) \quad (\text{Interaction Exists}) \\
-&\implies \text{Attenuation is largely monotonic across co-visible candidates} \\
+&\implies \text{The observed pattern is consistent with alpha-compositing attenuation} \\
 &\implies \operatorname{rank}(U^*(i \mid S)) \approx \operatorname{rank}(U^*(i \mid \emptyset)) \quad (\bar{\rho}_{\text{rank}} = 0.8916, \text{Overlap@5} = 80.0\%) \\
 &\implies \text{Pointwise utility } U^*(i \mid \emptyset) \text{ already captures most of the observed candidate priority structure} \\
 &\implies \text{Adaptive contextual selection increases selection-stage latency by } 424.2\times \text{ with no quality benefit}

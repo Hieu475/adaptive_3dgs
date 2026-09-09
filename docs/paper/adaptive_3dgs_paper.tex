@@ -233,7 +233,7 @@ Table~\ref{tab:p6_ablation} reports our systematic 8-variant ablation ladder. \t
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\linewidth]{../../results/figures/fig6_context_effect_paired_ranking.png}
-\caption{\textbf{Contextual Paired Utility Comparison.} For matching candidates, conditioning on selected context $S_t$ dampens utility magnitude monotonically without scrambling candidate order.}
+\caption{\textbf{Contextual Paired Utility Comparison.} For matching candidates, conditioning on selected context $S_t$ dampens utility magnitude, consistent with alpha-compositing attenuation, while candidate priority order is largely preserved.}
 \label{fig:context_paired}
 \end{figure}
 
@@ -244,14 +244,14 @@ Table~\ref{tab:p6_ablation} reports our systematic 8-variant ablation ladder. \t
 \label{fig:stability}
 \end{figure}
 
-Pairwise interaction measurements confirm that screen-space co-visibility drives sub-additivity ($\text{Spearman}(\text{IoU}, |I|) = \mathbf{0.5357}, p = \mathbf{0.0048}$; $100\%$ sub-additive for $\text{IoU} \ge 0.30$). However, evaluating full candidate pools across 27 exact context groups (with zero synthetic defaulting) reveals an unexpected phenomenon:
+Pairwise interaction measurements confirm that screen-space co-visibility drives sub-additivity ($\text{Spearman}(\text{IoU}, |I|) = \mathbf{0.5357}, p = \mathbf{0.0048}$; $100\%$ sub-additive in the high-IoU stratum $\text{IoU} \ge 0.30$). However, evaluating full candidate pools across 27 exact context groups (with zero synthetic defaulting) reveals an unexpected phenomenon:
 \begin{itemize}
     \item Mean Spearman rank correlation: $\bar{\rho}_{\text{rank}} = \mathbf{0.8916} \pm \mathbf{0.1104}$ (median $\rho = 0.9188$).
     \item Mean Kendall rank correlation: $\bar{\tau} = \mathbf{0.8043}$.
     \item Top-5 candidate overlap: $\mathbf{80.0\%}$ (Top-10 overlap: $\mathbf{89.3\%}$, Top-3 overlap: $\mathbf{72.8\%}$).
 \end{itemize}
 
-As visualized in Figure~\ref{fig:context_paired} and Figure~\ref{fig:stability}, co-visibility attenuates candidate utility magnitude monotonically, consistent with sub-additive effects induced by screen-space overlap and alpha compositing, but preserves relative ranking. In the 5-Policy Oracle Decomposition Benchmark, Oracle Conditional achieves identical quality to Oracle Static at both $30\%$ ($Q^\star = 1.1698 \times 10^{-4}$) and $60\%$ budgets ($Q^\star = 1.2955 \times 10^{-4}$), establishing a Context Advantage of exactly $\mathbf{+0.00 \times 10^{-5}}$. Furthermore, while Phase 6 reduces selection regret by $75.1\%\text{--}80.2\%$ over heuristic baselines (achieving $82.0\%\text{--}84.1\%$ of achievable oracle gain), multi-seed online selection sweeps across five protocol seeds ($n=5$) show no statistically significant quality advantage over Phase 4 static selection (Wilcoxon signed-rank $p = 0.7035$ at $20\%$ budget, $p = 1.0000$ at $50\%$, $p = 0.7812$ at $80\%$; all $95\%$ bootstrap CIs span zero). Because candidate priority ordering is substantially stable ($\bar{\rho}_{\text{rank}} = 0.8916$), pointwise static ranking already captures most of the observed candidate priority structure.
+As visualized in Figure~\ref{fig:context_paired} and Figure~\ref{fig:stability}, the observed pattern is consistent with attenuation arising from alpha-compositing and screen-space overlap, dampening candidate utility magnitude while preserving relative ranking. In the 5-Policy Oracle Decomposition Benchmark, Oracle Conditional achieves identical quality to Oracle Static at both $30\%$ ($Q^\star = 1.1698 \times 10^{-4}$) and $60\%$ budgets ($Q^\star = 1.2955 \times 10^{-4}$), establishing a Context Advantage of exactly $\mathbf{+0.00 \times 10^{-5}}$. Furthermore, while Phase 6 reduces selection regret by $75.1\%\text{--}80.2\%$ over heuristic baselines (achieving $82.0\%\text{--}84.1\%$ of achievable oracle gain), multi-seed online selection sweeps across five protocol seeds ($n=5$) show no statistically significant quality advantage over Phase 4 static selection (Wilcoxon signed-rank $p = 0.7035$ at $20\%$ budget, $p = 1.0000$ at $50\%$, $p = 0.7812$ at $80\%$; all $95\%$ bootstrap CIs span zero). Because candidate priority ordering is substantially stable ($\bar{\rho}_{\text{rank}} = 0.8916$), pointwise static ranking already captures most of the observed candidate priority structure.
 
 \begin{figure}[t]
 \centering
@@ -299,9 +299,9 @@ Total end-to-end stage execution latency increases by $+361.06\text{ ms}$ ($+64.
 \section{Conclusion}
 We have presented an intervention-based marginal utility estimation framework for online RGB-D 3D Gaussian Splatting under rigid compute budgets. Our research establishes a cohesive five-stage scientific narrative: (1) under our counterfactual intervention protocol, marginal optimization utility $U_i^\star = \Delta Q_i^{\text{intervention}} / C_i$ is causally measurable, and $20.5\%$ of gradient updates degrade quality ($U_i^\star < 0$); (2) utility can be learned from observable Gaussian state, delivering $+108.0\%$ selection efficiency gains at tight compute budgets ($B \le 20\%$); (3) contextual interactions alter marginal utility sub-additively, consistent with screen-space overlap and alpha-compositing saturation ($R_{add} \ll 1.0$, $p = 0.0048$); (4) however, contextual interaction changes utility magnitude while candidate priority rank remains substantially stable ($\bar{\rho}_{\text{rank}} = 0.8916 \pm 0.1104$, Kendall $\bar{\tau} = 0.8043$, Top-5 overlap = $80.0\%$); and (5) consequently, adaptive contextual selection increases selection-stage latency by $424.2\times$ ($76.36\text{ ms}$ vs $0.18\text{ ms}$; $+361.06\text{ ms}$ total pipeline latency) without statistically significant quality gain ($p \ge 0.7035$), establishing static pointwise scheduling as the Pareto-optimal design.
 
-{\small
+{\footnotesize
 \bibliographystyle{ieee_fullname}
-\begin{thebibliography}{10}\itemsep=-1pt
+\begin{thebibliography}{10}\itemsep=-2.5pt
 
 \bibitem{kerbl3Dgaussians}
 B.~Kerbl, G.~Kopanas, T.~Leimk{\"u}hler, and G.~Drettakis.

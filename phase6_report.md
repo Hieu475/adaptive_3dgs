@@ -27,7 +27,7 @@ Following the **Phase 6 Scientific Reform & Engineering Hardening** (P0, P1, P2)
 
 | Gate | Criterion | Threshold / Hypothesis | Observed Result | Status |
 | :--- | :--- | :--- | :--- | :---: |
-| **Gate 6A** (Representation) | Co-visibility non-additivity & IoU drive | $\Delta Q(S \cup \{i\}) \neq \Delta Q(S) + \Delta Q(i)$, $\rho(\text{IoU}, |I|) > 0$ | 100% sub-additive in high IoU, $\rho = \mathbf{0.5357}$ ($p = \mathbf{0.0048}$) | **✓ PASS** |
+| **Gate 6A** (Representation) | Co-visibility non-additivity & IoU drive | $\Delta Q(S \cup \{i\}) \neq \Delta Q(S) + \Delta Q(i)$, $\rho(\text{IoU}, |I|) > 0$ | 100% sub-additive in the high-IoU stratum ($\text{IoU} \ge 0.3$), $\rho = \mathbf{0.5357}$ ($p = \mathbf{0.0048}$) | **✓ PASS** |
 | **Gate 6B** (Prediction) | Conditional utility correlation across 5 seeds | $\rho(\hat{U}_{P6}, U^*) \approx \rho(\hat{U}_{P4}, U^*)$ | **Metric A (Prediction Fidelity)**: 5-seed distribution $\bar{\rho} = -0.0023 \pm 0.3142$; within-group $\text{NDCG@5} = \mathbf{0.5370} \pm 0.1055$ (95% CI: $[0.406, 0.668]$), $\text{NDCG@10} = \mathbf{0.5864} \pm 0.1027$ | **✓ RECOVERED** |
 | **Gate 6C** (Decision Gap) | Regret relative to oracle across budgets | $\text{Regret}(P6) \le \text{Regret}(\text{Heuristic})$ | $75.1\%\text{--}80.2\%$ regret reduction vs heuristic baselines at tight budgets | **✓ PASS** |
 | **Gate 6D** (Sensitivity) | Dynamic sensitivity to growing context $S_t$ | $\|U(i|S_A) - U(i|S_B)\| > 0$ for $S_A \neq S_B$ | 100% non-zero context residual response | **✓ PASS** |
@@ -62,7 +62,7 @@ The following single authoritative table synthesizes all frozen Phase 6 empirica
 
 | Experiment / Dimension | Metric / Criterion | Authoritative Result | Scientific Interpretation |
 | :--- | :--- | :---: | :--- |
-| **Context Utility Interaction** | Pairwise non-additivity $\Delta Q(S \cup \{i\}) \neq \Delta Q(S) + \Delta Q(i)$ | **Sub-additive (100% for $\text{IoU} \ge 0.3$)** | Co-visibility modulates utility magnitude ($\rho_{\text{IoU}, \|I\|} = 0.5357, p = 0.0048$) |
+| **Context Utility Interaction** | Pairwise non-additivity $\Delta Q(S \cup \{i\}) \neq \Delta Q(S) + \Delta Q(i)$ | **Sub-additive (100% in the high-IoU stratum $\text{IoU} \ge 0.3$)** | Co-visibility modulates utility magnitude ($\rho_{\text{IoU}, \|I\|} = 0.5357, p = 0.0048$) |
 | **Exact Group Coverage** | 27 exact context groups $g = (scene, frame, S_t)$ | **27 / 27 (100.0%)** | Full candidate pool evaluated ($|P_t| = |M_t| = 20$) |
 | **Missing Candidates** | Candidates dropped or unmeasured | **0 (0.0%)** | Zero unmeasured candidates across all 27 audited groups |
 | **Synthetic Baseline Fill** | Fallback to $U^\star(i\|\emptyset)$ on missing data | **False (0.0%)** | Metrics computed strictly on ground-truth measured pairs |
@@ -122,7 +122,7 @@ To resolve why Oracle Conditional Greedy yields approximately identical performa
 **Scientific Conclusion for Case 1 / Case B**:
 1. **Rank Preservation Under Conditioning**: Across all 27 groups, candidate rank remains substantially stable ($\bar{\rho} = 0.8916$, median $\rho = 0.9188$, $\bar{\tau} = 0.8043$).
 2. **High-Tier Candidate Overlap**: Top-5 candidate overlap averages $\mathbf{80.0\%}$, and Top-10 candidate overlap reaches $\mathbf{89.3\%}$.
-3. **The Empirical & Physical Implication**: Screen-space overlap dampens marginal utility, consistent with sub-additive effects induced by screen-space overlap and alpha compositing ($\rho(\text{IoU}, |I|) = 0.5357, p = 0.0048$). Because this attenuation is largely monotonic with respect to candidate impact, **contextual interaction changes utility magnitude while preserving substantial candidate-order stability** ($\bar{\rho}_{\text{rank}} = 0.8916 \pm 0.1104$, Kendall $\bar{\tau} = 0.8043$, Top-5 overlap = $80.0\%$). Consequently, static pointwise ranking already captures most of the observed candidate priority structure without requiring expensive adaptive re-ranking.
+3. **The Empirical & Physical Implication**: Screen-space overlap dampens marginal utility, consistent with sub-additive effects induced by screen-space overlap and alpha compositing ($\rho(\text{IoU}, |I|) = 0.5357, p = 0.0048$). The observed pattern is consistent with attenuation arising from alpha-compositing and screen-space overlap: **contextual interaction changes utility magnitude while preserving substantial candidate-order stability** ($\bar{\rho}_{\text{rank}} = 0.8916 \pm 0.1104$, Kendall $\bar{\tau} = 0.8043$, Top-5 overlap = $80.0\%$). Consequently, static pointwise ranking already captures most of the observed candidate priority structure without requiring expensive adaptive re-ranking.
 
 ---
 
@@ -178,7 +178,7 @@ Evaluation of live GPU joint optimization across 26 candidate pairs stratified b
 | **High** | $[0.30, 0.50)$ | 6 | $\mathbf{-2.730 \times 10^{-6}}$ | $\mathbf{-1.987 \times 10^{-6}}$ | $1.865 \times 10^{-6}$ | $-3.173 \times 10^{-6}$ | $-1.621 \times 10^{-6}$ | **100.0%** |
 | **Overall** | $[0.00, 0.50)$ | 26 | $-1.058 \times 10^{-6}$ | $-1.961 \times 10^{-7}$ | $5.279 \times 10^{-6}$ | $-2.048 \times 10^{-6}$ | $+4.128 \times 10^{-9}$ | **69.2%** |
 
-- **IoU Drive**: $\text{Spearman}(\text{IoU}, |I|) = \mathbf{0.5357}$ ($p = \mathbf{0.0048}$). Pairs with $\text{IoU} \ge 0.30$ are unanimously (100%) sub-additive.
+- **IoU Drive**: $\text{Spearman}(\text{IoU}, |I|) = \mathbf{0.5357}$ ($p = \mathbf{0.0048}$). Pairs in the high-IoU stratum ($\text{IoU} \ge 0.30$) are unanimously ($100\%$) sub-additive.
 
 ---
 
@@ -282,7 +282,7 @@ To rigorously dissect the contribution of each contextual feature group, we anal
 3. **+ Screen-Space IoU Overlap (`self_overlap`, 16D, P6-C) — Rasterization Interference**:
    - *Question*: How much predictive signal is provided by 2D screen-space projected bounding box overlap?
    - *Finding*: Spearman $\rho$ jumps to $0.1677$ (a $+90.4\%$ relative improvement over Self Only), with $\text{NDCG@5} = 0.7199$.
-   - *Interpretation*: Screen-space overlap directly models ray-marching occlusion and rasterizer competition during alpha blending. Since Gate 6A proves that high-IoU pairs are 100% sub-additive, explicit overlap metrics capture real physical interaction effects.
+   - *Interpretation*: Screen-space overlap directly models ray-marching occlusion and rasterizer competition during alpha blending. Since Gate 6A proves that pairs in the high-IoU stratum are 100% sub-additive, explicit overlap metrics capture real physical interaction effects.
 
 4. **+ Selected Set Context (`self_selected`, 19D, P6-D & `self_neighbor_selected`, 27D, P6-F Primary)**:
    - *Question*: Does dynamic awareness of the already-selected subset $S_t$ enhance utility prediction?
