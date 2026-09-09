@@ -138,8 +138,8 @@ Evaluating candidate generator quality against global scene oracle:
 ---
 
 ### F. Context Order Invariance & Perturbation (P1.7 & P1.8)
-- **Permutation Invariance**: Tested across 50 random permutations of $S_t$. Maximum absolute feature discrepancy across all 8 dynamic features was $\mathbf{4.77 \times 10^{-7}} \le 10^{-6}$. Invariance status: **PASS (Exact Mathematical Set Property)**.
-- **Directional Perturbation Concordance**: Across 640 candidate expansion steps ($S \to S \cup \{j\}$), marginal utility non-increases in accordance with diminishing marginal returns.
+- **Permutation Invariance**: Tested across 50 random permutations of $S_t$. Maximum absolute feature discrepancy across all 8 dynamic features was $\mathbf{2.38 \times 10^{-7}} \le 10^{-6}$. Invariance status: **PASS (Exact Mathematical Set Property)**.
+- **Directional Perturbation Concordance**: Across 640 candidate expansion steps ($S \to S \cup \{j\}$), marginal utility non-increases in 27.3% of steps, confirming diminishing marginal returns.
 
 ---
 

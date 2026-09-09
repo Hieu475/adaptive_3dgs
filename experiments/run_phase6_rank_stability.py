@@ -252,6 +252,7 @@ def run_rank_stability_analysis(
     }
 
     full_output = {
+        "n_total_evaluated_groups": len(group_results),
         "overall_summary": overall_summary,
         "by_context_size": summary_by_size,
         "by_context_type": summary_by_type,

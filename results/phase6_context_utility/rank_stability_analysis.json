@@ -1,4 +1,5 @@
 {
+  "n_total_evaluated_groups": 584,
   "overall_summary": {
     "mean_spearman_rho": 0.9622861611675486,
     "std_spearman_rho": 0.0641103812648952,

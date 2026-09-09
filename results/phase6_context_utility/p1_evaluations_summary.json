@@ -2,12 +2,12 @@
   "p1_5_reduced_models": {
     "self_neighbor_selected": {
       "description": "P6-D (Self + Neighbor + Selected, 27D)",
-      "test_spearman_rho": 0.272537283979681,
+      "test_spearman_rho": 0.2554911475838613,
       "feature_dim": 27
     },
     "self_selected": {
       "description": "P6-Selected (Self + Selected, 19D)",
-      "test_spearman_rho": 0.27858912464419605,
+      "test_spearman_rho": 0.37141838682309986,
       "feature_dim": 19
     }
   },
@@ -20,7 +20,7 @@
   },
   "p1_7_context_order_invariance": {
     "n_trials": 50,
-    "max_abs_diff": 4.76837158203125e-07,
+    "max_abs_diff": 2.384185791015625e-07,
     "is_permutation_invariant": true
   },
   "p1_8_context_perturbation": {
