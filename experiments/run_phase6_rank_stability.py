@@ -67,9 +67,7 @@ def run_rank_stability_analysis(
 
     # 1. Condition-level Groups (scene, frame, context_type, context_size)
     # Allows evaluating rank preservation among all candidates in a frame under context condition C
-    cond_groups: Dict[Tuple[str, int, str, int], List[Dict[str, Any]]] = {}
-    
-    # 2. Exact Context Groups g = (scene, frame, S_t)
+    # Exact Context Groups g = (scene, frame, S_t)
     exact_groups: Dict[Tuple[str, int, Tuple[int, ...]], List[Dict[str, Any]]] = {}
 
     for s in samples:
@@ -78,14 +76,23 @@ def run_rank_stability_analysis(
         if c_size == 0 or c_type == "empty":
             continue
 
-        cond_key = (str(s["scene"]), int(s["frame"]), c_type, c_size)
-        cond_groups.setdefault(cond_key, []).append(s)
-
         selected_ids = tuple(sorted(int(x) for x in (s.get("context_ids", []) or [])))
         exact_key = (str(s["scene"]), int(s["frame"]), selected_ids)
         exact_groups.setdefault(exact_key, []).append(s)
 
-    print(f">> Found {len(cond_groups)} conditional decision regimes and {len(exact_groups)} exact context groups")
+    print(f">> Found {len(exact_groups)} exact context groups g=(scene, frame, S_t)")
+
+    # Group exact groups by frame and condition regime for rank stability evaluation
+    # Allows evaluating candidate rank shifts under context S_t relative to U*(i|∅)
+    frame_conditions: Dict[Tuple[str, int, str, int], List[Tuple[Tuple[str, int, Tuple[int, ...]], Dict[str, Any]]]] = {}
+
+    for exact_key, cand_list in exact_groups.items():
+        scene_str, frame_int, ctx_ids = exact_key
+        for s in cand_list:
+            c_type = str(s.get("context_type", "default"))
+            c_size = len(ctx_ids)
+            fc_key = (scene_str, frame_int, c_type, c_size)
+            frame_conditions.setdefault(fc_key, []).append((exact_key, s))
 
     group_results = []
     by_size: Dict[int, Dict[str, List[float]]] = {}
@@ -103,19 +110,19 @@ def run_rank_stability_analysis(
     all_overlap_5 = []
     all_overlap_10 = []
 
-    for cond_key, cand_list in cond_groups.items():
-        if len(cand_list) < 3:
-            continue
+    for fc_key, items in frame_conditions.items():
+        scene_str, frame_int, c_type, c_size = fc_key
 
         u_empty = []
         u_cond = []
-        scene_str, frame_int, c_type, c_size = cond_key
+        cands_evaluated = []
 
-        for s in cand_list:
-            key = (str(s["scene"]), int(s["frame"]), int(s["candidate_id"]))
-            if key in empty_utils:
-                u_empty.append(empty_utils[key])
+        for exact_key, s in items:
+            cand_k = (scene_str, frame_int, int(s["candidate_id"]))
+            if cand_k in empty_utils:
+                u_empty.append(empty_utils[cand_k])
                 u_cond.append(float(s["utility_conditional"]))
+                cands_evaluated.append((exact_key, s))
 
         if len(u_empty) < 3:
             continue
@@ -166,7 +173,7 @@ def run_rank_stability_analysis(
         # Stratify by IoU overlap
         group_iou = float(np.mean([
             float(s.get("selected_features", {}).get("candidate_selected_overlap", s.get("overlap_features", {}).get("mean_overlap", 0.0)))
-            for s in cand_list
+            for _, s in cands_evaluated
         ]))
         if group_iou < 0.10:
             iou_key = "iou_lt_0.10"
@@ -183,20 +190,25 @@ def run_rank_stability_analysis(
         by_iou[iou_key]["o5"].append(float(o5))
         by_iou[iou_key]["o10"].append(float(o10))
 
-        group_results.append({
-            "group_key": f"{scene_str}_f{frame_int}_{c_type}_size{c_size}",
-            "scene": scene_str,
-            "frame": frame_int,
-            "context_type": c_type,
-            "context_size": c_size,
-            "mean_iou": group_iou,
-            "n_candidates": len(arr_empty),
-            "spearman_rho": float(rho),
-            "kendall_tau": float(tau),
-            "overlap_at_3": float(o3),
-            "overlap_at_5": float(o5),
-            "overlap_at_10": float(o10),
-        })
+        # Record exact context group result with explicit context_ids
+        for exact_key, s in cands_evaluated:
+            group_results.append({
+                "group_key": f"{scene_str}_f{frame_int}_ctx{len(exact_key[2])}_{'_'.join(str(x) for x in exact_key[2][:4])}",
+                "scene": scene_str,
+                "frame": frame_int,
+                "context_ids": list(exact_key[2]),
+                "candidate_id": int(s["candidate_id"]),
+                "context_type": c_type,
+                "context_size": c_size,
+                "mean_iou": float(s.get("selected_features", {}).get("candidate_selected_overlap", s.get("overlap_features", {}).get("mean_overlap", 0.0))),
+                "u_empty": float(empty_utils.get((scene_str, frame_int, int(s["candidate_id"])), 0.0)),
+                "u_cond": float(s["utility_conditional"]),
+                "spearman_rho": float(rho),
+                "kendall_tau": float(tau),
+                "overlap_at_3": float(o3),
+                "overlap_at_5": float(o5),
+                "overlap_at_10": float(o10),
+            })
 
     def _agg(d: Dict[str, List[float]]) -> Dict[str, float]:
         return {

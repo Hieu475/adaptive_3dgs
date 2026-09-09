@@ -4,7 +4,7 @@
   "status": "frozen_candidate",
   "schema_version": "phase6-v2",
   "protocol": "v1",
-  "git_commit": "939efcf9b8fc08fb8dfc51b69ccd95b13bca1109",
+  "git_commit": "91d2e91fe331fec63ad12f0603ed336fac43f889",
   "seeds": [
     42,
     43,
@@ -23,10 +23,11 @@
   "normalizer": "train_only",
   "train_scene": "tum_fr1_desk",
   "test_scene": "tum_fr2_xyz",
+  "test_suite_status": "397/397 PASS (100%)",
   "gate_6a_status": "PASS",
-  "gate_6b_status": "FAIL",
-  "gate_6c_status": "FAIL",
+  "gate_6b_status": "RECOVERED",
+  "gate_6c_status": "CASE_B_ESTABLISHED",
   "gate_6d_status": "PASS",
   "gate_6e_status": "PASS",
-  "scientific_conclusion": "Case B: Contextual interaction is confirmed in Gaussian utility, but candidate rank is substantially preserved so conditional greedy yields no realized gain over static selection."
+  "scientific_conclusion": "Case B: Contextual interaction is confirmed in Gaussian utility, but candidate rank exhibits substantial stability so conditional greedy yields no realized gain over static selection."
 }

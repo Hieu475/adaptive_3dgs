@@ -53,6 +53,11 @@ if os.path.exists(oracle_decomp_path):
         norm_regret_p6 = regret_p6 / max(q_oracle_cond, 1e-9)
         norm_regret_heur = regret_heur / max(q_oracle_cond, 1e-9)
 
+        # Explicit NormalizedRegret_gain = (Q* - Q_P) / (Q* - Q_0) where Q_0 = 0.0
+        norm_regret_gain_p4 = norm_regret_p4
+        norm_regret_gain_p6 = norm_regret_p6
+        norm_regret_gain_heur = norm_regret_heur
+
         decomp_summary[b_level] = {
             "q_oracle_static": float(q_oracle_static),
             "q_oracle_cond": float(q_oracle_cond),
@@ -68,6 +73,11 @@ if os.path.exists(oracle_decomp_path):
                 "phase4_learned": float(norm_regret_p4),
                 "phase6_adaptive": float(norm_regret_p6),
                 "static_heuristic": float(norm_regret_heur),
+            },
+            "normalized_regret_gain": {
+                "phase4_learned": float(norm_regret_gain_p4),
+                "phase6_adaptive": float(norm_regret_gain_p6),
+                "static_heuristic": float(norm_regret_gain_heur),
             },
             "regret_reduction_vs_heuristic_pct": float((norm_regret_heur - norm_regret_p6) / max(norm_regret_heur, 1e-6) * 100.0),
         }
@@ -87,13 +97,27 @@ for seed_res in per_seed_results:
         if bp not in sweep_by_budget:
             sweep_by_budget[bp] = {}
         if pol not in sweep_by_budget[bp]:
-            sweep_by_budget[bp][pol] = {"abs_regret": [], "rel_regret": [], "actual_dq": []}
-        sweep_by_budget[bp][pol]["abs_regret"].append(item.get("regret_abs", 0.0))
-        sweep_by_budget[bp][pol]["rel_regret"].append(item.get("regret_rel", 0.0))
+            sweep_by_budget[bp][pol] = {"abs_regret": [], "rel_regret": [], "norm_regret_gain": [], "actual_dq": []}
+        abs_r = item.get("regret_abs") or 0.0
+        rel_r = item.get("regret_rel")
+        if rel_r is None:
+            # compute from oracle_reference_gain if available
+            q_star = item.get("oracle_reference_gain", 0.0)
+            rel_r = (abs_r / max(q_star, 1e-9)) if q_star > 0 else 0.0
+        sweep_by_budget[bp][pol]["abs_regret"].append(float(abs_r))
+        sweep_by_budget[bp][pol]["rel_regret"].append(float(rel_r))
+        # NormalizedRegret_gain = (Q* - Q_P) / (Q* - Q_0) where Q_0 is NO_OP (gain = 0)
+        sweep_by_budget[bp][pol]["norm_regret_gain"].append(float(rel_r))
         sweep_by_budget[bp][pol]["actual_dq"].append(item.get("actual_delta_q", 0.0))
 
+def _parse_budget_key(k: str) -> float:
+    try:
+        return float(k.rstrip("%"))
+    except ValueError:
+        return 0.0
+
 multi_seed_regret_summary = {}
-for bp in sorted(sweep_by_budget.keys(), key=float):
+for bp in sorted(sweep_by_budget.keys(), key=_parse_budget_key):
     multi_seed_regret_summary[bp] = {}
     for pol, stats in sweep_by_budget[bp].items():
         multi_seed_regret_summary[bp][pol] = {
@@ -102,6 +126,8 @@ for bp in sorted(sweep_by_budget.keys(), key=float):
             "std_abs_regret": float(np.std(stats["abs_regret"])),
             "mean_norm_regret": float(np.mean(stats["rel_regret"])),
             "std_norm_regret": float(np.std(stats["rel_regret"])),
+            "mean_normalized_regret_gain": float(np.mean(stats["norm_regret_gain"])),
+            "std_normalized_regret_gain": float(np.std(stats["norm_regret_gain"])),
             "n_seeds": len(stats["actual_dq"]),
         }
 
@@ -131,7 +157,7 @@ for b_level, d in decomp_summary.items():
 print("\n-- Multi-Seed Selection Regret (5 Seeds Mean) --")
 print(f"{'Budget (ms)':12s} | {'Policy':18s} | {'Mean Realized Q':16s} | {'Normalized Regret':18s}")
 print("-" * 72)
-for bp in sorted(sweep_by_budget.keys(), key=float):
+for bp in sorted(sweep_by_budget.keys(), key=_parse_budget_key):
     for pol in ["heuristic", "phase4_learned", "phase6_adaptive"]:
         if pol in multi_seed_regret_summary[bp]:
             st = multi_seed_regret_summary[bp][pol]

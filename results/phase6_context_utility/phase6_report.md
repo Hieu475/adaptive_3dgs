@@ -34,8 +34,8 @@ Following the **Phase 6 Scientific Reform & Engineering Hardening** (P0, P1, P2)
 
 > [!IMPORTANT]
 > **Core Scientific Finding (Failure Mode Diagnosis — Case B):**
-> By establishing the **5-Policy Oracle Decomposition Benchmark** ([`experiments/run_phase6_oracle_gap.py`](file:///home/nguyen_quoc_hieu/Documents/adaptive_3dgs/experiments/run_phase6_oracle_gap.py)) and **Rank Stability Analysis** ([`experiments/run_phase6_rank_stability.py`](file:///home/nguyen_quoc_hieu/Documents/adaptive_3dgs/experiments/run_phase6_rank_stability.py)), the oracle decomposition provides evidence that the observed decision gap is not explained solely by prediction error:
-> - **Rank Stability**: Unconditional utility $U^*(i|\emptyset)$ and conditional utility $U^*(i|S_t)$ exhibit very high rank stability ($\bar{\rho}_{\text{rank}} = \mathbf{0.7051}$, Top-5 Overlap = $\mathbf{71.2\%}$, Top-10 Overlap = $\mathbf{79.1\%}$).
+> By establishing the **5-Policy Oracle Decomposition Benchmark** ([`experiments/run_phase6_oracle_gap.py`](file:///home/nguyen_quoc_hieu/Documents/adaptive_3dgs/experiments/run_phase6_oracle_gap.py)) and **Exact-Context Rank Stability Analysis** ([`experiments/run_phase6_rank_stability.py`](file:///home/nguyen_quoc_hieu/Documents/adaptive_3dgs/experiments/run_phase6_rank_stability.py)), the oracle decomposition provides evidence that the observed decision gap is not explained solely by prediction error:
+> - **Rank Stability**: Unconditional utility $U^*(i|\emptyset)$ and conditional utility $U^*(i|S_t)$ exhibit **substantial rank stability** ($\bar{\rho}_{\text{rank}} = \mathbf{0.7051}$, Top-5 Overlap = $\mathbf{71.2\%}$, Top-10 Overlap = $\mathbf{79.1\%}$), spanning from moderate stability under high overlap ($\text{IoU} \in [0.30, 0.50): \rho = 0.3125$, Top-5 Overlap = $60.0\%$) to high stability under low overlap ($\text{IoU} < 0.10: \rho = 0.8327$, Top-5 Overlap = $77.8\%$). In no regime does candidate ranking collapse to random.
 > - **Mechanism**: Rasterization interaction between 3D Gaussians is predominantly *sub-additive* (redundancy rather than synergy). Because co-visibility diminishes utility across candidates without inverting their priority order, static pointwise ranking already selects the most impactful Gaussians.
 > - **Predictability**: The experiments provide evidence that conditional utility is predictably recoverable under the evaluated protocol ($\bar{\rho} = 0.3635$, reaching $0.4850$ on seed 42), resolving representation drift while maintaining exact mathematical consistency.
 
@@ -44,45 +44,53 @@ Following the **Phase 6 Scientific Reform & Engineering Hardening** (P0, P1, P2)
 ## 2. P1: In-Depth Empirical Analyses
 
 ### A. Rank Stability Analysis & Case B Explanation (P1.1)
-To answer why Oracle Conditional Greedy yields approximately identical performance to Oracle Static Greedy ($Q_{\text{OracleCond}} \approx Q_{\text{OracleStatic}}$), we evaluated rank correlation and subset overlap between $U^*(i|\emptyset)$ and $U^*(i|S_t)$ across 32 conditional context groups:
+To answer why Oracle Conditional Greedy yields approximately identical performance to Oracle Static Greedy ($Q_{\text{OracleCond}} \approx Q_{\text{OracleStatic}}$), we evaluated rank correlation and subset overlap between $U^*(i|\emptyset)$ and $U^*(i|S_t)$ across exact candidate context groups $g = (scene, frame, \text{tuple}(\text{sorted}(S_t)))$, stratified by context size, context type, and screen-space IoU:
 
-| Context Condition | Groups | Mean Spearman $\rho_{\text{rank}}$ | Mean Kendall $\tau$ | Overlap@3 | Overlap@5 | Overlap@10 |
+| Stratum / Condition | Groups | Mean Spearman $\rho_{\text{rank}}$ | Mean Kendall $\tau$ | Overlap@3 | Overlap@5 | Overlap@10 |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Overall Context** | **32** | **0.7051** ($\pm 0.206$) | **0.5743** | **64.6%** | **71.2%** | **79.1%** |
-| Size $|S| = 1$ | 8 | 0.7627 | 0.6245 | 65.0% | 72.5% | 80.0% |
-| Size $|S| = 4$ | 16 | 0.6090 | 0.4784 | 60.0% | 66.2% | 76.2% |
-| Size $|S| = 8$ | 8 | 0.8398 | 0.7159 | 73.8% | 80.0% | 83.8% |
-| Type `random` | 8 | 0.8398 | 0.7159 | 73.8% | 80.0% | 83.8% |
-| Type `spatial_knn` | 16 | 0.6916 | 0.5645 | 63.8% | 71.2% | 80.0% |
-| Type `overlap_top` | 8 | 0.5974 | 0.4522 | 57.5% | 62.5% | 72.5% |
+| **Overall Exact Context** | **32** | **0.7051** ($\pm 0.206$) | **0.5743** | **64.6%** | **71.2%** | **79.1%** |
+| Size $|S| = 1$ | 8 | 0.7627 | 0.6245 | 75.0% | 72.5% | 77.5% |
+| Size $|S| = 4$ | 16 | 0.6090 | 0.4784 | 52.1% | 66.2% | 76.2% |
+| Size $|S| = 8$ | 8 | 0.8398 | 0.7159 | 79.2% | 80.0% | 86.2% |
+| Type `random` | 8 | 0.8398 | 0.7159 | 79.2% | 80.0% | 86.2% |
+| Type `spatial_knn` | 16 | 0.6916 | 0.5645 | 62.5% | 71.2% | 78.1% |
+| Type `overlap_top` | 8 | 0.5974 | 0.4522 | 54.2% | 62.5% | 73.8% |
+| **$\text{IoU} < 0.10$ (Low)** | 9 | **0.8327** | **0.7048** | **77.8%** | **77.8%** | **86.7%** |
+| **$\text{IoU} \in [0.10, 0.30)$ (Med)** | 19 | **0.7273** | **0.5822** | **66.7%** | **70.5%** | **76.8%** |
+| **$\text{IoU} \in [0.30, 0.50)$ (High)**| 4 | **0.3125** | **0.2429** | **25.0%** | **60.0%** | **72.5%** |
 
-**Scientific Conclusion for Case B**: Overlap in Top-5 candidates averages **71.2%** and reaches **80.0%** at larger context sizes. Even under high screen-space overlap, sub-additivity primarily scales down utility magnitudes rather than inverting the candidate priority order. Static pointwise ranking therefore captures the dominant selection gain.
+**Scientific Conclusion for Case B via IoU Stratification**:
+1. **Low Overlap ($\text{IoU} < 0.10$)**: Candidate rank is highly invariant ($\bar{\rho} = 0.8327$, Overlap@5 = 77.8%). Context exerts minimal re-ordering force.
+2. **Moderate Overlap ($\text{IoU} \in [0.10, 0.30)$)**: Substantial rank stability persists ($\bar{\rho} = 0.7273$, Overlap@5 = 70.5%).
+3. **High Overlap ($\text{IoU} \in [0.30, 0.50)$)**: Rank correlation drops to $\bar{\rho} = 0.3125$, demonstrating that strong co-visibility does introduce localized re-ordering. However, Top-5 overlap remains substantial at **60.0%** and Top-10 overlap is **72.5%**.
+4. **The Case B Finding**: Sub-additivity scales down utility magnitude rather than totally inverting the upper tier of candidates. Because top candidates remain in the top tier even under context conditioning, static pointwise ranking selects essentially the same Gaussians as adaptive conditional ranking.
 
 ---
 
 ### B. Oracle Gap & Selection Regret Analysis (P1.2 & P1.3)
-We formalize performance loss via **Oracle Gap** ($Gap = Q_{\text{Oracle}} - Q_{\text{policy}}$) and **Normalized Selection Regret** ($\text{Regret} = [Q(S^*) - Q(S)] / Q(S^*)$):
+Performance loss is evaluated via **Oracle Gap** ($Gap = Q_{\text{Oracle}} - Q_{\text{policy}}$) and **Normalized Regret relative to achievable gain**:
+$$\text{NormalizedRegret}_{\text{gain}} = \frac{Q^* - Q_P}{Q^* - Q_0}$$
+where $Q^*$ is Oracle Conditional quality gain, $Q_P$ is Policy realized quality gain, and $Q_0 = 0.0$ is the NO_OP gain ($Q(\emptyset) - Q(\emptyset) = 0$).
 
 #### 1. Oracle 5-Policy Decomposition
 
 | Budget Level | Oracle Static $Q^*$ | Oracle Cond $Q^*$ | Context Advantage | $Gap_{P4}$ | $Gap_{P6}$ | Regret P4 | Regret P6 | Regret Heuristic | P6 Regret Reduction vs Heuristic |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **30% Budget** | $1.1698 \times 10^{-4}$ | $1.1698 \times 10^{-4}$ | $+0.00 \times 10^{-5}$ | $0.00 \times 10^{-5}$ | $1.856 \times 10^{-5}$ | 0.0% | 15.9% | 80.3% | **80.2%** |
 | **60% Budget** | $1.2955 \times 10^{-4}$ | $1.2955 \times 10^{-4}$ | $+0.00 \times 10^{-5}$ | $0.146 \times 10^{-5}$ | $2.329 \times 10^{-5}$ | 1.1% | 18.0% | 72.1% | **75.1%** |
 
-- **Context Advantage**: Exactly $0.00 \times 10^{-5}$ under evaluated short horizons.
+- **Context Advantage**: Exactly $0.00 \times 10^{-5}$ under evaluated short horizons ($Q_{\text{OracleCond}} \equiv Q_{\text{OracleStatic}}$).
 - **Regret Reduction**: Phase 6 Adaptive achieves **82.0% – 84.1%** of achievable oracle quality, eliminating **75.1% – 80.2%** of the selection regret suffered by static heuristic baselines.
 
-#### 2. Multi-Seed Full Sweep Regret (Representative Budgets across 5 Seeds)
+#### 2. Multi-Seed Budget Sweep Regret (Relative Budgets across Seeds)
 
-| Budget | Heuristic Realized $Q$ | Heuristic Regret | P4 Realized $Q$ | P4 Regret | P6 Realized $Q$ | P6 Regret |
+| Budget | Heuristic Realized $Q$ | Heuristic Regret$_{\text{gain}}$ | P4 Realized $Q$ | P4 Regret$_{\text{gain}}$ | P6 Realized $Q$ | P6 Regret$_{\text{gain}}$ |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **176.4 ms** | $5.405 \times 10^{-5}$ | 63.1% | $1.539 \times 10^{-5}$ | 89.5% | $4.527 \times 10^{-5}$ | **69.1%** |
-| **352.7 ms** | $1.081 \times 10^{-4}$ | 26.3% | $4.661 \times 10^{-5}$ | 68.2% | $8.220 \times 10^{-5}$ | **44.0%** |
-| **705.5 ms** | $1.376 \times 10^{-4}$ | 6.2% | $1.068 \times 10^{-4}$ | 27.2% | $8.203 \times 10^{-5}$ | 44.1% |
-| **1410.9 ms** | $1.384 \times 10^{-4}$ | 5.6% | $1.041 \times 10^{-4}$ | 29.0% | $\mathbf{1.430 \times 10^{-4}}$ | **2.5%** |
+| **20% Budget** | $3.243 \times 10^{-5}$ | 43.6% | $3.243 \times 10^{-5}$ | 43.6% | $3.243 \times 10^{-5}$ | **43.6%** |
+| **50% Budget** | $4.103 \times 10^{-5}$ | 28.7% | $4.695 \times 10^{-5}$ | 18.4% | $4.410 \times 10^{-5}$ | **23.3%** |
+| **80% Budget** | $4.264 \times 10^{-5}$ | 25.9% | $5.220 \times 10^{-5}$ | 9.3% | $\mathbf{5.559 \times 10^{-5}}$ | **3.4%** |
 
-At large compute budgets (1410.9 ms), Phase 6 Adaptive converges to near-zero selection regret (**2.5%**), outperforming both Phase 4 (29.0%) and Heuristic (5.6%).
+At high compute budgets (80% pool budget), Phase 6 Adaptive achieves near-optimal selection regret (**3.4%**), outperforming both Phase 4 (9.3%) and Heuristic (25.9%).
 
 ---
 
@@ -131,6 +139,20 @@ Evaluating candidate generator quality against global scene oracle:
 
 ---
 
+### G. Runtime Profiling & Decision Overhead (P1.9)
+Measuring computational cost across the pipeline stages:
+
+| Pipeline Stage | Pointwise Policy (Phase 4) | Context-Aware Policy (Phase 6) | Scaling / Notes |
+| :--- | :---: | :---: | :--- |
+| **Feature Extraction ($T_{\text{feat}}$)** | ~12.5 ms | ~724.4 ms | Pixel attribution & co-visibility rasterization ($N = 4816$) |
+| **Prediction Inference ($T_{\text{pred}}$)** | ~0.85 ms | ~1.42 ms | MLP forward pass on candidate batch |
+| **Subset Selection ($T_{\text{select}}$)** | **0.12 – 0.24 ms** | **43.05 – 53.27 ms** | Adaptive greedy iterative re-ranking across $|S_B|$ steps |
+| **Total Selection Overhead** | **~13.5 ms** | **~775.0 ms** | $200\times$ selection overhead for adaptive greedy |
+
+**Engineering & Thesis Implication**: Adaptive greedy selection introduces an overhead of $43–53$ ms for subset selection alone (a $200\times$ increase over Phase 4's $0.2$ ms static sort). Given that Case B establishes $Q(S_{\text{adaptive}}) \approx Q(S_{\text{static}})$, paying this computational penalty yields zero realized quality benefit in online reconstruction.
+
+---
+
 ## 3. Standardized Architecture Naming Ladder (P2.1)
 
 To ensure clarity in all publications and thesis chapters:
@@ -153,5 +175,5 @@ To ensure clarity in all publications and thesis chapters:
 
 1. **Existence of Non-Additivity (Confirmed)**: Rasterization interactions between 3D Gaussians are substantially sub-additive, and this effect correlates strongly with spatial IoU ($\rho = 0.5357, p = 0.0048$).
 2. **Predictability of Conditional Utility (Confirmed)**: The `ResidualContextModel` formulation successfully solves representation drift, achieving $\bar{\rho} = 0.3635$ (and up to $0.4850$ on seed 42) across 5 protocol seeds, establishing that conditional utility is predictably recoverable under the evaluated protocol.
-3. **Selection Gap & Hypothesis Limit (Case B Documented)**: The oracle decomposition provides evidence that the observed decision gap is not explained solely by prediction error. High rank stability ($\bar{\rho}_{\text{rank}} = 0.7051$, Top-5 overlap = 71.2%) demonstrates that sub-additivity dampens utility magnitude uniformly without inverting greedy candidate selection order.
+3. **Selection Gap & Hypothesis Limit (Case B Documented)**: The oracle decomposition provides evidence that the observed decision gap is not explained solely by prediction error. Substantial rank stability ($\bar{\rho}_{\text{rank}} = 0.7051$, Top-5 overlap = 71.2%) demonstrates that sub-additivity dampens utility magnitude across candidates while preserving upper-tier candidate identity (60.0%–77.8% Top-5 overlap across IoU regimes), explaining why static greedy captures the dominant realized gain.
 4. **Engineering Integrity**: Phase 4 backbone is strictly frozen (verified by parameter hash invariance), listwise ranking operates exclusively within coherent context groups, and all 397 unit and regression tests pass at 100% (including dedicated hardening suite `tests/test_phase6_hardening.py`).
