@@ -493,7 +493,19 @@ class TestExactRankStability:
             assert "mean_candidate_context_overlap" in g, "Must record candidate-context overlap"
             assert -1.0 <= g["spearman_rho"] <= 1.0, "Spearman rho must be in [-1, 1]"
             assert 0.0 <= g["overlap_at_5"] <= 1.0, "Overlap@5 must be in [0, 1]"
+            # Candidate coverage audit fields
+            assert "exact_group" in g, "Must record exact_group identifier"
+            assert "n_frame_candidates" in g, "Must record n_frame_candidates"
+            assert "n_conditional_candidates" in g, "Must record n_conditional_candidates"
+            assert "missing_candidates" in g, "Must record missing_candidates"
+            assert "duplicate_candidates" in g, "Must record duplicate_candidates"
+            assert "coverage" in g, "Must record candidate coverage fraction"
+
+        # Coverage audit summary assertion
+        assert "candidate_coverage_audit" in summary, "Summary must include candidate coverage audit"
+        assert "condition_level_100pct_coverage_summary" in summary, "Summary must include condition-level 100% coverage metrics"
 
         # Scientific validity: rank stability is substantial (> 0.50)
         assert summary["mean_spearman_rho"] > 0.50, "Conditional utility must exhibit substantial rank stability"
+        assert summary["condition_level_100pct_coverage_summary"]["mean_spearman_rho"] > 0.50, "100% coverage condition rank stability must exceed 0.50"
 

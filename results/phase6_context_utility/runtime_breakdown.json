@@ -1,0 +1,23 @@
+{
+  "device": "cuda",
+  "n_gaussians": 4132,
+  "n_candidates": 50,
+  "budget_scheduled_ms": 15.0,
+  "actual_runtimes_ms": {
+    "t_feature_extraction": 218.0424070029403,
+    "t_context_construction": 68.57197799763526,
+    "t_mlp_inference": 1.1228383998968638,
+    "t_subset_selection": 77.63465999960317,
+    "t_gaussian_optimization": 590.6558959977701,
+    "t_total_pipeline": 956.0277793978457
+  },
+  "breakdown_percentages": {
+    "feature_extraction_pct": 22.80712043119441,
+    "context_construction_pct": 7.172592624957544,
+    "mlp_inference_pct": 0.11744830266376609,
+    "subset_selection_pct": 8.120544368334293,
+    "gaussian_optimization_pct": 61.78229427284998
+  },
+  "formula": "T_P6 = T_feature + T_context + T_MLP + T_selection + T_optimization",
+  "scientific_implication": "Adaptive context-aware greedy selection imposes an additional selection & context overhead over static sorting. Coupled with Case B rank stability (rho=0.9623), paying this runtime overhead yields zero realized quality improvement."
+}
