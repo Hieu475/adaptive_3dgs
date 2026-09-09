@@ -22,7 +22,7 @@ $$U_i^\star = \frac{\Delta Q_i^{\text{intervention}}}{C_i} \in \mathbb{R}$$
 
 - $\Delta Q_i^{\text{intervention}} = Q(G_t \cup \{\Delta \theta_i\}) - Q(G_t)$ is the realized change in global reconstruction quality under isolated trial intervention (combining photometric PSNR and geometric depth fidelity).
 - $C_i$ is the empirical execution time cost (ms).
-- Under this intervention protocol, $U_i^\star$ admits a direct causal interpretation as the counterfactual effect of allocating gradient updates to primitive $g_i$.
+- Under this intervention protocol, $U_i^\star$ quantifies the counterfactual intervention effect of allocating gradient updates to primitive $g_i$.
 - When optimization causes depth tearing or appearance degradation, $U_i^\star < 0$, providing an explicit penalty signal without artificial zero-clamping.
 
 ---
@@ -58,7 +58,7 @@ Budget-Constrained Selection (S_B) ──► Knapsack greedy under Σ C_i ≤ B
 Selective Optimization (SelectiveAdam) ──► Update only S_B; Background Cache
          │
          ▼
-Reconstruction Quality (Q_t) ──► Monitored PSNR, SSIM, Depth L1
+Optimized Scene State G_{t+1}
 ```
 
 1. **State Observation**: Extracts 11 canonical features per Gaussian: photometric residual, depth residual, gradient norm, screen-space visibility, attribution mass, positional drift, residual EMA drift, temporal drift, uncertainty, projected area, and update age.
@@ -72,7 +72,7 @@ Reconstruction Quality (Q_t) ──► Monitored PSNR, SSIM, Depth L1
 
 | Phase / Gate | Core Question | Empirical Finding & Authoritative Metric |
 | :--- | :--- | :--- |
-| **Oracle (Gate 1)** | Is marginal utility measurable and causally non-negative? | **Yes (Measurable & Frequently Negative)**: Evaluated on TUM RGB-D (`freiburg1_desk`); positive headroom $H = +0.000149 > 0$. Crucially, **$20.5\%$** of interventions yield negative utility ($U_i^\star < 0$), refuting non-negativity assumptions. Concurrent optimization is severely sub-additive ($R_{add} = 0.2249$ at $|S|=4$, $R_{add} = 0.0048$ at $|S|=16$). |
+| **Oracle (Gate 1)** | Is marginal utility measurable and empirically non-negative? | **Yes (Measurable & Frequently Negative)**: Evaluated on TUM RGB-D (`freiburg1_desk`); positive headroom $H = +0.000149 > 0$. Crucially, **$20.5\%$** of interventions yield negative utility ($U_i^\star < 0$), refuting non-negativity assumptions. Concurrent optimization is severely sub-additive ($R_{add} = 0.2249$ at $|S|=4$, $R_{add} = 0.0048$ at $|S|=16$). |
 | **Phase 4 (Gate 2)** | Can observable state predict marginal utility? | **Limited but Non-Trivial**: TwoHeadMLP achieves $\rho = +0.2035 \pm 0.172$, $\text{NDCG@20} = 0.4566$, $\text{OSE@20} = 0.497 \pm 0.102$, outperforming error-only heuristics on zero-shot cross-scene transfer (`tum_fr2_xyz`). |
 | **Phase 5 (Gate 3)** | Does utility prediction improve budgeted selection? | **Substantial Gain at Tight Budgets**: At $10\%\text{–}20\%$ budget, TwoHeadMLP delivers nearly double the selection efficiency of error ranking ($+\text{92.6}\%\text{–}+108.0\%$). In multi-frame online SLAM, reduces optimization latency by $33.6\%$ vs heuristic knapsack and $47.7\%$ vs error-only while matching reconstruction PSNR. |
 | **Phase 6 (Gate 6A-6E)** | Does context alter marginal utility and candidate ranking? | **Magnitude Shifts, Candidate Priority Substantially Stable**: Screen-space co-visibility modulates utility sub-additively ($\rho(\text{IoU}, \|I\|) = 0.5357, p = 0.0048$). However, candidate rank remains substantially stable: $\bar{\rho}_{\text{rank}} = \mathbf{0.8916} \pm \mathbf{0.1104}$, Kendall $\bar{\tau} = \mathbf{0.8043}$, and Top-5 candidate overlap reaches $\mathbf{80.0\%}$ across 27 full-coverage groups. |

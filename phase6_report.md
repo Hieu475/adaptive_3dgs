@@ -282,7 +282,7 @@ To rigorously dissect the contribution of each contextual feature group, we anal
 3. **+ Screen-Space IoU Overlap (`self_overlap`, 16D, P6-C) — Rasterization Interference**:
    - *Question*: How much predictive signal is provided by 2D screen-space projected bounding box overlap?
    - *Finding*: Spearman $\rho$ jumps to $0.1677$ (a $+90.4\%$ relative improvement over Self Only), with $\text{NDCG@5} = 0.7199$.
-   - *Interpretation*: Screen-space overlap directly models ray-marching occlusion and rasterizer competition during alpha blending. Since Gate 6A proves that pairs in the high-IoU stratum are 100% sub-additive, explicit overlap metrics capture real physical interaction effects.
+   - *Interpretation*: Screen-space overlap directly models ray-marching occlusion and rasterizer competition during alpha blending. Since Gate 6A demonstrates that pairs in the high-IoU stratum are 100% sub-additive, explicit overlap metrics capture real physical interaction effects.
 
 4. **+ Selected Set Context (`self_selected`, 19D, P6-D & `self_neighbor_selected`, 27D, P6-F Primary)**:
    - *Question*: Does dynamic awareness of the already-selected subset $S_t$ enhance utility prediction?
