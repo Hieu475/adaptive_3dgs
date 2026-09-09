@@ -129,21 +129,12 @@ def run_rank_stability_analysis(
         missing_cands = len(pool_set - unique_measured)
         coverage_pct = len(unique_measured & pool_set) / max(n_pool, 1)
 
-        # Check full-coverage invariant: measured candidates == pool candidates
-        is_full_coverage = (missing_cands == 0 and dup_cands == 0 and n_pool >= 3 and len(unique_measured) == n_pool)
-
-        # Mean candidate-context overlap for this exact context
-        mean_overlap = float(np.mean([
-            float(s.get("selected_features", {}).get("candidate_selected_overlap",
-                  s.get("overlap_features", {}).get("mean_overlap", 0.0)))
-            for s in cand_list
-        ]))
-
         c_size = len(ctx_ids)
         c_type = str(cand_list[0].get("context_type", "default"))
         exact_grp_key = f"{scene_str}_f{frame_int}_ctx{len(ctx_ids)}_{'_'.join(str(x) for x in ctx_ids[:4])}"
 
-        if not is_full_coverage:
+        # Invariant check: measured candidates must equal candidate pool exactly (zero missing, zero duplicates)
+        if pool_set != unique_measured or dup_cands > 0 or n_pool < 2:
             # SKIP group from ranking metrics: DO NOT USE SYNTHETIC BASELINE FILL!
             group_results.append({
                 "group_key": exact_grp_key,
@@ -160,7 +151,6 @@ def run_rank_stability_analysis(
                 "duplicate_candidates": dup_cands,
                 "coverage": float(coverage_pct),
                 "is_full_coverage": False,
-                "mean_candidate_context_overlap": mean_overlap,
                 "spearman_rho": None,
                 "kendall_tau": None,
                 "overlap_at_3": None,
@@ -170,15 +160,20 @@ def run_rank_stability_analysis(
             continue
 
         # Zero baseline fill: evaluate directly on measured vectors u_empty and u_cond
-        arr_empty = np.array([
-            empty_utils.get((scene_str, frame_int, cid), 0.0)
-            for cid in pool_ids
-        ], dtype=np.float64)
+        # Ordered by identical candidate ordering
+        ordered_ids = sorted(pool_ids)
+        u_empty = [empty_utils.get((scene_str, frame_int, cid), 0.0) for cid in ordered_ids]
+        u_cond = [measured_dict[cid] for cid in ordered_ids]
 
-        arr_cond = np.array([
-            measured_dict[cid]
-            for cid in pool_ids
-        ], dtype=np.float64)
+        arr_empty = np.array(u_empty, dtype=np.float64)
+        arr_cond = np.array(u_cond, dtype=np.float64)
+
+        # Mean candidate-context overlap for this exact context
+        mean_overlap = float(np.mean([
+            float(s.get("selected_features", {}).get("candidate_selected_overlap",
+                  s.get("overlap_features", {}).get("mean_overlap", 0.0)))
+            for s in cand_list
+        ]))
 
         # Spearman rank correlation & Kendall tau
         if np.all(arr_empty == arr_empty[0]) or np.all(arr_cond == arr_cond[0]):
@@ -270,8 +265,8 @@ def run_rank_stability_analysis(
     summary_by_type = {k: _agg(v) for k, v in sorted(by_type.items())}
     summary_by_iou = {k: _agg(v) for k, v in sorted(by_iou.items()) if len(v["rho"]) > 0}
 
-    # Tier 2: Coverage diagnostics
-    n_groups_100pct = sum(1 for g in group_results if g["missing_candidates"] == 0 and g["coverage"] == 1.0)
+    # Coverage audit metrics
+    n_groups_100pct = sum(1 for g in group_results if g["missing_candidates"] == 0 and g["duplicate_candidates"] == 0 and g["coverage"] == 1.0 and g["is_full_coverage"])
     mean_cov = float(np.mean([g["coverage"] for g in group_results])) if group_results else 0.0
     median_cov = float(np.median([g["coverage"] for g in group_results])) if group_results else 0.0
     mean_missing = float(np.mean([g["missing_candidates"] for g in group_results])) if group_results else 0.0
@@ -288,16 +283,16 @@ def run_rank_stability_analysis(
         "mean_missing_candidates_per_group": mean_missing,
         "total_missing_candidates": total_missing,
         "total_duplicate_candidates": total_dups,
-        "invariant_measured_equals_pool": bool(n_groups_100pct == len(group_results) and len(group_results) > 0),
+        "invariant_measured_equals_pool": bool(n_groups_100pct == len(group_results) and len(group_results) > 0 and total_missing == 0 and total_dups == 0),
         "synthetic_baseline_fill_used": False,
         "audit_finding": (
             f"Evaluated {len(group_results)} exact groups g=(scene, frame, S_t). "
-            f"Full-coverage groups (coverage=100%, missing=0): {n_groups_100pct}/{len(group_results)} ({n_groups_100pct/max(len(group_results),1):.1%}). "
+            f"Full-coverage groups (coverage=100%, missing=0, duplicates=0): {n_groups_100pct}/{len(group_results)} ({n_groups_100pct/max(len(group_results),1):.1%}). "
             f"Zero synthetic defaulting used: ranking metrics evaluated strictly on measured vectors."
         ),
     }
 
-    # Tier 1: Exact full-coverage ranking metrics
+    # Summary of full-coverage exact context groups
     overall_summary = {
         "mean_spearman_rho": float(np.mean(all_spearmans)) if all_spearmans else 0.0,
         "std_spearman_rho": float(np.std(all_spearmans)) if all_spearmans else 0.0,
@@ -309,29 +304,26 @@ def run_rank_stability_analysis(
         "n_total_evaluated_groups": len(group_results),
         "n_full_coverage_groups": len(all_spearmans),
         "candidate_coverage_audit": candidate_coverage_audit,
-        "condition_level_100pct_coverage_summary": {
-            "n_groups": len(all_spearmans),
-            "coverage": 1.0,
-            "missing_candidates": 0,
-            "mean_spearman_rho": float(np.mean(all_spearmans)) if all_spearmans else 0.0,
-            "mean_kendall_tau": float(np.mean(all_kendalls)) if all_kendalls else 0.0,
-            "mean_overlap_at_3": float(np.mean(all_overlap_3)) if all_overlap_3 else 0.0,
-            "mean_overlap_at_5": float(np.mean(all_overlap_5)) if all_overlap_5 else 0.0,
-            "mean_overlap_at_10": float(np.mean(all_overlap_10)) if all_overlap_10 else 0.0,
-        },
         "case_b_explanation": (
             f"Exact full-coverage conditional utility without synthetic baseline fill demonstrates "
             f"rank stability rho = {np.mean(all_spearmans):.4f} (Overlap@5 = {np.mean(all_overlap_5):.1%}) "
             f"across {len(all_spearmans)} 100%-coverage groups. Sub-additive rasterization interactions "
             f"modulate utility scales while candidate prioritization remains substantially stable."
         ) if all_spearmans else "No full-coverage groups found.",
+        "condition_level_100pct_coverage_summary": {
+            "note": "Heuristic aggregate retained for backwards-compatibility; exact context group is the primary rank evaluation unit",
+            "mean_spearman_rho": float(np.mean(all_spearmans)) if all_spearmans else 0.0,
+            "std_spearman_rho": float(np.std(all_spearmans)) if all_spearmans else 0.0,
+            "mean_kendall_tau": float(np.mean(all_kendalls)) if all_kendalls else 0.0,
+            "mean_overlap_at_5": float(np.mean(all_overlap_5)) if all_overlap_5 else 0.0,
+            "n_groups": len(all_spearmans),
+        },
     }
 
     full_output = {
         "n_total_evaluated_groups": len(group_results),
         "n_full_coverage_groups": len(all_spearmans),
         "candidate_coverage_audit": candidate_coverage_audit,
-        "condition_level_100pct_coverage_summary": overall_summary["condition_level_100pct_coverage_summary"],
         "overall_summary": overall_summary,
         "by_context_size": summary_by_size,
         "by_context_type": summary_by_type,

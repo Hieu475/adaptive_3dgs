@@ -1,22 +1,22 @@
 {
   "device": "cuda",
-  "n_gaussians": 4131,
+  "n_gaussians": 4138,
   "n_candidates": 50,
   "budget_scheduled_ms": 15.0,
   "actual_runtimes_ms": {
-    "t_feature_extraction": 240.25062399960007,
-    "t_context_construction": 74.72645700181602,
-    "t_mlp_inference": 1.2092905999452341,
-    "t_subset_selection": 82.73540399750345,
-    "t_gaussian_optimization": 596.7539320008655,
-    "t_total_pipeline": 995.6757075997302
+    "t_feature_extraction": 225.79198899620678,
+    "t_context_construction": 66.84313499863492,
+    "t_mlp_inference": 1.1200582011952065,
+    "t_subset_selection": 76.35735199437477,
+    "t_gaussian_optimization": 554.4764159931219,
+    "t_total_pipeline": 924.5889501835336
   },
   "breakdown_percentages": {
-    "feature_extraction_pct": 24.129405002635938,
-    "context_construction_pct": 7.505099946845009,
-    "mlp_inference_pct": 0.12145426374421286,
-    "subset_selection_pct": 8.309472990654077,
-    "gaussian_optimization_pct": 59.93456779612076
+    "feature_extraction_pct": 24.4207968255933,
+    "context_construction_pct": 7.22949749565646,
+    "mlp_inference_pct": 0.12114120561065235,
+    "subset_selection_pct": 8.258518769796849,
+    "gaussian_optimization_pct": 59.970045703342734
   },
   "formula": "T_P6 = T_feature + T_context + T_MLP + T_selection + T_optimization",
   "scientific_implication": "Adaptive context-aware greedy selection imposes an additional selection & context overhead over static sorting. Coupled with Case B rank stability (rho=0.9089 at 100% full candidate coverage), paying this runtime overhead yields zero realized quality improvement."

@@ -50,11 +50,11 @@
     },
     "neighbor_mean_rgb_error": {
       "mean": 0.3590119481086731,
-      "std": 0.21133527159690857
+      "std": 0.21133525669574738
     },
     "neighbor_mean_depth_error": {
-      "mean": 0.38838887214660645,
-      "std": 0.3429417312145233
+      "mean": 0.38838890194892883,
+      "std": 0.3429417014122009
     },
     "neighbor_mean_gradient_norm": {
       "mean": 6.360044002532959,
@@ -109,7 +109,7 @@
       "std": 0.2551155090332031
     },
     "selected_mean_depth_error": {
-      "mean": 0.21515052020549774,
+      "mean": 0.21515050530433655,
       "std": 0.24903516471385956
     },
     "selected_mean_influence": {

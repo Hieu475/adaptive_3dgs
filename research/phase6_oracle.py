@@ -294,10 +294,17 @@ class ConditionalOracleExperiment:
         delta_q_conditional = dq_si - dq_s
         delta_t_conditional_ms = t_si_ms - t_s_ms
 
-        # Conditional marginal utility
-        utility_conditional = delta_q_conditional / (
-            max(abs(delta_t_conditional_ms), eps)
-        )
+        # Cost validity protocol:
+        # ΔT = T(S ∪ {i}) - T(S) must physically be > 0.
+        # If ΔT <= 0 due to GPU timing noise/jitter, mark invalid and use regularized baseline cost
+        delta_t_valid = bool(delta_t_conditional_ms > 0.0)
+        if delta_t_valid:
+            effective_delta_t_ms = delta_t_conditional_ms
+        else:
+            # Standalone single cost fallback if S was non-empty, else eps floor
+            effective_delta_t_ms = max(eps, 1.0)
+
+        utility_conditional = delta_q_conditional / effective_delta_t_ms
 
         return {
             # Identification
@@ -595,14 +602,18 @@ class ConditionalOracleExperiment:
 
         rng = np.random.default_rng(seed)
 
-        if context_type == "spatial_knn":
+        if context_type in ("spatial_knn", "spatial_anchor_knn"):
+            # Sample random anchor Gaussian from available visible Gaussians: a_t ~ P(visible \ pool)
+            # S_t = KNN(a_t)
             anchor = int(rng.choice(available))
             avail_tensor = torch.tensor(available, dtype=torch.long, device=positions.device)
             diffs = positions[avail_tensor] - positions[anchor]
             dists = torch.norm(diffs, dim=-1)
             k_sel = min(context_size, len(available))
             topk = torch.argsort(dists)[:k_sel]
-            return [available[idx] for idx in topk.cpu().tolist()]
+            sampled_ids = [available[idx] for idx in topk.cpu().tolist()]
+            assert len(set(sampled_ids) & exclude_set) == 0, "Context S_t must be strictly disjoint from candidate pool P_t"
+            return sampled_ids
 
         elif context_type == "overlap_top":
             if contrib_indices is not None and contrib_weights is not None:
@@ -776,6 +787,8 @@ class ConditionalOracleExperiment:
                     q_si_loss = 0.0
                     t_si_ms = dt_cond
                     dq_si = dq_cond
+                    delta_t_valid = bool(dt_cond > 0.0)
+                    effective_dt = dt_cond if delta_t_valid else eps
                 else:
                     # S ≠ ∅: optimize S ∪ {cand_idx} from original state
                     group_si = context_ids + [cand_idx]
@@ -804,7 +817,14 @@ class ConditionalOracleExperiment:
                     dq_si = float(self._compute_delta_quality(q_baseline, q_si))
                     dq_cond = dq_si - dq_s
                     dt_cond = t_si_ms - t_s_ms
-                    u_cond = dq_cond / max(abs(dt_cond), eps)
+                    delta_t_valid = bool(dt_cond > 0.0)
+                    if delta_t_valid:
+                        effective_dt = dt_cond
+                    else:
+                        s_dt = single_measurements[cand_idx]["delta_t_single"]
+                        effective_dt = max(s_dt, eps) if s_dt > 0.0 else eps
+
+                    u_cond = dq_cond / effective_dt
                     q_si_psnr = q_si["psnr"]
                     q_si_loss = q_si["loss"]
 
@@ -845,6 +865,8 @@ class ConditionalOracleExperiment:
                     "t_s_ms": float(t_s_ms),
                     "t_si_ms": float(t_si_ms),
                     "delta_t_conditional_ms": float(dt_cond),
+                    "delta_t_valid": bool(delta_t_valid),
+                    "effective_delta_t_ms": float(effective_dt),
                     "utility_conditional": float(u_cond),
                     "delta_q_single": float(single_measurements[cand_idx]["delta_q_single"]),
                     "delta_t_single": float(single_measurements[cand_idx]["delta_t_single"]),

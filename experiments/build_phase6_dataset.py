@@ -518,6 +518,37 @@ def verify_dataset(
     verification["checks"]["total_duplicate_candidates"] = dup_count
     print(f"  [{'✓' if is_100pct_coverage else '✗'}] Exact Groups Coverage: {full_cov_groups}/{len(exact_groups)} ({cov_rate:.1%}), missing={missing_count}, dups={dup_count}")
 
+    # Check 7: Candidate pool consistency within exact groups
+    pool_consistent = all(
+        tuple(s_list[0].get("candidate_pool_ids", [])) == tuple(s.get("candidate_pool_ids", []))
+        for k, s_list in exact_groups.items() for s in s_list
+    )
+    verification["checks"]["candidate_pool_consistent_within_group"] = pool_consistent
+    print(f"  [{'✓' if pool_consistent else '✗'}] Candidate pool consistent across all records in same group")
+
+    # Check 8: Context S_t strictly disjoint from candidate pool P_t (S_t ∩ P_t = ∅)
+    disjoint_ok = all(
+        len(set(s.get("context_ids", [])) & set(s.get("candidate_pool_ids", []))) == 0
+        for s in all_samples
+    )
+    verification["checks"]["context_disjoint_from_pool"] = disjoint_ok
+    print(f"  [{'✓' if disjoint_ok else '✗'}] S_t ∩ P_t = ∅ across all {len(all_samples)} samples")
+
+    # Check 9: Cost validity audit
+    invalid_cost = sum(1 for s in all_samples if not s.get("delta_t_valid", True))
+    neg_dt = sum(1 for s in all_samples if s.get("delta_t_conditional_ms", 1.0) < 0)
+    zero_dt = sum(1 for s in all_samples if s.get("delta_t_conditional_ms", 1.0) == 0)
+    verification["cost_diagnostics"] = {
+        "invalid_cost_count": invalid_cost,
+        "negative_delta_t_count": neg_dt,
+        "zero_delta_t_count": zero_dt,
+        "valid_cost_fraction": float(1.0 - invalid_cost / max(len(all_samples), 1)),
+    }
+    verification["checks"]["no_unhandled_invalid_cost"] = all(
+        "effective_delta_t_ms" in s and s["effective_delta_t_ms"] > 0 for s in all_samples
+    )
+    print(f"  [{'✓' if verification['checks']['no_unhandled_invalid_cost'] else '✗'}] Cost validity: {invalid_cost}/{len(all_samples)} invalid raw ΔT (neg={neg_dt}, zero={zero_dt}); all handled via effective ΔT > 0")
+
     all_pass = all(v for k, v in verification["checks"].items() if isinstance(v, bool))
     verification["overall_pass"] = all_pass
     print(f"\n  {'✓ ALL CHECKS PASSED' if all_pass else '✗ SOME CHECKS FAILED'}")

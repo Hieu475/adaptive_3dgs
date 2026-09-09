@@ -13,26 +13,16 @@
     "total_duplicate_candidates": 0,
     "invariant_measured_equals_pool": true,
     "synthetic_baseline_fill_used": false,
-    "audit_finding": "Evaluated 27 exact groups g=(scene, frame, S_t). Full-coverage groups (coverage=100%, missing=0): 27/27 (100.0%). Zero synthetic defaulting used: ranking metrics evaluated strictly on measured vectors."
-  },
-  "condition_level_100pct_coverage_summary": {
-    "n_groups": 27,
-    "coverage": 1.0,
-    "missing_candidates": 0,
-    "mean_spearman_rho": 0.908939014202172,
-    "mean_kendall_tau": 0.8152046783625733,
-    "mean_overlap_at_3": 0.6790123456790125,
-    "mean_overlap_at_5": 0.8222222222222223,
-    "mean_overlap_at_10": 0.8999999999999999
+    "audit_finding": "Evaluated 27 exact groups g=(scene, frame, S_t). Full-coverage groups (coverage=100%, missing=0, duplicates=0): 27/27 (100.0%). Zero synthetic defaulting used: ranking metrics evaluated strictly on measured vectors."
   },
   "overall_summary": {
-    "mean_spearman_rho": 0.908939014202172,
-    "std_spearman_rho": 0.10397213899343916,
-    "median_spearman_rho": 0.9473684210526315,
-    "mean_kendall_tau": 0.8152046783625733,
-    "mean_overlap_at_3": 0.6790123456790125,
-    "mean_overlap_at_5": 0.8222222222222223,
-    "mean_overlap_at_10": 0.8999999999999999,
+    "mean_spearman_rho": 0.8916179337231968,
+    "std_spearman_rho": 0.11040618535787752,
+    "median_spearman_rho": 0.918796992481203,
+    "mean_kendall_tau": 0.8042884990253412,
+    "mean_overlap_at_3": 0.7283950617283951,
+    "mean_overlap_at_5": 0.8,
+    "mean_overlap_at_10": 0.8925925925925926,
     "n_total_evaluated_groups": 27,
     "n_full_coverage_groups": 27,
     "candidate_coverage_audit": {
@@ -47,71 +37,69 @@
       "total_duplicate_candidates": 0,
       "invariant_measured_equals_pool": true,
       "synthetic_baseline_fill_used": false,
-      "audit_finding": "Evaluated 27 exact groups g=(scene, frame, S_t). Full-coverage groups (coverage=100%, missing=0): 27/27 (100.0%). Zero synthetic defaulting used: ranking metrics evaluated strictly on measured vectors."
+      "audit_finding": "Evaluated 27 exact groups g=(scene, frame, S_t). Full-coverage groups (coverage=100%, missing=0, duplicates=0): 27/27 (100.0%). Zero synthetic defaulting used: ranking metrics evaluated strictly on measured vectors."
     },
+    "case_b_explanation": "Exact full-coverage conditional utility without synthetic baseline fill demonstrates rank stability rho = 0.8916 (Overlap@5 = 80.0%) across 27 100%-coverage groups. Sub-additive rasterization interactions modulate utility scales while candidate prioritization remains substantially stable.",
     "condition_level_100pct_coverage_summary": {
-      "n_groups": 27,
-      "coverage": 1.0,
-      "missing_candidates": 0,
-      "mean_spearman_rho": 0.908939014202172,
-      "mean_kendall_tau": 0.8152046783625733,
-      "mean_overlap_at_3": 0.6790123456790125,
-      "mean_overlap_at_5": 0.8222222222222223,
-      "mean_overlap_at_10": 0.8999999999999999
-    },
-    "case_b_explanation": "Exact full-coverage conditional utility without synthetic baseline fill demonstrates rank stability rho = 0.9089 (Overlap@5 = 82.2%) across 27 100%-coverage groups. Sub-additive rasterization interactions modulate utility scales while candidate prioritization remains substantially stable."
+      "note": "Heuristic aggregate retained for backwards-compatibility; exact context group is the primary rank evaluation unit",
+      "mean_spearman_rho": 0.8916179337231968,
+      "std_spearman_rho": 0.11040618535787752,
+      "mean_kendall_tau": 0.8042884990253412,
+      "mean_overlap_at_5": 0.8,
+      "n_groups": 27
+    }
   },
   "by_context_size": {
     "1": {
-      "mean_spearman_rho": 0.9124477861319965,
-      "mean_kendall_tau": 0.8257309941520469,
-      "mean_overlap_3": 0.7407407407407408,
-      "mean_overlap_5": 0.8444444444444446,
-      "mean_overlap_10": 0.9000000000000001,
-      "n_groups": 9
-    },
-    "4": {
-      "mean_spearman_rho": 0.8952380952380952,
-      "mean_kendall_tau": 0.8152046783625732,
-      "mean_overlap_3": 0.7407407407407407,
-      "mean_overlap_5": 0.7777777777777778,
+      "mean_spearman_rho": 0.8960735171261486,
+      "mean_kendall_tau": 0.816374269005848,
+      "mean_overlap_3": 0.7777777777777777,
+      "mean_overlap_5": 0.8,
       "mean_overlap_10": 0.8999999999999999,
       "n_groups": 9
     },
+    "4": {
+      "mean_spearman_rho": 0.8786967418546365,
+      "mean_kendall_tau": 0.8000000000000002,
+      "mean_overlap_3": 0.7407407407407408,
+      "mean_overlap_5": 0.8222222222222223,
+      "mean_overlap_10": 0.8888888888888888,
+      "n_groups": 9
+    },
     "8": {
-      "mean_spearman_rho": 0.9191311612364242,
-      "mean_kendall_tau": 0.8046783625730993,
-      "mean_overlap_3": 0.5555555555555556,
-      "mean_overlap_5": 0.8444444444444446,
-      "mean_overlap_10": 0.9000000000000001,
+      "mean_spearman_rho": 0.9000835421888053,
+      "mean_kendall_tau": 0.7964912280701755,
+      "mean_overlap_3": 0.6666666666666666,
+      "mean_overlap_5": 0.7777777777777778,
+      "mean_overlap_10": 0.8888888888888888,
       "n_groups": 9
     }
   },
   "by_context_type": {
     "random": {
-      "mean_spearman_rho": 0.9191311612364242,
-      "mean_kendall_tau": 0.8046783625730993,
-      "mean_overlap_3": 0.5555555555555556,
-      "mean_overlap_5": 0.8444444444444446,
-      "mean_overlap_10": 0.9000000000000001,
+      "mean_spearman_rho": 0.9000835421888053,
+      "mean_kendall_tau": 0.7964912280701755,
+      "mean_overlap_3": 0.6666666666666666,
+      "mean_overlap_5": 0.7777777777777778,
+      "mean_overlap_10": 0.8888888888888888,
       "n_groups": 9
     },
     "spatial_knn": {
-      "mean_spearman_rho": 0.9038429406850459,
-      "mean_kendall_tau": 0.82046783625731,
-      "mean_overlap_3": 0.7407407407407407,
+      "mean_spearman_rho": 0.8873851294903925,
+      "mean_kendall_tau": 0.808187134502924,
+      "mean_overlap_3": 0.7592592592592592,
       "mean_overlap_5": 0.8111111111111112,
-      "mean_overlap_10": 0.8999999999999999,
+      "mean_overlap_10": 0.8944444444444445,
       "n_groups": 18
     }
   },
   "by_iou_bin": {
     "iou_lt_0.10": {
-      "mean_spearman_rho": 0.908939014202172,
-      "mean_kendall_tau": 0.8152046783625733,
-      "mean_overlap_3": 0.6790123456790125,
-      "mean_overlap_5": 0.8222222222222223,
-      "mean_overlap_10": 0.8999999999999999,
+      "mean_spearman_rho": 0.8916179337231968,
+      "mean_kendall_tau": 0.8042884990253412,
+      "mean_overlap_3": 0.7283950617283951,
+      "mean_overlap_5": 0.8,
+      "mean_overlap_10": 0.8925925925925926,
       "n_groups": 27
     }
   },
@@ -134,10 +122,10 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.9774436090225563,
-      "kendall_tau": 0.9052631578947369,
+      "spearman_rho": 0.9699248120300751,
+      "kendall_tau": 0.8947368421052632,
       "overlap_at_3": 0.6666666666666666,
-      "overlap_at_5": 1.0,
+      "overlap_at_5": 0.8,
       "overlap_at_10": 1.0
     },
     {
@@ -161,11 +149,11 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.9804511278195487,
-      "kendall_tau": 0.9157894736842106,
-      "overlap_at_3": 0.6666666666666666,
-      "overlap_at_5": 1.0,
-      "overlap_at_10": 1.0
+      "spearman_rho": 0.8165413533834586,
+      "kendall_tau": 0.7473684210526316,
+      "overlap_at_3": 0.3333333333333333,
+      "overlap_at_5": 0.8,
+      "overlap_at_10": 0.9
     },
     {
       "group_key": "tum_fr1_desk_f10_ctx8_1156_3309_3606_5667",
@@ -192,9 +180,9 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.9308270676691727,
-      "kendall_tau": 0.8105263157894737,
-      "overlap_at_3": 0.3333333333333333,
+      "spearman_rho": 0.9172932330827066,
+      "kendall_tau": 0.7999999999999999,
+      "overlap_at_3": 0.6666666666666666,
       "overlap_at_5": 0.8,
       "overlap_at_10": 0.9
     },
@@ -216,11 +204,11 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.9398496240601503,
-      "kendall_tau": 0.8421052631578948,
-      "overlap_at_3": 0.6666666666666666,
+      "spearman_rho": 0.9864661654135337,
+      "kendall_tau": 0.9368421052631579,
+      "overlap_at_3": 1.0,
       "overlap_at_5": 0.8,
-      "overlap_at_10": 0.9
+      "overlap_at_10": 1.0
     },
     {
       "group_key": "tum_fr1_desk_f20_ctx4_5344_5434_5461_5965",
@@ -243,10 +231,10 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.003793103448275862,
-      "spearman_rho": 0.9669172932330825,
-      "kendall_tau": 0.8526315789473685,
+      "spearman_rho": 0.9834586466165413,
+      "kendall_tau": 0.9157894736842106,
       "overlap_at_3": 0.6666666666666666,
-      "overlap_at_5": 0.8,
+      "overlap_at_5": 1.0,
       "overlap_at_10": 0.9
     },
     {
@@ -274,8 +262,8 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.9443609022556391,
-      "kendall_tau": 0.8210526315789474,
+      "spearman_rho": 0.918796992481203,
+      "kendall_tau": 0.768421052631579,
       "overlap_at_3": 0.6666666666666666,
       "overlap_at_5": 0.8,
       "overlap_at_10": 1.0
@@ -298,8 +286,8 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.9729323308270676,
-      "kendall_tau": 0.8947368421052632,
+      "spearman_rho": 0.9488721804511278,
+      "kendall_tau": 0.8526315789473685,
       "overlap_at_3": 0.6666666666666666,
       "overlap_at_5": 0.8,
       "overlap_at_10": 0.9
@@ -325,11 +313,11 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.9593984962406013,
-      "kendall_tau": 0.8631578947368421,
-      "overlap_at_3": 0.6666666666666666,
+      "spearman_rho": 0.9774436090225563,
+      "kendall_tau": 0.8947368421052632,
+      "overlap_at_3": 1.0,
       "overlap_at_5": 0.8,
-      "overlap_at_10": 0.9
+      "overlap_at_10": 1.0
     },
     {
       "group_key": "tum_fr1_desk_f30_ctx8_270_2277_2572_2604",
@@ -356,11 +344,11 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.7473684210526315,
-      "kendall_tau": 0.6526315789473685,
+      "spearman_rho": 0.6210526315789473,
+      "kendall_tau": 0.5368421052631579,
       "overlap_at_3": 0.3333333333333333,
-      "overlap_at_5": 0.8,
-      "overlap_at_10": 0.9
+      "overlap_at_5": 0.4,
+      "overlap_at_10": 0.8
     },
     {
       "group_key": "tum_fr1_desk_f40_ctx1_406",
@@ -380,11 +368,11 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.7293233082706766,
-      "kendall_tau": 0.6631578947368422,
+      "spearman_rho": 0.7052631578947368,
+      "kendall_tau": 0.631578947368421,
       "overlap_at_3": 1.0,
       "overlap_at_5": 0.8,
-      "overlap_at_10": 0.9
+      "overlap_at_10": 0.8
     },
     {
       "group_key": "tum_fr1_desk_f40_ctx4_1372_1445_1446_1518",
@@ -407,8 +395,8 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.000847457627118644,
-      "spearman_rho": 0.5428571428571428,
-      "kendall_tau": 0.43157894736842106,
+      "spearman_rho": 0.5729323308270676,
+      "kendall_tau": 0.4842105263157895,
       "overlap_at_3": 0.6666666666666666,
       "overlap_at_5": 0.6,
       "overlap_at_10": 0.7
@@ -438,10 +426,10 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.9699248120300751,
-      "kendall_tau": 0.8631578947368421,
+      "spearman_rho": 0.8857142857142858,
+      "kendall_tau": 0.7368421052631579,
       "overlap_at_3": 0.6666666666666666,
-      "overlap_at_5": 1.0,
+      "overlap_at_5": 0.6,
       "overlap_at_10": 0.9
     },
     {
@@ -462,9 +450,9 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.7729323308270677,
-      "kendall_tau": 0.6947368421052632,
-      "overlap_at_3": 0.6666666666666666,
+      "spearman_rho": 0.8030075187969924,
+      "kendall_tau": 0.7263157894736842,
+      "overlap_at_3": 1.0,
       "overlap_at_5": 0.8,
       "overlap_at_10": 0.9
     },
@@ -489,8 +477,8 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.993984962406015,
-      "kendall_tau": 0.968421052631579,
+      "spearman_rho": 0.9894736842105262,
+      "kendall_tau": 0.9473684210526316,
       "overlap_at_3": 1.0,
       "overlap_at_5": 1.0,
       "overlap_at_10": 1.0
@@ -520,10 +508,10 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.9669172932330825,
-      "kendall_tau": 0.8842105263157894,
-      "overlap_at_3": 0.6666666666666666,
-      "overlap_at_5": 1.0,
+      "spearman_rho": 0.9699248120300751,
+      "kendall_tau": 0.9052631578947369,
+      "overlap_at_3": 1.0,
+      "overlap_at_5": 0.8,
       "overlap_at_10": 0.9
     },
     {
@@ -544,7 +532,7 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.9864661654135337,
+      "spearman_rho": 0.9894736842105262,
       "kendall_tau": 0.9263157894736842,
       "overlap_at_3": 1.0,
       "overlap_at_5": 1.0,
@@ -571,10 +559,10 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.8466165413533834,
-      "kendall_tau": 0.7263157894736842,
+      "spearman_rho": 0.831578947368421,
+      "kendall_tau": 0.7052631578947369,
       "overlap_at_3": 1.0,
-      "overlap_at_5": 0.6,
+      "overlap_at_5": 0.8,
       "overlap_at_10": 0.8
     },
     {
@@ -602,11 +590,11 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.875187969924812,
-      "kendall_tau": 0.7263157894736842,
+      "spearman_rho": 0.8887218045112781,
+      "kendall_tau": 0.7789473684210527,
       "overlap_at_3": 0.6666666666666666,
-      "overlap_at_5": 0.8,
-      "overlap_at_10": 0.9
+      "overlap_at_5": 1.0,
+      "overlap_at_10": 0.8
     },
     {
       "group_key": "tum_fr2_xyz_f10_ctx1_2801",
@@ -626,9 +614,9 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.9473684210526315,
+      "spearman_rho": 0.918796992481203,
       "kendall_tau": 0.8421052631578948,
-      "overlap_at_3": 0.6666666666666666,
+      "overlap_at_3": 1.0,
       "overlap_at_5": 0.8,
       "overlap_at_10": 0.8
     },
@@ -654,8 +642,8 @@
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
       "spearman_rho": 0.9894736842105262,
-      "kendall_tau": 0.9578947368421054,
-      "overlap_at_3": 0.6666666666666666,
+      "kendall_tau": 0.9473684210526316,
+      "overlap_at_3": 1.0,
       "overlap_at_5": 1.0,
       "overlap_at_10": 1.0
     },
@@ -684,8 +672,8 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.956390977443609,
-      "kendall_tau": 0.8526315789473685,
+      "spearman_rho": 0.9548872180451128,
+      "kendall_tau": 0.8631578947368421,
       "overlap_at_3": 0.3333333333333333,
       "overlap_at_5": 0.8,
       "overlap_at_10": 0.9
@@ -708,11 +696,11 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.9458646616541352,
-      "kendall_tau": 0.8421052631578948,
-      "overlap_at_3": 0.6666666666666666,
-      "overlap_at_5": 0.8,
-      "overlap_at_10": 0.9
+      "spearman_rho": 0.9082706766917292,
+      "kendall_tau": 0.7999999999999999,
+      "overlap_at_3": 0.3333333333333333,
+      "overlap_at_5": 0.6,
+      "overlap_at_10": 1.0
     },
     {
       "group_key": "tum_fr2_xyz_f20_ctx4_3145_3146_3147_3219",
@@ -735,10 +723,10 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.7954887218045112,
-      "kendall_tau": 0.7157894736842105,
+      "spearman_rho": 0.8030075187969924,
+      "kendall_tau": 0.7263157894736842,
       "overlap_at_3": 0.3333333333333333,
-      "overlap_at_5": 0.4,
+      "overlap_at_5": 0.6,
       "overlap_at_10": 0.9
     },
     {
@@ -766,9 +754,9 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.9548872180451128,
-      "kendall_tau": 0.8526315789473685,
-      "overlap_at_3": 0.6666666666666666,
+      "spearman_rho": 0.9804511278195487,
+      "kendall_tau": 0.9157894736842106,
+      "overlap_at_3": 1.0,
       "overlap_at_5": 0.8,
       "overlap_at_10": 0.9
     },
@@ -790,11 +778,11 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.9398496240601503,
-      "kendall_tau": 0.8210526315789474,
-      "overlap_at_3": 0.6666666666666666,
+      "spearman_rho": 0.8345864661654135,
+      "kendall_tau": 0.7368421052631579,
+      "overlap_at_3": 0.3333333333333333,
       "overlap_at_5": 0.8,
-      "overlap_at_10": 0.8
+      "overlap_at_10": 0.7
     },
     {
       "group_key": "tum_fr2_xyz_f30_ctx4_697_766_767_768",
@@ -817,11 +805,11 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.9819548872180449,
-      "kendall_tau": 0.9052631578947369,
-      "overlap_at_3": 1.0,
+      "spearman_rho": 0.9443609022556391,
+      "kendall_tau": 0.8315789473684211,
+      "overlap_at_3": 0.6666666666666666,
       "overlap_at_5": 0.8,
-      "overlap_at_10": 0.9
+      "overlap_at_10": 0.8
     },
     {
       "group_key": "tum_fr2_xyz_f30_ctx8_79_1353_1647_1683",
@@ -848,11 +836,11 @@
       "coverage": 1.0,
       "is_full_coverage": true,
       "mean_candidate_context_overlap": 0.0,
-      "spearman_rho": 0.9263157894736842,
-      "kendall_tau": 0.7789473684210527,
+      "spearman_rho": 0.9639097744360902,
+      "kendall_tau": 0.8631578947368421,
       "overlap_at_3": 0.6666666666666666,
-      "overlap_at_5": 0.8,
-      "overlap_at_10": 0.8
+      "overlap_at_5": 1.0,
+      "overlap_at_10": 0.9
     }
   ]
 }

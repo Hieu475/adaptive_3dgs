@@ -382,6 +382,7 @@ def prepare_phase6_splits(
                 empty_utils[k] = float(s["utility_conditional"])
 
     group_key_to_id: Dict[Tuple[str, int, Tuple[int, ...]], int] = {}
+    group_to_split: Dict[Tuple[str, int, Tuple[int, ...]], str] = {}
 
     for path in dataset_paths:
         with open(path, 'r') as f:
@@ -411,6 +412,13 @@ def prepare_phase6_splits(
             frame_int = int(s["frame"])
 
             split = s.get("split", "cross_scene_test")
+            # Invariant: No exact group may be split across train/val/test splits
+            if g_key in group_to_split and group_to_split[g_key] != split:
+                raise ValueError(
+                    f"Split-integrity violation: exact group {g_key} assigned to multiple splits: "
+                    f"'{group_to_split[g_key]}' vs '{split}'. All candidates in an exact context group must share the same split."
+                )
+            group_to_split[g_key] = split
             if split == "train":
                 all_train_feats.append(feat)
                 all_train_dq.append(dq)
