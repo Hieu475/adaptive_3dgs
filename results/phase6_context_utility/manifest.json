@@ -4,7 +4,7 @@
   "status": "frozen_candidate",
   "schema_version": "phase6-v2",
   "protocol": "v1",
-  "git_commit": "91d2e91fe331fec63ad12f0603ed336fac43f889",
+  "git_commit": "ebeefbd98567b1d3eb5f6c32eedcf49eb3e53ac5",
   "seeds": [
     42,
     43,
@@ -23,7 +23,7 @@
   "normalizer": "train_only",
   "train_scene": "tum_fr1_desk",
   "test_scene": "tum_fr2_xyz",
-  "test_suite_status": "397/397 PASS (100%)",
+  "test_suite_status": "398/398 PASS (100%)",
   "gate_6a_status": "PASS",
   "gate_6b_status": "RECOVERED",
   "gate_6c_status": "CASE_B_ESTABLISHED",

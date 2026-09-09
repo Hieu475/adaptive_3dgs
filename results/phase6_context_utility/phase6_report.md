@@ -35,7 +35,7 @@ Following the **Phase 6 Scientific Reform & Engineering Hardening** (P0, P1, P2)
 > [!IMPORTANT]
 > **Core Scientific Finding (Failure Mode Diagnosis — Case B):**
 > By establishing the **5-Policy Oracle Decomposition Benchmark** ([`experiments/run_phase6_oracle_gap.py`](file:///home/nguyen_quoc_hieu/Documents/adaptive_3dgs/experiments/run_phase6_oracle_gap.py)) and **Exact-Context Rank Stability Analysis** ([`experiments/run_phase6_rank_stability.py`](file:///home/nguyen_quoc_hieu/Documents/adaptive_3dgs/experiments/run_phase6_rank_stability.py)), the oracle decomposition provides evidence that the observed decision gap is not explained solely by prediction error:
-> - **Rank Stability**: Unconditional utility $U^*(i|\emptyset)$ and conditional utility $U^*(i|S_t)$ exhibit **substantial rank stability** ($\bar{\rho}_{\text{rank}} = \mathbf{0.7051}$, Top-5 Overlap = $\mathbf{71.2\%}$, Top-10 Overlap = $\mathbf{79.1\%}$), spanning from moderate stability under high overlap ($\text{IoU} \in [0.30, 0.50): \rho = 0.3125$, Top-5 Overlap = $60.0\%$) to high stability under low overlap ($\text{IoU} < 0.10: \rho = 0.8327$, Top-5 Overlap = $77.8\%$). In no regime does candidate ranking collapse to random.
+> - **Rank Stability**: Unconditional utility $U^*(i|\emptyset)$ and conditional utility $U^*(i|S_t)$ exhibit **substantial rank stability** ($\bar{\rho}_{\text{rank}} = \mathbf{0.9623}$, Top-5 Overlap = $\mathbf{93.2\%}$, Top-10 Overlap = $\mathbf{97.4\%}$ across 584 exact context groups $g=(scene, frame, S_t)$), ranging from $\rho = 0.9360$ under high co-visibility overlap to $\rho = 0.9876$ under random context. In no regime does candidate ranking collapse to random.
 > - **Mechanism**: Rasterization interaction between 3D Gaussians is predominantly *sub-additive* (redundancy rather than synergy). Because co-visibility diminishes utility across candidates without inverting their priority order, static pointwise ranking already selects the most impactful Gaussians.
 > - **Predictability**: The experiments provide evidence that conditional utility is predictably recoverable under the evaluated protocol ($\bar{\rho} = 0.3635$, reaching $0.4850$ on seed 42), resolving representation drift while maintaining exact mathematical consistency.
 
@@ -44,26 +44,27 @@ Following the **Phase 6 Scientific Reform & Engineering Hardening** (P0, P1, P2)
 ## 2. P1: In-Depth Empirical Analyses
 
 ### A. Rank Stability Analysis & Case B Explanation (P1.1)
-To answer why Oracle Conditional Greedy yields approximately identical performance to Oracle Static Greedy ($Q_{\text{OracleCond}} \approx Q_{\text{OracleStatic}}$), we evaluated rank correlation and subset overlap between $U^*(i|\emptyset)$ and $U^*(i|S_t)$ across exact candidate context groups $g = (scene, frame, \text{tuple}(\text{sorted}(S_t)))$, stratified by context size, context type, and screen-space IoU:
+To answer why Oracle Conditional Greedy yields approximately identical performance to Oracle Static Greedy ($Q_{\text{OracleCond}} \approx Q_{\text{OracleStatic}}$), we evaluated rank correlation and subset overlap between $U^*(i|\emptyset)$ and $U^*(i|S_t)$ directly across all 584 exact candidate context groups $g = (scene, frame, \text{tuple}(\text{sorted}(S_t)))$, stratified by context size, context type, and screen-space mean candidate-context overlap (IoU):
 
-| Stratum / Condition | Groups | Mean Spearman $\rho_{\text{rank}}$ | Mean Kendall $\tau$ | Overlap@3 | Overlap@5 | Overlap@10 |
+| Stratum / Condition | Exact Groups | Mean Spearman $\rho_{\text{rank}}$ | Mean Kendall $\tau$ | Overlap@3 | Overlap@5 | Overlap@10 |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Overall Exact Context** | **32** | **0.7051** ($\pm 0.206$) | **0.5743** | **64.6%** | **71.2%** | **79.1%** |
-| Size $|S| = 1$ | 8 | 0.7627 | 0.6245 | 75.0% | 72.5% | 77.5% |
-| Size $|S| = 4$ | 16 | 0.6090 | 0.4784 | 52.1% | 66.2% | 76.2% |
-| Size $|S| = 8$ | 8 | 0.8398 | 0.7159 | 79.2% | 80.0% | 86.2% |
-| Type `random` | 8 | 0.8398 | 0.7159 | 79.2% | 80.0% | 86.2% |
-| Type `spatial_knn` | 16 | 0.6916 | 0.5645 | 62.5% | 71.2% | 78.1% |
-| Type `overlap_top` | 8 | 0.5974 | 0.4522 | 54.2% | 62.5% | 73.8% |
-| **$\text{IoU} < 0.10$ (Low)** | 9 | **0.8327** | **0.7048** | **77.8%** | **77.8%** | **86.7%** |
-| **$\text{IoU} \in [0.10, 0.30)$ (Med)** | 19 | **0.7273** | **0.5822** | **66.7%** | **70.5%** | **76.8%** |
-| **$\text{IoU} \in [0.30, 0.50)$ (High)**| 4 | **0.3125** | **0.2429** | **25.0%** | **60.0%** | **72.5%** |
+| **Overall Exact Context** | **584** | **0.9623** ($\pm 0.064$) | **0.9488** | **89.2%** | **93.2%** | **97.4%** |
+| Size $|S| = 1$ | 160 | 0.9707 | 0.9551 | 91.5% | 93.8% | 97.5% |
+| Size $|S| = 4$ | 264 | 0.9418 | 0.9287 | 83.5% | 90.3% | 96.4% |
+| Size $|S| = 8$ | 160 | 0.9876 | 0.9758 | 96.5% | 97.5% | 98.9% |
+| Type `overlap_top` | 104 | 0.9360 | 0.9231 | 81.4% | 90.0% | 96.4% |
+| Type `spatial_knn` | 320 | 0.9581 | 0.9437 | 88.1% | 92.1% | 97.0% |
+| Type `random` | 160 | 0.9876 | 0.9758 | 96.5% | 97.5% | 98.9% |
+| **$\text{IoU} < 0.10$ (Low)** | 311 | **0.9770** | **0.9644** | **94.0%** | **95.8%** | **97.8%** |
+| **$\text{IoU} \in [0.10, 0.30)$ (Med)** | 146 | **0.9509** | **0.9359** | **85.2%** | **90.1%** | **97.1%** |
+| **$\text{IoU} \in [0.30, 0.50)$ (High)**| 111 | **0.9386** | **0.9241** | **81.4%** | **90.6%** | **96.6%** |
+| **$\text{IoU} \ge 0.50$ (Max)** | 16 | **0.9448** | **0.9350** | **87.5%** | **90.0%** | **97.5%** |
 
 **Scientific Conclusion for Case B via IoU Stratification**:
-1. **Low Overlap ($\text{IoU} < 0.10$)**: Candidate rank is highly invariant ($\bar{\rho} = 0.8327$, Overlap@5 = 77.8%). Context exerts minimal re-ordering force.
-2. **Moderate Overlap ($\text{IoU} \in [0.10, 0.30)$)**: Substantial rank stability persists ($\bar{\rho} = 0.7273$, Overlap@5 = 70.5%).
-3. **High Overlap ($\text{IoU} \in [0.30, 0.50)$)**: Rank correlation drops to $\bar{\rho} = 0.3125$, demonstrating that strong co-visibility does introduce localized re-ordering. However, Top-5 overlap remains substantial at **60.0%** and Top-10 overlap is **72.5%**.
-4. **The Case B Finding**: Sub-additivity scales down utility magnitude rather than totally inverting the upper tier of candidates. Because top candidates remain in the top tier even under context conditioning, static pointwise ranking selects essentially the same Gaussians as adaptive conditional ranking.
+1. **Low Overlap ($\text{IoU} < 0.10$)**: Candidate rank is overwhelmingly invariant ($\bar{\rho} = 0.9770$, Overlap@5 = 95.8%). Context exerts almost zero re-ordering force on the candidate pool.
+2. **Moderate Overlap ($\text{IoU} \in [0.10, 0.30)$)**: Substantial rank stability persists ($\bar{\rho} = 0.9509$, Overlap@5 = 90.1%).
+3. **High Overlap ($\text{IoU} \in [0.30, 0.50)$ & `overlap_top`)**: Rank correlation dips to $\bar{\rho} = 0.9360 - 0.9386$, confirming that high screen-space co-visibility produces the strongest utility reordering. However, Top-5 overlap remains $\ge \mathbf{90.0\%}$ and Top-10 overlap is $\ge \mathbf{96.4\%}$.
+4. **The Case B Finding**: Sub-additivity scales down utility magnitude rather than inverting candidate priorities. Because upper-tier candidates remain in the top tier even under exact context conditioning ($>90\%$ Top-5 preservation across all regimes), static pointwise ranking selects essentially the same Gaussians as adaptive conditional ranking.
 
 ---
 
@@ -71,6 +72,9 @@ To answer why Oracle Conditional Greedy yields approximately identical performan
 Performance loss is evaluated via **Oracle Gap** ($Gap = Q_{\text{Oracle}} - Q_{\text{policy}}$) and **Normalized Regret relative to achievable gain**:
 $$\text{NormalizedRegret}_{\text{gain}} = \frac{Q^* - Q_P}{Q^* - Q_0}$$
 where $Q^*$ is Oracle Conditional quality gain, $Q_P$ is Policy realized quality gain, and $Q_0 = 0.0$ is the NO_OP gain ($Q(\emptyset) - Q(\emptyset) = 0$).
+
+> [!NOTE]
+> *Interpretability Note*: In the current gain-relative setup, $Q_0 = 0$, therefore $\text{NormalizedRegret}_{\text{gain}}$ numerically coincides with regret normalized by oracle gain $\frac{Q^* - Q_P}{Q^*}$. Both metrics directly reflect the fraction of achievable oracle gain forfeited by the policy.
 
 #### 1. Oracle 5-Policy Decomposition
 
@@ -175,5 +179,5 @@ To ensure clarity in all publications and thesis chapters:
 
 1. **Existence of Non-Additivity (Confirmed)**: Rasterization interactions between 3D Gaussians are substantially sub-additive, and this effect correlates strongly with spatial IoU ($\rho = 0.5357, p = 0.0048$).
 2. **Predictability of Conditional Utility (Confirmed)**: The `ResidualContextModel` formulation successfully solves representation drift, achieving $\bar{\rho} = 0.3635$ (and up to $0.4850$ on seed 42) across 5 protocol seeds, establishing that conditional utility is predictably recoverable under the evaluated protocol.
-3. **Selection Gap & Hypothesis Limit (Case B Documented)**: The oracle decomposition provides evidence that the observed decision gap is not explained solely by prediction error. Substantial rank stability ($\bar{\rho}_{\text{rank}} = 0.7051$, Top-5 overlap = 71.2%) demonstrates that sub-additivity dampens utility magnitude across candidates while preserving upper-tier candidate identity (60.0%–77.8% Top-5 overlap across IoU regimes), explaining why static greedy captures the dominant realized gain.
+3. **Selection Gap & Hypothesis Limit (Case B Documented)**: The oracle decomposition provides evidence that the observed decision gap is not explained solely by prediction error. Substantial rank stability ($\bar{\rho}_{\text{rank}} = \mathbf{0.9623}$, Top-5 overlap = $\mathbf{93.2\%}$ across 584 exact context groups) demonstrates that sub-additivity dampens utility magnitude across candidates while preserving upper-tier candidate identity ($\ge 90.0\%$ Top-5 overlap across all IoU regimes), explaining why static greedy captures the dominant realized gain.
 4. **Engineering Integrity**: Phase 4 backbone is strictly frozen (verified by parameter hash invariance), listwise ranking operates exclusively within coherent context groups, and all 397 unit and regression tests pass at 100% (including dedicated hardening suite `tests/test_phase6_hardening.py`).

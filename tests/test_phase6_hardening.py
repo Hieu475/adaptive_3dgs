@@ -456,3 +456,44 @@ class TestPredictorAndReloadReproducibility:
             assert torch.allclose(u_before, u_after, atol=1e-6), "Utility predictions must match exactly after reload"
             assert torch.allclose(dq_before, dq_after, atol=1e-6), "Quality predictions must match exactly after reload"
             assert torch.allclose(dt_before, dt_after, atol=1e-6), "Cost predictions must match exactly after reload"
+
+
+# ==============================================================================
+# VIỆC 11: Exact-Context Rank Stability Invariant
+# ==============================================================================
+class TestExactRankStability:
+    def test_exact_context_rank_stability_invariants(self):
+        """VIỆC 11: Verify exact context rank stability schema and semantic integrity."""
+        artifact_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "results", "phase6_context_utility", "rank_stability_analysis.json"
+        )
+        if not os.path.exists(artifact_path):
+            pytest.skip("rank_stability_analysis.json not yet generated")
+
+        import json
+        with open(artifact_path, "r") as f:
+            data = json.load(f)
+
+        summary = data["overall_summary"]
+        per_group = data["per_group_results"]
+
+        # Semantic invariant: n_total_evaluated_groups must equal number of exact group records
+        assert summary["n_total_evaluated_groups"] == len(per_group), (
+            f"n_total_evaluated_groups ({summary['n_total_evaluated_groups']}) must equal len(per_group) ({len(per_group)})"
+        )
+        assert len(per_group) >= 500, f"Expected >= 500 exact context groups, got {len(per_group)}"
+
+        # Validate fields for each exact group
+        for g in per_group[:50]:
+            assert "context_ids" in g, "Each group record must contain explicit context_ids"
+            assert isinstance(g["context_ids"], list), "context_ids must be a list"
+            assert "n_candidates" in g, "Must record n_candidates in candidate pool"
+            assert g["n_candidates"] >= 3, "Pool size must be >= 3 for valid ranking"
+            assert "mean_candidate_context_overlap" in g, "Must record candidate-context overlap"
+            assert -1.0 <= g["spearman_rho"] <= 1.0, "Spearman rho must be in [-1, 1]"
+            assert 0.0 <= g["overlap_at_5"] <= 1.0, "Overlap@5 must be in [0, 1]"
+
+        # Scientific validity: rank stability is substantial (> 0.50)
+        assert summary["mean_spearman_rho"] > 0.50, "Conditional utility must exhibit substantial rank stability"
+

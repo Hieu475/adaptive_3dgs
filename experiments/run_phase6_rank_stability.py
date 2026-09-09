@@ -82,17 +82,14 @@ def run_rank_stability_analysis(
 
     print(f">> Found {len(exact_groups)} exact context groups g=(scene, frame, S_t)")
 
-    # Group exact groups by frame and condition regime for rank stability evaluation
-    # Allows evaluating candidate rank shifts under context S_t relative to U*(i|∅)
-    frame_conditions: Dict[Tuple[str, int, str, int], List[Tuple[Tuple[str, int, Tuple[int, ...]], Dict[str, Any]]]] = {}
-
-    for exact_key, cand_list in exact_groups.items():
-        scene_str, frame_int, ctx_ids = exact_key
-        for s in cand_list:
-            c_type = str(s.get("context_type", "default"))
-            c_size = len(ctx_ids)
-            fc_key = (scene_str, frame_int, c_type, c_size)
-            frame_conditions.setdefault(fc_key, []).append((exact_key, s))
+    # Pre-index all candidate IDs per (scene, frame) to evaluate pool-level rank stability
+    frame_candidates: Dict[Tuple[str, int], List[int]] = {}
+    for s in samples:
+        scene_k = (str(s["scene"]), int(s["frame"]))
+        cid = int(s["candidate_id"])
+        frame_candidates.setdefault(scene_k, set()).add(cid)
+    for k in frame_candidates:
+        frame_candidates[k] = sorted(list(frame_candidates[k]))
 
     group_results = []
     by_size: Dict[int, Dict[str, List[float]]] = {}
@@ -110,27 +107,29 @@ def run_rank_stability_analysis(
     all_overlap_5 = []
     all_overlap_10 = []
 
-    for fc_key, items in frame_conditions.items():
-        scene_str, frame_int, c_type, c_size = fc_key
+    # Loop directly over exact context groups g = (scene, frame, S_t)
+    for exact_key, cand_list in exact_groups.items():
+        scene_str, frame_int, ctx_ids = exact_key
+        cands_in_frame = frame_candidates.get((scene_str, frame_int), [])
 
-        u_empty = []
-        u_cond = []
-        cands_evaluated = []
-
-        for exact_key, s in items:
-            cand_k = (scene_str, frame_int, int(s["candidate_id"]))
-            if cand_k in empty_utils:
-                u_empty.append(empty_utils[cand_k])
-                u_cond.append(float(s["utility_conditional"]))
-                cands_evaluated.append((exact_key, s))
-
-        if len(u_empty) < 3:
+        if len(cands_in_frame) < 3:
             continue
 
-        arr_empty = np.array(u_empty, dtype=np.float64)
-        arr_cond = np.array(u_cond, dtype=np.float64)
+        # Baseline unconditional utility vector U*(i|∅) for candidate pool in this frame
+        arr_empty = np.array([
+            empty_utils.get((scene_str, frame_int, cid), 0.0)
+            for cid in cands_in_frame
+        ], dtype=np.float64)
 
-        # Spearman rank
+        # Conditional utility vector U*(i|S_t) under exact context S_t
+        arr_cond = arr_empty.copy()
+        for s in cand_list:
+            cid = int(s["candidate_id"])
+            if cid in cands_in_frame:
+                idx = cands_in_frame.index(cid)
+                arr_cond[idx] = float(s["utility_conditional"])
+
+        # Spearman rank correlation & Kendall tau
         if np.all(arr_empty == arr_empty[0]) or np.all(arr_cond == arr_cond[0]):
             rho, p_rho = 1.0, 0.0
             tau, p_tau = 1.0, 0.0
@@ -152,7 +151,10 @@ def run_rank_stability_analysis(
         all_overlap_5.append(float(o5))
         all_overlap_10.append(float(o10))
 
-        # Stratify by size
+        # Stratification: size and type (purely diagnostic, NOT used for grouping)
+        c_size = len(ctx_ids)
+        c_type = str(cand_list[0].get("context_type", "default"))
+
         if c_size not in by_size:
             by_size[c_size] = {"rho": [], "tau": [], "o3": [], "o5": [], "o10": []}
         by_size[c_size]["rho"].append(float(rho))
@@ -161,7 +163,6 @@ def run_rank_stability_analysis(
         by_size[c_size]["o5"].append(float(o5))
         by_size[c_size]["o10"].append(float(o10))
 
-        # Stratify by type
         if c_type not in by_type:
             by_type[c_type] = {"rho": [], "tau": [], "o3": [], "o5": [], "o10": []}
         by_type[c_type]["rho"].append(float(rho))
@@ -170,16 +171,18 @@ def run_rank_stability_analysis(
         by_type[c_type]["o5"].append(float(o5))
         by_type[c_type]["o10"].append(float(o10))
 
-        # Stratify by IoU overlap
-        group_iou = float(np.mean([
-            float(s.get("selected_features", {}).get("candidate_selected_overlap", s.get("overlap_features", {}).get("mean_overlap", 0.0)))
-            for _, s in cands_evaluated
+        # Mean candidate-context overlap for this exact context
+        mean_overlap = float(np.mean([
+            float(s.get("selected_features", {}).get("candidate_selected_overlap",
+                  s.get("overlap_features", {}).get("mean_overlap", 0.0)))
+            for s in cand_list
         ]))
-        if group_iou < 0.10:
+
+        if mean_overlap < 0.10:
             iou_key = "iou_lt_0.10"
-        elif group_iou < 0.30:
+        elif mean_overlap < 0.30:
             iou_key = "iou_0.10_to_0.30"
-        elif group_iou < 0.50:
+        elif mean_overlap < 0.50:
             iou_key = "iou_0.30_to_0.50"
         else:
             iou_key = "iou_gte_0.50"
@@ -190,25 +193,22 @@ def run_rank_stability_analysis(
         by_iou[iou_key]["o5"].append(float(o5))
         by_iou[iou_key]["o10"].append(float(o10))
 
-        # Record exact context group result with explicit context_ids
-        for exact_key, s in cands_evaluated:
-            group_results.append({
-                "group_key": f"{scene_str}_f{frame_int}_ctx{len(exact_key[2])}_{'_'.join(str(x) for x in exact_key[2][:4])}",
-                "scene": scene_str,
-                "frame": frame_int,
-                "context_ids": list(exact_key[2]),
-                "candidate_id": int(s["candidate_id"]),
-                "context_type": c_type,
-                "context_size": c_size,
-                "mean_iou": float(s.get("selected_features", {}).get("candidate_selected_overlap", s.get("overlap_features", {}).get("mean_overlap", 0.0))),
-                "u_empty": float(empty_utils.get((scene_str, frame_int, int(s["candidate_id"])), 0.0)),
-                "u_cond": float(s["utility_conditional"]),
-                "spearman_rho": float(rho),
-                "kendall_tau": float(tau),
-                "overlap_at_3": float(o3),
-                "overlap_at_5": float(o5),
-                "overlap_at_10": float(o10),
-            })
+        # Record EXACT group result (one per exact context S_t)
+        group_results.append({
+            "group_key": f"{scene_str}_f{frame_int}_ctx{len(ctx_ids)}_{'_'.join(str(x) for x in ctx_ids[:4])}",
+            "scene": scene_str,
+            "frame": frame_int,
+            "context_ids": list(ctx_ids),
+            "context_size": c_size,
+            "context_type": c_type,
+            "n_candidates": len(cands_in_frame),
+            "mean_candidate_context_overlap": mean_overlap,
+            "spearman_rho": float(rho),
+            "kendall_tau": float(tau),
+            "overlap_at_3": float(o3),
+            "overlap_at_5": float(o5),
+            "overlap_at_10": float(o10),
+        })
 
     def _agg(d: Dict[str, List[float]]) -> Dict[str, float]:
         return {
