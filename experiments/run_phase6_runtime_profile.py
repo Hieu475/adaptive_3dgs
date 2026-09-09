@@ -203,7 +203,7 @@ def run_runtime_profile():
         "formula": "T_P6 = T_feature + T_context + T_MLP + T_selection + T_optimization",
         "scientific_implication": (
             "Adaptive context-aware greedy selection imposes an additional selection & context overhead "
-            "over static sorting. Coupled with Case B rank stability (rho=0.9623), "
+            "over static sorting. Coupled with Case B rank stability (rho=0.9089 at 100% full candidate coverage), "
             "paying this runtime overhead yields zero realized quality improvement."
         )
     }

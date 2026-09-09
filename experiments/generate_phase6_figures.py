@@ -40,12 +40,12 @@ def plot_phase6_diagnostics():
     ax1.set_xlabel('Context Size |S|', fontweight='bold')
     ax1.set_xticks(x)
     ax1.set_xticklabels([f"|S|={s}" for s in sizes])
-    ax1.set_ylim(0.8, 1.05)
+    ax1.set_ylim(0.75, 1.05)
     
     ax1_twin = ax1.twinx()
     ax1_twin.plot(x + width/2, o5s, 's-', color='#d62728', linewidth=2, label='Overlap@5 (%)')
     ax1_twin.set_ylabel('Top-5 Overlap (%)', color='#d62728', fontweight='bold')
-    ax1_twin.set_ylim(80, 105)
+    ax1_twin.set_ylim(60, 105)
     ax1.set_title('(A) Rank Stability vs. Context Set Size |S|', fontweight='bold')
     
     # 2. Runtime Profiling Breakdown
@@ -64,7 +64,7 @@ def plot_phase6_diagnostics():
         colors = ['#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#9467bd']
         ax2.bar(labels, vals, color=colors, edgecolor='black', alpha=0.85)
         ax2.set_ylabel('Percentage of Stage Runtime (%)', fontweight='bold')
-        ax2.set_title('(B) Phase 6 Runtime Breakdown ($T_{\mathrm{P6}}$)', fontweight='bold')
+        ax2.set_title(r'(B) Phase 6 Runtime Breakdown ($T_{\mathrm{P6}}$)', fontweight='bold')
         for i, v in enumerate(vals):
             ax2.text(i, v + 1.0, f"{v:.1f}%", ha='center', fontweight='bold', fontsize=9)
         ax2.set_ylim(0, 75)

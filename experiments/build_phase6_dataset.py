@@ -31,7 +31,7 @@ import hashlib
 import argparse
 import numpy as np
 import torch
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -233,134 +233,49 @@ def sample_candidates(pipeline, n_candidates, visible_indices=None, seed=42):
         return []
 
     rng = np.random.default_rng(seed)
-    return rng.choice(pool, size=n_sample, replace=False).tolist()
+    chosen = rng.choice(pool, size=n_sample, replace=False).tolist()
+    return sorted([int(x) for x in chosen])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Main
+# Scene Sample Generation & Dataset Verification
 # ─────────────────────────────────────────────────────────────────────────────
 
-def main():
-    parser = argparse.ArgumentParser(description="Phase 6 Conditional Oracle Dataset Builder")
-    parser.add_argument("--tiny", action="store_true",
-                        help="Tiny mode: 2 frames, 10 candidates for quick verification")
-    parser.add_argument("--seed", type=int, default=42,
-                        help="Random seed (default: 42)")
-    parser.add_argument("--seeds", type=str, default=None,
-                        help="Comma-separated seeds for multi-seed generation (e.g. 42,43,44,45,46)")
-    parser.add_argument("--max-candidates", type=int, default=30,
-                        help="Max candidates per frame (default: 30)")
-    parser.add_argument("--frames", type=str, default="10,15,20,25,30",
-                        help="Comma-separated frame indices to evaluate (default: 10,15,20,25,30)")
-    parser.add_argument("--scene", type=str, default="tum_fr2_xyz",
-                        help="Scene name (default: tum_fr2_xyz)")
-    parser.add_argument("--protocol-splits", action="store_true",
-                        help="Generate ALL protocol splits: tum_fr1_desk (train 0-40, val 41-60) "
-                             "AND tum_fr2_xyz (test). Overrides --scene and --frames.")
-    parser.add_argument("--append", action="store_true", default=False,
-                        help="Append samples to existing dataset file if it exists, merging without overwriting.")
-    parser.add_argument("--output-filename", type=str, default=None,
-                        help="Custom filename for the output json dataset.")
-    parser.add_argument("--output-dir", type=str, default=None,
-                        help="Output directory (default: results/phase6_context_utility/datasets)")
-    args = parser.parse_args()
-
-    # Multi-seed support
-    seeds = [int(s) for s in args.seeds.split(",")] if args.seeds else [args.seed]
-
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f"=" * 80)
-    print(f"  PHASE 6 — CONDITIONAL ORACLE DATASET BUILDER [Device: {device}]")
-    print(f"=" * 80)
-
-    # ─── Protocol-splits mode: generate ALL splits ───
-    if args.protocol_splits:
-        print("  MODE: PROTOCOL SPLITS (train + val + test)")
-        print("    Train: tum_fr1_desk frames 5,10,15,20,25,30,35,40")
-        print("    Val:   tum_fr1_desk frames 42,45,48,51,54,57,60")
-        print("    Test:  tum_fr2_xyz frames 10,15,20,25,30")
-        print(f"    Seeds: {seeds}")
-        print()
-
-        # We'll call the main generation logic for each scene
-        # For now, set up for current invocation based on --scene
-        # Full protocol-splits requires running this script twice:
-        #   1. --scene tum_fr1_desk --frames 5,10,15,20,25,30,35,40,42,45,48,51,54,57,60
-        #   2. --scene tum_fr2_xyz --frames 10,20,30
-        print("  [INFO] To generate full protocol splits, run:")
-        for s in seeds:
-            print(f"    python experiments/build_phase6_dataset.py --scene tum_fr1_desk "
-                  f"--frames 5,10,15,20,25,30,35,40,42,45,48,51,54,57,60 --seed {s} --max-candidates 30")
-            print(f"    python experiments/build_phase6_dataset.py --scene tum_fr2_xyz "
-                  f"--frames 10,15,20,25,30 --seed {s} --max-candidates 30")
-        print()
-
-    # ─── Configuration ───
-    if args.tiny:
-        frames_to_sample = [10, 20]
-        max_candidates = 10
-        print(f"  MODE: TINY PROTOTYPE (2 frames, {max_candidates} candidates)")
-    else:
-        frames_to_sample = [int(f) for f in args.frames.split(",")]
-        max_candidates = args.max_candidates
-        print(f"  MODE: STANDARD ({len(frames_to_sample)} frames, {max_candidates} candidates/frame)")
-
-    seed = seeds[0]  # Primary seed for single-seed mode
-    scene_name = args.scene
-    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-    # Output directory
-    if args.output_dir:
-        output_dir = args.output_dir
-    else:
-        output_dir = os.path.join(repo_root, "results", "phase6_context_utility", "datasets")
-    os.makedirs(output_dir, exist_ok=True)
-
-    print(f"  Seeds: {seeds}")
-    print(f"  Scene: {scene_name}")
-    print(f"  Frames: {frames_to_sample}")
-    print(f"  Max candidates/frame: {max_candidates}")
-    print(f"  Output: {output_dir}")
-    print(f"  Feature dim: {PHASE6_FEATURE_DIM}")
-    print()
-
-    # ─── Load protocol and data ───
-    protocol = load_protocol()
+def generate_samples_for_scene(
+    scene_name: str,
+    frames_to_sample: List[int],
+    max_candidates: int,
+    seed: int,
+    device: str,
+    protocol: Dict[str, Any],
+    context_specs: Optional[List[Tuple[str, int]]] = None,
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Generate context-centric conditional oracle samples for a given scene and frame list."""
     oracle_cfg = get_oracle_config(protocol)
     H, W = get_resolution(scene_name, protocol)
 
-    # Determine camera type
-    if "fr1" in scene_name:
-        camera = "freiburg1"
-    elif "fr2" in scene_name:
-        camera = "freiburg2"
-    else:
-        camera = "freiburg1"
-
+    camera = "freiburg1" if "fr1" in scene_name else ("freiburg2" if "fr2" in scene_name else "freiburg1")
     ds_cfg = get_dataset_config(scene_name, protocol)
     data_path = ds_cfg["full_path"]
     max_frame = max(frames_to_sample) + 1
 
-    print(f"[Data] Loading {scene_name} ({max_frame} frames, {W}x{H})...")
+    print(f"\n[Data] Loading {scene_name} ({max_frame} frames, {W}x{H})...")
     frames, intrinsics = load_sequence(data_path, camera, max_frame, H, W, device)
     print(f"[Data] Loaded {len(frames)} frames.")
 
-    # ─── Build pipeline and warm up ───
     torch.manual_seed(seed)
     np.random.seed(seed)
 
     pipeline = build_pipeline(H, W, device)
     pipeline.initialize(frames[0]['rgb'], frames[0]['depth'], intrinsics, frames[0]['pose'])
 
-    # Process frames sequentially to build up Gaussian model
-    print(f"\n[Pipeline] Running {max_frame-1} frames to build model...")
+    print(f"[Pipeline] Running {max_frame-1} frames to build model...")
     for t in range(1, max_frame):
         pipeline.process_frame(frames[t]['rgb'], frames[t]['depth'], frames[t]['pose'])
-        if t % 5 == 0 or t == max_frame - 1:
+        if t % 10 == 0 or t == max_frame - 1:
             N = pipeline.gaussian_model.num_gaussians
             print(f"  Frame {t}: {N} Gaussians")
 
-    # ─── Configure conditional oracle ───
     cond_config = ConditionalOracleConfig(
         n_opt_steps=oracle_cfg['n_opt_steps'],
         k_neighbors=8,
@@ -382,13 +297,20 @@ def main():
         },
     )
 
-    # ─── Generate dataset ───
-    all_samples: List[Dict[str, Any]] = []
+    if context_specs is None:
+        context_specs = [
+            ("empty", 0),
+            ("spatial_knn", 1),
+            ("spatial_knn", 4),
+            ("random", 8),
+        ]
+
+    scene_samples: List[Dict[str, Any]] = []
     frame_stats: List[Dict[str, Any]] = []
 
     for frame_idx in frames_to_sample:
         print(f"\n{'─'*60}")
-        print(f"  FRAME {frame_idx}")
+        print(f"  SCENE: {scene_name} | FRAME {frame_idx}")
         print(f"{'─'*60}")
 
         if frame_idx >= len(frames):
@@ -400,17 +322,13 @@ def main():
         model = pipeline.gaussian_model
         N = model.num_gaussians
 
-        # Verify state integrity before measurement
         hash_before = hash_state(model)
         print(f"  N_gaussians: {N}")
         print(f"  State hash (before): {hash_before[:16]}...")
 
-        # Extract canonical features for ALL Gaussians
         print(f"  Extracting features for {N} Gaussians...")
         all_features = extract_all_features(pipeline, rgb, depth)
-        print(f"  Feature shape: {all_features.shape}")
 
-        # Get attribution for overlap computation
         print(f"  Computing attribution...")
         attr_out = render_with_attribution(
             means3D=model.positions,
@@ -427,15 +345,12 @@ def main():
         contrib_indices = attr_out['contrib_indices']
         contrib_weights = attr_out['contrib_weights']
 
-        # Extract visible indices from attribution
         valid_attr = contrib_weights > 0.01
         visible_indices = contrib_indices[valid_attr].unique().tolist() if valid_attr.any() else None
 
-        # Sample candidates from visible Gaussians
         candidates = sample_candidates(pipeline, max_candidates, visible_indices=visible_indices, seed=seed + frame_idx)
         print(f"  Candidates: {len(candidates)} (sampled from {len(visible_indices) if visible_indices else N} visible)")
 
-        # Determine split
         if scene_name == "tum_fr2_xyz":
             split = "cross_scene_test"
         elif frame_idx <= 40:
@@ -443,9 +358,8 @@ def main():
         else:
             split = "validation"
 
-        # Generate conditional measurements
         t_start = time.perf_counter()
-        frame_samples = cond_oracle.generate_conditional_dataset(
+        frame_samples = cond_oracle.generate_context_centric_dataset(
             candidate_pool=candidates,
             rgb_gt=rgb,
             depth_gt=depth,
@@ -456,29 +370,30 @@ def main():
             frame_idx=frame_idx,
             split=split,
             seed=seed,
-            max_candidates=max_candidates,
+            visible_indices=visible_indices,
+            context_specs=context_specs,
         )
         elapsed = time.perf_counter() - t_start
 
-        # Verify state integrity after measurement
         hash_after = hash_state(model)
         state_ok = (hash_before == hash_after)
         print(f"  State hash (after):  {hash_after[:16]}...")
         print(f"  State integrity:     {'✓ PASS' if state_ok else '✗ FAIL'}")
         print(f"  Samples generated:   {len(frame_samples)}")
-        print(f"  Time:                {elapsed:.1f}s ({elapsed/max(len(frame_samples),1):.2f}s/sample)")
+        print(f"  Time:                {elapsed:.1f}s ({elapsed/max(len(frame_samples),1):.3f}s/sample)")
 
         if not state_ok:
             print(f"  ⚠ WARNING: State corruption detected! Snapshot/restore failed.")
 
-        # Collect statistics
         if frame_samples:
             dqs = [s["delta_q_conditional"] for s in frame_samples]
             utils = [s["utility_conditional"] for s in frame_samples]
             context_sizes = [s["context_size"] for s in frame_samples]
 
             frame_stats.append({
+                "scene": scene_name,
                 "frame": frame_idx,
+                "split": split,
                 "n_candidates": len(candidates),
                 "n_samples": len(frame_samples),
                 "n_gaussians": N,
@@ -502,39 +417,24 @@ def main():
                 },
             })
 
-        all_samples.extend(frame_samples)
+        scene_samples.extend(frame_samples)
 
-    # ─── Save dataset ───
-    fname = args.output_filename or f"conditional_oracle_seed_{seed}.json"
-    dataset_path = os.path.join(output_dir, fname)
+    return scene_samples, frame_stats
 
-    if args.append and os.path.exists(dataset_path):
-        with open(dataset_path, 'r') as f:
-            existing_samples = json.load(f)
-        print(f"\n[Append] Found {len(existing_samples)} existing samples in {dataset_path}")
-        combined_samples = existing_samples + all_samples
-        print(f"[Save] Writing total {len(combined_samples)} samples ({len(existing_samples)} existing + {len(all_samples)} new) to {dataset_path}")
-        with open(dataset_path, 'w') as f:
-            json.dump(combined_samples, f, indent=2, default=str)
-        all_samples = combined_samples
-    else:
-        print(f"\n[Save] Writing {len(all_samples)} samples to {dataset_path}")
-        with open(dataset_path, 'w') as f:
-            json.dump(all_samples, f, indent=2, default=str)
 
-    # ─── Verification checks ───
-    print(f"\n{'='*60}")
-    print(f"  PROTOTYPE VERIFICATION")
-    print(f"{'='*60}")
-
+def verify_dataset(
+    all_samples: List[Dict[str, Any]],
+    frame_stats: List[Dict[str, Any]],
+    seed: int,
+) -> Dict[str, Any]:
+    """Verify core Phase 6 mathematical invariants and 100% candidate coverage."""
     verification = {
         "total_samples": len(all_samples),
-        "frames_evaluated": frames_to_sample,
-        "scene": scene_name,
         "seed": seed,
         "feature_dim": PHASE6_FEATURE_DIM,
         "has_single_measurements": all("delta_q_single" in s for s in all_samples),
         "has_utility_single": all("utility_single" in s for s in all_samples),
+        "has_candidate_pool_ids": all("candidate_pool_ids" in s for s in all_samples),
         "context_types_used": sorted(list(set(s["context_type"] for s in all_samples))),
         "context_sizes_used": sorted(list(set(s["context_size"] for s in all_samples))),
         "samples_per_context_type": {
@@ -544,7 +444,7 @@ def main():
         "checks": {},
     }
 
-    # Check 1: All samples have correct feature vector length
+    # Check 1: Feature vector length 32
     all_vectors_correct = all(
         len(s["full_feature_vector"]) == PHASE6_FEATURE_DIM
         for s in all_samples
@@ -552,14 +452,13 @@ def main():
     verification["checks"]["feature_vector_dim_32"] = all_vectors_correct
     print(f"  [{'✓' if all_vectors_correct else '✗'}] Feature vector dim = {PHASE6_FEATURE_DIM}")
 
-    # Check 2: Empty context recovers marginal utility (dq_s = 0 when |S| = 0)
+    # Check 2: Empty context recovers marginal utility
     empty_samples = [s for s in all_samples if s["context_size"] == 0]
     if empty_samples:
         all_dq_s_zero = all(abs(s["delta_q_s"]) < 1e-10 for s in empty_samples)
         verification["checks"]["empty_context_dq_s_zero"] = all_dq_s_zero
         print(f"  [{'✓' if all_dq_s_zero else '✗'}] S=∅ ⟹ ΔQ(S) = 0 ({len(empty_samples)} samples)")
 
-        # delta_q_conditional should equal delta_q_si for empty context
         identity_ok = all(
             abs(s["delta_q_conditional"] - s["delta_q_si"]) < 1e-10
             for s in empty_samples
@@ -568,84 +467,219 @@ def main():
         print(f"  [{'✓' if identity_ok else '✗'}] S=∅ ⟹ ΔQ(i|∅) = ΔQ({{i}})")
 
     # Check 3: ΔQ identity: delta_q_conditional = delta_q_si - delta_q_s
-    identity_errors = []
-    for s in all_samples:
-        expected = s["delta_q_si"] - s["delta_q_s"]
-        actual = s["delta_q_conditional"]
-        identity_errors.append(abs(expected - actual))
+    identity_errors = [
+        abs((s["delta_q_si"] - s["delta_q_s"]) - s["delta_q_conditional"])
+        for s in all_samples
+    ]
+    max_err = max(identity_errors) if identity_errors else 0.0
+    id_pass = max_err < 1e-8
+    verification["checks"]["delta_q_identity"] = id_pass
+    verification["checks"]["delta_q_identity_max_error"] = max_err
+    print(f"  [{'✓' if id_pass else '✗'}] ΔQ(i|S) = ΔQ(S∪{{i}}) - ΔQ(S) (max err: {max_err:.2e})")
 
-    max_identity_error = max(identity_errors) if identity_errors else 0.0
-    identity_pass = max_identity_error < 1e-8
-    verification["checks"]["delta_q_identity"] = identity_pass
-    verification["checks"]["delta_q_identity_max_error"] = max_identity_error
-    print(f"  [{'✓' if identity_pass else '✗'}] ΔQ(i|S) = ΔQ(S∪{{i}}) - ΔQ(S)  (max err: {max_identity_error:.2e})")
+    # Check 4: No NaN in features
+    nan_count = sum(1 for s in all_samples if any(np.isnan(v) for v in s["full_feature_vector"]))
+    verification["checks"]["no_nan_features"] = (nan_count == 0)
+    print(f"  [{'✓' if nan_count == 0 else '✗'}] No NaN in features ({nan_count} NaN samples)")
 
-    # Check 4: Different context sizes exist
-    context_sizes = set(s["context_size"] for s in all_samples)
-    has_variety = len(context_sizes) >= 2
-    verification["checks"]["context_size_variety"] = has_variety
-    print(f"  [{'✓' if has_variety else '✗'}] Context size variety: {sorted(context_sizes)}")
-
-    # Check 5: Multiple context types exist
-    context_types = set(s["context_type"] for s in all_samples)
-    has_type_variety = len(context_types) >= 2
-    verification["checks"]["context_type_variety"] = has_type_variety
-    print(f"  [{'✓' if has_type_variety else '✗'}] Context type variety: {sorted(context_types)}")
-
-    # Check 6: No NaN in features
-    nan_count = sum(
-        1 for s in all_samples
-        if any(np.isnan(v) for v in s["full_feature_vector"])
-    )
-    no_nans = (nan_count == 0)
-    verification["checks"]["no_nan_features"] = no_nans
-    print(f"  [{'✓' if no_nans else '✗'}] No NaN in features ({nan_count} NaN samples)")
-
-    # Check 7: State integrity across all frames
+    # Check 5: State integrity
     all_integrity = all(fs["state_integrity"] for fs in frame_stats)
     verification["checks"]["state_integrity"] = all_integrity
     print(f"  [{'✓' if all_integrity else '✗'}] State integrity (snapshot/restore)")
 
-    # Overall verdict
-    all_pass = all(
-        v for k, v in verification["checks"].items()
-        if isinstance(v, bool)
-    )
+    # Check 6: 100% Candidate Pool Coverage across all exact non-empty groups
+    exact_groups: Dict[Tuple[str, int, Tuple[int, ...]], List[Dict[str, Any]]] = {}
+    for s in all_samples:
+        if s.get("context_size", 0) > 0:
+            k = (str(s["scene"]), int(s["frame"]), tuple(sorted(int(x) for x in s.get("context_ids", []))))
+            exact_groups.setdefault(k, []).append(s)
+
+    full_cov_groups = 0
+    missing_count = 0
+    dup_count = 0
+    for k, s_list in exact_groups.items():
+        pool_ids = set(s_list[0].get("candidate_pool_ids", []))
+        measured_ids = [int(s["candidate_id"]) for s in s_list]
+        unique_measured = set(measured_ids)
+        if len(pool_ids) > 0:
+            missing = len(pool_ids - unique_measured)
+            dups = len(measured_ids) - len(unique_measured)
+            missing_count += missing
+            dup_count += dups
+            if missing == 0 and dups == 0 and len(unique_measured) == len(pool_ids):
+                full_cov_groups += 1
+
+    cov_rate = full_cov_groups / max(len(exact_groups), 1)
+    is_100pct_coverage = (full_cov_groups == len(exact_groups) and len(exact_groups) > 0)
+    verification["checks"]["exact_context_full_candidate_coverage"] = is_100pct_coverage
+    verification["checks"]["exact_context_groups_count"] = len(exact_groups)
+    verification["checks"]["full_coverage_groups_count"] = full_cov_groups
+    verification["checks"]["total_missing_candidates"] = missing_count
+    verification["checks"]["total_duplicate_candidates"] = dup_count
+    print(f"  [{'✓' if is_100pct_coverage else '✗'}] Exact Groups Coverage: {full_cov_groups}/{len(exact_groups)} ({cov_rate:.1%}), missing={missing_count}, dups={dup_count}")
+
+    all_pass = all(v for k, v in verification["checks"].items() if isinstance(v, bool))
     verification["overall_pass"] = all_pass
     print(f"\n  {'✓ ALL CHECKS PASSED' if all_pass else '✗ SOME CHECKS FAILED'}")
+    return verification
 
-    # Save verification
-    verification_path = os.path.join(output_dir, "prototype_verification.json")
-    with open(verification_path, 'w') as f:
-        json.dump(verification, f, indent=2)
 
-    # Save summary
-    summary = {
-        "phase": "Phase 6 — Conditional Oracle Dataset",
-        "scene": scene_name,
-        "seed": seed,
-        "total_samples": len(all_samples),
-        "feature_dim": PHASE6_FEATURE_DIM,
-        "feature_names": PHASE6_FEATURE_NAMES,
-        "frame_stats": frame_stats,
-        "verification": verification,
-        "config": {
-            "n_opt_steps": cond_config.n_opt_steps,
-            "k_neighbors": cond_config.k_neighbors,
-            "context_sizes": cond_config.context_sizes,
-            "context_size_weights": cond_config.context_size_weights,
-            "context_types": cond_config.context_types,
-        },
-    }
-    summary_path = os.path.join(output_dir, "dataset_summary.json")
-    with open(summary_path, 'w') as f:
-        json.dump(summary, f, indent=2, default=str)
+# ─────────────────────────────────────────────────────────────────────────────
+# Main
+# ─────────────────────────────────────────────────────────────────────────────
 
-    print(f"\n[Done] Saved:")
-    print(f"  Dataset:      {dataset_path}")
-    print(f"  Verification: {verification_path}")
-    print(f"  Summary:      {summary_path}")
+def main():
+    parser = argparse.ArgumentParser(description="Phase 6 Conditional Oracle Dataset Builder")
+    parser.add_argument("--tiny", action="store_true",
+                        help="Tiny mode: 2 frames, 10 candidates for quick verification")
+    parser.add_argument("--seed", type=int, default=42,
+                        help="Random seed (default: 42)")
+    parser.add_argument("--seeds", type=str, default=None,
+                        help="Comma-separated seeds for multi-seed generation (e.g. 42,43,44,45,46)")
+    parser.add_argument("--max-candidates", type=int, default=20,
+                        help="Max candidates per frame (default: 20)")
+    parser.add_argument("--frames", type=str, default="10,20,30",
+                        help="Comma-separated frame indices to evaluate (default: 10,20,30)")
+    parser.add_argument("--scene", type=str, default="tum_fr2_xyz",
+                        help="Scene name (default: tum_fr2_xyz)")
+    parser.add_argument("--protocol-splits", action="store_true",
+                        help="Generate ALL protocol splits: tum_fr1_desk (train 0-40, val 41-60) "
+                             "AND tum_fr2_xyz (test). Overrides --scene and --frames.")
+    parser.add_argument("--append", action="store_true", default=False,
+                        help="Append samples to existing dataset file if it exists, merging without overwriting.")
+    parser.add_argument("--output-filename", type=str, default=None,
+                        help="Custom filename for the output json dataset.")
+    parser.add_argument("--output-dir", type=str, default=None,
+                        help="Output directory (default: results/phase6_context_utility/datasets)")
+    args = parser.parse_args()
+
+    seeds = [int(s) for s in args.seeds.split(",")] if args.seeds else [args.seed]
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    print(f"=" * 80)
+    print(f"  PHASE 6 — CONTEXT-CENTRIC CONDITIONAL ORACLE DATASET BUILDER [Device: {device}]")
+    print(f"=" * 80)
+
+    protocol = load_protocol()
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    output_dir = args.output_dir or os.path.join(repo_root, "results", "phase6_context_utility", "datasets")
+    os.makedirs(output_dir, exist_ok=True)
+
+    context_specs = [
+        ("empty", 0),
+        ("spatial_knn", 1),
+        ("spatial_knn", 4),
+        ("random", 8),
+    ]
+
+    for seed in seeds:
+        print(f"\n{'#'*80}")
+        print(f"  GENERATING DATASET FOR SEED {seed}")
+        print(f"{'#'*80}")
+
+        all_samples: List[Dict[str, Any]] = []
+        all_stats: List[Dict[str, Any]] = []
+
+        if args.protocol_splits:
+            print("  MODE: PROTOCOL SPLITS (Train: tum_fr1_desk frames 10,20,30,40 | Val: frames 45,55 | Test: tum_fr2_xyz frames 10,20,30)")
+            fr1_frames = [10, 20, 30, 40, 45, 55]
+            fr2_frames = [10, 20, 30]
+
+            s_fr1, stats_fr1 = generate_samples_for_scene(
+                scene_name="tum_fr1_desk",
+                frames_to_sample=fr1_frames,
+                max_candidates=args.max_candidates,
+                seed=seed,
+                device=device,
+                protocol=protocol,
+                context_specs=context_specs,
+            )
+            all_samples.extend(s_fr1)
+            all_stats.extend(stats_fr1)
+
+            s_fr2, stats_fr2 = generate_samples_for_scene(
+                scene_name="tum_fr2_xyz",
+                frames_to_sample=fr2_frames,
+                max_candidates=args.max_candidates,
+                seed=seed,
+                device=device,
+                protocol=protocol,
+                context_specs=context_specs,
+            )
+            all_samples.extend(s_fr2)
+            all_stats.extend(stats_fr2)
+
+        elif args.tiny:
+            print("  MODE: TINY PROTOTYPE (tum_fr2_xyz frames 10, 20, 10 candidates)")
+            s_tiny, stats_tiny = generate_samples_for_scene(
+                scene_name="tum_fr2_xyz",
+                frames_to_sample=[10, 20],
+                max_candidates=10,
+                seed=seed,
+                device=device,
+                protocol=protocol,
+                context_specs=context_specs,
+            )
+            all_samples.extend(s_tiny)
+            all_stats.extend(stats_tiny)
+
+        else:
+            frames_to_sample = [int(f) for f in args.frames.split(",")]
+            print(f"  MODE: CUSTOM ({args.scene} frames {frames_to_sample}, {args.max_candidates} candidates)")
+            s_custom, stats_custom = generate_samples_for_scene(
+                scene_name=args.scene,
+                frames_to_sample=frames_to_sample,
+                max_candidates=args.max_candidates,
+                seed=seed,
+                device=device,
+                protocol=protocol,
+                context_specs=context_specs,
+            )
+            all_samples.extend(s_custom)
+            all_stats.extend(stats_custom)
+
+        # Save dataset
+        fname = args.output_filename or f"conditional_oracle_seed_{seed}.json"
+        dataset_path = os.path.join(output_dir, fname)
+
+        if args.append and os.path.exists(dataset_path):
+            with open(dataset_path, 'r') as f:
+                existing_samples = json.load(f)
+            print(f"\n[Append] Found {len(existing_samples)} existing samples in {dataset_path}")
+            combined_samples = existing_samples + all_samples
+            all_samples = combined_samples
+
+        print(f"\n[Save] Writing {len(all_samples)} samples to {dataset_path}")
+        with open(dataset_path, 'w') as f:
+            json.dump(all_samples, f, indent=2, default=str)
+
+        # Verification
+        print(f"\n{'='*60}")
+        print(f"  VERIFICATION (Seed {seed})")
+        print(f"{'='*60}")
+        verification = verify_dataset(all_samples, all_stats, seed)
+
+        verification_path = os.path.join(output_dir, f"prototype_verification_seed_{seed}.json" if len(seeds) > 1 else "prototype_verification.json")
+        with open(verification_path, 'w') as f:
+            json.dump(verification, f, indent=2)
+
+        summary = {
+            "phase": "Phase 6 — Context-Centric Conditional Oracle Dataset",
+            "seed": seed,
+            "total_samples": len(all_samples),
+            "feature_dim": PHASE6_FEATURE_DIM,
+            "feature_names": PHASE6_FEATURE_NAMES,
+            "frame_stats": all_stats,
+            "verification": verification,
+            "context_specs": context_specs,
+        }
+        summary_path = os.path.join(output_dir, f"dataset_summary_seed_{seed}.json" if len(seeds) > 1 else "dataset_summary.json")
+        with open(summary_path, 'w') as f:
+            json.dump(summary, f, indent=2, default=str)
+
+    print(f"\n[Done] Successfully built dataset for seed(s): {seeds}")
 
 
 if __name__ == "__main__":
     main()
+

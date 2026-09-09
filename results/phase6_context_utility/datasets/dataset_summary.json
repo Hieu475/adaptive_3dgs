@@ -1,8 +1,7 @@
 {
-  "phase": "Phase 6 \u2014 Conditional Oracle Dataset",
-  "scene": "tum_fr2_xyz",
+  "phase": "Phase 6 \u2014 Context-Centric Conditional Oracle Dataset",
   "seed": 42,
-  "total_samples": 800,
+  "total_samples": 720,
   "feature_dim": 32,
   "feature_names": [
     "rgb_error",
@@ -40,90 +39,349 @@
   ],
   "frame_stats": [
     {
+      "scene": "tum_fr1_desk",
       "frame": 10,
-      "n_candidates": 15,
-      "n_samples": 75,
-      "n_gaussians": 4887,
+      "split": "train",
+      "n_candidates": 20,
+      "n_samples": 80,
+      "n_gaussians": 7990,
       "state_integrity": true,
-      "time_s": 123.6240589370027,
-      "delta_q_mean": 6.037231179720477e-06,
-      "delta_q_std": 1.3066604899485553e-05,
-      "delta_q_min": -2.4926291921249704e-05,
-      "delta_q_max": 4.8601629745494796e-05,
-      "utility_mean": 6.7537939320311226e-06,
-      "utility_std": 3.701949411727368e-05,
-      "positive_utility_frac": 0.8,
+      "time_s": 90.60699212499821,
+      "delta_q_mean": 1.4538152206036505e-05,
+      "delta_q_std": 1.5615814754739094e-05,
+      "delta_q_min": -4.80871762966763e-06,
+      "delta_q_max": 4.7666075917368814e-05,
+      "utility_mean": 5.181774921647586e-07,
+      "utility_std": 7.2528210212213e-07,
+      "positive_utility_frac": 0.9,
+      "delta_q_single_mean": 1.4520707387841268e-05,
+      "delta_q_single_std": 1.564204137758571e-05,
+      "utility_single_mean": 2.675491045482951e-07,
+      "n_context_types": 3,
+      "context_types_seen": [
+        "empty",
+        "random",
+        "spatial_knn"
+      ],
       "context_size_distribution": {
-        "0": 15,
-        "1": 15,
-        "4": 30,
-        "8": 15
+        "0": 20,
+        "1": 20,
+        "4": 20,
+        "8": 20
       }
     },
     {
+      "scene": "tum_fr1_desk",
       "frame": 20,
-      "n_candidates": 15,
-      "n_samples": 75,
-      "n_gaussians": 4887,
+      "split": "train",
+      "n_candidates": 20,
+      "n_samples": 80,
+      "n_gaussians": 7990,
       "state_integrity": true,
-      "time_s": 126.66616740300014,
-      "delta_q_mean": 1.2439415611520492e-05,
-      "delta_q_std": 1.8808343093280237e-05,
-      "delta_q_min": -1.034608591281244e-05,
-      "delta_q_max": 7.44876681711409e-05,
-      "utility_mean": 7.722486493834143e-06,
-      "utility_std": 3.513840764463702e-05,
-      "positive_utility_frac": 0.7866666666666666,
+      "time_s": 95.66323560000092,
+      "delta_q_mean": 2.9619478220616165e-05,
+      "delta_q_std": 5.59885253715351e-05,
+      "delta_q_min": -8.254439265696412e-06,
+      "delta_q_max": 0.0002193680265549539,
+      "utility_mean": 9.264946881946485e-07,
+      "utility_std": 1.913317945070452e-06,
+      "positive_utility_frac": 0.8,
+      "delta_q_single_mean": 2.9680084511568988e-05,
+      "delta_q_single_std": 5.5892496556769796e-05,
+      "utility_single_mean": 3.9666994580730306e-07,
+      "n_context_types": 3,
+      "context_types_seen": [
+        "empty",
+        "random",
+        "spatial_knn"
+      ],
       "context_size_distribution": {
-        "0": 15,
-        "1": 15,
-        "4": 30,
-        "8": 15
+        "0": 20,
+        "1": 20,
+        "4": 20,
+        "8": 20
+      }
+    },
+    {
+      "scene": "tum_fr1_desk",
+      "frame": 30,
+      "split": "train",
+      "n_candidates": 20,
+      "n_samples": 80,
+      "n_gaussians": 7990,
+      "state_integrity": true,
+      "time_s": 98.20718416800082,
+      "delta_q_mean": 1.675578913601234e-05,
+      "delta_q_std": 1.99407529006101e-05,
+      "delta_q_min": -1.0977063369399565e-05,
+      "delta_q_max": 8.464456754371577e-05,
+      "utility_mean": 8.836839507460408e-07,
+      "utility_std": 4.568173332677034e-06,
+      "positive_utility_frac": 0.9375,
+      "delta_q_single_mean": 1.7115526687187632e-05,
+      "delta_q_single_std": 1.9256051015455183e-05,
+      "utility_single_mean": 2.3531204538689025e-07,
+      "n_context_types": 3,
+      "context_types_seen": [
+        "empty",
+        "random",
+        "spatial_knn"
+      ],
+      "context_size_distribution": {
+        "0": 20,
+        "1": 20,
+        "4": 20,
+        "8": 20
+      }
+    },
+    {
+      "scene": "tum_fr1_desk",
+      "frame": 40,
+      "split": "train",
+      "n_candidates": 20,
+      "n_samples": 80,
+      "n_gaussians": 7990,
+      "state_integrity": true,
+      "time_s": 97.57585707399994,
+      "delta_q_mean": 2.6074670910977193e-05,
+      "delta_q_std": 5.0611256833240494e-05,
+      "delta_q_min": -3.9336053452919495e-06,
+      "delta_q_max": 0.00022645476034032657,
+      "utility_mean": 6.70308996221543e-07,
+      "utility_std": 1.2068469839448588e-06,
+      "positive_utility_frac": 0.8125,
+      "delta_q_single_mean": 2.5437708666655496e-05,
+      "delta_q_single_std": 5.053756644884813e-05,
+      "utility_single_mean": 3.93885905011639e-07,
+      "n_context_types": 3,
+      "context_types_seen": [
+        "empty",
+        "random",
+        "spatial_knn"
+      ],
+      "context_size_distribution": {
+        "0": 20,
+        "1": 20,
+        "4": 20,
+        "8": 20
+      }
+    },
+    {
+      "scene": "tum_fr1_desk",
+      "frame": 45,
+      "split": "validation",
+      "n_candidates": 20,
+      "n_samples": 80,
+      "n_gaussians": 7990,
+      "state_integrity": true,
+      "time_s": 98.57741724000152,
+      "delta_q_mean": 1.1859546226286932e-05,
+      "delta_q_std": 2.9315682484209317e-05,
+      "delta_q_min": -7.334783632915282e-06,
+      "delta_q_max": 0.0001347899741841317,
+      "utility_mean": 3.332699486906257e-07,
+      "utility_std": 9.324495016735453e-07,
+      "positive_utility_frac": 0.85,
+      "delta_q_single_mean": 1.1464300036107078e-05,
+      "delta_q_single_std": 2.9373813587873756e-05,
+      "utility_single_mean": 1.7461939083860457e-07,
+      "n_context_types": 3,
+      "context_types_seen": [
+        "empty",
+        "random",
+        "spatial_knn"
+      ],
+      "context_size_distribution": {
+        "0": 20,
+        "1": 20,
+        "4": 20,
+        "8": 20
+      }
+    },
+    {
+      "scene": "tum_fr1_desk",
+      "frame": 55,
+      "split": "validation",
+      "n_candidates": 20,
+      "n_samples": 80,
+      "n_gaussians": 7990,
+      "state_integrity": true,
+      "time_s": 97.77128252500188,
+      "delta_q_mean": 1.948430505288892e-05,
+      "delta_q_std": 4.457156450947351e-05,
+      "delta_q_min": -7.010994477585407e-06,
+      "delta_q_max": 0.00019956919300618726,
+      "utility_mean": 6.636076709843002e-07,
+      "utility_std": 1.5643334530297223e-06,
+      "positive_utility_frac": 0.8,
+      "delta_q_single_mean": 1.928134660706386e-05,
+      "delta_q_single_std": 4.4617413845943825e-05,
+      "utility_single_mean": 2.7565488418945765e-07,
+      "n_context_types": 3,
+      "context_types_seen": [
+        "empty",
+        "random",
+        "spatial_knn"
+      ],
+      "context_size_distribution": {
+        "0": 20,
+        "1": 20,
+        "4": 20,
+        "8": 20
+      }
+    },
+    {
+      "scene": "tum_fr2_xyz",
+      "frame": 10,
+      "split": "cross_scene_test",
+      "n_candidates": 20,
+      "n_samples": 80,
+      "n_gaussians": 5575,
+      "state_integrity": true,
+      "time_s": 75.41094045099817,
+      "delta_q_mean": 1.6949668186506234e-05,
+      "delta_q_std": 3.3743821829181245e-05,
+      "delta_q_min": -5.2197913182907445e-06,
+      "delta_q_max": 0.00015202991045890906,
+      "utility_mean": 6.260323320374517e-07,
+      "utility_std": 1.053739470814894e-06,
+      "positive_utility_frac": 0.8,
+      "delta_q_single_mean": 1.6946632264605865e-05,
+      "delta_q_single_std": 3.377489784524653e-05,
+      "utility_single_mean": 3.397942773348357e-07,
+      "n_context_types": 3,
+      "context_types_seen": [
+        "empty",
+        "random",
+        "spatial_knn"
+      ],
+      "context_size_distribution": {
+        "0": 20,
+        "1": 20,
+        "4": 20,
+        "8": 20
+      }
+    },
+    {
+      "scene": "tum_fr2_xyz",
+      "frame": 20,
+      "split": "cross_scene_test",
+      "n_candidates": 20,
+      "n_samples": 80,
+      "n_gaussians": 5575,
+      "state_integrity": true,
+      "time_s": 77.60024781700122,
+      "delta_q_mean": 4.000889625895941e-06,
+      "delta_q_std": 6.531133952236872e-06,
+      "delta_q_min": -4.680948983036529e-06,
+      "delta_q_max": 2.419186405568834e-05,
+      "utility_mean": 1.320715705282927e-07,
+      "utility_std": 2.551596939507947e-07,
+      "positive_utility_frac": 0.7125,
+      "delta_q_single_mean": 3.892047811353977e-06,
+      "delta_q_single_std": 6.528788141641307e-06,
+      "utility_single_mean": 5.81643826256716e-08,
+      "n_context_types": 3,
+      "context_types_seen": [
+        "empty",
+        "random",
+        "spatial_knn"
+      ],
+      "context_size_distribution": {
+        "0": 20,
+        "1": 20,
+        "4": 20,
+        "8": 20
+      }
+    },
+    {
+      "scene": "tum_fr2_xyz",
+      "frame": 30,
+      "split": "cross_scene_test",
+      "n_candidates": 20,
+      "n_samples": 80,
+      "n_gaussians": 5575,
+      "state_integrity": true,
+      "time_s": 76.35617295999691,
+      "delta_q_mean": 5.967816818725121e-06,
+      "delta_q_std": 2.0767033574327908e-05,
+      "delta_q_min": -6.554433931124877e-05,
+      "delta_q_max": 4.421748250512735e-05,
+      "utility_mean": 3.086147580879028e-07,
+      "utility_std": 7.030199521995178e-07,
+      "positive_utility_frac": 0.75,
+      "delta_q_single_mean": 5.973769042441534e-06,
+      "delta_q_single_std": 2.074824226114049e-05,
+      "utility_single_mean": 1.4578420938905602e-07,
+      "n_context_types": 3,
+      "context_types_seen": [
+        "empty",
+        "random",
+        "spatial_knn"
+      ],
+      "context_size_distribution": {
+        "0": 20,
+        "1": 20,
+        "4": 20,
+        "8": 20
       }
     }
   ],
   "verification": {
-    "total_samples": 800,
-    "frames_evaluated": [
-      10,
-      20
-    ],
-    "scene": "tum_fr2_xyz",
+    "total_samples": 720,
     "seed": 42,
     "feature_dim": 32,
+    "has_single_measurements": true,
+    "has_utility_single": true,
+    "has_candidate_pool_ids": true,
+    "context_types_used": [
+      "empty",
+      "random",
+      "spatial_knn"
+    ],
+    "context_sizes_used": [
+      0,
+      1,
+      4,
+      8
+    ],
+    "samples_per_context_type": {
+      "empty": 180,
+      "random": 180,
+      "spatial_knn": 360
+    },
     "checks": {
       "feature_vector_dim_32": true,
       "empty_context_dq_s_zero": true,
       "empty_context_identity": true,
       "delta_q_identity": true,
       "delta_q_identity_max_error": 0.0,
-      "context_size_variety": true,
-      "context_type_variety": true,
       "no_nan_features": true,
-      "state_integrity": true
+      "state_integrity": true,
+      "exact_context_full_candidate_coverage": true,
+      "exact_context_groups_count": 27,
+      "full_coverage_groups_count": 27,
+      "total_missing_candidates": 0,
+      "total_duplicate_candidates": 0
     },
     "overall_pass": true
   },
-  "config": {
-    "n_opt_steps": 5,
-    "k_neighbors": 8,
-    "context_sizes": [
-      0,
-      1,
-      4,
-      8
-    ],
-    "context_size_weights": [
-      0.3,
-      0.25,
-      0.25,
-      0.2
-    ],
-    "context_types": [
+  "context_specs": [
+    [
       "empty",
+      0
+    ],
+    [
       "spatial_knn",
-      "overlap_top",
-      "random"
+      1
+    ],
+    [
+      "spatial_knn",
+      4
+    ],
+    [
+      "random",
+      8
     ]
-  }
+  ]
 }

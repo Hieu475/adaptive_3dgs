@@ -4,7 +4,7 @@
   "status": "frozen",
   "schema_version": "phase6-v2",
   "protocol": "v1",
-  "git_commit": "ca39709f6b9db0764dce475821d49863846e0e2f",
+  "git_commit": "ab458af9088195e21975e536e2f4f20815ad7097",
   "seeds": [
     42,
     43,
@@ -26,12 +26,12 @@
   "normalizer": "train_only",
   "train_scene": "tum_fr1_desk",
   "test_scene": "tum_fr2_xyz",
-  "test_suite_status": "398/398 PASS (100%)",
-  "candidate_coverage_audit": "AUDITED (584 exact groups logged, 100% coverage condition benchmark confirms Case B at rho=0.7051)",
+  "test_suite_status": "404/404 PASS (100%)",
+  "candidate_coverage_audit": "AUDITED (27 exact groups g=(scene,frame,S_t) under context-centric generation, 100% exact candidate pool coverage |M_t|=|P_t|=20, missing=0, zero synthetic baseline fill. Confirms Case 1 rank stability at rho=0.9089, Kendall tau=0.8152, Overlap@5=82.2%)",
   "gate_6a_status": "PASS",
   "gate_6b_status": "RECOVERED",
   "gate_6c_status": "CASE_B_ESTABLISHED",
   "gate_6d_status": "PASS",
   "gate_6e_status": "PASS",
-  "scientific_conclusion": "Case B: Contextual interaction is confirmed in Gaussian utility, but candidate rank exhibits substantial stability (rho=0.7051 at 100% pool coverage, rho=0.9623 exact baseline-fill) so conditional greedy yields no realized gain over static selection."
+  "scientific_conclusion": "Case 1 / Case B: Contextual interaction exists in Gaussian utility (U*(i|S) != U*(i|empty), Gate 6A/6D pass), but within-frame candidate priority rank is substantially stable (rho=0.9089, Overlap@5=82.2% across 27 100%-coverage groups without synthetic fill). Consequently, Oracle Conditional achieves identical quality to Oracle Static (+0.00 context advantage), explaining why context-aware adaptive selection yields no statistically significant quality gain over static selection (p > 0.30, CI spans 0 across 5 seeds)."
 }

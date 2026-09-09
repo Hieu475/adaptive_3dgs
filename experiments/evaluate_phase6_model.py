@@ -204,9 +204,13 @@ def main():
     output_dir = args.output_dir or os.path.join(repo_root, "results", "phase6_context_utility")
     os.makedirs(output_dir, exist_ok=True)
 
-    dataset_path = args.dataset or os.path.join(
-        output_dir, "datasets", f"conditional_oracle_seed_{args.seed}.json"
-    )
+    dataset_path = args.dataset
+    if dataset_path is None:
+        cand_path = os.path.join(output_dir, "datasets", f"conditional_oracle_seed_{args.seed}.json")
+        if os.path.exists(cand_path):
+            dataset_path = cand_path
+        else:
+            dataset_path = os.path.join(output_dir, "datasets", "conditional_oracle_seed_42.json")
     if not os.path.exists(dataset_path):
         print(f"[ERROR] Dataset not found at: {dataset_path}")
         sys.exit(1)

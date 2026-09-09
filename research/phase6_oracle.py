@@ -560,6 +560,301 @@ class ConditionalOracleExperiment:
         overlaps.sort(key=lambda x: x[1], reverse=True)
         return [idx for idx, _ in overlaps[:context_size]]
 
+    def sample_frame_context(
+        self,
+        context_type: str,
+        context_size: int,
+        exclude_pool: List[int],
+        positions: torch.Tensor,
+        visible_indices: Optional[List[int]] = None,
+        contrib_indices: Optional[torch.Tensor] = None,
+        contrib_weights: Optional[torch.Tensor] = None,
+        seed: int = 42,
+        all_features: Optional[np.ndarray] = None,
+    ) -> List[int]:
+        """Sample a context set S for an entire frame, disjoint from exclude_pool.
+
+        Guarantees that no candidate in exclude_pool is in S (S ∩ exclude_pool = ∅).
+        """
+        if context_size <= 0 or context_type == "empty":
+            return []
+
+        N = positions.shape[0]
+        exclude_set = set(int(x) for x in exclude_pool)
+
+        if visible_indices is not None and len(visible_indices) > 0:
+            available = [int(i) for i in visible_indices if int(i) not in exclude_set and 0 <= int(i) < N]
+        else:
+            available = [i for i in range(N) if i not in exclude_set]
+
+        if len(available) == 0:
+            available = [i for i in range(N) if i not in exclude_set]
+
+        if len(available) == 0:
+            return []
+
+        rng = np.random.default_rng(seed)
+
+        if context_type == "spatial_knn":
+            anchor = int(rng.choice(available))
+            avail_tensor = torch.tensor(available, dtype=torch.long, device=positions.device)
+            diffs = positions[avail_tensor] - positions[anchor]
+            dists = torch.norm(diffs, dim=-1)
+            k_sel = min(context_size, len(available))
+            topk = torch.argsort(dists)[:k_sel]
+            return [available[idx] for idx in topk.cpu().tolist()]
+
+        elif context_type == "overlap_top":
+            if contrib_indices is not None and contrib_weights is not None:
+                threshold = self.config.contribution_threshold
+                avail_weights = []
+                check_pool = available[:min(len(available), 300)]
+                for idx in check_pool:
+                    mask = (contrib_indices == idx) & (contrib_weights >= threshold)
+                    w = float(contrib_weights[mask].sum().item())
+                    avail_weights.append((idx, w))
+                avail_weights.sort(key=lambda x: x[1], reverse=True)
+                k_sel = min(context_size, len(avail_weights))
+                return [idx for idx, _ in avail_weights[:k_sel]]
+            else:
+                anchor = int(rng.choice(available))
+                avail_tensor = torch.tensor(available, dtype=torch.long, device=positions.device)
+                dists = torch.norm(positions[avail_tensor] - positions[anchor], dim=-1)
+                k_sel = min(context_size, len(available))
+                topk = torch.argsort(dists)[:k_sel]
+                return [available[idx] for idx in topk.cpu().tolist()]
+
+        elif context_type == "high_utility":
+            scores = []
+            for idx in available:
+                if all_features is not None and idx < len(all_features):
+                    scores.append((idx, float(all_features[idx, 0] + all_features[idx, 1])))
+                else:
+                    scores.append((idx, 0.0))
+            scores.sort(key=lambda x: x[1], reverse=True)
+            k_sel = min(context_size, len(scores))
+            return [idx for idx, _ in scores[:k_sel]]
+
+        elif context_type == "random":
+            k_sel = min(context_size, len(available))
+            chosen = rng.choice(available, size=k_sel, replace=False)
+            return [int(x) for x in chosen.tolist()]
+
+        else:
+            k_sel = min(context_size, len(available))
+            chosen = rng.choice(available, size=k_sel, replace=False)
+            return [int(x) for x in chosen.tolist()]
+
+    def generate_context_centric_dataset(
+        self,
+        candidate_pool: List[int],
+        rgb_gt: torch.Tensor,
+        depth_gt: torch.Tensor,
+        contrib_indices: torch.Tensor,
+        contrib_weights: torch.Tensor,
+        all_features: np.ndarray,
+        scene_name: str = "scene",
+        frame_idx: int = 0,
+        split: str = "test",
+        seed: int = 42,
+        visible_indices: Optional[List[int]] = None,
+        context_specs: Optional[List[Tuple[str, int]]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Context-Centric Conditional Oracle Dataset Generation.
+
+        Group unit: G = (scene, frame, S_t, P_t).
+        Every candidate in P_t is measured under the exact same context S_t.
+        Guarantees 100% exact candidate coverage (|M_t| = |P_t|) with zero synthetic defaulting.
+        """
+        model = self.pipeline.gaussian_model
+        positions = model.positions
+        N = model.num_gaussians
+
+        # Valid candidate pool
+        pool = [int(i) for i in candidate_pool if 0 <= int(i) < N]
+        if not pool:
+            return []
+
+        if context_specs is None:
+            context_specs = [
+                ("empty", 0),
+                ("spatial_knn", 1),
+                ("spatial_knn", 4),
+                ("random", 8),
+            ]
+
+        eps = self.config.epsilon
+        results: List[Dict[str, Any]] = []
+
+        # 1. Measure baseline quality Q_0 on original state
+        snapshot_orig = self.oracle_engine.snapshot_state()
+        try:
+            q_baseline = self.measure_quality_at_state(rgb_gt, depth_gt)
+        finally:
+            self.oracle_engine.restore_state(snapshot_orig)
+
+        # 2. Pre-pass: measure single-Gaussian (unconditional S=∅) for every candidate in pool
+        single_measurements: Dict[int, Dict[str, Any]] = {}
+        for cand_idx in pool:
+            m_single = self.measure_conditional_utility(
+                candidate_idx=cand_idx,
+                context_indices=[],
+                rgb_gt=rgb_gt,
+                depth_gt=depth_gt,
+                contrib_indices=contrib_indices,
+                contrib_weights=contrib_weights,
+            )
+            single_measurements[cand_idx] = {
+                "delta_q_single": float(m_single["delta_q_conditional"]),
+                "delta_t_single": float(m_single["delta_t_conditional_ms"]),
+                "utility_single": float(m_single["utility_conditional"]),
+                "q_single_psnr": float(m_single["q_si_psnr"]),
+            }
+
+        # 3. Process each context specification
+        for ctx_idx, (ctx_type, ctx_size) in enumerate(context_specs):
+            ctx_seed = seed + frame_idx * 100 + ctx_idx * 17
+
+            if ctx_type == "empty" or ctx_size == 0:
+                context_ids: List[int] = []
+                q_s = q_baseline.copy()
+                t_s_ms = 0.0
+                dq_s = 0.0
+            else:
+                context_ids = self.sample_frame_context(
+                    context_type=ctx_type,
+                    context_size=ctx_size,
+                    exclude_pool=pool,
+                    positions=positions,
+                    visible_indices=visible_indices,
+                    contrib_indices=contrib_indices,
+                    contrib_weights=contrib_weights,
+                    seed=ctx_seed,
+                    all_features=all_features,
+                )
+                context_ids = sorted(list(set(int(x) for x in context_ids)))
+                if len(context_ids) == 0:
+                    continue
+
+                # Precompute Q(S_t) and T(S_t) once for the whole candidate pool
+                snapshot = self.oracle_engine.snapshot_state()
+                try:
+                    influence_mask_s = self.oracle_engine._get_influence_mask(
+                        context_ids, contrib_indices, contrib_weights
+                    )
+                    res_s = self.oracle_engine.optimize_gaussian_group(
+                        indices=context_ids,
+                        n_steps=self.config.n_opt_steps,
+                        rgb=rgb_gt,
+                        depth=depth_gt,
+                        influence_mask=influence_mask_s,
+                    )
+                    q_s = {
+                        "psnr": float(res_s['psnr_global_after']),
+                        "ssim": float(res_s['ssim_global_after']),
+                        "depth_l1": float(res_s['depth_l1_global_after']),
+                        "loss": float(res_s['loss_global_after']),
+                    }
+                    t_s_ms = float(res_s['measured_trial_cost_ms'])
+                finally:
+                    self.oracle_engine.restore_state(snapshot)
+
+                dq_s = float(self._compute_delta_quality(q_baseline, q_s))
+
+            # Evaluate EVERY candidate in pool under this exact context S_t
+            for cand_idx in pool:
+                p_id = cand_idx
+                if hasattr(model, 'persistent_ids') and cand_idx < len(model.persistent_ids):
+                    p_id = int(model.persistent_ids[cand_idx].item())
+
+                if len(context_ids) == 0:
+                    # S = ∅
+                    dq_cond = single_measurements[cand_idx]["delta_q_single"]
+                    dt_cond = single_measurements[cand_idx]["delta_t_single"]
+                    u_cond = single_measurements[cand_idx]["utility_single"]
+                    q_si_psnr = single_measurements[cand_idx]["q_single_psnr"]
+                    q_si_loss = 0.0
+                    t_si_ms = dt_cond
+                    dq_si = dq_cond
+                else:
+                    # S ≠ ∅: optimize S ∪ {cand_idx} from original state
+                    group_si = context_ids + [cand_idx]
+                    snapshot_cand = self.oracle_engine.snapshot_state()
+                    try:
+                        influence_mask_si = self.oracle_engine._get_influence_mask(
+                            group_si, contrib_indices, contrib_weights
+                        )
+                        res_si = self.oracle_engine.optimize_gaussian_group(
+                            indices=group_si,
+                            n_steps=self.config.n_opt_steps,
+                            rgb=rgb_gt,
+                            depth=depth_gt,
+                            influence_mask=influence_mask_si,
+                        )
+                        q_si = {
+                            "psnr": float(res_si['psnr_global_after']),
+                            "ssim": float(res_si['ssim_global_after']),
+                            "depth_l1": float(res_si['depth_l1_global_after']),
+                            "loss": float(res_si['loss_global_after']),
+                        }
+                        t_si_ms = float(res_si['measured_trial_cost_ms'])
+                    finally:
+                        self.oracle_engine.restore_state(snapshot_cand)
+
+                    dq_si = float(self._compute_delta_quality(q_baseline, q_si))
+                    dq_cond = dq_si - dq_s
+                    dt_cond = t_si_ms - t_s_ms
+                    u_cond = dq_cond / max(abs(dt_cond), eps)
+                    q_si_psnr = q_si["psnr"]
+                    q_si_loss = q_si["loss"]
+
+                # Extract context features
+                ctx_feats = build_full_context(
+                    positions=positions,
+                    candidate_idx=cand_idx,
+                    all_features=all_features,
+                    selected_indices=context_ids,
+                    contrib_indices=contrib_indices,
+                    contrib_weights=contrib_weights,
+                    config=self.context_config,
+                )
+
+                sample = {
+                    "scene": scene_name,
+                    "frame": int(frame_idx),
+                    "split": split,
+                    "seed": int(seed),
+                    "candidate_id": int(cand_idx),
+                    "candidate_persistent_id": int(p_id),
+                    "candidate_pool_ids": list(pool),
+                    "context_ids": list(context_ids),
+                    "context_type": str(ctx_type),
+                    "context_size": len(context_ids),
+                    "self_features": ctx_feats["self_features"].tolist(),
+                    "neighbor_features": ctx_feats["neighbor_features"],
+                    "overlap_features": ctx_feats["overlap_features"],
+                    "selected_features": ctx_feats["selected_features"],
+                    "full_feature_vector": ctx_feats["full_vector"].tolist(),
+                    "q_baseline_psnr": float(q_baseline["psnr"]),
+                    "q_baseline_loss": float(q_baseline["loss"]),
+                    "q_s_psnr": float(q_s["psnr"]),
+                    "q_si_psnr": float(q_si_psnr),
+                    "delta_q_s": float(dq_s),
+                    "delta_q_si": float(dq_si),
+                    "delta_q_conditional": float(dq_cond),
+                    "t_s_ms": float(t_s_ms),
+                    "t_si_ms": float(t_si_ms),
+                    "delta_t_conditional_ms": float(dt_cond),
+                    "utility_conditional": float(u_cond),
+                    "delta_q_single": float(single_measurements[cand_idx]["delta_q_single"]),
+                    "delta_t_single": float(single_measurements[cand_idx]["delta_t_single"]),
+                    "utility_single": float(single_measurements[cand_idx]["utility_single"]),
+                    "q_single_psnr": float(single_measurements[cand_idx]["q_single_psnr"]),
+                }
+                results.append(sample)
+
+        return results
+
     # ─── Dataset Generation ──────────────────────────────────────────────
 
     def generate_conditional_dataset(
