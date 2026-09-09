@@ -167,3 +167,36 @@ def test_no_synthetic_filling_in_rank_stability(dataset_path, tmp_path):
     assert audit["total_duplicate_candidates"] == 0
     assert audit["invariant_measured_equals_pool"] is True
     assert results["n_full_coverage_groups"] == results["n_total_evaluated_groups"]
+
+
+def test_candidates_in_group_share_exact_metadata(exact_context_groups):
+    """Test 11: All candidate records in the same group share identical scene, frame, context_ids, candidate_pool_ids."""
+    for key, s_list in exact_context_groups.items():
+        scene, frame, ctx = key
+        first = s_list[0]
+        expected_pool = first.get("candidate_pool_ids", [])
+        for s in s_list:
+            assert s["scene"] == scene, f"Scene mismatch in group {key}: {s['scene']} != {scene}"
+            assert s["frame"] == frame, f"Frame mismatch in group {key}: {s['frame']} != {frame}"
+            assert tuple(sorted(s.get("context_ids", []) or [])) == ctx, f"Context mismatch in group {key}"
+            assert s.get("candidate_pool_ids", []) == expected_pool, f"Candidate pool mismatch in group {key}"
+
+
+def test_cost_timing_noise_fraction_audit(dataset_samples):
+    """Test 12: Audit Delta_T GPU timing noise fraction (must be <= 5% and regularized)."""
+    non_empty = [s for s in dataset_samples if s.get("context_ids")]
+    assert len(non_empty) > 0, "Dataset must contain non-empty context samples"
+    
+    n_neg = sum(1 for s in non_empty if s["delta_t_conditional_ms"] < 0)
+    n_pos = sum(1 for s in non_empty if s["delta_t_conditional_ms"] > 0)
+    n_zero = sum(1 for s in non_empty if s["delta_t_conditional_ms"] == 0)
+    
+    # Timing noise fraction must be small (< 5%)
+    noise_rate = n_neg / len(non_empty)
+    assert noise_rate < 0.05, f"Timing noise fraction {noise_rate:.1%} exceeds 5% threshold"
+    assert n_zero == 0, f"Expected 0 exact zero delta_t samples, got {n_zero}"
+    
+    # 100% of samples must have positive effective_delta_t_ms
+    for s in non_empty:
+        assert s["effective_delta_t_ms"] > 0, "All effective costs must be positive"
+        assert not np.isnan(s["effective_delta_t_ms"])

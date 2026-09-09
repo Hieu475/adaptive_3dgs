@@ -349,3 +349,44 @@ class TestDatasetSchema:
 
     def test_feature_vector_length(self):
         assert PHASE6_FEATURE_DIM == 32
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 8. Snapshot / Restore Isolation & Cryptographic Invariance (VIỆC F)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestSnapshotRestoreCryptographicInvariance:
+    """Verify that ConditionalOracleExperiment restores exact parameter states."""
+
+    def test_conditional_oracle_snapshot_restore_exact_state_hash(self):
+        """Assert cryptographic equality of model parameters before and after conditional measurement."""
+        from research.pipeline import OnlineReconstructionPipeline
+        from tests.test_oracle_utility import hash_gaussian_state
+
+        pipeline = OnlineReconstructionPipeline(device="cpu")
+        H, W = 32, 40
+        torch.manual_seed(42)
+        rgb = torch.rand(H, W, 3)
+        depth = torch.ones(H, W) * 2.0
+        fx, fy = 80.0, 80.0
+        intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
+        pipeline.initialize(rgb, depth, intrinsics)
+
+        oracle = ConditionalOracleExperiment(pipeline=pipeline, config=ConditionalOracleConfig(n_opt_steps=2))
+        state_before_hash = hash_gaussian_state(pipeline.gaussian_model, pipeline.optimizer)
+
+        contrib_indices = torch.zeros((H, W, 4), dtype=torch.long)
+        contrib_weights = torch.zeros((H, W, 4), dtype=torch.float32)
+        meas = oracle.measure_conditional_utility(
+            candidate_idx=0,
+            context_indices=[1, 2],
+            rgb_gt=rgb,
+            depth_gt=depth,
+            contrib_indices=contrib_indices,
+            contrib_weights=contrib_weights,
+        )
+        state_after_hash = hash_gaussian_state(pipeline.gaussian_model, pipeline.optimizer)
+
+        assert state_before_hash == state_after_hash, (
+            f"State hash mismatch after conditional measurement: {state_before_hash} vs {state_after_hash}"
+        )

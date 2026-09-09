@@ -57,6 +57,11 @@ To resolve why Oracle Conditional Greedy yields approximately identical performa
   - `total_duplicate_candidates`: **0**
   - `synthetic_baseline_fill_used`: **false (Strictly 0% synthetic fill)**
 - **Methodological Disclosure**: All ranking metrics are computed strictly across measured ground-truth candidate pairs with zero defaulting to $U^*(i|\emptyset)$.
+- **Cost Validity & Timing Noise Audit**:
+  - $N_{\Delta T > 0} = \mathbf{520}$ (**96.3%**)
+  - $N_{\Delta T < 0} = \mathbf{20}$ (**3.7%** due to sub-millisecond GPU timing jitter)
+  - $N_{\Delta T = 0} = \mathbf{0}$ (**0.0%**)
+  - All 20 jittered samples regularized transparently via positive baseline standalone cost $T(\{i\})$, yielding $100\%$ positive and finite `effective_delta_t_ms` (mean = $36.12\text{ ms}$, min = $0.07\text{ ms}$, max = $125.37\text{ ms}$).
 
 #### 2. Rank Stability Results: Exact 100% Full-Coverage Groups
 
@@ -209,4 +214,4 @@ All 8 variants share the exact same training split (tum_fr1_desk [0:40]), valida
 1. **Context Modulates Utility Magnitude ($U^*(i|S) \neq U^*(i|\emptyset)$)**: Rasterization interactions between 3D Gaussians are substantially sub-additive and correlate strongly with spatial IoU ($\rho = 0.5357, p = 0.0048$). Conditioning on context significantly scales down utility magnitude, passing Gate 6A and Gate 6D sensitivity across 100% of seeds.
 2. **Candidate Rank Remains Substantially Stable ($\operatorname{rank}(U^*(i|S)) \approx \operatorname{rank}(U^*(i|\emptyset))$)**: Evaluated strictly across 27 exact context groups with 100% measured candidate pool coverage and zero synthetic baseline fill, rank stability remains exceptionally high: $\bar{\rho} = \mathbf{0.8916} \pm \mathbf{0.1104}$, $\bar{\tau} = \mathbf{0.8043}$, and Top-5 candidate overlap reaches $\mathbf{80.0\%}$. Co-visibility dampens utility values monotonically without scrambling candidate order.
 3. **Absence of Realized Quality Advantage ($Q(\pi_{P6}) \approx Q(\pi_{P4})$)**: In both the Oracle Decomposition Benchmark ($\text{Context Advantage} \equiv +0.00 \times 10^{-5}$) and the 5-seed online selection benchmark, context-aware adaptive greedy yields no statistically significant quality gain over static pointwise selection ($p > 0.70$, 95% bootstrap CI spans zero across all budgets). Pointwise ranking already selects the high-utility Gaussians, while adaptive re-ranking incurs a $420\times$ selection overhead ($76.36$ ms vs $0.18$ ms).
-4. **Engineering & Rigor Standards**: Phase 4 backbone is strictly frozen and immutable (SHA256 verified), candidate pool coverage is 100% exact, no synthetic baseline fill is employed, and the entire test suite passes at **414 / 414 (100%)**.
+4. **Engineering & Rigor Standards**: Phase 4 backbone is strictly frozen and immutable (SHA256 verified), candidate pool coverage is 100% exact, no synthetic baseline fill is employed, and the entire test suite passes at **417 / 417 (100%)**.

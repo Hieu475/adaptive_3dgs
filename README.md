@@ -85,6 +85,21 @@ Transforms Phase 4 predictions $\hat U_i, \hat C_i \to S_B \to \text{actual opti
   - **Per-Frame Latency Breakdown:** Latency audit separates selective gradient backward & Adam steps ($67.8\text{ ms}$) from rendering, tile binning, and CPU-side point cloud tracking (~$1.3\text{ s}$).
   - **Frame-by-Frame Quality Preservation:** $Q_{\text{ours}}(t) \ge Q_{\text{error}}(t)$ on **$100.0\%$ (49/49 frames)**.
 
+### Phase 6: Context-Aware Conditional Utility & Interaction Hardening (Case B Scientific Finding)
+Investigates whether conditioning on already-selected 3D Gaussians $S_t$ alters the marginal utility $U^*(i|S_t) = \frac{\Delta Q(i|S_t)}{\Delta T(i|S_t)}$ and whether context-aware adaptive selection $\pi_{P6}$ outperforms pointwise selection $\pi_{P4}$:
+- **Exact Candidate Pool Coverage & Zero Synthetic Fill:** Evaluated on **27 / 27 (100.0%)** exact context groups $g = (scene, frame, S_t)$ with full measured pool coverage ($|M_t| = |P_t| = 20$, `missing=0`, `duplicates=0`). Zero synthetic defaulting to unconditional utility is used (`synthetic_baseline_fill_used = False`).
+- **High Rank Stability ($\rho = 0.8916$):**
+  - Mean Spearman $\bar{\rho} = \mathbf{0.8916 \pm 0.1104}$ (median $\rho = 0.9188$).
+  - Mean Kendall $\bar{\tau} = \mathbf{0.8043}$.
+  - Top-5 Candidate Overlap: $\mathbf{80.0\%}$ (Top-10 Overlap: $\mathbf{89.3\%}$, Top-3 Overlap: $\mathbf{72.8\%}$).
+- **Oracle Gap & Case B Established:**
+  - **Oracle Context Advantage:** Exactly $+0.00 \times 10^{-5}$ ($Q_{\text{OracleCond}} \equiv Q_{\text{OracleStatic}}$ at 30% and 60% budgets).
+  - **Selection Regret:** $P_6$ Adaptive eliminates $75.1\% - 80.2\%$ of the selection regret suffered by heuristic baselines, converging to $9.1\%$ regret at 80% budget.
+  - **Statistical Testing ($n=5$ seeds):** 95% bootstrap confidence intervals for $Q(P_6) - Q(P_4)$ span zero across all budgets (Wilcoxon $p > 0.70$).
+  - **Core Dissertation Finding (Case 1 / Case B):** Screen-space co-visibility modulates utility values sub-additively through rasterization saturation, but attenuates candidates monotonically without scrambling priority ranks ($\rho \approx 0.89$). Thus, static pointwise selection already captures the optimal candidates, while adaptive re-ranking adds $76.36\text{ ms}$ selection overhead with no statistically significant quality advantage.
+- **Stage Runtime Profile:** $T_{\text{total}} = 924.59\text{ ms}$ ($T_{\text{feat}} = 225.79\text{ ms}$, $T_{\text{ctx}} = 66.84\text{ ms}$, $T_{\text{MLP}} = 1.12\text{ ms}$, $T_{\text{sel}} = 76.36\text{ ms}$, $T_{\text{opt}} = 554.48\text{ ms}$).
+- **Rigorous Invariant Verification:** P4 backbone is strictly frozen bitwise, $S_t \cap P_t = \emptyset$, cryptographic snapshot/restore state hash verified, and 100% of test suite passes (**417/417 PASS**).
+
 ---
 
 ## 4. Repository Structure
