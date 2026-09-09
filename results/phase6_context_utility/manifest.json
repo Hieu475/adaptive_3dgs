@@ -35,5 +35,5 @@
   "gate_6c_status": "CASE_B_ESTABLISHED",
   "gate_6d_status": "PASS",
   "gate_6e_status": "PASS",
-  "scientific_conclusion": "Case 1 / Case B: Contextual interaction exists in Gaussian utility (U*(i|S) != U*(i|empty), Gate 6A/6D pass), but within-frame candidate priority rank is substantially stable (rho=0.8916, Overlap@5=80.0% across 27 100%-coverage groups without synthetic fill). Consequently, Oracle Conditional achieves identical quality to Oracle Static (+0.00 context advantage), explaining why context-aware adaptive selection yields no statistically significant quality gain over static selection (p > 0.70, CI spans 0 across 5 seeds)."
+  "scientific_conclusion": "Case 1 / Case B: Contextual interaction exists in Gaussian utility (U*(i|S) != U*(i|empty), Gate 6A/6D pass), but within-frame candidate priority rank is substantially stable (rho=0.8916, Overlap@5=80.0% across 27 100%-coverage groups without synthetic fill). Consequently, Oracle Conditional achieves identical quality to Oracle Static (+0.00 context advantage), explaining why context-aware adaptive selection yields no statistically significant quality gain over static selection (Wilcoxon p >= 0.7035, CI spans 0 across 5 seeds)."
 }

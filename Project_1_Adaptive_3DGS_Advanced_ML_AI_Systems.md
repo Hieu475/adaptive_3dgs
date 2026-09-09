@@ -643,8 +643,8 @@ Dự án đã được thực thi và nghiệm thu thực nghiệm qua chuỗi n
   - *Hypothesis*: Tương tác co-visibility và che khuất alpha-compositing làm thay đổi giá trị utility biên: $U^*(i|S) \neq U^*(i|\emptyset)$.
   - *Experiment*: Thiết lập chuẩn đối sánh Oracle Conditional 5-Policy và kiểm định Candidate Coverage Audit trên 27 nhóm ngữ cảnh chính xác ($|M_t| = |P_t| = 20$, $100\%$ full pool coverage, zero synthetic baseline fill).
   - *Result*: Tương tác ngữ cảnh thay đổi độ lớn utility nhưng bảo toàn độ ổn định thứ tự thực chất: $\bar{\rho}_{\text{rank}} = \mathbf{0.8916} \pm \mathbf{0.1104}$, Kendall $\bar{\tau} = \mathbf{0.8043}$, $\text{Overlap@5} = \mathbf{80.0\%}$, Oracle Context Advantage $= \mathbf{+0.00 \times 10^{-5}}$.
-  - *Decision*: Lựa chọn thích ứng động (adaptive re-ranking) không mang lại cải thiện chất lượng có ý nghĩa thống kê so với static pointwise ranking ($p > 0.70$, 95% bootstrap CI chứa 0) $\to$ **Case B được xác lập vững chắc**.
-  - *Systems Implication*: Tính toán ngữ cảnh động tốn thêm $+361.06\text{ ms}$ ($+64.1\%$ thời gian stage, overhead chọn lọc tăng $424\times$) nhưng không mang lại lợi ích chất lượng, chứng minh static pointwise ranking là thiết kế tối ưu Pareto cho hệ thống SLAM thời gian thực.
+  - *Decision*: Lựa chọn thích ứng động (adaptive re-ranking) không mang lại cải thiện chất lượng có ý nghĩa thống kê so với static pointwise ranking (Wilcoxon $p \ge 0.7035$, 95% bootstrap CI chứa 0) $\to$ **Case B được xác lập vững chắc**.
+  - *Systems Implication*: Tính toán ngữ cảnh động tốn thêm $+361.06\text{ ms}$ ($+64.1\%$ thời gian pipeline stage, tỷ số overhead chọn lọc tăng $424.2\times$) nhưng không mang lại lợi ích chất lượng, chứng minh static pointwise ranking là thiết kế tối ưu Pareto cho hệ thống SLAM thời gian thực.
 
 #### B. AI Systems Contribution ($\hat{U} \to S_B \to \text{SelectiveAdam} \to \text{Online Reconstruction}$)
 - **Budget Enforcement**: Lập lịch tối ưu knapsack đa tiêu chí dưới ngân sách phần cứng cứng $B_{\text{sched}} = 15.0\text{ ms}$, phân biệt rõ thời gian mô hình hóa và thời gian thực thi thực tế.

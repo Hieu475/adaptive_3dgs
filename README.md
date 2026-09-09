@@ -16,12 +16,13 @@ This work establishes that **high residual error does not imply high marginal op
 
 $$\max_{S_t \subseteq G_t} \Delta Q(S_t) \quad \text{subject to} \quad C(S_t) \le B_t$$
 
-where the causal marginal utility of candidate Gaussian $g_i$ is defined via counterfactual intervention:
+where the counterfactual (intervention-based) marginal utility of candidate Gaussian $g_i$ under our experimental protocol is defined as:
 
-$$U_i^\star = \frac{\Delta Q_i}{C_i} \in \mathbb{R}$$
+$$U_i^\star = \frac{\Delta Q_i^{\text{intervention}}}{C_i} \in \mathbb{R}$$
 
-- $\Delta Q_i = Q(G_t \cup \{\Delta \theta_i\}) - Q(G_t)$ is the realized change in global reconstruction quality (combining photometric PSNR and geometric depth fidelity).
+- $\Delta Q_i^{\text{intervention}} = Q(G_t \cup \{\Delta \theta_i\}) - Q(G_t)$ is the realized change in global reconstruction quality under isolated trial intervention (combining photometric PSNR and geometric depth fidelity).
 - $C_i$ is the empirical execution time cost (ms).
+- Under this intervention protocol, $U_i^\star$ admits a direct causal interpretation as the counterfactual effect of allocating gradient updates to primitive $g_i$.
 - When optimization causes depth tearing or appearance degradation, $U_i^\star < 0$, providing an explicit penalty signal without artificial zero-clamping.
 
 ---
@@ -75,7 +76,7 @@ Reconstruction Quality (Q_t) ──► Monitored PSNR, SSIM, Depth L1
 | **Phase 4 (Gate 2)** | Can observable state predict marginal utility? | **Limited but Non-Trivial**: TwoHeadMLP achieves $\rho = +0.2035 \pm 0.172$, $\text{NDCG@20} = 0.4566$, $\text{OSE@20} = 0.497 \pm 0.102$, outperforming error-only heuristics on zero-shot cross-scene transfer (`tum_fr2_xyz`). |
 | **Phase 5 (Gate 3)** | Does utility prediction improve budgeted selection? | **Substantial Gain at Tight Budgets**: At $10\%\text{–}20\%$ budget, TwoHeadMLP delivers nearly double the selection efficiency of error ranking ($+\text{92.6}\%\text{–}+108.0\%$). In multi-frame online SLAM, reduces optimization latency by $33.6\%$ vs heuristic knapsack and $47.7\%$ vs error-only while matching reconstruction PSNR. |
 | **Phase 6 (Gate 6A-6E)** | Does context alter marginal utility and candidate ranking? | **Magnitude Shifts, Candidate Priority Substantially Stable**: Screen-space co-visibility modulates utility sub-additively ($\rho(\text{IoU}, \|I\|) = 0.5357, p = 0.0048$). However, candidate rank remains substantially stable: $\bar{\rho}_{\text{rank}} = \mathbf{0.8916} \pm \mathbf{0.1104}$, Kendall $\bar{\tau} = \mathbf{0.8043}$, and Top-5 candidate overlap reaches $\mathbf{80.0\%}$ across 27 full-coverage groups. |
-| **Phase 6 (Case B)** | Does adaptive contextual re-ranking improve selection? | **No Statistically Significant Gain**: Oracle Context Advantage $\equiv +0.00 \times 10^{-5}$ ($Q_{\text{OracleCond}} \equiv Q_{\text{OracleStatic}}$); 5-seed online selection gain $Q(P_6) - Q(P_4)$ spans zero across all budgets ($p > 0.70$). Pointwise ranking already identifies top candidates. |
+| **Phase 6 (Case B)** | Does adaptive contextual re-ranking improve selection? | **No Statistically Significant Gain**: Oracle Context Advantage $\equiv +0.00 \times 10^{-5}$ ($Q_{\text{OracleCond}} \equiv Q_{\text{OracleStatic}}$); 5-seed online selection gain $Q(P_6) - Q(P_4)$ spans zero across all budgets (Wilcoxon $p \ge 0.7035$). Pointwise ranking already captures most of the observed candidate priority structure. |
 
 ---
 
@@ -84,11 +85,11 @@ Reconstruction Quality (Q_t) ──► Monitored PSNR, SSIM, Depth L1
 The empirical trajectory across Phases 1 through 6 establishes a coherent, non-trivial scientific insight:
 
 $$\begin{aligned}
-\text{Co-visibility \& rasterization interaction} &\implies U^*(i \mid S) \neq U^*(i \mid \emptyset) \quad (\text{Interaction Exists}) \\
+\text{Co-visibility \& alpha-compositing interaction} &\implies U^*(i \mid S) \neq U^*(i \mid \emptyset) \quad (\text{Interaction Exists}) \\
 &\implies \text{Attenuation is largely monotonic across co-visible candidates} \\
-&\implies \operatorname{rank}(U^*(i \mid S)) \approx \operatorname{rank}(U^*(i \mid \emptyset)) \quad (\bar{\rho} = 0.8916, \text{Overlap@5} = 80.0\%) \\
-&\implies \text{Pointwise utility } U^*(i \mid \emptyset) \text{ already captures the optimal prioritization} \\
-&\implies \text{Adaptive contextual re-ranking introduces } 420\times \text{ selection overhead with no quality benefit}
+&\implies \operatorname{rank}(U^*(i \mid S)) \approx \operatorname{rank}(U^*(i \mid \emptyset)) \quad (\bar{\rho}_{\text{rank}} = 0.8916, \text{Overlap@5} = 80.0\%) \\
+&\implies \text{Pointwise utility } U^*(i \mid \emptyset) \text{ already captures most of the observed candidate priority structure} \\
+&\implies \text{Adaptive contextual selection increases selection-stage latency by } 424.2\times \text{ with no quality benefit}
 \end{aligned}$$
 
 Rather than claiming that contextual modeling enhances selection, our study **empirically characterizes contextual marginal utility and demonstrates that, under the evaluated online RGB-D setting, contextual interactions modulate utility magnitude while preserving substantial candidate rank stability, rendering adaptive greedy re-ranking unnecessary under the tested budget regime.**
@@ -121,7 +122,7 @@ $$T_{\text{stage}} = T_{\text{feature}} + T_{\text{context}} + T_{\text{MLP}} + 
 | **Gaussian Optimization** | $T_{\text{opt}}$ | ~550 ms | **554.48 ms** | 60.0% | Selective Adam backward passes & parameter updates |
 | **Total Pipeline Stage** | $T_{\text{total}}$ | **~563.5 ms** | **924.59 ms** | 100.0% | $1.64\times$ total stage runtime penalty |
 
-Adaptive greedy selection imposes a $420\times$ overhead on subset selection alone ($76.36\text{ ms}$ vs $0.18\text{ ms}$). Coupled with Case B rank stability ($\bar{\rho} = 0.8916$), paying this runtime penalty yields zero statistically significant quality gain in online reconstruction.
+Specifically, adaptive contextual selection increases the selection-stage latency by $424.2\times$ ($76.36\text{ ms}$ vs $0.18\text{ ms}$), with a $+361.06\text{ ms}$ ($+64.1\%$) total pipeline stage latency overhead ($924.59\text{ ms}$ vs $563.53\text{ ms}$). Coupled with Case B rank stability ($\bar{\rho}_{\text{rank}} = 0.8916$, Overlap@5 = $80.0\%$), paying this runtime penalty yields zero statistically significant quality gain in online reconstruction.
 
 ---
 
