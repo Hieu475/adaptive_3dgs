@@ -307,39 +307,81 @@ def generate_standardized_figures():
     with open(stability_file, 'r') as f:
         stab_data = json.load(f)
         
+    # Collect paired unconditional vs conditional utilities for scatter
+    ds_file = os.path.join(repo_root, 'results', 'phase6_context_utility', 'datasets', 'conditional_oracle_seed_42.json')
+    with open(ds_file, 'r') as f:
+        ds_samples = json.load(f)
+        
+    u0_map = {}
+    for s in ds_samples:
+        if s.get('context_size', 0) == 0:
+            key = (str(s['scene']), int(s['frame']), int(s['candidate_id']))
+            u0_map[key] = float(s['utility_conditional'])
+            
+    scatter_u0 = []
+    scatter_us = []
+    for s in ds_samples:
+        c_size = int(s.get('context_size', 0))
+        if c_size > 0:
+            key = (str(s['scene']), int(s['frame']), int(s['candidate_id']))
+            if key in u0_map:
+                scatter_u0.append(u0_map[key] * 1e4)
+                scatter_us.append(float(s['utility_conditional']) * 1e4)
+                
+    scatter_u0 = np.array(scatter_u0)
+    scatter_us = np.array(scatter_us)
+        
     ctx_sizes = [1, 4, 8]
     rhos = [stab_data['by_context_size'][str(s)]['mean_spearman_rho'] for s in ctx_sizes]
     taus = [stab_data['by_context_size'][str(s)]['mean_kendall_tau'] for s in ctx_sizes]
     ov5s = [stab_data['by_context_size'][str(s)]['mean_overlap_5'] * 100.0 for s in ctx_sizes]
     ov10s = [stab_data['by_context_size'][str(s)]['mean_overlap_10'] * 100.0 for s in ctx_sizes]
     
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9.5, 4.4), dpi=300)
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(14.5, 4.4), dpi=300)
     
-    # Left: Rank Correlations
-    x_pos = np.arange(len(ctx_sizes))
-    ax1.bar(x_pos - 0.18, rhos, width=0.35, color='#1A73E8', alpha=0.85, label=r'Spearman Rank $\bar{\rho}$')
-    ax1.bar(x_pos + 0.18, taus, width=0.35, color='#137333', alpha=0.85, label=r'Kendall $\bar{\tau}$')
-    ax1.set_ylabel('Correlation Coefficient', fontsize=10.5, fontweight='bold')
-    ax1.set_xlabel('Context Set Cardinality $|S|$', fontsize=10.5, fontweight='bold')
-    ax1.set_title('(a) Rank Correlation under Context', fontsize=11, fontweight='bold')
-    ax1.set_xticks(x_pos)
-    ax1.set_xticklabels([f'|S| = {s}' for s in ctx_sizes], fontsize=10)
-    ax1.set_ylim(0.5, 1.0)
+    # (a) Scatter Plot: U*(i|empty) vs U*(i|S)
+    ax1.scatter(scatter_u0, scatter_us, color='#1A73E8', alpha=0.55, edgecolors='none', s=24, label='Candidate Pairs')
+    if len(scatter_u0) > 0:
+        z = np.polyfit(scatter_u0, scatter_us, 1)
+        p = np.poly1d(z)
+        x_line = np.linspace(min(scatter_u0), max(scatter_u0), 50)
+        ax1.plot(x_line, p(x_line), color='#C5221F', linestyle='--', linewidth=1.8, label=f'Trend Fit (slope={z[0]:.2f})')
+        ax1.plot(x_line, x_line, color='#5F6368', linestyle=':', linewidth=1.2, label='Identity (y=x)')
+        
+    ax1.set_xlabel(r'Unconditional Utility $U^*(i \mid \emptyset)$ ($\times 10^{-4}$)', fontsize=10.0, fontweight='bold')
+    ax1.set_ylabel(r'Conditional Utility $U^*(i \mid S)$ ($\times 10^{-4}$)', fontsize=10.0, fontweight='bold')
+    ax1.set_title(r'(a) Utility Scatter ($U^\star(\emptyset)$ vs $U^\star(S)$)', fontsize=11, fontweight='bold')
     ax1.grid(True, linestyle='--', alpha=0.4)
-    ax1.legend(frameon=True, fontsize=9, loc='lower right')
+    ax1.legend(frameon=True, fontsize=8.0, loc='lower right')
+    ax1.text(0.04, 0.68, 'Authoritative Case B:\n' + r'$\bar{\rho}_{\mathrm{rank}} = 0.8916 \pm 0.1104$' + '\n' + r'$\bar{\tau} = 0.8043$' + '\n' + r'$\mathrm{Overlap@5} = 80.0\%$' + '\n(27 Groups, 100% Coverage)', 
+             transform=ax1.transAxes, fontsize=8.0, fontweight='medium',
+             bbox=dict(boxstyle='round,pad=0.3', facecolor='#E8F0FE', edgecolor='#1A73E8', alpha=0.9))
     
-    # Right: Overlap Metrics
-    ax2.plot(ctx_sizes, ov5s, color='#B06000', marker='s', linewidth=2.0, markersize=7, label='Top-5 Candidate Overlap')
-    ax2.plot(ctx_sizes, ov10s, color='#8430CE', marker='^', linestyle='--', linewidth=2.0, markersize=7, label='Top-10 Candidate Overlap')
-    ax2.set_ylabel('Candidate Overlap (%)', fontsize=10.5, fontweight='bold')
-    ax2.set_xlabel('Context Set Cardinality $|S|$', fontsize=10.5, fontweight='bold')
-    ax2.set_title('(b) Top-K Selection Overlap', fontsize=11, fontweight='bold')
-    ax2.set_xticks(ctx_sizes)
-    ax2.set_ylim(65, 100)
+    # (b) Rank Correlations
+    x_pos = np.arange(len(ctx_sizes))
+    ax2.bar(x_pos - 0.18, rhos, width=0.35, color='#1A73E8', alpha=0.85, label=r'Spearman Rank $\bar{\rho}$')
+    ax2.bar(x_pos + 0.18, taus, width=0.35, color='#137333', alpha=0.85, label=r'Kendall $\bar{\tau}$')
+    ax2.set_ylabel('Correlation Coefficient', fontsize=10.0, fontweight='bold')
+    ax2.set_xlabel('Context Set Cardinality $|S|$', fontsize=10.0, fontweight='bold')
+    ax2.set_title('(b) Rank Correlation across $|S|$', fontsize=11, fontweight='bold')
+    ax2.set_xticks(x_pos)
+    ax2.set_xticklabels([f'|S| = {s}' for s in ctx_sizes], fontsize=9.5)
+    ax2.set_ylim(0.5, 1.0)
     ax2.grid(True, linestyle='--', alpha=0.4)
-    ax2.legend(frameon=True, fontsize=9, loc='lower right')
+    ax2.legend(frameon=True, fontsize=8.5, loc='lower right')
     
-    plt.suptitle('Figure 7: High Rank Stability across Context Regimes (Authoritative $\\bar{\\rho} = 0.8916$)', 
+    # (c) Overlap Metrics
+    ax3.plot(ctx_sizes, ov5s, color='#B06000', marker='s', linewidth=2.0, markersize=7, label='Top-5 Candidate Overlap')
+    ax3.plot(ctx_sizes, ov10s, color='#8430CE', marker='^', linestyle='--', linewidth=2.0, markersize=7, label='Top-10 Candidate Overlap')
+    ax3.set_ylabel('Candidate Overlap (%)', fontsize=10.0, fontweight='bold')
+    ax3.set_xlabel('Context Set Cardinality $|S|$', fontsize=10.0, fontweight='bold')
+    ax3.set_title('(c) Top-K Selection Overlap', fontsize=11, fontweight='bold')
+    ax3.set_xticks(ctx_sizes)
+    ax3.set_ylim(65, 100)
+    ax3.grid(True, linestyle='--', alpha=0.4)
+    ax3.legend(frameon=True, fontsize=8.5, loc='lower right')
+    
+    plt.suptitle(r'Figure 7: Substantial Rank Stability across Context Regimes ($\bar{\rho} = 0.8916$, Overlap@5 = $80.0\%$)', 
                  fontsize=12, fontweight='bold', y=1.02)
     plt.tight_layout()
     f7_path = os.path.join(fig_dir, 'fig7_rank_stability_and_overlap.png')

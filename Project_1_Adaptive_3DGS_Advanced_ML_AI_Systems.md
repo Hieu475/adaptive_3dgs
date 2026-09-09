@@ -638,8 +638,13 @@ Dự án đã được thực thi và nghiệm thu thực nghiệm qua chuỗi n
 - **Counterfactual Intervention Oracle**: Đo lường chuẩn xác độ biến thiên chất lượng thực tế $\Delta Q_i$ chia cho thời gian can thiệp $C_i$ ($U_i^\star = \Delta Q_i / C_i \in \mathbb{R}$). Phát hiện **$20.5\%$** lượt tối ưu gây suy giảm chất lượng ($U_i^\star < 0$).
 - **Representation & Feature Design**: Xây dựng vector 11 đặc trưng quan sát tiền can thiệp ($s_i \in \mathbb{R}^{11}$) với chuẩn hóa độc lập (train-only normalizer).
 - **Two-Head Decoupled Architecture**: Tách rời dự đoán lợi ích $\widehat{\Delta Q}_i$ và chi phí $\widehat{C}_i$ với hàm phạt pairwise ranking có trọng số biên độ.
-- **Contextual Interaction & Non-Additivity**: Chứng minh bằng giải tích và đo lường trực tiếp rằng 3DGS có tính sub-additive mạnh do alpha-compositing ($R_{add} \ll 1.0$, correlation giữa IoU và sai số tương tác đạt $\rho = 0.5357, p = 0.0048$).
-- **Rank Stability (Case B)**: Đánh giá trên 27 nhóm ngữ cảnh với $100\%$ candidate pool coverage và không điền dữ liệu giả lập (zero synthetic fill), chứng minh độ ổn định thứ tự cực cao: $\bar{\rho}_{\text{rank}} = \mathbf{0.8916} \pm \mathbf{0.1104}$, Kendall $\bar{\tau} = \mathbf{0.8043}$, $\text{Overlap@5} = \mathbf{80.0\%}$.
+- **Contextual Interaction & Case B Formalization (Phase 6)**:
+  - *Research Question*: Liệu mô hình hóa ngữ cảnh tương tác $U^*(i|S_t)$ có mang lại lợi ích quyết định so với đánh giá điểm độc lập $U^*(i|\emptyset)$?
+  - *Hypothesis*: Tương tác co-visibility và che khuất alpha-compositing làm thay đổi giá trị utility biên: $U^*(i|S) \neq U^*(i|\emptyset)$.
+  - *Experiment*: Thiết lập chuẩn đối sánh Oracle Conditional 5-Policy và kiểm định Candidate Coverage Audit trên 27 nhóm ngữ cảnh chính xác ($|M_t| = |P_t| = 20$, $100\%$ full pool coverage, zero synthetic baseline fill).
+  - *Result*: Tương tác ngữ cảnh thay đổi độ lớn utility nhưng bảo toàn độ ổn định thứ tự thực chất: $\bar{\rho}_{\text{rank}} = \mathbf{0.8916} \pm \mathbf{0.1104}$, Kendall $\bar{\tau} = \mathbf{0.8043}$, $\text{Overlap@5} = \mathbf{80.0\%}$, Oracle Context Advantage $= \mathbf{+0.00 \times 10^{-5}}$.
+  - *Decision*: Lựa chọn thích ứng động (adaptive re-ranking) không mang lại cải thiện chất lượng có ý nghĩa thống kê so với static pointwise ranking ($p > 0.70$, 95% bootstrap CI chứa 0) $\to$ **Case B được xác lập vững chắc**.
+  - *Systems Implication*: Tính toán ngữ cảnh động tốn thêm $+361.06\text{ ms}$ ($+64.1\%$ thời gian stage, overhead chọn lọc tăng $424\times$) nhưng không mang lại lợi ích chất lượng, chứng minh static pointwise ranking là thiết kế tối ưu Pareto cho hệ thống SLAM thời gian thực.
 
 #### B. AI Systems Contribution ($\hat{U} \to S_B \to \text{SelectiveAdam} \to \text{Online Reconstruction}$)
 - **Budget Enforcement**: Lập lịch tối ưu knapsack đa tiêu chí dưới ngân sách phần cứng cứng $B_{\text{sched}} = 15.0\text{ ms}$, phân biệt rõ thời gian mô hình hóa và thời gian thực thi thực tế.
@@ -653,8 +658,9 @@ Dự án đã được thực thi và nghiệm thu thực nghiệm qua chuỗi n
 - **Authoritative Metrics**:
   - Headroom tối ưu: $H = +0.000149 > 0$
   - Gate 4 Latency Reduction: $67.8\text{ ms}$ vs $138.3\text{ ms}$ (Full)
-  - Phase 6 Rank Stability: $\rho = 0.8916$, Overlap@5 = $80.0\%$
+  - Phase 6 Rank Stability: $\bar{\rho} = 0.8916 \pm 0.1104$, Overlap@5 = $80.0\%$
   - Oracle Context Advantage: $+0.00 \times 10^{-5}$ ($Q_{\text{OracleCond}} \equiv Q_{\text{OracleStatic}}$)
+  - Latency Overhead: $+361.06\text{ ms}$ (+64.1% pipeline stage runtime, $424\times$ selection overhead)
   - Test suite: **417/417 PASS (100%)**
 
 ---
