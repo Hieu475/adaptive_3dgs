@@ -4,7 +4,7 @@
   "status": "frozen",
   "schema_version": "phase6-v2",
   "protocol": "v1",
-  "git_commit": "ab458af9088195e21975e536e2f4f20815ad7097",
+  "git_commit": "004c416f3d8dd4c83afb2fdbf3162b01b47fb5e7",
   "seeds": [
     42,
     43,
