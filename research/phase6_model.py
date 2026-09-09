@@ -26,7 +26,7 @@ import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from typing import Dict, List, Optional, Tuple, Any, Union
 
 from .phase6_context import (
@@ -116,6 +116,10 @@ class Phase6ModelConfig:
         if self.use_neighbor and self.use_overlap and self.use_selected:
             return "V11_full_context"
         return "custom"
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert config to dictionary."""
+        return asdict(self)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -638,6 +642,11 @@ class FrozenContextPredictor:
                 p4_net.eval()
                 for p in p4_net.parameters():
                     p.requires_grad = False
+            else:
+                raise RuntimeError(
+                    f"P0 REQUIREMENT: Residual checkpoint requires a valid pretrained Phase 4 checkpoint at '{p4_ckpt}'. "
+                    "Cannot initialize FrozenContextPredictor with uninitialized or random P4 backbone."
+                )
             self.model = ResidualContextModel(config, p4_model=p4_net).to(self.device)
         else:
             self.model = ContextAwareTwoHeadMLP(config).to(self.device)

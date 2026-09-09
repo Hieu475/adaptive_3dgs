@@ -1,0 +1,32 @@
+{
+  "phase": 6,
+  "title": "Context-Aware Conditional Utility & Interaction Hardening",
+  "status": "frozen_candidate",
+  "schema_version": "phase6-v2",
+  "protocol": "v1",
+  "git_commit": "939efcf9b8fc08fb8dfc51b69ccd95b13bca1109",
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "resolution": [
+    320,
+    240
+  ],
+  "primary_architecture": "residual_context",
+  "primary_variant": "self_neighbor_selected",
+  "p4_frozen": true,
+  "group_definition": "g = (scene_id, frame_id, tuple(sorted(selected_gaussian_ids)))",
+  "normalizer": "train_only",
+  "train_scene": "tum_fr1_desk",
+  "test_scene": "tum_fr2_xyz",
+  "gate_6a_status": "PASS",
+  "gate_6b_status": "FAIL",
+  "gate_6c_status": "FAIL",
+  "gate_6d_status": "PASS",
+  "gate_6e_status": "PASS",
+  "scientific_conclusion": "Case B: Contextual interaction is confirmed in Gaussian utility, but candidate rank is substantially preserved so conditional greedy yields no realized gain over static selection."
+}

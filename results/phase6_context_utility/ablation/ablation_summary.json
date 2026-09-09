@@ -11,7 +11,7 @@
       "val_loss": 0.04204307017607789,
       "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_self_only.pt",
       "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_self_only.json",
-      "train_time_s": 6.816360745999191
+      "train_time_s": 5.918890828001167
     },
     {
       "variant": "self_neighbor",
@@ -23,7 +23,7 @@
       "val_loss": 0.04329845509055304,
       "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_self_neighbor.pt",
       "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_self_neighbor.json",
-      "train_time_s": 6.741071461001411
+      "train_time_s": 5.298987768997904
     },
     {
       "variant": "self_overlap",
@@ -35,7 +35,7 @@
       "val_loss": 0.047197145324753366,
       "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_self_overlap.pt",
       "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_self_overlap.json",
-      "train_time_s": 6.534778601000653
+      "train_time_s": 5.09026136600005
     },
     {
       "variant": "self_selected",
@@ -47,7 +47,7 @@
       "val_loss": 0.043698551790657805,
       "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_self_selected.pt",
       "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_self_selected.json",
-      "train_time_s": 5.899029900998357
+      "train_time_s": 5.104558659997565
     },
     {
       "variant": "self_neighbor_overlap",
@@ -59,7 +59,7 @@
       "val_loss": 0.045494817008875546,
       "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_self_neighbor_overlap.pt",
       "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_self_neighbor_overlap.json",
-      "train_time_s": 6.318950840999605
+      "train_time_s": 5.253829260000202
     },
     {
       "variant": "self_neighbor_selected",
@@ -71,7 +71,7 @@
       "val_loss": 0.04257305690625799,
       "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_self_neighbor_selected.pt",
       "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_self_neighbor_selected.json",
-      "train_time_s": 6.104426167001293
+      "train_time_s": 5.448263907001092
     },
     {
       "variant": "self_overlap_selected",
@@ -83,7 +83,7 @@
       "val_loss": 0.044604041782440616,
       "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_self_overlap_selected.pt",
       "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_self_overlap_selected.json",
-      "train_time_s": 6.205031326999233
+      "train_time_s": 5.137142727999162
     },
     {
       "variant": "all_features",
@@ -95,7 +95,7 @@
       "val_loss": 0.04395549126056721,
       "ckpt_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/model_all_features.pt",
       "norm_path": "/home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/ablation/norm_all_features.json",
-      "train_time_s": 7.679443086999527
+      "train_time_s": 5.267718099999911
     }
   ],
   "interaction_analysis": {

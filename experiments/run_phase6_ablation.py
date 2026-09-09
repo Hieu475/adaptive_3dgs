@@ -182,9 +182,10 @@ def train_and_eval_variant(
     if architecture == "residual":
         p4_ckpt = os.path.join(repo_root, "results", "learned_utility", "checkpoints", f"two_head_mlp_seed_{seed}.pt")
         if not os.path.exists(p4_ckpt):
-            p4_ckpt = os.path.join(repo_root, "results", "learned_utility", "checkpoints", "two_head_mlp_seed_42.pt")
-        if not os.path.exists(p4_ckpt):
-            raise FileNotFoundError(f"P0.2 REQUIREMENT: Pretrained Phase 4 checkpoint required at {p4_ckpt}")
+            raise FileNotFoundError(
+                f"P0.2 REQUIREMENT: Matched Phase 4 checkpoint required at '{p4_ckpt}' for seed {seed}. "
+                "Ablation strictly requires matched seed checkpoint without fallback."
+            )
 
         from research.utility_models import TwoHeadMLP
         p4_net = TwoHeadMLP(in_features=11)
@@ -577,7 +578,9 @@ def main():
         if args.architecture == "residual":
             p4_ckpt = os.path.join(repo_root, "results", "learned_utility", "checkpoints", f"two_head_mlp_seed_{args.seed}.pt")
             if not os.path.exists(p4_ckpt):
-                p4_ckpt = os.path.join(repo_root, "results", "learned_utility", "checkpoints", "two_head_mlp_seed_42.pt")
+                raise FileNotFoundError(
+                    f"P0.2 REQUIREMENT: Matched Phase 4 checkpoint required at '{p4_ckpt}' for seed {args.seed}."
+                )
             from research.utility_models import TwoHeadMLP
             p4_net = TwoHeadMLP(in_features=11)
             ckpt_data = torch.load(p4_ckpt, map_location="cpu", weights_only=False)

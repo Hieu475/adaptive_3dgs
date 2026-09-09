@@ -2,12 +2,12 @@
   "p1_5_reduced_models": {
     "self_neighbor_selected": {
       "description": "P6-D (Self + Neighbor + Selected, 27D)",
-      "test_spearman_rho": 0.29265912083073303,
+      "test_spearman_rho": 0.272537283979681,
       "feature_dim": 27
     },
     "self_selected": {
       "description": "P6-Selected (Self + Selected, 19D)",
-      "test_spearman_rho": 0.33427174791464587,
+      "test_spearman_rho": 0.27858912464419605,
       "feature_dim": 19
     }
   },

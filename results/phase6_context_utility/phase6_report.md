@@ -30,7 +30,7 @@ Following the **Phase 6 Scientific Reform & Engineering Hardening** (P0, P1, P2)
 | **Gate 6B** (Prediction) | Conditional utility correlation across 5 seeds | $\rho(\hat{U}_{P6}, U^*) \approx \rho(\hat{U}_{P4}, U^*)$ | Mean $\bar{\rho} = \mathbf{0.3635}$ (up to $\mathbf{0.4850}$ on seed 42, all $p < 0.05$), exceeding P4 baseline ($\rho = 0.3175$) | **✓ RECOVERED** |
 | **Gate 6C** (Decision) | Oracle benchmark failure decomposition | Oracle Conditional Greedy vs Static | Oracle Cond $\approx$ Oracle Static ($\Delta Q = 11.70$ vs $11.70 \times 10^{-5}$) | **HONEST DIAGNOSIS (Case B)** |
 | **Gate 6D** (Sensitivity) | Dynamic context responsiveness & Invariance | Context shuffle drop $\Delta \rho > 0$, Order invariance | Shuffle $S_t$ drops $\rho \to -0.0494$; Permutation order diff $\le 4.77 \times 10^{-7}$ | **✓ PASS** |
-| **Gate 6E** (Engineering) | Unit test suite & frozen P4 invariant | All unit & integration tests pass, hash invariant | **380 / 380 test suite passed (100%)** | **✓ PASS** |
+| **Gate 6E** (Engineering) | Unit test suite & frozen P4 invariant | All unit & integration tests pass, hash invariant | **397 / 397 test suite passed (100%)** | **✓ PASS** |
 
 > [!IMPORTANT]
 > **Core Scientific Finding (Failure Mode Diagnosis — Case B):**
@@ -154,4 +154,4 @@ To ensure clarity in all publications and thesis chapters:
 1. **Existence of Non-Additivity (Confirmed)**: Rasterization interactions between 3D Gaussians are substantially sub-additive, and this effect correlates strongly with spatial IoU ($\rho = 0.5357, p = 0.0048$).
 2. **Predictability of Conditional Utility (Confirmed)**: The `ResidualContextModel` formulation successfully solves representation drift, achieving $\bar{\rho} = 0.3635$ (and up to $0.4850$ on seed 42) across 5 protocol seeds, establishing that conditional utility is predictably recoverable under the evaluated protocol.
 3. **Selection Gap & Hypothesis Limit (Case B Documented)**: The oracle decomposition provides evidence that the observed decision gap is not explained solely by prediction error. High rank stability ($\bar{\rho}_{\text{rank}} = 0.7051$, Top-5 overlap = 71.2%) demonstrates that sub-additivity dampens utility magnitude uniformly without inverting greedy candidate selection order.
-4. **Engineering Integrity**: Phase 4 backbone is strictly frozen (verified by parameter hash invariance), listwise ranking operates exclusively within coherent context groups, and all 380 unit and regression tests pass at 100%.
+4. **Engineering Integrity**: Phase 4 backbone is strictly frozen (verified by parameter hash invariance), listwise ranking operates exclusively within coherent context groups, and all 397 unit and regression tests pass at 100% (including dedicated hardening suite `tests/test_phase6_hardening.py`).

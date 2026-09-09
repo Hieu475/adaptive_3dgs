@@ -65,24 +65,37 @@ def run_rank_stability_analysis(
 
     print(f">> Indexed {len(empty_utils)} unconditional U*(i|∅) baselines")
 
-    # Group non-empty samples by context group (scene, frame, context_type, context_size)
-    groups: Dict[str, List[Dict[str, Any]]] = {}
+    # 1. Condition-level Groups (scene, frame, context_type, context_size)
+    # Allows evaluating rank preservation among all candidates in a frame under context condition C
+    cond_groups: Dict[Tuple[str, int, str, int], List[Dict[str, Any]]] = {}
+    
+    # 2. Exact Context Groups g = (scene, frame, S_t)
+    exact_groups: Dict[Tuple[str, int, Tuple[int, ...]], List[Dict[str, Any]]] = {}
+
     for s in samples:
         c_size = int(s.get("context_size", 0))
         c_type = str(s.get("context_type", "default"))
         if c_size == 0 or c_type == "empty":
             continue
 
-        g_key = f"{s['scene']}_f{s['frame']}_{c_type}_size{c_size}"
-        if g_key not in groups:
-            groups[g_key] = []
-        groups[g_key].append(s)
+        cond_key = (str(s["scene"]), int(s["frame"]), c_type, c_size)
+        cond_groups.setdefault(cond_key, []).append(s)
 
-    print(f">> Found {len(groups)} distinct conditional context groups")
+        selected_ids = tuple(sorted(int(x) for x in (s.get("context_ids", []) or [])))
+        exact_key = (str(s["scene"]), int(s["frame"]), selected_ids)
+        exact_groups.setdefault(exact_key, []).append(s)
+
+    print(f">> Found {len(cond_groups)} conditional decision regimes and {len(exact_groups)} exact context groups")
 
     group_results = []
     by_size: Dict[int, Dict[str, List[float]]] = {}
     by_type: Dict[str, Dict[str, List[float]]] = {}
+    by_iou: Dict[str, Dict[str, List[float]]] = {
+        "iou_lt_0.10": {"rho": [], "tau": [], "o3": [], "o5": [], "o10": []},
+        "iou_0.10_to_0.30": {"rho": [], "tau": [], "o3": [], "o5": [], "o10": []},
+        "iou_0.30_to_0.50": {"rho": [], "tau": [], "o3": [], "o5": [], "o10": []},
+        "iou_gte_0.50": {"rho": [], "tau": [], "o3": [], "o5": [], "o10": []},
+    }
 
     all_spearmans = []
     all_kendalls = []
@@ -90,14 +103,13 @@ def run_rank_stability_analysis(
     all_overlap_5 = []
     all_overlap_10 = []
 
-    for g_key, cand_list in groups.items():
+    for cond_key, cand_list in cond_groups.items():
         if len(cand_list) < 3:
             continue
 
         u_empty = []
         u_cond = []
-        c_size = int(cand_list[0].get("context_size", 0))
-        c_type = str(cand_list[0].get("context_type", "default"))
+        scene_str, frame_int, c_type, c_size = cond_key
 
         for s in cand_list:
             key = (str(s["scene"]), int(s["frame"]), int(s["candidate_id"]))
@@ -151,12 +163,33 @@ def run_rank_stability_analysis(
         by_type[c_type]["o5"].append(float(o5))
         by_type[c_type]["o10"].append(float(o10))
 
+        # Stratify by IoU overlap
+        group_iou = float(np.mean([
+            float(s.get("selected_features", {}).get("candidate_selected_overlap", s.get("overlap_features", {}).get("mean_overlap", 0.0)))
+            for s in cand_list
+        ]))
+        if group_iou < 0.10:
+            iou_key = "iou_lt_0.10"
+        elif group_iou < 0.30:
+            iou_key = "iou_0.10_to_0.30"
+        elif group_iou < 0.50:
+            iou_key = "iou_0.30_to_0.50"
+        else:
+            iou_key = "iou_gte_0.50"
+
+        by_iou[iou_key]["rho"].append(float(rho))
+        by_iou[iou_key]["tau"].append(float(tau))
+        by_iou[iou_key]["o3"].append(float(o3))
+        by_iou[iou_key]["o5"].append(float(o5))
+        by_iou[iou_key]["o10"].append(float(o10))
+
         group_results.append({
-            "group_key": g_key,
-            "scene": cand_list[0]["scene"],
-            "frame": cand_list[0]["frame"],
+            "group_key": f"{scene_str}_f{frame_int}_{c_type}_size{c_size}",
+            "scene": scene_str,
+            "frame": frame_int,
             "context_type": c_type,
             "context_size": c_size,
+            "mean_iou": group_iou,
             "n_candidates": len(arr_empty),
             "spearman_rho": float(rho),
             "kendall_tau": float(tau),
@@ -177,6 +210,16 @@ def run_rank_stability_analysis(
 
     summary_by_size = {k: _agg(v) for k, v in sorted(by_size.items())}
     summary_by_type = {k: _agg(v) for k, v in sorted(by_type.items())}
+    summary_by_iou = {k: _agg(v) for k, v in sorted(by_iou.items()) if len(v["rho"]) > 0}
+
+    # Exact Context Pair Preservation
+    exact_pair_preserved = []
+    for exact_k, cand_list in exact_groups.items():
+        if len(cand_list) >= 2:
+            u_e = [empty_utils.get((str(s["scene"]), int(s["frame"]), int(s["candidate_id"])), 0.0) for s in cand_list]
+            u_c = [float(s["utility_conditional"]) for s in cand_list]
+            if len(cand_list) == 2 and u_e[0] != u_e[1]:
+                exact_pair_preserved.append(1.0 if (u_e[0] > u_e[1]) == (u_c[0] > u_c[1]) else 0.0)
 
     overall_summary = {
         "mean_spearman_rho": float(np.mean(all_spearmans)) if all_spearmans else 0.0,
@@ -186,12 +229,13 @@ def run_rank_stability_analysis(
         "mean_overlap_at_3": float(np.mean(all_overlap_3)) if all_overlap_3 else 0.0,
         "mean_overlap_at_5": float(np.mean(all_overlap_5)) if all_overlap_5 else 0.0,
         "mean_overlap_at_10": float(np.mean(all_overlap_10)) if all_overlap_10 else 0.0,
+        "exact_context_pair_order_preservation": float(np.mean(exact_pair_preserved)) if exact_pair_preserved else 0.0,
         "n_total_evaluated_groups": len(group_results),
         "case_b_explanation": (
-            f"Ground-truth conditional utility maintains very high rank stability "
+            f"Ground-truth conditional utility maintains substantial rank stability "
             f"(mean rho = {np.mean(all_spearmans):.4f}, mean Top-5 overlap = {np.mean(all_overlap_5):.1%}) "
             f"relative to unconditional marginal utility. Sub-additive rasterization interactions "
-            f"primarily scale utility magnitudes rather than inverting the candidate priority order."
+            f"primarily modulate utility scales rather than radically inverting candidate selection priority."
         ),
     }
 
@@ -199,6 +243,7 @@ def run_rank_stability_analysis(
         "overall_summary": overall_summary,
         "by_context_size": summary_by_size,
         "by_context_type": summary_by_type,
+        "by_iou_bin": summary_by_iou,
         "per_group_results": group_results,
     }
 
@@ -207,13 +252,15 @@ def run_rank_stability_analysis(
         json.dump(full_output, f, indent=2)
 
     print("\n" + "=" * 70)
-    print("  PHASE 6: RANK STABILITY & TOP-K OVERLAP SUMMARY (P1.1)")
+    print("  PHASE 6: RANK STABILITY & TOP-K OVERLAP SUMMARY")
     print("=" * 70)
     print(f"  Mean Spearman rho(rank_0, rank_S): {overall_summary['mean_spearman_rho']:.4f} (std={overall_summary['std_spearman_rho']:.4f})")
     print(f"  Mean Kendall tau(rank_0, rank_S):  {overall_summary['mean_kendall_tau']:.4f}")
     print(f"  Mean Top-3 Overlap:                {overall_summary['mean_overlap_at_3']:.1%}")
     print(f"  Mean Top-5 Overlap:                {overall_summary['mean_overlap_at_5']:.1%}")
     print(f"  Mean Top-10 Overlap:               {overall_summary['mean_overlap_at_10']:.1%}")
+    if exact_pair_preserved:
+        print(f"  Exact S_t Pair Order Preserved:    {overall_summary['exact_context_pair_order_preservation']:.1%}")
     print("\n-- Stratification by Context Size |S| --")
     for sz, stats in summary_by_size.items():
         print(f"  |S|={sz:2d} ({stats['n_groups']:2d} grps): rho={stats['mean_spearman_rho']:.4f} | tau={stats['mean_kendall_tau']:.4f} | Overlap@5={stats['mean_overlap_5']:.1%}")
@@ -221,6 +268,10 @@ def run_rank_stability_analysis(
     print("\n-- Stratification by Context Type --")
     for ct, stats in summary_by_type.items():
         print(f"  {ct:15s} ({stats['n_groups']:2d} grps): rho={stats['mean_spearman_rho']:.4f} | tau={stats['mean_kendall_tau']:.4f} | Overlap@5={stats['mean_overlap_5']:.1%}")
+
+    print("\n-- Stratification by IoU Overlap Bins --")
+    for bin_name, stats in summary_by_iou.items():
+        print(f"  {bin_name:18s} ({stats['n_groups']:2d} grps): rho={stats['mean_spearman_rho']:.4f} | tau={stats['mean_kendall_tau']:.4f} | Overlap@5={stats['mean_overlap_5']:.1%}")
 
     print(f"\n[Saved] Artifact: {output_path}")
     return full_output
