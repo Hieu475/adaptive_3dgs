@@ -246,7 +246,7 @@ $$T_{P6} = T_{\text{feature}} + T_{\text{context}} + T_{\text{MLP}} + T_{\text{s
    $$\text{Selection Overhead Ratio} = \frac{T_{\text{sel, P6}}}{T_{\text{sel, P4}}} = \frac{76.36\text{ ms}}{0.18\text{ ms}} = 424.2\times$$
 3. **Additional Context Reasoning Cost**: Adding context-aware reasoning introduces a total pipeline stage increase of **$+361.06\text{ ms}$** (+64.1% stage latency):
    $$\Delta T_{\text{total}} = T_{\text{total, P6}} - T_{\text{total, P4}} = 924.59\text{ ms} - 563.53\text{ ms} = +361.06\text{ ms}$$
-4. **Systems Decision Justification**: Under Case B, where candidate rank stability is $\bar{\rho} = 0.8916$ and context advantage is $+0.00 \times 10^{-5}$, paying an additional **$+361.06\text{ ms}$** yields zero statistically significant quality improvement. Deploying adaptive context re-ranking is strictly Pareto-suboptimal in real-time online SLAM.
+4. **Systems Decision Justification**: Under Case B, where candidate rank stability is $\bar{\rho}_{\text{rank}} = 0.8916$ and context advantage is $+0.00 \times 10^{-5}$, paying an additional **$+361.06\text{ ms}$** yields zero statistically significant quality improvement. Static pointwise scheduling remains the preferred quality–latency trade-off under the evaluated regime.
 
 ---
 
