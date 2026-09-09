@@ -412,9 +412,9 @@ def generate_standardized_figures():
     ax1.legend(frameon=True, fontsize=9.0)
     
     # Annotate selection overhead
-    ax1.annotate('420x Selection\nOverhead (76.36 ms)', xy=(3 + width/2, 76.36), xytext=(2.6, 2.0),
+    ax1.annotate(r'424.2$\times$ Selection' + '\nOverhead (76.36 ms vs 0.18 ms)', xy=(3 + width/2, 76.36), xytext=(1.8, 1.8),
                  arrowprops=dict(arrowstyle="->", color='#C5221F', lw=1.5),
-                 fontsize=8.0, fontweight='bold', color='#C5221F')
+                 fontsize=7.8, fontweight='bold', color='#C5221F')
 
     # Right: Phase 6 Breakdown Pie Chart
     p6_labels = ['Features (24.4%)', 'Context (7.2%)', 'MLP (0.1%)', 'Selection (8.3%)', 'Optimization (60.0%)']
@@ -426,11 +426,11 @@ def generate_standardized_figures():
     for at in autotexts:
         at.set_color('white')
         at.set_fontweight('bold')
-    ax2.set_title('(b) Total Pipeline Time Share (T_total = 924.59 ms)', fontsize=11, fontweight='bold')
+    ax2.set_title(r'(b) Total Pipeline Time Share ($T_{\mathrm{total}} = 924.59\text{ ms}$)', fontsize=11, fontweight='bold')
     
-    plt.suptitle('Figure 8: Systems Profiling: Model Inference is Cheap (0.1%), Selection Orchestration Dominates', 
-                 fontsize=11.5, fontweight='bold', y=1.02)
-    plt.tight_layout()
+    plt.suptitle(r'Figure 8: AI Systems Profiling: Model Inference is Cheap (0.1%), Selection Orchestration Dominates', 
+                 fontsize=11.5, fontweight='bold', y=0.98)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
     f8_path = os.path.join(fig_dir, 'fig8_systems_latency_breakdown.png')
     plt.savefig(f8_path)
     plt.close()

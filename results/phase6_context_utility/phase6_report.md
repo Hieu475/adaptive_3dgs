@@ -66,7 +66,7 @@ The following single authoritative table synthesizes all frozen Phase 6 empirica
 > By establishing the **5-Policy Oracle Decomposition Benchmark** ([`experiments/run_phase6_oracle_gap.py`](file:///home/nguyen_quoc_hieu/Documents/adaptive_3dgs/experiments/run_phase6_oracle_gap.py)) and **Context-Centric Rank Stability Analysis & Candidate Coverage Audit** ([`experiments/run_phase6_rank_stability.py`](file:///home/nguyen_quoc_hieu/Documents/adaptive_3dgs/experiments/run_phase6_rank_stability.py)), the empirical evidence demonstrates three distinct findings:
 > 1. **Context alters marginal utility**: $U^*(i|S_t) \neq U^*(i|\emptyset)$ (confirmed via sub-additivity and Gate 6D sensitivity).
 > 2. **Candidate rank remains substantially stable**: Measured strictly on 100% full-coverage groups ($|M_t| = |P_t| = 20$, zero missing candidates, zero synthetic baseline fill), rank stability is $\bar{\rho}_{\text{rank}} = \mathbf{0.8916} \pm \mathbf{0.1104}$ ($\bar{\tau} = \mathbf{0.8043}$, $\text{Overlap@5} = \mathbf{80.0\%}$).
-> 3. **Context-aware greedy yields near-identical selection to static greedy**: $Q(\text{OracleCond}) \equiv Q(\text{OracleStatic})$ (Context Advantage $= +0.00 \times 10^{-5}$), and online quality gain $Q(\pi_{P6}) - Q(\pi_{P4})$ shows no statistically significant improvement ($p > 0.30$, 95% bootstrap CI spans zero across all budget levels).
+> 3. **Context-aware greedy yields near-identical selection to static greedy**: $Q(\text{OracleCond}) \equiv Q(\text{OracleStatic})$ (Context Advantage $= +0.00 \times 10^{-5}$), and online quality gain $Q(\pi_{P6}) - Q(\pi_{P4})$ shows no statistically significant improvement (Wilcoxon signed-rank $p \ge 0.7035$, 95% bootstrap CI spans zero across all budget levels).
 
 ---
 
@@ -166,7 +166,7 @@ Evaluation of live GPU joint optimization across 26 candidate pairs stratified b
 
 ---
 
-### D. Canonical Reduced Feature Models (P1.5)
+### D. Key Feature Subset Comparison (Ablation Preview)
 Evaluating reduced input spaces to establish whether full 32D context is required (evaluating zero-shot cross-scene test split `tum_fr2_xyz`, $N=240$, strictly adhering to Single Source of Truth `results/phase6_context_utility/ablation/ablation_summary.json`):
 
 | Model Architecture | Name | Input Dim | Features Included | Test Spearman $\rho(U)$ | NDCG@5 | MAE ($U$) |
@@ -176,7 +176,9 @@ Evaluating reduced input spaces to establish whether full 32D context is require
 | **P6-H (Full)** | `all_features` | 32 | Self (11) + Neighbor (8) + Overlap (5) + Selected (8) | 0.0780 | 0.7666 | 0.0096 |
 
 > [!NOTE]
-> **Provenance & Reconciliation Note**: An earlier unhardened exploratory prototype without canonical context grouping reported unanchored values ($0.3343, 0.2927, 0.4850$). Those values are formally **deprecated**. The authoritative confirmatory ablation ladder is reported above and in Section 3, proving that spatial neighborhood and selected-set context provide the primary predictive signals ($\rho = 0.2353$, $\text{NDCG@5} = 0.7681$), whereas raw screen-overlap features in `all_features` (32D) introduce redundant noise and overfit under zero-shot transfer ($\rho = 0.0780$).
+> **Single Source of Truth & Legacy Provenance**:
+> - **Authoritative Main Ablation**: The comprehensive, authoritative 8-variant ladder (P6-A through P6-H) is detailed in [Section 3](#3-standardized-architecture-naming-ladder--8-variant-ablation-p21) and stored in `results/phase6_context_utility/ablation/ablation_summary.json`. All variants were trained with canonical context grouping ($g = (scene, frame, \text{sorted}(S_t))$), `GroupedBatchSampler`, and train-only normalization.
+> - **Legacy Exploratory Prototype**: An earlier exploratory prototype tested prior to canonical grouping reported unanchored values ($0.3343, 0.2927, 0.4850$). Those unhardened numbers are formally **deprecated** and archived; they must not be compared against the authoritative 8-variant ladder.
 
 ---
 
@@ -224,8 +226,10 @@ $$T_{P6} = T_{\text{feature}} + T_{\text{context}} + T_{\text{MLP}} + T_{\text{s
 
 **AI Systems Analysis & Systems Bottleneck Diagnosis**:
 1. **Neural inference is negligible**: $T_{\text{MLP}} = 1.12\text{ ms}$ accounts for only **0.1%** of total runtime ($T_{\text{MLP}} \ll T_{\text{feat}} + T_{\text{ctx}} + T_{\text{sel}}$). Forward inference through the Residual Context MLP is already extremely fast; model pruning or quantization would provide near-zero end-to-end acceleration.
-2. **Adaptive orchestration is the bottleneck**: Constructing dynamic context graphs ($66.84\text{ ms}$) and iteratively evaluating greedy candidate additions ($76.36\text{ ms}$) incurs **$143.20\text{ ms}$** of pure orchestration overhead. The selection stage alone is **$424.2\times$ slower** than Phase 4's single-pass static quicksort ($0.18\text{ ms}$).
-3. **Additional Context Reasoning Cost**: Adding context-aware reasoning introduces **$+361.06\text{ ms}$** (+64.1% stage latency).
+2. **Adaptive orchestration is the bottleneck**: Constructing dynamic context graphs ($66.84\text{ ms}$) and iteratively evaluating greedy candidate additions ($76.36\text{ ms}$) incurs **$143.20\text{ ms}$** of pure orchestration overhead. The selection stage alone is **$424.2\times$ slower** than Phase 4's single-pass static quicksort:
+   $$\text{Selection Overhead Ratio} = \frac{T_{\text{sel, P6}}}{T_{\text{sel, P4}}} = \frac{76.36\text{ ms}}{0.18\text{ ms}} = 424.2\times$$
+3. **Additional Context Reasoning Cost**: Adding context-aware reasoning introduces a total pipeline stage increase of **$+361.06\text{ ms}$** (+64.1% stage latency):
+   $$\Delta T_{\text{total}} = T_{\text{total, P6}} - T_{\text{total, P4}} = 924.59\text{ ms} - 563.53\text{ ms} = +361.06\text{ ms}$$
 4. **Systems Decision Justification**: Under Case B, where candidate rank stability is $\bar{\rho} = 0.8916$ and context advantage is $+0.00 \times 10^{-5}$, paying an additional **$+361.06\text{ ms}$** yields zero statistically significant quality improvement. Deploying adaptive context re-ranking is strictly Pareto-suboptimal in real-time online SLAM.
 
 ---

@@ -31,7 +31,7 @@ Dense online 3D scene reconstruction from streaming RGB-D sensors requires maint
 \begin{equation}
 \max_{S_t \subseteq G_t} \Delta Q(S_t) \quad \text{subject to} \quad C(S_t) \le B_t
 \end{equation}
-where $U_i^\star = \Delta Q_i / C_i \in \mathbb{R}$ represents the counterfactual quality gain per unit of execution time. Across five protocol seeds ($n=5$), we show that: (1) optimization headroom is strictly positive ($H = +0.000149$), with $20.5\%$ of interventions inducing negative utility; (2) concurrent optimization exhibits severe sub-additivity ($R_{add} \to 0.0048$ at $|S|=16$) driven by alpha-compositing overlap ($\rho(\text{IoU}, |I|) = 0.5357, p = 0.0048$); and (3) a learned Two-Head MLP achieves $+108.0\%$ selection efficiency gains at tight compute budgets ($B \le 20\%$). Furthermore, investigating contextual conditioning $U^*(i \mid S)$ reveals a fundamental property: while co-visibility interactions modulate utility magnitude, within-frame candidate priority rank is substantially stable ($\bar{\rho}_{\text{rank}} = \mathbf{0.8916} \pm \mathbf{0.1104}$, Kendall $\bar{\tau} = \mathbf{0.8043}$, Top-5 overlap = $\mathbf{80.0\%}$ across 27 full-coverage groups). Consequently, adaptive contextual re-ranking introduces a $420\times$ selection overhead without statistically significant quality gains ($p > 0.70$), establishing that static pointwise utility already captures optimal prioritization.
+where $U_i^\star = \Delta Q_i / C_i \in \mathbb{R}$ represents the counterfactual quality gain per unit of execution time. Across five protocol seeds ($n=5$), we show that: (1) optimization headroom is strictly positive ($H = +0.000149$), with $20.5\%$ of interventions inducing negative utility; (2) concurrent optimization exhibits severe sub-additivity ($R_{add} \to 0.0048$ at $|S|=16$) driven by alpha-compositing overlap ($\rho(\text{IoU}, |I|) = 0.5357, p = 0.0048$); and (3) a learned Two-Head MLP achieves $+108.0\%$ selection efficiency gains at tight compute budgets ($B \le 20\%$). Furthermore, investigating contextual conditioning $U^*(i \mid S)$ reveals a fundamental property: while co-visibility interactions modulate utility magnitude, within-frame candidate priority rank is substantially stable ($\bar{\rho}_{\text{rank}} = \mathbf{0.8916} \pm \mathbf{0.1104}$, Kendall $\bar{\tau} = \mathbf{0.8043}$, Top-5 overlap = $\mathbf{80.0\%}$ across 27 full-coverage groups). Consequently, adaptive contextual re-ranking introduces a $424.2\times$ selection latency overhead ($T_{\text{sel, P6}} / T_{\text{sel, P4}} = 76.36\text{ ms} / 0.18\text{ ms}$; $+361.06\text{ ms}$ total pipeline overhead) without statistically significant quality gains (Wilcoxon $p \ge 0.7035$), establishing that static pointwise utility already captures optimal prioritization.
 \end{abstract}
 
 \section{Introduction}
@@ -133,11 +133,11 @@ P_t^+ = \{g_i \in P_t \mid \hat{U}_i > 0\}
 The knapsack optimizer then sorts $P_t^+$ in descending order of $\hat{U}_i$ and greedily selects subset $S_B = \{g_{\pi(1)}, \dots, g_{\pi(K)}\}$ such that $\sum_{k=1}^K \widehat{C}_{\pi(k)} \le B_t$. SelectiveAdam subsequently updates only parameters of $S_B$, while \texttt{FrozenBackgroundCache} preserves inactive primitives without recompilation.
 
 \subsection{Context-Aware Conditional Utility (Phase 6)}
-To investigate higher-order interactions, we formulate conditional marginal utility $U^*(i \mid S_t)$, representing the marginal gain of candidate $i$ given that subset $S_t$ has already been selected. The Residual Context Model predicts:
+To investigate higher-order interactions, we formulate conditional marginal utility $U^\star(i \mid S_t)$, representing the marginal gain of candidate $i$ given that subset $S_t$ has already been selected. The Residual Context Model predicts:
 \begin{equation}
 \hat{U}(i \mid S_t) = \hat{U}_{P4}(s_i) + \hat{R}(s_i, \mathcal{N}_i, \mathcal{O}_i, S_t)
 \end{equation}
-where $\hat{U}_{P4}$ is the strictly frozen Phase 4 backbone, $\mathcal{N}_i$ is the spatial KNN neighborhood (8D), $\mathcal{O}_i$ is screen-space IoU overlap (5D), and $S_t$ is the dynamic selected-set context (8D). Training enforces exact context group isolation $g = (\text{scene}, \text{frame}, \text{sorted}(S_t))$ via \texttt{GroupedBatchSampler}.
+where $\hat{U}_{P4}$ is the strictly frozen Phase 4 backbone ($\theta_{P4}$ locked, \texttt{requires\_grad = False}, SHA256 verified invariant). The residual head directly supervises residual target $r_i^\star = U^\star(i \mid S_t) - U^\star(i \mid \emptyset)$ with zero-initialized projection and $L_0$ SmoothL1 regularization enforcing $\hat{R}(\emptyset) \approx 0$. Input features combine intrinsic state $s_i$ (11D), spatial KNN neighborhood $\mathcal{N}_i$ (8D), screen-space bounding box IoU overlap $\mathcal{O}_i$ (5D), and dynamic selected-set context $S_t$ (8D). Training partitions candidate groups strictly by $g = (\text{scene}, \text{frame}, \text{sorted}(S_t))$ via \texttt{GroupedBatchSampler}, eliminating cross-context batch leakage.
 
 \section{Experimental Protocol}
 All experiments follow Confirmatory Protocol v1 across five frozen random seeds ($n=5$: \texttt{[42, 43, 44, 45, 46]}). Evaluations use real RGB-D sequences from the TUM benchmark:
@@ -251,29 +251,45 @@ Pairwise interaction measurements confirm that screen-space co-visibility drives
     \item Top-5 candidate overlap: $\mathbf{80.0\%}$ (Top-10 overlap: $\mathbf{89.3\%}$, Top-3 overlap: $\mathbf{72.8\%}$).
 \end{itemize}
 
-As visualized in Figure~\ref{fig:context_paired} and Figure~\ref{fig:stability}, co-visibility attenuates candidate utility monotonically through rasterization saturation, but preserves relative ranking. In the 5-Policy Oracle Decomposition, Oracle Conditional achieves identical quality to Oracle Static (Context Advantage $\equiv +0.00 \times 10^{-5}$ at $30\%$ and $60\%$ budgets). In online selection benchmarks across five seeds, $Q(P_6) - Q(P_4)$ shows no statistically significant improvement ($p > 0.70$, 95\% bootstrap CI spans zero).
+As visualized in Figure~\ref{fig:context_paired} and Figure~\ref{fig:stability}, co-visibility attenuates candidate utility magnitude monotonically through rasterization saturation, but preserves relative ranking. In the 5-Policy Oracle Decomposition Benchmark, Oracle Conditional achieves identical quality to Oracle Static at both $30\%$ ($Q^\star = 1.1698 \times 10^{-4}$) and $60\%$ budgets ($Q^\star = 1.2955 \times 10^{-4}$), establishing a Context Advantage of exactly $\mathbf{+0.00 \times 10^{-5}}$. Furthermore, while Phase 6 reduces selection regret by $75.1\%\text{--}80.2\%$ over heuristic baselines (achieving $82.0\%\text{--}84.1\%$ of achievable oracle gain), multi-seed online selection sweeps across five protocol seeds ($n=5$) show no statistically significant quality advantage over Phase 4 static selection (Wilcoxon signed-rank $p = 0.7035$ at $20\%$ budget, $p = 1.0000$ at $50\%$, $p = 0.7812$ at $80\%$; all $95\%$ bootstrap CIs span zero). Because candidate priority ordering is substantially stable ($\bar{\rho}_{\text{rank}} = 0.8916$), pointwise static ranking already selects the high-priority Gaussians.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\linewidth]{../../results/figures/fig8_systems_latency_breakdown.png}
-\caption{\textbf{AI Systems Profiling Breakdown ($T_{\text{total}} = 924.59\text{ ms}$).} (a) Per-stage latency on log scale, highlighting $420\times$ selection overhead. (b) Neural MLP forward pass is negligible ($0.1\%$), whereas state extraction and selection orchestration dominate.}
+\caption{\textbf{AI Systems Profiling Breakdown ($T_{\text{total}} = 924.59\text{ ms}$).} (a) Per-stage latency on log scale, highlighting $424.2\times$ selection overhead ($76.36\text{ ms}$ vs $0.18\text{ ms}$). (b) Neural MLP forward pass is negligible ($0.1\%$), whereas state extraction and selection orchestration dominate.}
 \label{fig:latency}
 \end{figure}
 
 \section{AI Systems Analysis \& Overhead}
-Figure~\ref{fig:latency} details the stage-by-stage execution latency under $B_{\text{sched}} = 15.0\text{ ms}$. Total pipeline stage latency is $T_{\text{total}} = 924.59\text{ ms}$, partitioned into:
-\begin{itemize}
-    \item Feature Extraction: $T_{\text{feat}} = 225.79\text{ ms}$ (24.4\%)
-    \item Context Construction: $T_{\text{ctx}} = 66.84\text{ ms}$ (7.2\%)
-    \item Model Forward Pass: $T_{\text{MLP}} = \mathbf{1.12\text{ ms}}$ ($\mathbf{0.1\%}$)
-    \item Subset Selection: $T_{\text{sel}} = 76.36\text{ ms}$ (8.3\%)
-    \item Gaussian Optimization: $T_{\text{opt}} = 554.48\text{ ms}$ (60.0\%)
-\end{itemize}
+Figure~\ref{fig:latency} and Table~\ref{tab:latency} detail the stage-by-stage execution latency under $B_{\text{sched}} = 15.0\text{ ms}$. Total pipeline stage latency is $T_{\text{total}} = 924.59\text{ ms}$, where feature extraction consumes $225.79\text{ ms}$ (24.4\%), context construction $66.84\text{ ms}$ (7.2\%), iterative greedy selection $76.36\text{ ms}$ (8.3\%), and Gaussian optimization $554.48\text{ ms}$ (60.0\%), while the Two-Head MLP forward pass accounts for only $T_{\text{MLP}} = \mathbf{1.12\text{ ms}}$ ($\mathbf{0.1\%}$).
 
-This profile surfaces an essential AI Systems insight: \textbf{neural inference itself is cheap ($1.12\text{ ms}$); state extraction, spatial indexing, and selection orchestration dominate adaptive overhead.} Adaptive greedy re-ranking incurs a $420\times$ selection latency penalty over static sorting ($76.36\text{ ms}$ vs $0.18\text{ ms}$). Given that Case B demonstrates $\operatorname{rank}(U^*(i \mid S)) \approx \operatorname{rank}(U^*(i \mid \emptyset))$, paying this runtime penalty yields zero realized quality advantage in online SLAM.
+\begin{table}[t]
+\centering
+\small
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Pipeline} & \textbf{Feature} & \textbf{Context} & \textbf{MLP} & \textbf{Selection} & \textbf{Opt.} & \textbf{Total} \\
+\midrule
+Phase 4 (Static) & 12.5 ms & — & 0.85 ms & \textbf{0.18 ms} & 550.0 ms & \textbf{563.5 ms} \\
+Phase 6 (Adaptive) & 225.8 ms & 66.8 ms & 1.12 ms & \textbf{76.36 ms} & 554.5 ms & \textbf{924.6 ms} \\
+\midrule
+\textit{Difference ($\Delta$)} & \textit{+213.3 ms} & \textit{+66.8 ms} & \textit{+0.27 ms} & \textit{+76.18 ms} & \textit{+4.5 ms} & \textit{\textbf{+361.1 ms}} \\
+\bottomrule
+\end{tabular}
+}
+\caption{Stage Latency: Phase 4 (Pointwise) vs Phase 6 (Adaptive Context).}
+\label{tab:latency}
+\end{table}
+
+This profile surfaces an essential AI Systems insight: \textbf{neural inference itself is cheap ($1.12\text{ ms}$, $0.1\%$); state extraction, spatial indexing, and selection orchestration dominate adaptive overhead.} The selection overhead ratio is defined explicitly as:
+\begin{equation}
+\text{Overhead Ratio} = \frac{T_{\text{sel, P6}}}{T_{\text{sel, P4}}} = \frac{76.36\text{ ms}}{0.18\text{ ms}} = 424.2\times
+\end{equation}
+Total stage execution latency increases by $+361.06\text{ ms}$ ($+64.1\%$ over Phase 4). Given that Case B demonstrates $\operatorname{rank}(U^\star(i \mid S)) \approx \operatorname{rank}(U^\star(i \mid \emptyset))$ ($\bar{\rho}_{\text{rank}} = 0.8916$, Overlap@5 = $80.0\%$), paying this overhead yields zero realized quality advantage, making adaptive re-ranking Pareto-suboptimal for online SLAM.
 
 \section{Limitations}
-\begin{enumerate}
+\begin{enumerate}\itemsep=-2pt
     \item \textbf{Short Horizon}: Oracle utilities are evaluated over $M=5$ gradient steps; longer multi-frame trajectory coupling remains unmodeled.
     \item \textbf{Non-Additivity}: While sub-additivity is proven, knapsack selection relies on a linear additive relaxation.
     \item \textbf{Dataset Scope}: Confirmatory experiments focus on TUM RGB-D sequences; outdoor unbounded transfer requires further evaluation.
@@ -281,7 +297,7 @@ This profile surfaces an essential AI Systems insight: \textbf{neural inference 
 \end{enumerate}
 
 \section{Conclusion}
-We have presented a causal marginal utility estimation framework for online RGB-D 3D Gaussian Splatting under compute budgets. By proving that high rendering error does not imply optimization utility, we established that $20.5\%$ of interventions degrade reconstruction fidelity. Our learned Two-Head MLP achieves $+108.0\%$ selection efficiency gains under tight compute budgets. Furthermore, rigorous contextual characterization resolves Case B: co-visibility modulates utility magnitude while candidate priority ranks remain substantially stable ($\bar{\rho} = 0.8916$, Overlap@5 = $80.0\%$), rendering costly adaptive re-ranking unnecessary under the evaluated budget regime.
+We have presented a causal marginal utility estimation framework for online RGB-D 3D Gaussian Splatting under rigid compute budgets. Our research establishes a cohesive five-stage scientific narrative: (1) marginal optimization utility $U_i^\star = \Delta Q_i / C_i$ is causally measurable, and $20.5\%$ of gradient updates degrade quality ($U_i^\star < 0$); (2) utility can be learned from observable Gaussian state, delivering $+108.0\%$ selection efficiency gains at tight compute budgets ($B \le 20\%$); (3) contextual interactions alter marginal utility sub-additively through rasterization saturation ($R_{add} \ll 1.0$, $p = 0.0048$); (4) however, contextual interaction changes utility magnitude while candidate priority rank remains substantially stable ($\bar{\rho}_{\text{rank}} = 0.8916 \pm 0.1104$, Kendall $\bar{\tau} = 0.8043$, Top-5 overlap = $80.0\%$); and (5) consequently, adaptive dynamic re-ranking incurs a $424.2\times$ selection latency overhead ($+361.06\text{ ms}$) without statistically significant quality gain ($p \ge 0.7035$), establishing static pointwise scheduling as the Pareto-optimal design.
 
 {\small
 \bibliographystyle{ieee_fullname}
