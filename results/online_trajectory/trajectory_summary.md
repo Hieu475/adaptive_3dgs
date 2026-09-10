@@ -1,6 +1,6 @@
 # Phase 7: Online Reconstruction Trajectory Validation Summary
 
-**Date:** 2026-09-11 00:48:33  
+**Date:** 2026-09-11 01:28:50  
 **Benchmark Sequence:** TUM RGB-D `freiburg1_desk` (50 frames, 320x240)  
 **Seeds Evaluated ($n=5$):** `[42, 43, 44, 45, 46]`  
 **Per-Frame Scheduler Budget:** $B = 15.0$ ms  
@@ -15,7 +15,14 @@
 
 In contrast to isolated static evaluations (Phases 4–6), Phase 7 validates the closed-loop state update trajectory:
 $$G_0 \xrightarrow{F_1, S_1} G_1 \xrightarrow{F_2, S_2} G_2 \xrightarrow{\dots} G_{50}$$
-The empirical findings confirm that **Ours (Utility Knapsack)** consistently outperforms heuristic error-only selection and random selection across all 5 random seeds with high statistical significance, zero runaway instability, and significant wall-clock latency reduction.
+
+### Key Empirical Findings:
+1. **Computational Efficiency (Gate 7C PASS):** Under identical framework conditions, **Ours (Utility Knapsack)** achieves **31.1 ms** optimization latency per frame vs **488.3 ms** for Full Unconstrained (**93.6% latency reduction**).
+2. **Online Trajectory Stability (Gate 7E PASS):** Reconstructions remain strictly bounded across all 50 frames and 5 independent seeds with zero catastrophic drift or runaway divergence.
+3. **Quality Comparison vs Error-Only (Gate 7D FAIL):** In contrast to isolated oracle settings, in continuous online reconstruction Ours does **not** retain a quality advantage over Error-Only top-K selection under identical model budgets:
+   - **Seed-Level Paired Inference ($n=5$):** Mean $\Delta Q = -0.0184$ dB, all 5/5 seeds negative ([-0.0194, -0.0236, -0.0184, -0.0063, -0.0244]), Wilcoxon $p_{\text{two-sided}} = 0.0625$, $p_{\text{less}} = 0.0312$.
+   - **Frame-Level Pooled Diagnostics ($N=245$):** Mean $\Delta Q = -0.0184$ dB, 95% bootstrap CI [-0.0252, -0.0122] dB (strictly negative), frame win rate **32.2%** (79/245), Wilcoxon $p = 3.36e-10$ ($p_{\text{less}} = 1.68e-10$).
+   - **Scientific Root Cause:** Greedy single-frame utility selection $\hat{U}_i = \hat{\Delta Q}_i / \hat{\Delta T}_i$ optimizes instantaneous marginal gain on the current frame $F_t$ without multi-frame temporal credit assignment or spatial continuity. Direct photometric error selection concentrates updates on persistent residual structures that compound over camera motion. Additionally, prototype Python autograd overhead causes budget overruns (mean 31.1 ms vs 15.0 ms target), motivating CUDA kernel fusion in Phase 10.
 
 ---
 
@@ -26,10 +33,13 @@ The empirical findings confirm that **Ours (Utility Knapsack)** consistently out
 | **Gate 7A** | Trajectory Integrity | 50/50 frames continuous without crash | 50/50 frames (100%) | **PASS ✅** |
 | **Gate 7B** | Policy Fairness | Identical initial state G_0 per seed | Guaranteed independent map init | **PASS ✅** |
 | **Gate 7C** | Budget Accounting | Explicit separation of B_sched and T_wall | B=15 ms vs measured runtime | **PASS ✅** |
-| **Gate 7D** | Quality Preserved | No systematic degradation vs error-only | **-0.0184 dB** (95% CI [-0.0252, -0.0122] dB) | **PASS ✅** |
-| **Gate 7E** | Online Robustness | No severe frame-level degradation/drift | Stable monotonic convergence | **PASS ✅** |
-| **Gate 7F** | Statistical Validation | Paired Wilcoxon test across seeds and frames | Seed p = 1.0000, Frame p = 1.0000 | **PASS ✅** |
+| **Gate 7D** | Quality Preserved | No systematic degradation vs error-only | **-0.0184 dB** (95% CI [-0.0252, -0.0122] dB, 5/5 seeds < 0) | **FAIL ❌** |
+| **Gate 7E** | Online Robustness | No severe runaway drift / catastrophic divergence | Bounded error (min ΔQ = -0.1587 dB, zero drift) | **PASS ✅** |
+| **Gate 7F** | Statistical Validation | Paired Wilcoxon test across seeds and frames | Seed p(2s) = 0.0625, Frame p = 3.36e-10 | **PASS ✅** |
 | **Gate 7G** | Reproducibility | Deterministic multi-seed execution | SHA256 frozen in manifest | **PASS ✅** |
+
+> [!WARNING]
+> **Milestone Gate Status:** `DATA COMPLETE, SCIENTIFIC GATE REQUIRES REPAIR (Gate 7D FAIL)`. While the trajectory infrastructure, budget accounting, and systems execution passed completely, algorithmic utility selection requires multi-frame credit assignment to overcome heuristic error-only selection in continuous recursive SLAM.
 
 ---
 
@@ -52,25 +62,73 @@ The empirical findings confirm that **Ours (Utility Knapsack)** consistently out
 
 ---
 
-## 4. Per-Frame Quality Delta Statistics (Pooled across 5 Seeds x 49 Frames)
+## 4. Statistical Validation & Hypothesis Testing
 
-### A. Ours vs Error-Only Baseline
+### 4.1 Primary Seed-Level Paired Inference ($n=5$ Independent Trajectories)
+*In recursive online SLAM ($G_{t+1} = \mathcal{U}(G_t, F_t, S_t)$), each 50-frame trajectory is an independent realization, making seed-level paired testing the primary statistical inference.*
+
+#### Ours vs Error-Only Top-K Baseline
+- **Per-Seed Mean ΔQ [dB]:** `[-0.0194, -0.0236, -0.0184, -0.0063, -0.0244]` (all 5/5 negative)
+- **Mean Seed ΔQ:** **-0.0184 dB** (Median: **-0.0194 dB**)
+- **Paired Wilcoxon Signed-Rank Test ($n=5$):**
+  - Two-sided ($H_1: \Delta Q \ne 0$): $W = 0.0$, $p = 0.0625$
+  - Directional Less ($H_1: \text{Ours} < \text{error_only}$): $p = 0.0312$
+  - Directional Greater ($H_1: \text{Ours} > \text{error_only}$): $p = 1.0000$
+
+#### Ours vs Random Uniform Baseline
+- **Per-Seed Mean ΔQ [dB]:** `[-0.0261, -0.0288, 0.013, -0.0126, -0.0173]` (mixed)
+- **Mean Seed ΔQ:** **-0.0143 dB** (Median: **-0.0173 dB**)
+- **Paired Wilcoxon Signed-Rank Test ($n=5$):**
+  - Two-sided ($H_1: \Delta Q \ne 0$): $W = 2.0$, $p = 0.1875$
+  - Directional Less ($H_1: \text{Ours} < \text{random}$): $p = 0.0938$
+  - Directional Greater ($H_1: \text{Ours} > \text{random}$): $p = 0.9375$
+
+#### Ours vs Full Unconstrained Baseline
+- **Per-Seed Mean ΔQ [dB]:** `[0.0023, -0.0167, -0.0152, 0.0089, 0.0069]` (mixed)
+- **Mean Seed ΔQ:** **-0.0028 dB** (Median: **+0.0023 dB**)
+- **Paired Wilcoxon Signed-Rank Test ($n=5$):**
+  - Two-sided ($H_1: \Delta Q \ne 0$): $W = 6.0$, $p = 0.8125$
+  - Directional Less ($H_1: \text{Ours} < \text{full}$): $p = 0.4062$
+  - Directional Greater ($H_1: \text{Ours} > \text{full}$): $p = 0.6875$
+
+---
+
+### 4.2 Secondary Frame-Level Pooled Diagnostics ($N=245$ Frames)
+*Descriptive diagnostics across all 245 frame transitions (auto-correlated within trajectories).*
+
+#### A. Ours vs Error-Only Baseline
 - **Mean Realized Quality Delta (Delta Q):** **-0.0184 dB**
 - **Median Quality Delta:** **-0.0078 dB**
 - **Range [Min, Max]:** [**-0.1587 dB**, **+0.1598 dB**]
-- **95% Bootstrap Confidence Interval:** [**-0.0252 dB**, **-0.0122 dB**] (Cuts 0)
-- **Paired Wilcoxon Signed-Rank Test:** p = 1.000000
-- **Cohen's d Effect Size:** d = -0.360
+- **95% Bootstrap Confidence Interval:** [**-0.0252 dB**, **-0.0122 dB**] (Strictly Negative ❌)
+- **Paired Wilcoxon Signed-Rank Test:**
+  - Two-sided ($H_1: \Delta Q \ne 0$): $W = 8093.0$, $p = 3.3645e-10$
+  - Directional Less ($H_1: \text{Ours} < \text{Error}$): $p = 1.6822e-10$
+  - Directional Greater ($H_1: \text{Ours} > \text{Error}$): $p = 1.0000e+00$
+- **Cohen's d Effect Size:** $d = -0.360$
 - **Frame Win Rate:** **32.2%** (79/245 frames)
 
-### B. Ours vs Random Baseline
+#### B. Ours vs Random Baseline
 - **Mean Realized Quality Delta (Delta Q):** **-0.0143 dB**
 - **Median Quality Delta:** **-0.0058 dB**
 - **Range [Min, Max]:** [**-0.2256 dB**, **+0.1249 dB**]
-- **95% Bootstrap Confidence Interval:** [**-0.0209 dB**, **-0.0079 dB**] (Cuts 0)
-- **Paired Wilcoxon Signed-Rank Test:** p = 0.999986
-- **Cohen's d Effect Size:** d = -0.283
+- **95% Bootstrap Confidence Interval:** [**-0.0209 dB**, **-0.0079 dB**] (Strictly Negative ❌)
+- **Paired Wilcoxon Signed-Rank Test:**
+  - Two-sided ($H_1: \Delta Q \ne 0$): $W = 10412.0$, $p = 2.7581e-05$
+  - Directional Less ($H_1: \text{Ours} < \text{Random}$): $p = 1.3790e-05$
+  - Directional Greater ($H_1: \text{Ours} > \text{Random}$): $p = 9.9999e-01$
+- **Cohen's d Effect Size:** $d = -0.283$
 - **Frame Win Rate:** **37.1%** (91/245 frames)
+
+#### C. Ours vs Full Unconstrained Baseline
+- **Mean Realized Quality Delta (Delta Q):** **-0.0028 dB**
+- **Median Quality Delta:** **-0.0004 dB**
+- **Range [Min, Max]:** [**-0.1834 dB**, **+0.1640 dB**]
+- **95% Bootstrap Confidence Interval:** [**-0.0087 dB**, **+0.0033 dB**] (Spans Zero (Parity))
+- **Paired Wilcoxon Signed-Rank Test:**
+  - Two-sided ($H_1: \Delta Q \ne 0$): $W = 14145.0$, $p = 4.0610e-01$
+- **Cohen's d Effect Size:** $d = -0.058$
+- **Frame Win Rate:** **47.8%** (117/245 frames)
 
 ---
 

@@ -579,31 +579,33 @@ def generate_plots(
     overall_mean_err = float(pivoted['delta_q_err'].mean())
     overall_mean_rnd = float(pivoted['delta_q_rnd'].mean())
 
+    colors_err = ['#2ca02c' if v >= 0 else '#d62728' for v in mean_dq_err['delta_q_err']]
     ax1.bar(
         mean_dq_err['frame'],
         mean_dq_err['delta_q_err'],
-        color='#2ca02c',
+        color=colors_err,
         alpha=0.75,
         width=0.8,
         label=r'$\Delta Q_t = \mathrm{PSNR}_{\mathrm{ours}} - \mathrm{PSNR}_{\mathrm{error}}$',
     )
-    ax1.axhline(0, color='red', linestyle='--', linewidth=1.5, label='Baseline (ΔQ = 0)')
-    ax1.axhline(overall_mean_err, color='darkgreen', linestyle='-', linewidth=1.8, label=f'Mean ΔQ = {overall_mean_err:+.3f} dB')
+    ax1.axhline(0, color='black', linestyle='--', linewidth=1.2, label='Baseline (ΔQ = 0)')
+    ax1.axhline(overall_mean_err, color='crimson' if overall_mean_err < 0 else 'darkgreen', linestyle='-', linewidth=1.8, label=f'Mean ΔQ = {overall_mean_err:+.3f} dB')
     ax1.set_ylabel(r'Quality Delta $\Delta Q$ (dB)', fontsize=10.5, fontweight='bold')
     ax1.set_title(r'(a) Per-Frame Realized Gain vs Error-Only Baseline ($\Delta Q_t^{\mathrm{error}}$)', fontsize=11, fontweight='bold')
     ax1.grid(True, linestyle='--', alpha=0.4)
     ax1.legend(loc='upper right', frameon=True, fontsize=9)
 
+    colors_rnd = ['#1f77b4' if v >= 0 else '#d62728' for v in mean_dq_rnd['delta_q_rnd']]
     ax2.bar(
         mean_dq_rnd['frame'],
         mean_dq_rnd['delta_q_rnd'],
-        color='#1f77b4',
+        color=colors_rnd,
         alpha=0.75,
         width=0.8,
         label=r'$\Delta Q_t = \mathrm{PSNR}_{\mathrm{ours}} - \mathrm{PSNR}_{\mathrm{random}}$',
     )
-    ax2.axhline(0, color='red', linestyle='--', linewidth=1.5, label='Baseline (ΔQ = 0)')
-    ax2.axhline(overall_mean_rnd, color='navy', linestyle='-', linewidth=1.8, label=f'Mean ΔQ = {overall_mean_rnd:+.3f} dB')
+    ax2.axhline(0, color='black', linestyle='--', linewidth=1.2, label='Baseline (ΔQ = 0)')
+    ax2.axhline(overall_mean_rnd, color='crimson' if overall_mean_rnd < 0 else 'navy', linestyle='-', linewidth=1.8, label=f'Mean ΔQ = {overall_mean_rnd:+.3f} dB')
     ax2.set_xlabel('Online Frame Index (t)', fontsize=11, fontweight='bold')
     ax2.set_ylabel(r'Quality Delta $\Delta Q$ (dB)', fontsize=10.5, fontweight='bold')
     ax2.set_title(r'(b) Per-Frame Realized Gain vs Random Baseline ($\Delta Q_t^{\mathrm{random}}$)', fontsize=11, fontweight='bold')
@@ -727,12 +729,18 @@ def write_summary_report(
 
     st_err = stats_agg['vs_error']
     st_rnd = stats_agg['vs_random']
+    st_full = stats_agg.get('vs_full', {})
+    seed_lvl = stats_agg.get('seed_level', {})
+    seed_all = stats_agg.get('seed_level_all', {})
 
     # Locate Full and Ours latency entries safely
     lat_dict = {r['policy']: r for r in latency_table}
     full_mean_opt = lat_dict.get('full', {}).get('mean_opt_ms', 1.0)
     ours_mean_opt = lat_dict.get('ours', {}).get('mean_opt_ms', 1.0)
     reduction_pct = ((full_mean_opt - ours_mean_opt) / max(full_mean_opt, 1e-5)) * 100.0
+
+    ci_label_err = 'Strictly Negative ❌' if st_err['ci_95'][1] < 0 else ('Strictly Positive ✅' if st_err['ci_95'][0] > 0 else 'Spans Zero (Parity)')
+    ci_label_rnd = 'Strictly Negative ❌' if st_rnd['ci_95'][1] < 0 else ('Strictly Positive ✅' if st_rnd['ci_95'][0] > 0 else 'Spans Zero (Parity)')
 
     md_lines = [
         "# Phase 7: Online Reconstruction Trajectory Validation Summary",
@@ -752,7 +760,14 @@ def write_summary_report(
         "",
         "In contrast to isolated static evaluations (Phases 4–6), Phase 7 validates the closed-loop state update trajectory:",
         "$$G_0 \\xrightarrow{F_1, S_1} G_1 \\xrightarrow{F_2, S_2} G_2 \\xrightarrow{\\dots} G_{50}$$",
-        "The empirical findings confirm that **Ours (Utility Knapsack)** consistently outperforms heuristic error-only selection and random selection across all 5 random seeds with high statistical significance, zero runaway instability, and significant wall-clock latency reduction.",
+        "",
+        "### Key Empirical Findings:",
+        f"1. **Computational Efficiency (Gate 7C PASS):** Under identical framework conditions, **Ours (Utility Knapsack)** achieves **{ours_mean_opt:.1f} ms** optimization latency per frame vs **{full_mean_opt:.1f} ms** for Full Unconstrained (**{reduction_pct:.1f}% latency reduction**).",
+        "2. **Online Trajectory Stability (Gate 7E PASS):** Reconstructions remain strictly bounded across all 50 frames and 5 independent seeds with zero catastrophic drift or runaway divergence.",
+        f"3. **Quality Comparison vs Error-Only (Gate 7D FAIL):** In contrast to isolated oracle settings, in continuous online reconstruction Ours does **not** retain a quality advantage over Error-Only top-K selection under identical model budgets:",
+        f"   - **Seed-Level Paired Inference ($n=5$):** Mean $\\Delta Q = {seed_lvl.get('mean_delta_q', st_err['mean']):+.4f}$ dB, all 5/5 seeds negative ({[round(x, 4) for x in seed_lvl.get('per_seed_delta_q', [])]}), Wilcoxon $p_{{\\text{{two-sided}}}} = {seed_lvl.get('wilcoxon_p_twosided', 0.0625):.4f}$, $p_{{\\text{{less}}}} = {seed_lvl.get('wilcoxon_p_less', 0.0313):.4f}$.",
+        f"   - **Frame-Level Pooled Diagnostics ($N=245$):** Mean $\\Delta Q = {st_err['mean']:+.4f}$ dB, 95% bootstrap CI [{st_err['ci_95'][0]:+.4f}, {st_err['ci_95'][1]:+.4f}] dB (strictly negative), frame win rate **{st_err['win_rate_pct']:.1f}%** ({st_err['win_count']}/{st_err['total_count']}), Wilcoxon $p = {st_err.get('wilcoxon_p_twosided', st_err['wilcoxon_p']):.2e}$ ($p_{{\\text{{less}}}} = {st_err.get('wilcoxon_p_less', 1.0):.2e}$).",
+        "   - **Scientific Root Cause:** Greedy single-frame utility selection $\\hat{U}_i = \\hat{\\Delta Q}_i / \\hat{\\Delta T}_i$ optimizes instantaneous marginal gain on the current frame $F_t$ without multi-frame temporal credit assignment or spatial continuity. Direct photometric error selection concentrates updates on persistent residual structures that compound over camera motion. Additionally, prototype Python autograd overhead causes budget overruns (mean 31.1 ms vs 15.0 ms target), motivating CUDA kernel fusion in Phase 10.",
         "",
         "---",
         "",
@@ -763,10 +778,13 @@ def write_summary_report(
         "| **Gate 7A** | Trajectory Integrity | 50/50 frames continuous without crash | 50/50 frames (100%) | **PASS ✅** |",
         "| **Gate 7B** | Policy Fairness | Identical initial state G_0 per seed | Guaranteed independent map init | **PASS ✅** |",
         "| **Gate 7C** | Budget Accounting | Explicit separation of B_sched and T_wall | B=15 ms vs measured runtime | **PASS ✅** |",
-        f"| **Gate 7D** | Quality Preserved | No systematic degradation vs error-only | **{st_err['mean']:+.4f} dB** (95% CI [{st_err['ci_95'][0]:+.4f}, {st_err['ci_95'][1]:+.4f}] dB) | **{'PASS ✅' if st_err['mean'] >= -0.05 else 'MARGINAL'}** |",
-        "| **Gate 7E** | Online Robustness | No severe frame-level degradation/drift | Stable monotonic convergence | **PASS ✅** |",
-        f"| **Gate 7F** | Statistical Validation | Paired Wilcoxon test across seeds and frames | Seed p = {stats_agg['seed_level']['wilcoxon_p']:.4f}, Frame p = {st_err['wilcoxon_p']:.4f} | **PASS ✅** |",
+        f"| **Gate 7D** | Quality Preserved | No systematic degradation vs error-only | **{st_err['mean']:+.4f} dB** (95% CI [{st_err['ci_95'][0]:+.4f}, {st_err['ci_95'][1]:+.4f}] dB, 5/5 seeds < 0) | **FAIL ❌** |",
+        "| **Gate 7E** | Online Robustness | No severe runaway drift / catastrophic divergence | Bounded error (min ΔQ = -0.1587 dB, zero drift) | **PASS ✅** |",
+        f"| **Gate 7F** | Statistical Validation | Paired Wilcoxon test across seeds and frames | Seed p(2s) = {seed_lvl.get('wilcoxon_p_twosided', 0.0625):.4f}, Frame p = {st_err.get('wilcoxon_p_twosided', st_err['wilcoxon_p']):.2e} | **PASS ✅** |",
         "| **Gate 7G** | Reproducibility | Deterministic multi-seed execution | SHA256 frozen in manifest | **PASS ✅** |",
+        "",
+        "> [!WARNING]",
+        "> **Milestone Gate Status:** `DATA COMPLETE, SCIENTIFIC GATE REQUIRES REPAIR (Gate 7D FAIL)`. While the trajectory infrastructure, budget accounting, and systems execution passed completely, algorithmic utility selection requires multi-frame credit assignment to overcome heuristic error-only selection in continuous recursive SLAM.",
         "",
         "---",
         "",
@@ -797,26 +815,77 @@ def write_summary_report(
         "",
         "---",
         "",
-        "## 4. Per-Frame Quality Delta Statistics (Pooled across 5 Seeds x 49 Frames)",
+        "## 4. Statistical Validation & Hypothesis Testing",
         "",
-        "### A. Ours vs Error-Only Baseline",
+        "### 4.1 Primary Seed-Level Paired Inference ($n=5$ Independent Trajectories)",
+        "*In recursive online SLAM ($G_{t+1} = \\mathcal{U}(G_t, F_t, S_t)$), each 50-frame trajectory is an independent realization, making seed-level paired testing the primary statistical inference.*",
+        "",
+    ])
+
+    for b_key, b_label in [('vs_error', 'Error-Only Top-K Baseline'), ('vs_random', 'Random Uniform Baseline'), ('vs_full', 'Full Unconstrained Baseline')]:
+        if b_key in seed_all:
+            s_data = seed_all[b_key]
+            neg_pos_str = 'all 5/5 negative' if s_data['all_negative'] else ('all 5/5 positive' if s_data['all_positive'] else 'mixed')
+            md_lines.extend([
+                f"#### Ours vs {b_label}",
+                f"- **Per-Seed Mean ΔQ [dB]:** `{[round(x, 4) for x in s_data['per_seed_delta_q']]}` ({neg_pos_str})",
+                f"- **Mean Seed ΔQ:** **{s_data['mean_delta_q']:+.4f} dB** (Median: **{s_data['median_delta_q']:+.4f} dB**)",
+                f"- **Paired Wilcoxon Signed-Rank Test ($n=5$):**",
+                f"  - Two-sided ($H_1: \\Delta Q \\ne 0$): $W = {s_data['wilcoxon_stat']:.1f}$, $p = {s_data['wilcoxon_p_twosided']:.4f}$",
+                f"  - Directional Less ($H_1: \\text{{Ours}} < \\text{{{s_data['baseline']}}}$): $p = {s_data['wilcoxon_p_less']:.4f}$",
+                f"  - Directional Greater ($H_1: \\text{{Ours}} > \\text{{{s_data['baseline']}}}$): $p = {s_data['wilcoxon_p_greater']:.4f}$",
+                "",
+            ])
+
+    md_lines.extend([
+        "---",
+        "",
+        "### 4.2 Secondary Frame-Level Pooled Diagnostics ($N=245$ Frames)",
+        "*Descriptive diagnostics across all 245 frame transitions (auto-correlated within trajectories).*",
+        "",
+        "#### A. Ours vs Error-Only Baseline",
         f"- **Mean Realized Quality Delta (Delta Q):** **{st_err['mean']:+.4f} dB**",
         f"- **Median Quality Delta:** **{st_err['median']:+.4f} dB**",
         f"- **Range [Min, Max]:** [**{st_err['min']:+.4f} dB**, **{st_err['max']:+.4f} dB**]",
-        f"- **95% Bootstrap Confidence Interval:** [**{st_err['ci_95'][0]:+.4f} dB**, **{st_err['ci_95'][1]:+.4f} dB**] ({'Strictly Positive ✅' if st_err['ci_95'][0] > 0 else 'Cuts 0'})",
-        f"- **Paired Wilcoxon Signed-Rank Test:** p = {st_err['wilcoxon_p']:.6f}",
-        f"- **Cohen's d Effect Size:** d = {st_err['cohens_d']:+.3f}",
+        f"- **95% Bootstrap Confidence Interval:** [**{st_err['ci_95'][0]:+.4f} dB**, **{st_err['ci_95'][1]:+.4f} dB**] ({ci_label_err})",
+        f"- **Paired Wilcoxon Signed-Rank Test:**",
+        f"  - Two-sided ($H_1: \\Delta Q \\ne 0$): $W = {st_err.get('wilcoxon_stat', 0.0):.1f}$, $p = {st_err.get('wilcoxon_p_twosided', st_err['wilcoxon_p']):.4e}$",
+        f"  - Directional Less ($H_1: \\text{{Ours}} < \\text{{Error}}$): $p = {st_err.get('wilcoxon_p_less', 1.0):.4e}$",
+        f"  - Directional Greater ($H_1: \\text{{Ours}} > \\text{{Error}}$): $p = {st_err.get('wilcoxon_p_greater', 1.0):.4e}$",
+        f"- **Cohen's d Effect Size:** $d = {st_err['cohens_d']:+.3f}$",
         f"- **Frame Win Rate:** **{st_err['win_rate_pct']:.1f}%** ({st_err['win_count']}/{st_err['total_count']} frames)",
         "",
-        "### B. Ours vs Random Baseline",
+        "#### B. Ours vs Random Baseline",
         f"- **Mean Realized Quality Delta (Delta Q):** **{st_rnd['mean']:+.4f} dB**",
         f"- **Median Quality Delta:** **{st_rnd['median']:+.4f} dB**",
         f"- **Range [Min, Max]:** [**{st_rnd['min']:+.4f} dB**, **{st_rnd['max']:+.4f} dB**]",
-        f"- **95% Bootstrap Confidence Interval:** [**{st_rnd['ci_95'][0]:+.4f} dB**, **{st_rnd['ci_95'][1]:+.4f} dB**] ({'Strictly Positive ✅' if st_rnd['ci_95'][0] > 0 else 'Cuts 0'})",
-        f"- **Paired Wilcoxon Signed-Rank Test:** p = {st_rnd['wilcoxon_p']:.6f}",
-        f"- **Cohen's d Effect Size:** d = {st_rnd['cohens_d']:+.3f}",
+        f"- **95% Bootstrap Confidence Interval:** [**{st_rnd['ci_95'][0]:+.4f} dB**, **{st_rnd['ci_95'][1]:+.4f} dB**] ({ci_label_rnd})",
+        f"- **Paired Wilcoxon Signed-Rank Test:**",
+        f"  - Two-sided ($H_1: \\Delta Q \\ne 0$): $W = {st_rnd.get('wilcoxon_stat', 0.0):.1f}$, $p = {st_rnd.get('wilcoxon_p_twosided', st_rnd['wilcoxon_p']):.4e}$",
+        f"  - Directional Less ($H_1: \\text{{Ours}} < \\text{{Random}}$): $p = {st_rnd.get('wilcoxon_p_less', 1.0):.4e}$",
+        f"  - Directional Greater ($H_1: \\text{{Ours}} > \\text{{Random}}$): $p = {st_rnd.get('wilcoxon_p_greater', 1.0):.4e}$",
+        f"- **Cohen's d Effect Size:** $d = {st_rnd['cohens_d']:+.3f}$",
         f"- **Frame Win Rate:** **{st_rnd['win_rate_pct']:.1f}%** ({st_rnd['win_count']}/{st_rnd['total_count']} frames)",
         "",
+    ])
+
+    if 'vs_full' in stats_agg:
+        st_f = stats_agg['vs_full']
+        ci_label_full = 'Strictly Negative ❌' if st_f['ci_95'][1] < 0 else ('Strictly Positive ✅' if st_f['ci_95'][0] > 0 else 'Spans Zero (Parity)')
+        md_lines.extend([
+            "#### C. Ours vs Full Unconstrained Baseline",
+            f"- **Mean Realized Quality Delta (Delta Q):** **{st_f['mean']:+.4f} dB**",
+            f"- **Median Quality Delta:** **{st_f['median']:+.4f} dB**",
+            f"- **Range [Min, Max]:** [**{st_f['min']:+.4f} dB**, **{st_f['max']:+.4f} dB**]",
+            f"- **95% Bootstrap Confidence Interval:** [**{st_f['ci_95'][0]:+.4f} dB**, **{st_f['ci_95'][1]:+.4f} dB**] ({ci_label_full})",
+            f"- **Paired Wilcoxon Signed-Rank Test:**",
+            f"  - Two-sided ($H_1: \\Delta Q \\ne 0$): $W = {st_f.get('wilcoxon_stat', 0.0):.1f}$, $p = {st_f.get('wilcoxon_p_twosided', st_f['wilcoxon_p']):.4e}$",
+            f"- **Cohen's d Effect Size:** $d = {st_f['cohens_d']:+.3f}$",
+            f"- **Frame Win Rate:** **{st_f['win_rate_pct']:.1f}%** ({st_f['win_count']}/{st_f['total_count']} frames)",
+            "",
+        ])
+
+    md_lines.extend([
         "---",
         "",
         "## 5. Online Adaptation & Selection Dynamics",
@@ -1064,9 +1133,18 @@ def main():
 
         diff_nonzero = dq_arr[np.abs(dq_arr) > 1e-6]
         if len(diff_nonzero) >= 5:
-            _, p_w = wilcoxon(diff_nonzero, alternative='greater')
+            res_2s = wilcoxon(diff_nonzero, alternative='two-sided')
+            res_less = wilcoxon(diff_nonzero, alternative='less')
+            res_greater = wilcoxon(diff_nonzero, alternative='greater')
+            p_w_2s = float(res_2s.pvalue)
+            p_w_less = float(res_less.pvalue)
+            p_w_greater = float(res_greater.pvalue)
+            stat_w = float(res_2s.statistic)
         else:
-            p_w = 1.0
+            p_w_2s = 1.0
+            p_w_less = 1.0
+            p_w_greater = 1.0
+            stat_w = 0.0
         d_val = compute_cohens_d(dq_arr)
         wins = int(np.sum(dq_arr >= -1e-5))
         tot = len(dq_arr)
@@ -1078,36 +1156,62 @@ def main():
             'min': min_dq,
             'max': max_dq,
             'ci_95': [ci_low, ci_high],
-            'wilcoxon_p': float(p_w),
+            'wilcoxon_stat': stat_w,
+            'wilcoxon_p': p_w_2s,
+            'wilcoxon_p_twosided': p_w_2s,
+            'wilcoxon_p_less': p_w_less,
+            'wilcoxon_p_greater': p_w_greater,
             'cohens_d': d_val,
             'win_count': wins,
             'total_count': tot,
             'win_rate_pct': float((wins / max(tot, 1)) * 100.0),
         }
 
-    # Seed-level paired tests
-    seed_dq_err = []
-    seed_dq_rnd = []
-    for s in seeds:
-        if s in seed_results and 'paired_comparison' in seed_results[s]:
-            pc = seed_results[s]['paired_comparison']
-            if 'delta_q_vs_error_mean' in pc:
-                seed_dq_err.append(pc['delta_q_vs_error_mean'])
-            if 'delta_q_vs_random_mean' in pc:
-                seed_dq_rnd.append(pc['delta_q_vs_random_mean'])
+    # Primary Seed-level paired tests (n=5 independent trajectories)
+    seed_stats = {}
+    for baseline, key_name, pc_mean_key in [
+        ('error_only', 'vs_error', 'delta_q_vs_error_mean'),
+        ('random', 'vs_random', 'delta_q_vs_random_mean'),
+        ('full', 'vs_full', 'delta_q_vs_full_mean'),
+    ]:
+        seed_dq = []
+        for s in seeds:
+            if s in seed_results and 'paired_comparison' in seed_results[s]:
+                pc = seed_results[s]['paired_comparison']
+                if pc_mean_key in pc:
+                    seed_dq.append(pc[pc_mean_key])
+        seed_dq = np.array(seed_dq)
+        if len(seed_dq) >= 5 and np.any(np.abs(seed_dq) > 1e-6):
+            res_2s = wilcoxon(seed_dq, alternative='two-sided')
+            res_less = wilcoxon(seed_dq, alternative='less')
+            res_greater = wilcoxon(seed_dq, alternative='greater')
+            p_2s = float(res_2s.pvalue)
+            p_less = float(res_less.pvalue)
+            p_greater = float(res_greater.pvalue)
+            stat_val = float(res_2s.statistic)
+        else:
+            p_2s = 1.0
+            p_less = 1.0
+            p_greater = 1.0
+            stat_val = 0.0
 
-    seed_dq_err = np.array(seed_dq_err)
-    if len(seed_dq_err) >= 5 and np.any(np.abs(seed_dq_err) > 1e-6):
-        _, seed_p_err = wilcoxon(seed_dq_err, alternative='greater')
-    else:
-        seed_p_err = 0.03125 if np.all(seed_dq_err > 0) else 1.0
+        seed_stats[key_name] = {
+            'baseline': baseline,
+            'n_seeds': len(seeds),
+            'mean_delta_q': float(np.mean(seed_dq)) if len(seed_dq) > 0 else 0.0,
+            'median_delta_q': float(np.median(seed_dq)) if len(seed_dq) > 0 else 0.0,
+            'per_seed_delta_q': [float(x) for x in seed_dq],
+            'wilcoxon_stat': stat_val,
+            'wilcoxon_p': p_2s,
+            'wilcoxon_p_twosided': p_2s,
+            'wilcoxon_p_less': p_less,
+            'wilcoxon_p_greater': p_greater,
+            'all_negative': bool(np.all(seed_dq < 0)) if len(seed_dq) > 0 else False,
+            'all_positive': bool(np.all(seed_dq > 0)) if len(seed_dq) > 0 else False,
+        }
 
-    stats_agg['seed_level'] = {
-        'n_seeds': len(seeds),
-        'mean_delta_q_vs_error': float(np.mean(seed_dq_err)) if len(seed_dq_err) > 0 else 0.0,
-        'wilcoxon_p': float(seed_p_err),
-        'per_seed_delta_q_vs_error': [float(x) for x in seed_dq_err],
-    }
+    stats_agg['seed_level'] = seed_stats['vs_error']
+    stats_agg['seed_level_all'] = seed_stats
 
     # Print summary table
     print("\n--- Latency Breakdown Table ---")
@@ -1118,9 +1222,12 @@ def main():
 
     if 'vs_error' in stats_agg:
         st = stats_agg['vs_error']
+        sl = stats_agg['seed_level']
         print("\n--- Realized Delta Q vs Error-Only ---")
-        print(f"Mean ΔQ: {st['mean']:+.4f} dB | Median: {st['median']:+.4f} dB | 95% CI: [{st['ci_95'][0]:+.4f}, {st['ci_95'][1]:+.4f}] dB")
-        print(f"Wilcoxon p: {st['wilcoxon_p']:.6f} | Cohen's d: {st['cohens_d']:+.3f} | Win Rate: {st['win_rate_pct']:.1f}% ({st['win_count']}/{st['total_count']})")
+        print(f"Seed-Level ($n={sl['n_seeds']}$): Mean ΔQ: {sl['mean_delta_q']:+.4f} dB | Wilcoxon p(2s): {sl['wilcoxon_p_twosided']:.4f} | p(less): {sl['wilcoxon_p_less']:.4f}")
+        print(f"Per-Seed ΔQ: {sl['per_seed_delta_q']}")
+        print(f"Frame-Level ($N={st['total_count']}$): Mean ΔQ: {st['mean']:+.4f} dB | Median: {st['median']:+.4f} dB | 95% CI: [{st['ci_95'][0]:+.4f}, {st['ci_95'][1]:+.4f}] dB")
+        print(f"Wilcoxon p(2s): {st['wilcoxon_p_twosided']:.4e} | p(less): {st['wilcoxon_p_less']:.4e} | Cohen's d: {st['cohens_d']:+.3f} | Win Rate: {st['win_rate_pct']:.1f}% ({st['win_count']}/{st['total_count']})")
 
     # Generate Figures
     print("\n>> Generating Figures (fig8, fig9, fig10, fig11)...")
@@ -1179,8 +1286,11 @@ def main():
     for s in seeds:
         manifest_files.append(f"seed_{s}.json")
 
+    gate_7d_status = 'PASS' if stats_agg.get('vs_error', {}).get('mean', 0.0) >= 0.0 else 'FAIL'
+
     manifest = {
         'phase': 'Phase 7: Online Reconstruction Trajectory Validation',
+        'phase_status': 'DATA COMPLETE, SCIENTIFIC GATE REQUIRES REPAIR (Gate 7D FAIL)' if gate_7d_status == 'FAIL' else 'COMPLETED',
         'generated_at': datetime.now().isoformat(),
         'protocol_version': protocol.get('protocol_version', '1.0.0'),
         'device': device,
@@ -1191,7 +1301,7 @@ def main():
             'Gate_7A_trajectory_integrity': 'PASS',
             'Gate_7B_fairness': 'PASS',
             'Gate_7C_budget_accounting': 'PASS',
-            'Gate_7D_quality_advantage': 'PASS' if stats_agg.get('vs_error', {}).get('mean', 0.0) >= -0.05 else 'MARGINAL',
+            'Gate_7D_quality_advantage': gate_7d_status,
             'Gate_7E_online_robustness': 'PASS',
             'Gate_7F_statistical_validation': 'PASS',
             'Gate_7G_reproducibility': 'PASS',

@@ -1,6 +1,7 @@
 {
   "phase": "Phase 7: Online Reconstruction Trajectory Validation",
-  "generated_at": "2026-09-11T00:48:33.845866",
+  "phase_status": "DATA COMPLETE, SCIENTIFIC GATE REQUIRES REPAIR (Gate 7D FAIL)",
+  "generated_at": "2026-09-11T01:28:50.926207",
   "protocol_version": "1.0.0",
   "device": "cuda",
   "seeds": [
@@ -21,19 +22,19 @@
     "Gate_7A_trajectory_integrity": "PASS",
     "Gate_7B_fairness": "PASS",
     "Gate_7C_budget_accounting": "PASS",
-    "Gate_7D_quality_advantage": "PASS",
+    "Gate_7D_quality_advantage": "FAIL",
     "Gate_7E_online_robustness": "PASS",
     "Gate_7F_statistical_validation": "PASS",
     "Gate_7G_reproducibility": "PASS"
   },
   "artifacts": {
     "trajectory_results.json": {
-      "sha256": "26f92a231f48ad63d307952a6c48970e42e9a0561db7051a6ddf2eb36ed846af",
-      "size_bytes": 9111
+      "sha256": "c9478f998de74bc0a264f32a2e224cb97bf2b1548948983e0733748fbeadde1c",
+      "size_bytes": 11774
     },
     "trajectory_summary.md": {
-      "sha256": "40a9c8d827689bade5d20792b9cc0fe9a32838affdb900abb21a50d0f61cf98a",
-      "size_bytes": 5522
+      "sha256": "d27e5dbd097c8a156fce32ad7ef00219e91e39c7ac259686507d285dd41a6651",
+      "size_bytes": 10038
     },
     "per_frame_metrics.csv": {
       "sha256": "531b4397b718f45a8b438e4c2f8719d5034221744a11c4fba471c3bd648a246b",
@@ -44,8 +45,8 @@
       "size_bytes": 306703
     },
     "fig9_delta_q.png": {
-      "sha256": "563ba54acf56c1e06ff68e667c1880c6eb0f9103bd5207fbfbb79f2cdda47fd2",
-      "size_bytes": 253082
+      "sha256": "a3ff396145e9c9e9568ceaa18556ae57858c127bc9646437982d1dea8845c4da",
+      "size_bytes": 247608
     },
     "fig10_latency_trajectory.png": {
       "sha256": "3cff67741290d9719b5df3082ce1ca041174da5e611e364c37dfa8d95a176e7e",

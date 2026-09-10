@@ -1,6 +1,6 @@
 {
   "protocol_version": "1.0.0",
-  "timestamp": "2026-09-11T00:48:33.845218",
+  "timestamp": "2026-09-11T01:28:50.925539",
   "dataset": "tum_fr1_desk",
   "resolution": [
     240,
@@ -128,7 +128,11 @@
         -0.025178845196354147,
         -0.012248309656065338
       ],
-      "wilcoxon_p": 0.9999999998317765,
+      "wilcoxon_stat": 8093.0,
+      "wilcoxon_p": 3.3644708057275395e-10,
+      "wilcoxon_p_twosided": 3.3644708057275395e-10,
+      "wilcoxon_p_less": 1.6822354028637698e-10,
+      "wilcoxon_p_greater": 0.9999999998317765,
       "cohens_d": -0.35978930871937764,
       "win_count": 79,
       "total_count": 245,
@@ -144,7 +148,11 @@
         -0.02094022862765254,
         -0.007871185212719197
       ],
-      "wilcoxon_p": 0.9999862095720451,
+      "wilcoxon_stat": 10412.0,
+      "wilcoxon_p": 2.75808559099054e-05,
+      "wilcoxon_p_twosided": 2.75808559099054e-05,
+      "wilcoxon_p_less": 1.37904279549527e-05,
+      "wilcoxon_p_greater": 0.9999862095720451,
       "cohens_d": -0.28288513234049184,
       "win_count": 91,
       "total_count": 245,
@@ -160,23 +168,97 @@
         -0.00869555935567739,
         0.003325658732531022
       ],
-      "wilcoxon_p": 0.7969481434277395,
+      "wilcoxon_stat": 14145.0,
+      "wilcoxon_p": 0.4061037131445212,
+      "wilcoxon_p_twosided": 0.4061037131445212,
+      "wilcoxon_p_less": 0.2030518565722606,
+      "wilcoxon_p_greater": 0.7969481434277395,
       "cohens_d": -0.05800236599270619,
       "win_count": 117,
       "total_count": 245,
       "win_rate_pct": 47.755102040816325
     },
     "seed_level": {
+      "baseline": "error_only",
       "n_seeds": 5,
-      "mean_delta_q_vs_error": -0.018414159210360784,
-      "wilcoxon_p": 1.0,
-      "per_seed_delta_q_vs_error": [
+      "mean_delta_q": -0.018414159210360784,
+      "median_delta_q": -0.019363274379652375,
+      "per_seed_delta_q": [
         -0.019363274379652375,
         -0.023620165124231457,
         -0.01836585755250892,
         -0.006284397475573481,
         -0.024437101519837672
-      ]
+      ],
+      "wilcoxon_stat": 0.0,
+      "wilcoxon_p": 0.0625,
+      "wilcoxon_p_twosided": 0.0625,
+      "wilcoxon_p_less": 0.03125,
+      "wilcoxon_p_greater": 1.0,
+      "all_negative": true,
+      "all_positive": false
+    },
+    "seed_level_all": {
+      "vs_error": {
+        "baseline": "error_only",
+        "n_seeds": 5,
+        "mean_delta_q": -0.018414159210360784,
+        "median_delta_q": -0.019363274379652375,
+        "per_seed_delta_q": [
+          -0.019363274379652375,
+          -0.023620165124231457,
+          -0.01836585755250892,
+          -0.006284397475573481,
+          -0.024437101519837672
+        ],
+        "wilcoxon_stat": 0.0,
+        "wilcoxon_p": 0.0625,
+        "wilcoxon_p_twosided": 0.0625,
+        "wilcoxon_p_less": 0.03125,
+        "wilcoxon_p_greater": 1.0,
+        "all_negative": true,
+        "all_positive": false
+      },
+      "vs_random": {
+        "baseline": "random",
+        "n_seeds": 5,
+        "mean_delta_q": -0.014342792180119728,
+        "median_delta_q": -0.017309894367140168,
+        "per_seed_delta_q": [
+          -0.026057046286913813,
+          -0.028786647076509436,
+          0.012996865778553243,
+          -0.012557238948588468,
+          -0.017309894367140168
+        ],
+        "wilcoxon_stat": 2.0,
+        "wilcoxon_p": 0.1875,
+        "wilcoxon_p_twosided": 0.1875,
+        "wilcoxon_p_less": 0.09375,
+        "wilcoxon_p_greater": 0.9375,
+        "all_negative": false,
+        "all_positive": false
+      },
+      "vs_full": {
+        "baseline": "full",
+        "n_seeds": 5,
+        "mean_delta_q": -0.0027646677834647034,
+        "median_delta_q": 0.002339664770632374,
+        "per_seed_delta_q": [
+          0.002339664770632374,
+          -0.01673854127222178,
+          -0.015238304527438417,
+          0.008940879179506886,
+          0.0068729629321974154
+        ],
+        "wilcoxon_stat": 6.0,
+        "wilcoxon_p": 0.8125,
+        "wilcoxon_p_twosided": 0.8125,
+        "wilcoxon_p_less": 0.40625,
+        "wilcoxon_p_greater": 0.6875,
+        "all_negative": false,
+        "all_positive": false
+      }
     }
   },
   "per_seed_summaries": {
