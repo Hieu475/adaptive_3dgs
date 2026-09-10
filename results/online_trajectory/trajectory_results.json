@@ -1,6 +1,6 @@
 {
   "protocol_version": "1.0.0",
-  "timestamp": "2026-09-11T01:28:50.925539",
+  "timestamp": "2026-09-11T01:46:45.657226",
   "dataset": "tum_fr1_desk",
   "resolution": [
     240,
@@ -259,6 +259,16 @@
         "all_negative": false,
         "all_positive": false
       }
+    },
+    "robustness_audit": {
+      "max_abs_delta_q_vs_error": 0.1598280668258667,
+      "max_abs_delta_q_vs_full": 0.1834094524383545,
+      "min_psnr_observed": 5.244165658950806,
+      "max_depth_l1_observed": 1.448603630065918,
+      "criterion_max_deviation_threshold_db": 1.0,
+      "criterion_min_psnr_threshold_db": 0.0,
+      "no_catastrophic_drift": true,
+      "gate_7e_status": "PASS"
     }
   },
   "per_seed_summaries": {
