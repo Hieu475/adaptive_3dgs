@@ -24,7 +24,7 @@
     "Gate_7C_budget_accounting": "PASS",
     "Gate_7D_quality_advantage": "FAIL",
     "Gate_7E_online_robustness": "PASS",
-    "Gate_7F_statistical_validation": "PASS",
+    "Gate_7F_statistical_validation": "PASS (Protocol Executed)",
     "Gate_7G_reproducibility": "PASS"
   },
   "artifacts": {
@@ -33,8 +33,8 @@
       "size_bytes": 12175
     },
     "trajectory_summary.md": {
-      "sha256": "6bba0dc49c135ac7f983bbce970cb99ffcd8bb81a6f445f357a776352a255b08",
-      "size_bytes": 12069
+      "sha256": "28d5afbc8e05e006d1b0dbe5c86846ff4864b13fdb978fce9a410960a1f27800",
+      "size_bytes": 14654
     },
     "per_frame_metrics.csv": {
       "sha256": "531b4397b718f45a8b438e4c2f8719d5034221744a11c4fba471c3bd648a246b",

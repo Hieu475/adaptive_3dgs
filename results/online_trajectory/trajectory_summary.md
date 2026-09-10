@@ -17,7 +17,7 @@ In contrast to isolated static evaluations (Phases 4–6), Phase 7 validates the
 $$G_0 \xrightarrow{F_1, S_1} G_1 \xrightarrow{F_2, S_2} G_2 \xrightarrow{\dots} G_{50}$$
 
 ### A. Observed Empirical Facts:
-1. **Systems Compute Reduction (Gate 7C PASS):** Under identical framework conditions, **Ours (Utility Knapsack)** achieves **31.1 ms** per-frame optimization latency versus **488.3 ms** for Full Unconstrained (**93.6% latency reduction**).
+1. **AI Systems Trade-Off — Near-FULL Quality with Far Less Optimization Work:** Under identical continuous trajectory conditions, **Ours achieves quality virtually indistinguishable from Full Unconstrained** ($\Delta Q_{\text{Ours-Full}} = -0.0028$ dB, 95% bootstrap CI $[-0.0087, +0.0033]$ dB, seed-level paired Wilcoxon $p = 0.8125$) while **slashing per-frame optimization latency from 488.3 ms to 31.1 ms (a 93.6% latency reduction)**. From an AI Systems perspective, Ours establishes an appealing efficiency operating point: $\text{quality} \approx \text{FULL}$ with $T_{\text{Ours}} \ll T_{\text{FULL}}$, delivering near-FULL quality with far less optimization work (without claiming to be better than FULL in quality).
 2. **Online Trajectory Stability (Gate 7E PASS):** No catastrophic drift or runaway divergence was observed across all 50 frames and 5 independent seeds. Frame-level quality deltas remain strictly bounded (max |ΔQ_t (vs error)| = 0.1598 dB, max |ΔQ_t (vs full)| = 0.1834 dB << 1.0 dB), with positive finite PSNR (Q_t >= 5.24 dB). Note: per-frame PSNR fluctuates as camera moves into unmapped regions (~30% monotonic frame-to-frame steps across all policies), confirming that trajectory stability is characterized by bounded error rather than monotonic quality increase.
 3. **Quality Comparison vs Error-Only (Gate 7D FAIL):** In continuous recursive online reconstruction, Ours does **not** retain a quality advantage over Error-Only top-K selection under identical model budgets:
    - **Seed-Level Paired Inference ($n=5$):** Mean $\Delta Q = -0.0184$ dB, with all 5/5 seeds strictly negative ([-0.0194, -0.0236, -0.0184, -0.0063, -0.0244]).
@@ -25,7 +25,7 @@ $$G_0 \xrightarrow{F_1, S_1} G_1 \xrightarrow{F_2, S_2} G_2 \xrightarrow{\dots} 
    - **Secondary Frame-Level Pooled Diagnostics ($N=245$ Frames, Descriptive Diagnostic):** Mean $\Delta Q = -0.0184$ dB, 95% bootstrap CI [-0.0252, -0.0122] dB (Strictly Negative ❌), frame win rate **32.2%** (79/245), two-sided $p = 3.36e-10$.
 
 ### B. Supported Interpretation & Systems Insight:
-- **Scientific Hypothesis on Quality Gap:** A plausible explanation for the quality gap in continuous online SLAM is that the pointwise utility model $\hat{U}_i = \hat{\Delta Q}_i / \hat{\Delta T}_i$ optimizes instantaneous marginal gain on frame $F_t$ without explicit multi-frame temporal credit assignment or spatial continuity signals. Direct photometric error prioritization persistently targets large residual regions that compound across camera motion.
+- **Scientific Hypothesis on Quality Gap:** A plausible explanation for the observed quality gap in continuous online SLAM is that the pointwise utility model $\hat{U}_i = \hat{\Delta Q}_i / \hat{\Delta T}_i$ optimizes instantaneous marginal gain on frame $F_t$ without explicit multi-frame temporal credit assignment or spatial continuity signals. Direct photometric error prioritization persistently targets large residual regions that compound across camera motion. The observed quality gap suggests that explicit multi-frame temporal credit assignment and/or spatial continuity may be useful directions for future improvement.
 - **Systems Budget Gap:** While the scheduler strictly enforces knapsack capacity $\sum_{i \in S_t} \hat{c}_i \le B_{\text{sched}} = 15.0$ ms (scheduled cost $\le 13.6$ ms with safety factor 1.10), measured Python wall-clock optimization runtime is 31.1 ms (100% violation rate). This demonstrates that pure Python/PyTorch autograd overhead accounts for ~16 ms of baseline latency, establishing the direct motivation for Phase 10 CUDA kernel fusion.
 
 ---
@@ -39,11 +39,14 @@ $$G_0 \xrightarrow{F_1, S_1} G_1 \xrightarrow{F_2, S_2} G_2 \xrightarrow{\dots} 
 | **Gate 7C** | Budget Accounting | Separation of B_sched (modeled) and T_wall (measured) | Modeled $\le 13.6$ ms enforced vs 31.1 ms measured | **PASS ✅** |
 | **Gate 7D** | Quality Preserved | Quality preservation / advantage vs error-only (ΔQ >= 0) | **-0.0184 dB** (95% CI [-0.0252, -0.0122] dB, 5/5 seeds < 0) | **FAIL ❌** |
 | **Gate 7E** | Online Robustness | Absence of catastrophic runaway drift or divergence | Bounded error (max |ΔQ_err| = 0.1598 dB, zero drift) | **PASS ✅** |
-| **Gate 7F** | Statistical Validation | Paired Wilcoxon test across seeds and frames | Seed p(2s) = 0.0625, Seed p(less) = 0.0312 | **PASS ✅** |
+| **Gate 7F** | Statistical Protocol Validation | Execution of paired Wilcoxon, bootstrap CI, effect size | Protocol fully executed; hypothesis tests confirm Ours has no advantage (p_less = 0.0312 vs Error) | **PASS (Protocol Executed) ✅** |
 | **Gate 7G** | Reproducibility | Deterministic execution and frozen checksums | Bit-level identical rerun (0.0 dB diff) & SHA256 frozen | **PASS ✅** |
 
+> [!NOTE]
+> **Gate 7F Clarification (Protocol Execution vs Hypothesis Result):** Gate 7F evaluates whether the rigorous statistical validation procedure (seed-level paired Wilcoxon, bootstrap CIs, effect sizes) was executed correctly according to protocol. A "PASS" indicates the statistical protocol was executed completely and correctly. It does **not** mean that Ours won statistically; on the contrary, the hypothesis tests show that Ours does not have a quality advantage over Error-only, and directional testing confirms a statistically significant disadvantage ($p_{\text{less}} = 0.0312$).
+
 > [!WARNING]
-> **Milestone Gate Status:** `DATA COMPLETE, SCIENTIFIC GATE REQUIRES REPAIR (Gate 7D FAIL)`. While the trajectory infrastructure, budget accounting, and systems execution passed completely, algorithmic utility selection requires multi-frame credit assignment to overcome heuristic error-only selection in continuous recursive SLAM.
+> **Milestone Gate Status:** `DATA COMPLETE, SCIENTIFIC GATE REQUIRES REPAIR (Gate 7D FAIL)`. While the trajectory infrastructure, budget accounting, and systems execution passed completely, Ours did not achieve a quality advantage over Error-only top-K selection in continuous recursive SLAM ($\Delta Q = -0.0184$ dB). The observed quality gap suggests that explicit multi-frame temporal credit assignment and/or spatial continuity may be useful directions for future improvement.
 
 ---
 
@@ -55,7 +58,18 @@ $$G_0 \xrightarrow{F_1, S_1} G_1 \xrightarrow{F_2, S_2} G_2 \xrightarrow{\dots} 
 > 2. **System Execution Reality:** Actual optimization runtime $T_{\text{wall}}$ measured around PyTorch `backward()` and `step()` averages **31.1 ms** (93.6% reduction vs Full 488.3 ms).
 > 3. **The Systems Gap:** The delta ($31.1 - 15.0 = 16.1$ ms) represents host-device dispatch overhead, non-fused kernel launches, and autograd book-keeping in pure Python. This empirical finding precisely defines the optimization target for **Phase 10 (CUDA Kernel Fusion)**.
 
-### Optimization Latency Breakdown across All Evaluated Seeds
+### 3.1 AI Systems Key Result: Near-FULL Quality with 93.6% Compute Reduction
+
+| Policy | Mean Opt Latency | Speedup vs FULL | Mean ΔQ vs FULL | 95% Bootstrap CI vs FULL | Wilcoxon p (2-sided) |
+|:---|:---:|:---:|:---:|:---:|:---:|
+| **FULL** | 488.3 ms | 1.0x (Baseline) | 0.0000 dB | — | — |
+| **OURS** | **31.1 ms** | **15.7x (93.6% faster)** | **-0.0028 dB** | **[-0.0087, +0.0033] dB** | **0.8125** |
+
+> [!TIP]
+> **Systems Perspective on Efficiency:**  
+> In continuous online SLAM, optimizing all ~5,800 active Gaussians per frame consumes ~488 ms without producing noticeable visual gains over optimizing just ~4 to 10 critically selected Gaussians (~31 ms). Ours identifies an operating point of $\text{quality} \approx \text{FULL}$ with $T_{\text{Ours}} \ll T_{\text{FULL}}$, delivering near-FULL reconstruction quality with far less optimization work. The algorithmic challenge identified in Phase 7 is not efficiency relative to unconstrained optimization, but rather ranking Gaussians under a fixed small budget more effectively than simple photometric error.
+
+### 3.2 Optimization Latency Breakdown across All Evaluated Seeds
 
 | Policy | Mean Opt Latency | Median | P90 | P95 | P99 | Max | Budget Violation Rate | Mean Budget Utilization |
 |:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
