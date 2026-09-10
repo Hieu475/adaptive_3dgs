@@ -60,6 +60,25 @@ state_factors:
   cost: ["projected_area", "tile_footprint"]
   pre_fusion_normalization: true
 
+pipeline_specification:
+  gaussian:
+    sh_degree: 0
+    initial_opacity: 0.5
+    max_gaussians: 30000
+    initial_scale: 0.02
+  rendering:
+    tile_size: 16
+    use_surface_aware_depth: true
+    attribution_top_k: 4
+  scheduler:
+    ratio: 0.25
+    cost_per_gaussian_us: 2.0
+    budget_ms: 15.0
+  densification:
+    max_new_per_frame: 80
+    strategy: "importance"
+    use_adaptive_thresholds: true
+
 densification_state_initialization:
   policy: "fresh"  # 'fresh': child Gaussians get reset EMA/uncertainty; 'inherit': child inherits parent state
 

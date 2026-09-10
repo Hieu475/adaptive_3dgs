@@ -106,3 +106,11 @@ def get_densification_policy(protocol: Optional[Dict[str, Any]] = None) -> str:
         protocol = load_protocol()
     return str(protocol.get("densification_state_initialization", {}).get("policy", "fresh"))
 
+
+def get_pipeline_specification(protocol: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Return canonical pipeline specification dictionary."""
+    if protocol is None:
+        protocol = load_protocol()
+    return dict(protocol.get("pipeline_specification", {}))
+
+

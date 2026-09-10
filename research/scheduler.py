@@ -377,8 +377,14 @@ class BudgetScheduler:
             density = importance_scores / (cost_estimates + 1e-6)
             return _pack_by_scores(density, cost_estimates, budget_us, max_k=top_k)
 
-        elif policy_str in ("learned_utility", OptimizationPolicy.LEARNED_UTILITY.value):
-            eff = utility_scores if utility_scores is not None else (importance_scores / (cost_estimates + 1e-6))
+        elif policy_str in ("learned_utility", OptimizationPolicy.LEARNED_UTILITY.value) or (policy_str in ("budget_aware", "ours") and utility_scores is not None):
+            if utility_scores is not None:
+                if utility_scores.shape[0] < N:
+                    eff = torch.cat([utility_scores, torch.zeros(N - utility_scores.shape[0], device=device)])
+                else:
+                    eff = utility_scores[:N]
+            else:
+                eff = (importance_scores / (cost_estimates + 1e-6))
             return _pack_by_scores(
                 scores=eff,
                 costs=cost_estimates,

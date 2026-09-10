@@ -1,0 +1,79 @@
+{
+  "phase": "Phase 7: Online Reconstruction Trajectory Validation",
+  "generated_at": "2026-09-11T00:48:33.845866",
+  "protocol_version": "1.0.0",
+  "device": "cuda",
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "policies": [
+    "full",
+    "random",
+    "error_only",
+    "ours"
+  ],
+  "budget_ms": 15.0,
+  "gates_status": {
+    "Gate_7A_trajectory_integrity": "PASS",
+    "Gate_7B_fairness": "PASS",
+    "Gate_7C_budget_accounting": "PASS",
+    "Gate_7D_quality_advantage": "PASS",
+    "Gate_7E_online_robustness": "PASS",
+    "Gate_7F_statistical_validation": "PASS",
+    "Gate_7G_reproducibility": "PASS"
+  },
+  "artifacts": {
+    "trajectory_results.json": {
+      "sha256": "26f92a231f48ad63d307952a6c48970e42e9a0561db7051a6ddf2eb36ed846af",
+      "size_bytes": 9111
+    },
+    "trajectory_summary.md": {
+      "sha256": "40a9c8d827689bade5d20792b9cc0fe9a32838affdb900abb21a50d0f61cf98a",
+      "size_bytes": 5522
+    },
+    "per_frame_metrics.csv": {
+      "sha256": "531b4397b718f45a8b438e4c2f8719d5034221744a11c4fba471c3bd648a246b",
+      "size_bytes": 169037
+    },
+    "fig8_quality_trajectory.png": {
+      "sha256": "aa80860363649491b78ad332849a7c37a69b4611cf6c5d90ead678d0d1dd27fa",
+      "size_bytes": 306703
+    },
+    "fig9_delta_q.png": {
+      "sha256": "563ba54acf56c1e06ff68e667c1880c6eb0f9103bd5207fbfbb79f2cdda47fd2",
+      "size_bytes": 253082
+    },
+    "fig10_latency_trajectory.png": {
+      "sha256": "3cff67741290d9719b5df3082ce1ca041174da5e611e364c37dfa8d95a176e7e",
+      "size_bytes": 270968
+    },
+    "fig11_quality_latency.png": {
+      "sha256": "513887dca981d1006ec1fad499bda460407724f009885022a586a8a2ee445cd9",
+      "size_bytes": 224134
+    },
+    "seed_42.json": {
+      "sha256": "0331ff5947f3154fe3945fce9dd5709267fa2f54e73430938dc6350c6e73afa9",
+      "size_bytes": 101899
+    },
+    "seed_43.json": {
+      "sha256": "b6d95563ac9f982d9251e39186a316dc95eb35a53b474b6797369c3140a3b31b",
+      "size_bytes": 101918
+    },
+    "seed_44.json": {
+      "sha256": "0946791387ce9b7a19a5af71b6d6e86eef3fe1c819e942dc2865003c2eb5ea7c",
+      "size_bytes": 101935
+    },
+    "seed_45.json": {
+      "sha256": "dafec3cbda0aedc4fa25966492cb4aaa966842a4c69bc29cc8eee5eb371f1ce4",
+      "size_bytes": 101858
+    },
+    "seed_46.json": {
+      "sha256": "cbe05f2c0a1f9fdc9b24fdc30a6ed210b10def0a208fec5e639f9f2531c1fff0",
+      "size_bytes": 101921
+    }
+  }
+}

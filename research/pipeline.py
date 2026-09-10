@@ -463,6 +463,7 @@ class OnlineReconstructionPipeline:
                 frame_idx=self.frame_count,
                 binary_threshold=binary_threshold,
                 utility_scores=getattr(self, '_learned_utility_scores', None),
+                seed=self.config.get('seed', 42),
             )
         self._last_optimize_mask = optimize_mask
         

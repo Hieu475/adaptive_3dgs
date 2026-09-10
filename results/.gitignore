@@ -5,8 +5,10 @@
 !results_frozen.json
 !figures/*.png
 !gate1_headroom/group_interaction_curve.csv
-!online_trajectory/per_frame_deltas.csv
-!online_trajectory/latency_breakdown.csv
+!online_trajectory/*.json
+!online_trajectory/*.csv
+!online_trajectory/*.png
+!online_trajectory/*.md
 !budget_sweep/pareto_frontier.csv
 !seeds/**/*.json
 !statistics/*.json
