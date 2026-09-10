@@ -1,113 +1,15 @@
-# Byte-compiled / optimized / DLL files
 __pycache__/
-*.py[cod]
-*$py.class
+*.pyc
 *.so
-
-# C / C++ / CUDA compilation artifacts
-*.o
-*.obj
-*.a
-*.lib
-*.dylib
-*.dll
-*.cudafe*
-*.fatbin
-*.cubin
-*.ptx
-adaptive_3dgs/_C.*
-
-# Distribution / packaging
 build/
 dist/
-develop-eggs/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Testing, Coverage, Type checking, Linters
-.pytest_cache/
-.coverage
-.coverage.*
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.tox/
-.nox/
-htmlcov/
-.mypy_cache/
-.ruff_cache/
-
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints
-*/.ipynb_checkpoints/*
-
-# Scratch, temporary and logs
-scratch/
-tmp/
-temp/
-*.tmp
-*.bak
-*.log
-wandb/
-runs/
-lightning_logs/
-*.prof
-*.profile
-
-# LaTeX intermediate build files (e.g. for docs/paper/)
-*.aux
-*.bbl
-*.blg
-*.brf
-*.fls
-*.fdb_latexmk
-*.synctex.gz
-*.toc
-*.out
-*.nav
-*.snm
-*.vrb
-
-# Editors and IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-*.sublime-project
-*.sublime-workspace
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Datasets & large data
 data/
-datasets/
+datasets/TUM/
+datasets/Replica/
+*.egg-info/
+.pytest_cache/
+scratch/
+.vscode/
+.DS_Store
+
 
