@@ -4,12 +4,16 @@ __pycache__/
 build/
 dist/
 data/
-datasets/TUM/
-datasets/Replica/
+datasets/
 *.egg-info/
 .pytest_cache/
 scratch/
 .vscode/
 .DS_Store
+*.log
+*.swp
+*.swo
+*~
+.ipynb_checkpoints/
 
 
