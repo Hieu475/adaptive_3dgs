@@ -8,7 +8,7 @@
 !online_trajectory/*.json
 !online_trajectory/*.csv
 !online_trajectory/*.png
-!online_trajectory/*.md
+online_trajectory/*.md
 !budget_sweep/pareto_frontier.csv
 !seeds/**/*.json
 !statistics/*.json
