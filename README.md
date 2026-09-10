@@ -4,7 +4,8 @@
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-orange.svg)](https://pytorch.org/)
 [![CUDA](https://img.shields.io/badge/CUDA-Custom%20C%2B%2B%2FCUDA-green.svg)](csrc/)
-[![Status](https://img.shields.io/badge/Phase%206-FROZEN%20(Case%20B)-blueviolet.svg)](results/phase6_context_utility/manifest.json)
+[![Phase 6 Status](https://img.shields.io/badge/Phase%206-FROZEN%20(Case%20B)-blueviolet.svg)](results/phase6_context_utility/manifest.json)
+[![Phase 7 Status](https://img.shields.io/badge/Phase%207-DATA%20COMPLETE%20(Gate%207D%3A%20FAIL)-critical.svg)](results/online_trajectory/manifest.json)
 
 ---
 
@@ -77,6 +78,7 @@ Optimized Scene State G_{t+1}
 | **Phase 5 (Gate 3)** | Does utility prediction improve budgeted selection? | **Substantial Gain at Tight Budgets**: At $10\%\text{–}20\%$ budget, TwoHeadMLP delivers nearly double the selection efficiency of error ranking ($+\text{92.6}\%\text{–}+108.0\%$). In multi-frame online SLAM, reduces optimization latency by $33.6\%$ vs heuristic knapsack and $47.7\%$ vs error-only while matching reconstruction PSNR. |
 | **Phase 6 (Gate 6A-6E)** | Does context alter marginal utility and candidate ranking? | **Magnitude Shifts, Candidate Priority Substantially Stable**: Screen-space co-visibility modulates utility sub-additively ($\rho(\text{IoU}, \|I\|) = 0.5357, p = 0.0048$). However, candidate rank remains substantially stable: $\bar{\rho}_{\text{rank}} = \mathbf{0.8916} \pm \mathbf{0.1104}$, Kendall $\bar{\tau} = \mathbf{0.8043}$, and Top-5 candidate overlap reaches $\mathbf{80.0\%}$ across 27 full-coverage groups. |
 | **Phase 6 (Case B)** | Does adaptive contextual re-ranking improve selection? | **No Statistically Significant Gain**: Oracle Context Advantage $\equiv +0.00 \times 10^{-5}$ ($Q_{\text{OracleCond}} \equiv Q_{\text{OracleStatic}}$); 5-seed online selection gain $Q(P_6) - Q(P_4)$ spans zero across all budgets (Wilcoxon $p \ge 0.7035$). Pointwise ranking already captures most of the observed candidate priority structure. |
+| **Phase 7 (Gate 7A-7G)** | Does utility-aware selection retain quality advantage over error-only in continuous recursive online reconstruction? | **Hypothesis Rejected (Gate 7D FAIL, Gate 7E PASS)**: In continuous 50-frame recursive trajectories across 5 seeds ($N=245$ frames), Ours reduces optimization latency vs Full by **93.6%** ($31.1\text{ ms}$ vs $488.3\text{ ms}$) and maintains bounded trajectory error without catastrophic runaway drift (Gate 7E PASS, max $|\Delta Q_{\text{err}}| = 0.1598\text{ dB}$, max $|\Delta Q_{\text{full}}| = 0.1834\text{ dB}$, min $\text{PSNR} = 5.24\text{ dB}$). However, Ours does not outperform Error-only top-K selection ($\Delta Q_{\text{OURS-ERROR}} = -0.0184\text{ dB}$, 95% bootstrap CI $[-0.0252, -0.0122]\text{ dB}$, frame win rate $32.2\%$, seed Wilcoxon directional disadvantage $p_{\text{less}} = 0.0312$). Rigorous statistical validation protocol fully executed (Gate 7F PASS). |
 
 ---
 
@@ -98,12 +100,16 @@ Rather than claiming that contextual modeling enhances selection, our study **em
 
 ## 6. Limitations
 
-To maintain scientific integrity, four fundamental limitations are explicitly acknowledged:
+To maintain scientific integrity, five fundamental limitations and future directions are explicitly acknowledged:
 
 1. **Short-Horizon Oracle**: Counterfactual interventions evaluate short trial horizons ($M=5$ gradient steps). While computationally tractable for collecting thousands of ground-truth points, $U_i^\star$ reflects immediate local improvement rather than long-horizon trajectory dynamics over distant keyframes.
 2. **Non-Additivity & Submodularity Limits**: Direct measurements confirm severe sub-additivity ($\Delta Q(S) \neq \sum_i \Delta Q_i$, with $R_{add} \to 0.0048$ at $|S|=16$). Pointwise greedy selection relies on a linear additive proxy; rigorous combinatorial submodular guarantees require conditions that do not strictly hold in dense alpha-blended rendering.
 3. **Dataset & Scene Coverage**: Confirmatory experiments are evaluated on real indoor sequences from the TUM RGB-D benchmark (`tum_fr1_desk` and `tum_fr2_xyz`). Extrapolation to wide-baseline outdoor environments, dynamic scenes, or extreme viewpoint shifts remains to be characterized.
 4. **Systems Overhead vs Model Inference**: Profiling reveals an essential AI Systems insight: **neural model inference itself is negligible ($T_{\text{MLP}} \approx 1.12\text{ ms}$, $0.1\%$ of stage time), but state construction ($225.79\text{ ms}$), context extraction ($66.84\text{ ms}$), and adaptive selection ($76.36\text{ ms}$) dominate the pipeline.** State management and orchestration, rather than deep learning compute, are the primary bottlenecks in real-time execution.
+5. **Recursive Trajectory Compounding & Marginal vs. Long-Horizon Gap (Phase 7)**: Pointwise marginal utility evaluated under isolated trials (Phases 1–6) does not translate into a quality advantage over direct photometric error heuristics when states compound recursively ($G_{t+1} = \mathcal{U}(G_t, F_t, S_t)$). Direct error heuristics persistently target large residual regions, whereas greedy instantaneous utility $\hat{U}_i = \widehat{\Delta Q}_i / \hat{C}_i$ lacks temporal credit propagation. The observed quality gap suggests that explicit multi-frame temporal credit assignment and/or spatial continuity signals may be useful directions for improving continuous online selection.
+   - *Roadmap Candidate 1 (Temporal Credit Assignment)*: Formulate multi-frame temporal credit assignment across sliding windows to bridge instantaneous utility with continuous trajectory dynamics.
+   - *Roadmap Candidate 2 (Spatial Continuity Regularization)*: Regularize selection with co-visibility graph connectivity to preserve geometric coherence across camera motion.
+   - *Roadmap Candidate 3 (Phase 10 CUDA Kernel Fusion)*: Close the ~16 ms Python/autograd runtime gap between modeled scheduler budget ($B_{\text{sched}} \le 13.6\text{ ms}$) and actual wall-clock execution ($T_{\text{wall}} = 31.1\text{ ms}$).
 
 ---
 
@@ -128,13 +134,19 @@ Specifically, adaptive contextual selection increases the selection-stage latenc
 
 ## 8. Repository Structure & Single Source of Truth
 
-All experimental numbers, checkpoints, and reports in this repository adhere to a **Single Source of Truth** rooted in frozen artifacts:
+All experimental numbers, checkpoints, and reports in this repository adhere to an authoritative **Single Source of Truth** rooted in frozen artifacts and manifests:
 
-- **Manifest Single Source of Truth**: [`results/phase6_context_utility/manifest.json`](results/phase6_context_utility/manifest.json)
-- **Rank Stability Analysis**: [`results/phase6_context_utility/rank_stability_analysis.json`](results/phase6_context_utility/rank_stability_analysis.json)
-- **Ablation Ladder Summary**: [`results/phase6_context_utility/ablation/ablation_summary.json`](results/phase6_context_utility/ablation/ablation_summary.json)
-- **Oracle Gap & Regret**: [`results/phase6_context_utility/oracle_gap_and_regret.json`](results/phase6_context_utility/oracle_gap_and_regret.json)
-- **Runtime Breakdown**: [`results/phase6_context_utility/runtime_breakdown.json`](results/phase6_context_utility/runtime_breakdown.json)
+### Authoritative Decision Chain:
+$$\text{README.md} \longrightarrow \text{manifest.json} \longrightarrow \text{trajectory\_summary.md} \longrightarrow \text{trajectory\_results.json / per\_frame\_metrics.csv} \longrightarrow \text{Diagnostic Figures}$$
+
+- **Phase 7 Authoritative Manifest**: [`results/online_trajectory/manifest.json`](results/online_trajectory/manifest.json) (12 frozen artifacts verified by SHA-256)
+- **Phase 7 Trajectory Summary Report**: [`results/online_trajectory/trajectory_summary.md`](results/online_trajectory/trajectory_summary.md)
+- **Phase 7 Aggregated Results & CSV**: [`results/online_trajectory/trajectory_results.json`](results/online_trajectory/trajectory_results.json) & [`results/online_trajectory/per_frame_metrics.csv`](results/online_trajectory/per_frame_metrics.csv)
+- **Phase 6 Authoritative Manifest**: [`results/phase6_context_utility/manifest.json`](results/phase6_context_utility/manifest.json)
+- **Phase 6 Rank Stability Analysis**: [`results/phase6_context_utility/rank_stability_analysis.json`](results/phase6_context_utility/rank_stability_analysis.json)
+- **Phase 6 Ablation Ladder Summary**: [`results/phase6_context_utility/ablation/ablation_summary.json`](results/phase6_context_utility/ablation/ablation_summary.json)
+- **Phase 6 Oracle Gap & Regret**: [`results/phase6_context_utility/oracle_gap_and_regret.json`](results/phase6_context_utility/oracle_gap_and_regret.json)
+- **Phase 6 Runtime Breakdown**: [`results/phase6_context_utility/runtime_breakdown.json`](results/phase6_context_utility/runtime_breakdown.json)
 
 ```
 adaptive_3dgs/
@@ -154,7 +166,9 @@ adaptive_3dgs/
 │   ├── run_phase6_ablation.py      # Phase 6 8-variant architecture ablation ladder
 │   ├── run_phase6_oracle_gap.py    # Phase 6 5-policy oracle decomposition
 │   ├── run_phase6_selection.py     # Phase 6 Multi-seed budget & safety sweep
-│   └── run_phase6_runtime_profile.py   # Phase 6 Runtime profiling & latency breakdown
+│   ├── run_phase6_runtime_profile.py   # Phase 6 Runtime profiling & latency breakdown
+│   ├── run_phase7_online_trajectory.py # Phase 7 50-frame online trajectory validation
+│   └── export_phase7_summary.py    # Phase 7 Markdown report exporter & verifier
 ├── research/                       # Core algorithms & scientific modules
 │   ├── gaussian_model.py           # 3D Gaussian representation & state
 │   ├── oracle_utility.py           # Counterfactual intervention engine
@@ -169,13 +183,23 @@ adaptive_3dgs/
 ├── results/
 │   ├── learned_utility/            # Phase 4 evaluation tables & checkpoints
 │   ├── phase5_budget_selection/    # Phase 5 budget sweep & trajectory data
-│   └── phase6_context_utility/     # Phase 6 FROZEN authoritative artifacts
-│       ├── manifest.json           # Phase 6 Single Source of Truth
-│       ├── rank_stability_analysis.json # 27 exact groups, 100% pool coverage
-│       ├── oracle_gap_and_regret.json   # 5-policy oracle decomposition
-│       ├── runtime_breakdown.json       # T_P6 pipeline latency breakdown
-│       ├── ablation/               # 8-variant ablation ladder & checkpoints
-│       └── datasets/               # Context-centric conditional oracle dataset
+│   ├── phase6_context_utility/     # Phase 6 FROZEN authoritative artifacts
+│   │   ├── manifest.json           # Phase 6 Single Source of Truth
+│   │   ├── rank_stability_analysis.json # 27 exact groups, 100% pool coverage
+│   │   ├── oracle_gap_and_regret.json   # 5-policy oracle decomposition
+│   │   ├── runtime_breakdown.json       # T_P6 pipeline latency breakdown
+│   │   ├── ablation/               # 8-variant ablation ladder & checkpoints
+│   │   └── datasets/               # Context-centric conditional oracle dataset
+│   └── online_trajectory/          # Phase 7 FROZEN authoritative artifacts
+│       ├── manifest.json           # Phase 7 Single Source of Truth (12 artifacts SHA-256)
+│       ├── trajectory_summary.md   # Executive research report & empirical gate audit
+│       ├── trajectory_results.json # 5-seed aggregated metrics & statistical tests
+│       ├── per_frame_metrics.csv   # 245 frame transitions across 4 policies
+│       ├── fig8_quality_trajectory.png
+│       ├── fig9_delta_q.png
+│       ├── fig10_latency_trajectory.png
+│       ├── fig11_quality_latency.png
+│       └── seed_*.json             # Individual trajectory logs (seeds 42-46)
 └── tests/                          # Comprehensive test suite (417/417 PASS)
 ```
 
@@ -207,6 +231,15 @@ python3 experiments/run_phase6_selection.py --seeds 42 43 44 45 46
 python3 experiments/run_phase6_runtime_profile.py
 ```
 
+### Reproducing Authoritative Phase 7 Artifacts
+```bash
+# 1. Continuous 50-frame online trajectory evaluation (5 seeds, 4 policies)
+python3 experiments/run_phase7_online_trajectory.py --seeds 42 43 44 45 46 --frames 50
+
+# 2. Export summary report & verify checksums from raw results
+python3 experiments/export_phase7_summary.py
+```
+
 ---
 
 ## 10. Research Provenance & Frozen Integrity
@@ -215,6 +248,8 @@ Every scientific number in this repository can be reverse-traced to exact source
 
 $$\text{Reported Metric} \longrightarrow \text{Authoritative Artifact} \longrightarrow \text{Evaluation Script} \longrightarrow \text{Dataset Hash} \longrightarrow \text{Frozen Checkpoint} \longrightarrow \text{Git Commit}$$
 
-- **Authoritative Provenance**: `results/phase6_context_utility/manifest.json`
-- **Backbone Model Invariance**: Phase 4 checkpoint `two_head_mlp_seed_42.pt` SHA-256 hash verified bitwise immutable during all Phase 6 operations.
-- **Data Integrity**: Zero synthetic baseline defaulting; all rank stability metrics evaluate strictly on measured candidate vectors.
+- **Authoritative Provenances**:
+  - Phase 7 Online Trajectory: [`results/online_trajectory/manifest.json`](results/online_trajectory/manifest.json) (12 artifacts, bit-level identical reruns).
+  - Phase 6 Context Utility: [`results/phase6_context_utility/manifest.json`](results/phase6_context_utility/manifest.json).
+- **Backbone Model Invariance**: Phase 4 checkpoint `two_head_mlp_seed_42.pt` SHA-256 hash verified bitwise immutable during all downstream evaluations.
+- **Data Integrity**: Zero synthetic baseline defaulting; all trajectory and rank metrics evaluate strictly on measured candidate vectors. Raw seed results (`seed_42.json`–`seed_46.json`), `trajectory_results.json`, and `per_frame_metrics.csv` remain strictly frozen.

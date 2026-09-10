@@ -43,6 +43,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from scipy.stats import wilcoxon
 
+from experiments.export_phase7_summary import write_summary_report
+
 # Repository root
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
@@ -1083,13 +1085,20 @@ def main():
         json.dump(results_agg, f, indent=2)
     print(f">> Saved aggregated trajectory results to: {results_json_file}")
 
-    # Core benchmark artifacts complete
-    print(f">> Core trajectory benchmark artifacts saved.")
-    print(f">> To export markdown summary report: python -m experiments.export_phase7_summary")
+    # Generate Report
+    report_file = os.path.join(output_dir, "trajectory_summary.md")
+    write_summary_report(
+        results_agg=results_agg,
+        stats_agg=stats_agg,
+        adaptation_table=adaptation_table,
+        latency_table=latency_table,
+        output_file=report_file,
+    )
 
     # Generate Manifest
     manifest_files = [
         "trajectory_results.json",
+        "trajectory_summary.md",
         "per_frame_metrics.csv",
         "fig8_quality_trajectory.png",
         "fig9_delta_q.png",

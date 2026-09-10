@@ -32,6 +32,10 @@
       "sha256": "b8d582bd7c0f65ca249c3b6ced563d0717839ed603e2051d545bb7ebda58d0d1",
       "size_bytes": 12175
     },
+    "trajectory_summary.md": {
+      "sha256": "43fa6b7abb7618feaa06e404f8353e37481547ce4941e7ef40af7c3b7892822b",
+      "size_bytes": 14757
+    },
     "per_frame_metrics.csv": {
       "sha256": "531b4397b718f45a8b438e4c2f8719d5034221744a11c4fba471c3bd648a246b",
       "size_bytes": 169037
