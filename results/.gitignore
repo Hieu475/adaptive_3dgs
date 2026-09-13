@@ -26,3 +26,7 @@
 !phase6_context_utility/*.json
 !phase6_context_utility/**/*.json
 phase6_context_utility/ablation/*.pt
+!phase8_generalization/*.json
+!phase8_generalization/*.csv
+!phase8_generalization/*.md
+!phase8_generalization/figures/*.png

@@ -1,0 +1,171 @@
+{
+  "phase": 8,
+  "title": "Generalization / Zero-Shot Transfer",
+  "protocol_version": "1.0.0",
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "train_scenes": [
+    "tum_fr1_desk"
+  ],
+  "train_frame_range": [
+    0,
+    40
+  ],
+  "val_scenes": [
+    "tum_fr1_desk"
+  ],
+  "val_frame_range": [
+    41,
+    60
+  ],
+  "test_scenes": [
+    "tum_fr2_xyz"
+  ],
+  "transfer_levels": {
+    "in_domain": "tum_fr1_desk frames 41-60 (temporal holdout, same scene)",
+    "zero_shot": "tum_fr2_xyz (unseen scene, different camera/motion)"
+  },
+  "budgets": [
+    0.1,
+    0.2,
+    0.4,
+    0.6,
+    0.8
+  ],
+  "top_k_fractions": [
+    0.1,
+    0.2
+  ],
+  "checkpoint_pattern": "results/learned_utility/checkpoints/two_head_mlp_seed_{seed}.pt",
+  "normalizer_source": "results/learned_utility/normalization.json",
+  "model_in_features": 11,
+  "model_hidden_dim": 64,
+  "feature_schema": [
+    "rgb_error",
+    "depth_error",
+    "gradient_norm",
+    "visibility_count",
+    "influence_mass",
+    "position_drift",
+    "residual_drift_ema",
+    "uncertainty_var",
+    "projected_area",
+    "update_frequency",
+    "age"
+  ],
+  "oracle_config": {
+    "n_samples": 40,
+    "n_opt_steps": 5,
+    "w_rgb": 0.7,
+    "w_depth": 0.3,
+    "min_influence_pixels": 25
+  },
+  "confidence_level": 0.95,
+  "bootstrap_resamples": 1000,
+  "n_seeds": 5,
+  "baselines": [
+    "random",
+    "error_only",
+    "heuristic",
+    "learned",
+    "oracle"
+  ],
+  "gate_criteria": {
+    "Gate_8A_protocol_integrity": {
+      "description": "Train/test strictly separated; checkpoint frozen; normalizer fit on train only; no test leakage",
+      "type": "checklist",
+      "criteria": [
+        "train_test_separated",
+        "checkpoint_frozen",
+        "normalizer_train_only",
+        "no_test_leakage"
+      ]
+    },
+    "Gate_8B_zero_shot_prediction": {
+      "description": "Zero-shot prediction quality on unseen scene",
+      "type": "quantitative",
+      "primary_metric": "spearman_rho",
+      "pass_criterion": "rho_learned > rho_random AND rho_learned > 0",
+      "secondary_metrics": [
+        "ndcg_20pct",
+        "ose_20pct"
+      ],
+      "secondary_criterion": "ndcg_learned > ndcg_random",
+      "note": "If rho_learned <= 0, model has no zero-shot transfer signal"
+    },
+    "Gate_8C_zero_shot_selection": {
+      "description": "Budget selection quality on unseen scene",
+      "type": "quantitative",
+      "primary_metric": "realized_delta_q",
+      "pass_criterion": "delta_q_learned >= delta_q_error_only at majority of budgets",
+      "secondary_metrics": [
+        "regret",
+        "ose"
+      ],
+      "note": "Phase 7 found no advantage on in-domain; zero-shot may be worse"
+    },
+    "Gate_8D_transfer_robustness": {
+      "description": "Generalization gap measurement",
+      "type": "descriptive",
+      "metrics": [
+        "delta_rho = rho_in_domain - rho_zero_shot",
+        "delta_ndcg = ndcg_in_domain - ndcg_zero_shot",
+        "delta_ose = ose_in_domain - ose_zero_shot"
+      ],
+      "note": "No pass/fail \u2014 this is a measurement gate. Reports how much performance degrades under distribution shift."
+    }
+  },
+  "execution_stages": [
+    {
+      "stage": "A",
+      "name": "Utility Prediction",
+      "description": "Evaluate \u03c1, NDCG, OSE of frozen model on test scene",
+      "gate": "Gate_8B",
+      "required": true
+    },
+    {
+      "stage": "B",
+      "name": "Budget Selection",
+      "description": "Evaluate \u0394Q, regret at equal budgets on test scene",
+      "gate": "Gate_8C",
+      "required": true
+    },
+    {
+      "stage": "C",
+      "name": "Generalization Analysis",
+      "description": "Compute generalization gap metrics",
+      "gate": "Gate_8D",
+      "required": true
+    },
+    {
+      "stage": "D",
+      "name": "Online Transfer (Optional)",
+      "description": "Full online reconstruction on test scene",
+      "gate": null,
+      "required": false
+    }
+  ],
+  "output_dir": "results/phase8_generalization",
+  "freeze_checklist": [
+    "protocol frozen",
+    "checkpoint frozen",
+    "no leakage",
+    "prediction evaluation done",
+    "selection evaluation done",
+    "generalization gap reported",
+    "n=5 statistics",
+    "raw results saved",
+    "figures generated",
+    "manifest created",
+    "checksums computed",
+    "README updated",
+    "pytest passing",
+    "git diff --check clean",
+    "phase8-frozen tag created"
+  ]
+}

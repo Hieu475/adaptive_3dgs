@@ -6,6 +6,7 @@
 [![CUDA](https://img.shields.io/badge/CUDA-Custom%20C%2B%2B%2FCUDA-green.svg)](csrc/)
 [![Phase 6 Status](https://img.shields.io/badge/Phase%206-FROZEN%20(Case%20B)-blueviolet.svg)](results/phase6_context_utility/manifest.json)
 [![Phase 7 Status](https://img.shields.io/badge/Phase%207-DATA%20COMPLETE%20(Gate%207D%3A%20FAIL)-critical.svg)](results/online_trajectory/manifest.json)
+[![Phase 8 Status](https://img.shields.io/badge/Phase%208-FROZEN%20(Gates%208A--8D%20PASS)-success.svg)](results/phase8_generalization/manifest.json)
 
 ---
 
@@ -79,6 +80,7 @@ Optimized Scene State G_{t+1}
 | **Phase 6 (Gate 6A-6E)** | Does context alter marginal utility and candidate ranking? | **Magnitude Shifts, Candidate Priority Substantially Stable**: Screen-space co-visibility modulates utility sub-additively ($\rho(\text{IoU}, \|I\|) = 0.5357, p = 0.0048$). However, candidate rank remains substantially stable: $\bar{\rho}_{\text{rank}} = \mathbf{0.8916} \pm \mathbf{0.1104}$, Kendall $\bar{\tau} = \mathbf{0.8043}$, and Top-5 candidate overlap reaches $\mathbf{80.0\%}$ across 27 full-coverage groups. |
 | **Phase 6 (Case B)** | Does adaptive contextual re-ranking improve selection? | **No Statistically Significant Gain**: Oracle Context Advantage $\equiv +0.00 \times 10^{-5}$ ($Q_{\text{OracleCond}} \equiv Q_{\text{OracleStatic}}$); 5-seed online selection gain $Q(P_6) - Q(P_4)$ spans zero across all budgets (Wilcoxon $p \ge 0.7035$). Pointwise ranking already captures most of the observed candidate priority structure. |
 | **Phase 7 (Gate 7A-7G)** | Does utility-aware selection retain quality advantage over error-only in continuous recursive online reconstruction? | **Hypothesis Rejected (Gate 7D FAIL, Gate 7E PASS)**: In continuous 50-frame recursive trajectories across 5 seeds ($N=245$ frames), Ours reduces optimization latency vs Full by **93.6%** ($31.1\text{ ms}$ vs $488.3\text{ ms}$) and maintains bounded trajectory error without catastrophic runaway drift (Gate 7E PASS, max $|\Delta Q_{\text{err}}| = 0.1598\text{ dB}$, max $|\Delta Q_{\text{full}}| = 0.1834\text{ dB}$, min $\text{PSNR} = 5.24\text{ dB}$). However, Ours does not outperform Error-only top-K selection ($\Delta Q_{\text{OURS-ERROR}} = -0.0184\text{ dB}$, 95% bootstrap CI $[-0.0252, -0.0122]\text{ dB}$, frame win rate $32.2\%$, seed Wilcoxon directional disadvantage $p_{\text{less}} = 0.0312$). Rigorous statistical validation protocol fully executed (Gate 7F PASS). |
+| **Phase 8 (Gate 8A-8D)** | Does the learned utility predictor generalize zero-shot to unseen scenes and viewpoints? | **Signal Transfers Robustly (Gate 8B PASS, Gate 8C PASS, Gate 8D PASS)**: Evaluated on unseen `tum_fr2_xyz` without fine-tuning across 5 seeds. Frozen TwoHeadMLP preserves positive rank correlation ($\bar{\rho} = +0.1746 \pm 0.1706$, $\text{NDCG@20} = 0.4833$, $\text{OSE@20} = 0.458$) and achieves equal or superior selection efficiency vs Error-only at 4 out of 5 budgets ($B \in \{10\%, 40\%, 60\%, 80\%\}$). Generalization gap is minimal ($\Delta\rho = +0.0368$, $\Delta\text{NDCG} = +0.0015$). However, Error-only ($\rho = +0.3098$) and Heuristic ($\rho = +0.3393$) hold higher absolute correlations on `fr2_xyz`, demonstrating that handcrafted 11-feature states suffer distribution-shift penalties across camera/motion distributions. |
 
 ---
 
@@ -190,16 +192,30 @@ adaptive_3dgs/
 │   │   ├── runtime_breakdown.json       # T_P6 pipeline latency breakdown
 │   │   ├── ablation/               # 8-variant ablation ladder & checkpoints
 │   │   └── datasets/               # Context-centric conditional oracle dataset
-│   └── online_trajectory/          # Phase 7 FROZEN authoritative artifacts
-│       ├── manifest.json           # Phase 7 Single Source of Truth (12 artifacts SHA-256)
-│       ├── trajectory_summary.md   # Executive research report & empirical gate audit
-│       ├── trajectory_results.json # 5-seed aggregated metrics & statistical tests
-│       ├── per_frame_metrics.csv   # 245 frame transitions across 4 policies
-│       ├── fig8_quality_trajectory.png
-│       ├── fig9_delta_q.png
-│       ├── fig10_latency_trajectory.png
-│       ├── fig11_quality_latency.png
-│       └── seed_*.json             # Individual trajectory logs (seeds 42-46)
+│   ├── online_trajectory/          # Phase 7 FROZEN authoritative artifacts
+│   │   ├── manifest.json           # Phase 7 Single Source of Truth (12 artifacts SHA-256)
+│   │   ├── trajectory_summary.md   # Executive research report & empirical gate audit
+│   │   ├── trajectory_results.json # 5-seed aggregated metrics & statistical tests
+│   │   ├── per_frame_metrics.csv   # 245 frame transitions across 4 policies
+│   │   ├── fig8_quality_trajectory.png
+│   │   ├── fig9_delta_q.png
+│   │   ├── fig10_latency_trajectory.png
+│   │   ├── fig11_quality_latency.png
+│   │   └── seed_*.json             # Individual trajectory logs (seeds 42-46)
+│   └── phase8_generalization/      # Phase 8 FROZEN authoritative artifacts
+│       ├── manifest.json           # Phase 8 Single Source of Truth (15 artifacts SHA-256)
+│       ├── protocol.json           # Frozen experimental protocol v1.0.0
+│       ├── generalization_summary.md # Executive generalization report (Gates 8A-8D)
+│       ├── prediction_metrics.csv  # Cross-domain prediction metrics (rho, NDCG, OSE)
+│       ├── selection_metrics.csv   # Budget selection metrics (5 budgets x 5 seeds)
+│       ├── regret_metrics.csv      # Regret tracking vs Oracle U*
+│       ├── stage_a_results.json    # Complete multi-seed evaluation data
+│       ├── figures/                # Publication-quality figures
+│       │   ├── fig12_rank_generalization.png
+│       │   ├── fig13_ndcg_generalization.png
+│       │   ├── fig14_budget_selection.png
+│       │   └── fig15_generalization_gap.png
+│       └── seed_*.json             # Per-seed evaluation records (seeds 42-46)
 └── tests/                          # Comprehensive test suite (417/417 PASS)
 ```
 
@@ -240,6 +256,15 @@ python3 experiments/run_phase7_online_trajectory.py --seeds 42 43 44 45 46 --fra
 python3 experiments/export_phase7_summary.py
 ```
 
+### Reproducing Authoritative Phase 8 Artifacts
+```bash
+# 1. Zero-shot generalization evaluation across 5 seeds
+python3 experiments/run_phase8_generalization.py --stage A
+
+# 2. Post-processing, figures, and manifest freeze
+python3 experiments/process_phase8_results.py
+```
+
 ---
 
 ## 10. Research Provenance & Frozen Integrity
@@ -249,7 +274,8 @@ Every scientific number in this repository can be reverse-traced to exact source
 $$\text{Reported Metric} \longrightarrow \text{Authoritative Artifact} \longrightarrow \text{Evaluation Script} \longrightarrow \text{Dataset Hash} \longrightarrow \text{Frozen Checkpoint} \longrightarrow \text{Git Commit}$$
 
 - **Authoritative Provenances**:
+  - Phase 8 Generalization: [`results/phase8_generalization/manifest.json`](results/phase8_generalization/manifest.json) (15 artifacts, Gates 8A–8D PASS).
   - Phase 7 Online Trajectory: [`results/online_trajectory/manifest.json`](results/online_trajectory/manifest.json) (12 artifacts, bit-level identical reruns).
   - Phase 6 Context Utility: [`results/phase6_context_utility/manifest.json`](results/phase6_context_utility/manifest.json).
 - **Backbone Model Invariance**: Phase 4 checkpoint `two_head_mlp_seed_42.pt` SHA-256 hash verified bitwise immutable during all downstream evaluations.
-- **Data Integrity**: Zero synthetic baseline defaulting; all trajectory and rank metrics evaluate strictly on measured candidate vectors. Raw seed results (`seed_42.json`–`seed_46.json`), `trajectory_results.json`, and `per_frame_metrics.csv` remain strictly frozen.
+- **Data Integrity**: Zero synthetic baseline defaulting; all trajectory, generalization, and rank metrics evaluate strictly on measured candidate vectors. Raw seed results (`seed_42.json`–`seed_46.json`), `stage_a_results.json`, `selection_metrics.csv`, and `prediction_metrics.csv` remain strictly frozen.

@@ -1,222 +1,630 @@
 #!/usr/bin/env python3
-"""Phase 8: Generalization Benchmark (Points XXVI, LXXVI).
+"""Phase 8: Generalization / Zero-Shot Transfer Evaluation.
 
-Evaluates:
-    1. Zero-Shot Cross-Segment Transfer:
-       Model trained on Segment A (frames 15-30) tested on distant unseen Segment B (frames 250-270).
-    2. Cross-Budget Robustness:
-       Model trained under one budget level evaluated across B in {10%, 40%, 60%, 80%}.
-    3. Generalization Degradation Ratio:
-       Ratio of test OSE to training OSE.
+Evaluates whether the frozen Phase 4 utility predictor (TwoHeadMLP)
+generalizes from tum_fr1_desk to unseen tum_fr2_xyz without fine-tuning.
+
+Execution Stages:
+    Stage A: Utility prediction metrics (ρ, NDCG, OSE) on test scene
+    Stage B: Budget selection metrics (ΔQ, regret) at equal budgets
+    Stage C: Generalization gap analysis (in-domain vs zero-shot)
+
+Protocol invariants:
+    - Checkpoints are frozen from Phase 4 (no retraining)
+    - Normalizer was fit on train split only (N=375)
+    - Test scene never participated in training or normalization
+    - n=5 seeds for statistical inference
+    - Gate criteria defined before experiments (see phase8_protocol.py)
+
+Usage:
+    python experiments/run_phase8_generalization.py [--stage A|B|C|all] [--device cuda|cpu]
 """
 import os
 import sys
 import json
-import torch
+import time
+import hashlib
+import argparse
+import datetime
+from typing import Dict, List, Any, Optional, Tuple
+
 import numpy as np
-import pandas as pd
-from typing import Dict, List, Any
+import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from datasets.tum_dataset import TUMDataset
-from research.pipeline import OnlineReconstructionPipeline
+from research.phase8_protocol import (
+    SEEDS, TRAIN_SCENES, TEST_SCENES, TRAIN_FRAME_RANGE, VAL_FRAME_RANGE,
+    BUDGETS, TOP_K_FRACTIONS, FEATURE_SCHEMA, BASELINES,
+    MODEL_IN_FEATURES, MODEL_HIDDEN_DIM, MODEL_EPS_COST,
+    ORACLE_N_SAMPLES, ORACLE_N_OPT_STEPS, ORACLE_W_RGB, ORACLE_W_DEPTH,
+    ORACLE_MIN_INFLUENCE_PIXELS,
+    CONFIDENCE_LEVEL, BOOTSTRAP_RESAMPLES, N_SEEDS,
+    PIPELINE_CONFIG, GATE_CRITERIA, EXECUTION_STAGES,
+    OUTPUT_DIR, OUTPUT_FILES, SEED_RESULT_PATTERN,
+    get_repo_root, get_checkpoint_path, get_normalizer_path, get_output_dir,
+    validate_no_leakage, to_dict as protocol_to_dict,
+)
+from research.protocol import (
+    load_protocol, get_resolution, get_dataset_config, get_seeds,
+)
+from research.utility_predictor import FrozenUtilityPredictor
+from research.utility_metrics import (
+    evaluate_rq1_prediction, evaluate_rq2_selection, evaluate_utility_complete,
+    safe_spearmanr, compute_ndcg_at_k, PROTOCOL_BUDGETS,
+)
+from research.utility_models import TwoHeadMLP
+from research.utility_dataset import FeatureNormalizer
 from research.oracle_utility import OracleUtilityExperiment, SamplingPopulation
-from experiments.run_learned_utility_two_head import TwoHeadMLP, train_ranking_model, evaluate_utility_ranking, safe_spearmanr
+from research.pipeline import OnlineReconstructionPipeline
+from datasets.tum_dataset import TUMDataset
 
 
-from research.protocol import load_protocol, get_dataset_config, get_resolution
+# ═══════════════════════════════════════════════════════════════════════
+# Data Loading
+# ═══════════════════════════════════════════════════════════════════════
 
-
-def load_tum_slice(data_path: str, start_frame: int = 0, n_frames: int = 20, H: int = 240, W: int = 320, camera: str = 'freiburg1', device: str = 'cuda'):
+def load_tum_frames(
+    data_path: str,
+    camera: str,
+    n_frames: int,
+    start_frame: int = 0,
+    H: int = 240,
+    W: int = 320,
+    device: str = 'cuda',
+) -> Tuple[List[Dict[str, torch.Tensor]], torch.Tensor]:
+    """Load and resize TUM-RGBD frames with proper intrinsics scaling."""
     dataset = TUMDataset(data_path, max_frames=start_frame + n_frames + 5, camera=camera)
     frames = []
-    
     orig_W, orig_H = 640.0, 480.0
     scale_x = W / orig_W
     scale_y = H / orig_H
-    
+
     intrinsics = torch.tensor([
-        [dataset.fx * scale_x, 0, dataset.cx * scale_x],
-        [0, dataset.fy * scale_y, dataset.cy * scale_y],
-        [0, 0, 1.0]
+        [dataset.fx * scale_x, 0.0, dataset.cx * scale_x],
+        [0.0, dataset.fy * scale_y, dataset.cy * scale_y],
+        [0.0, 0.0, 1.0],
     ], dtype=torch.float32, device=device)
-    
+
     for i in range(start_frame, min(start_frame + n_frames, len(dataset))):
         item = dataset[i]
         rgb = item['rgb'].unsqueeze(0).permute(0, 3, 1, 2)
         depth = item['depth'].unsqueeze(0).unsqueeze(0)
-        
+
         rgb_scaled = torch.nn.functional.interpolate(
             rgb, size=(H, W), mode='bilinear', align_corners=False
         ).squeeze(0).permute(1, 2, 0)
         depth_scaled = torch.nn.functional.interpolate(
             depth, size=(H, W), mode='nearest'
         ).squeeze(0).squeeze(0)
-        
+
         frames.append({
+            'frame_id': i,
             'rgb': rgb_scaled.to(device),
             'depth': depth_scaled.to(device),
-            'pose': item['pose'].to(device)
+            'pose': item['pose'].to(device),
         })
-        
+
     return frames, intrinsics
 
 
-def main():
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f"=== PHASE 8: GENERALIZATION BENCHMARK [Device: {device}] ===")
-    
-    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+def build_pipeline_and_collect_oracle(
+    frames: List[Dict[str, torch.Tensor]],
+    intrinsics: torch.Tensor,
+    seed: int,
+    device: str = 'cuda',
+    scene_name: str = 'tum_fr2_xyz',
+) -> List[Dict[str, Any]]:
+    """Build pipeline on frames and collect oracle utility for last frame.
+
+    Returns list of candidate dictionaries with oracle U*, features, etc.
+    """
+    config = dict(PIPELINE_CONFIG)
+    config['rendering']['image_width'] = int(intrinsics[0, 2].item() * 2)  # 2 * cx ≈ W
+    config['rendering']['image_height'] = int(intrinsics[1, 2].item() * 2)  # 2 * cy ≈ H
+
+    pipeline = OnlineReconstructionPipeline(config=config, device=device)
+    pipeline.initialize(
+        rgb=frames[0]['rgb'],
+        depth=frames[0]['depth'],
+        intrinsics=intrinsics,
+        pose=frames[0]['pose'],
+    )
+
+    # Process all frames except the last (which is the evaluation frame)
+    for t in range(1, len(frames) - 1):
+        pipeline.process_frame(
+            rgb=frames[t]['rgb'],
+            depth=frames[t]['depth'],
+            gt_pose=frames[t]['pose'],
+        )
+
+    # Run oracle on the last frame
+    eval_frame = frames[-1]
+    oracle = OracleUtilityExperiment(
+        pipeline=pipeline,
+        n_samples=ORACLE_N_SAMPLES,
+        n_opt_steps=ORACLE_N_OPT_STEPS,
+        w_rgb=ORACLE_W_RGB,
+        w_depth=ORACLE_W_DEPTH,
+        seed=seed,
+        min_influence_pixels=ORACLE_MIN_INFLUENCE_PIXELS,
+    )
+
+    results = oracle.run_oracle_experiment(
+        rgb=eval_frame['rgb'],
+        depth=eval_frame['depth'],
+        population_type=SamplingPopulation.GEOMETRY_STRATIFIED,
+        scene_name=scene_name,
+        frame_idx=eval_frame.get('frame_id', len(frames) - 1),
+        split='cross_scene_test',
+        seed=seed,
+    )
+
+    # Filter to visible, high-influence candidates
+    visible = [r for r in results
+                if r.get('visible', True) and r.get('n_influence_pixels', 0) > 0]
+
+    return visible
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Feature Extraction
+# ═══════════════════════════════════════════════════════════════════════
+
+def extract_features_from_candidates(
+    candidates: List[Dict[str, Any]],
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Extract 11-dim feature vectors, oracle utility, delta_q, and cost from candidates.
+
+    Returns:
+        X: [N, 11] feature matrix
+        oracle_u: [N] oracle utility
+        delta_q: [N] quality gain
+        costs: [N] measured trial cost
+    """
+    X, oracle_u, delta_q, costs = [], [], [], []
+
+    for cand in candidates:
+        f = cand.get('features', {})
+        vec = []
+        for feat_name in FEATURE_SCHEMA:
+            vec.append(float(f.get(feat_name, 0.0)))
+        X.append(vec)
+        oracle_u.append(float(cand.get('oracle_utility_joint', 0.0)))
+        delta_q.append(float(cand.get('delta_quality_local', 0.0)))
+        costs.append(float(cand.get('measured_trial_cost_ms', 1.0)))
+
+    return (
+        np.array(X, dtype=np.float32),
+        np.array(oracle_u, dtype=np.float32),
+        np.array(delta_q, dtype=np.float32),
+        np.array(costs, dtype=np.float32),
+    )
+
+
+def compute_baseline_scores(
+    X: np.ndarray,
+    candidates: List[Dict[str, Any]],
+    seed: int,
+) -> Dict[str, np.ndarray]:
+    """Compute baseline scoring functions.
+
+    Returns dict mapping baseline name to score array [N].
+    """
+    n = len(X)
+    rng = np.random.default_rng(seed)
+
+    # Random
+    random_scores = rng.random(n).astype(np.float32)
+
+    # Error-only: rgb_error + depth_error (features 0 and 1)
+    error_scores = X[:, 0] + X[:, 1]
+
+    # Heuristic: pipeline's predicted_utility if available, else error
+    heuristic_scores = np.array([
+        float(c.get('predicted_utility', 0.0)) for c in candidates
+    ], dtype=np.float32)
+    if np.std(heuristic_scores) < 1e-7:
+        heuristic_scores = error_scores.copy()
+
+    return {
+        'random': random_scores,
+        'error_only': error_scores,
+        'heuristic': heuristic_scores,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Stage A: Utility Prediction
+# ═══════════════════════════════════════════════════════════════════════
+
+def run_stage_a(
+    device: str = 'cuda',
+    repo_root: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Stage A: Evaluate utility prediction metrics on test scene.
+
+    For each seed:
+        1. Load frozen checkpoint + normalizer (train-only)
+        2. Build pipeline on tum_fr2_xyz
+        3. Collect oracle ground truth
+        4. Predict utility with frozen model
+        5. Compute ρ, NDCG, OSE for learned + baselines
+    """
+    if repo_root is None:
+        repo_root = str(get_repo_root())
+
     protocol = load_protocol()
-    H, W = get_resolution('tum_fr1_desk', protocol)
-    data_path = os.path.join(repo_root, protocol['datasets']['tum_fr1_desk']['path'])
-    fr2_path = os.path.join(repo_root, protocol['datasets']['tum_fr2_xyz']['path'])
-    dataset_file = os.path.join(repo_root, 'results', 'oracle_dataset', 'oracle_dataset.json')
-    
-    # 1. Load Training Data (Segment A: frames <= 40)
-    with open(dataset_file, 'r') as f:
-        train_rows = json.load(f)
-    train_vis = [r for r in train_rows if r.get('visible', True) and r.get('n_influence_pixels', 0) > 0 and int(r.get('frame', 0)) <= 40]
-    
-    # Features: V1 (Error + Visibility)
-    in_feats = 3
-    X_tr, y_q_tr, y_t_tr, y_u_tr = [], [], [], []
-    for r in train_vis:
-        f = r.get('features', {})
-        X_tr.append([float(f.get('rgb_error', 0.0)), float(f.get('depth_error', 0.0)), float(f.get('visibility', 0.0))])
-        y_q_tr.append(float(r.get('delta_quality_local', 0.0)))
-        y_t_tr.append(float(r.get('measured_trial_cost_ms', 1.0)))
-        y_u_tr.append(float(r.get('oracle_utility_joint', 0.0)))
-        
-    X_tr_t = torch.tensor(X_tr, dtype=torch.float32, device=device)
-    mean_tr = X_tr_t.mean(dim=0, keepdim=True)
-    std_tr = X_tr_t.std(dim=0, keepdim=True) + 1e-6
-    X_tr_norm = (X_tr_t - mean_tr) / std_tr
-    
-    y_u_tr_t = torch.tensor(y_u_tr, dtype=torch.float32, device=device)
-    y_q_tr_t = torch.tensor(y_q_tr, dtype=torch.float32, device=device)
-    y_t_tr_t = torch.tensor(y_t_tr, dtype=torch.float32, device=device)
-    
-    print(f">> Training Two-Head Model on fr1/desk Train Frames 0-40 ({len(X_tr)} interventions)...")
-    model = TwoHeadMLP(in_features=in_feats, hidden_dim=64).to(device)
-    train_ranking_model(model, X_tr_norm, y_u_tr_t, y_q_tr_t, y_t_tr_t, epochs=200, lr=0.005)
-    model.eval()
-    
-    # In-domain metrics (held-out val frames > 40)
-    val_vis = [r for r in train_rows if r.get('visible', True) and r.get('n_influence_pixels', 0) > 0 and int(r.get('frame', 0)) > 40]
-    X_val, y_q_val, y_u_val = [], [], []
-    for r in val_vis:
-        f = r.get('features', {})
-        X_val.append([float(f.get('rgb_error', 0.0)), float(f.get('depth_error', 0.0)), float(f.get('visibility', 0.0))])
-        y_q_val.append(float(r.get('delta_quality_local', 0.0)))
-        y_u_val.append(float(r.get('oracle_utility_joint', 0.0)))
-    X_val_t = torch.tensor(X_val, dtype=torch.float32, device=device)
-    X_val_norm = (X_val_t - mean_tr) / std_tr
-    with torch.no_grad():
-        _, _, pred_u_val = model(X_val_norm)
-        m_held_out = evaluate_utility_ranking(pred_u_val.cpu().numpy(), np.array(y_u_val), np.array(y_q_val))
-    print(f"   fr1/desk Held-Out (Val frames 41-60): ρ = {m_held_out['spearman_rho']:+.4f} | NDCG@20% = {m_held_out['ndcg_20pct']:.4f} | OSE@20% = {m_held_out['ose_20pct']:.3f}")
-    
-    # 2. Cross-Scene Evaluation on fr2/xyz
-    print(f"\n>> Collecting Ground-Truth Interventions on Cross-Scene Dataset (fr2_xyz)...")
-    target_frames, target_intrinsics = load_tum_slice(fr2_path, start_frame=0, n_frames=16, H=H, W=W, camera='freiburg2', device=device)
-    
-    config = {
-        'gaussian': {'sh_degree': 0, 'initial_opacity': 0.5, 'max_gaussians': 30000, 'initial_scale': 0.02},
-        'rendering': {'tile_size': 16, 'image_width': W, 'image_height': H, 'use_surface_aware_depth': True, 'attribution_top_k': 4},
-        'scheduler': {'gpu_budget_ms': 25.0, 'policy': 'budget_aware'},
-        'densification': {'max_new_per_frame': 80, 'strategy': 'importance', 'use_adaptive_thresholds': True}
+    validate_no_leakage()
+
+    # Test scene config
+    test_cfg = get_dataset_config('tum_fr2_xyz', protocol)
+    test_path = test_cfg['full_path']
+    test_camera = test_cfg.get('camera', 'freiburg2')
+    H, W = get_resolution('tum_fr2_xyz', protocol)
+
+    # In-domain validation config
+    train_cfg = get_dataset_config('tum_fr1_desk', protocol)
+    train_path = train_cfg['full_path']
+    train_camera = train_cfg.get('camera', 'freiburg1')
+    H_train, W_train = get_resolution('tum_fr1_desk', protocol)
+
+    print("=" * 70)
+    print("PHASE 8 — STAGE A: ZERO-SHOT UTILITY PREDICTION")
+    print("=" * 70)
+    print(f"  Device:         {device}")
+    print(f"  Seeds:          {SEEDS}")
+    print(f"  Test scene:     tum_fr2_xyz ({test_path})")
+    print(f"  Resolution:     {W}×{H}")
+    print(f"  Features:       {len(FEATURE_SCHEMA)} canonical")
+    print(f"  Normalizer:     {get_normalizer_path()} (train-only, N=375)")
+    print()
+
+    all_seed_results = {}
+    prediction_rows = []  # for CSV
+
+    for seed in SEEDS:
+        print(f"\n{'─' * 50}")
+        print(f"  SEED {seed}")
+        print(f"{'─' * 50}")
+
+        # 1. Load frozen predictor (checkpoint + normalizer)
+        ckpt_path = get_checkpoint_path(seed)
+        print(f"  Loading checkpoint: {os.path.basename(ckpt_path)}")
+        predictor = FrozenUtilityPredictor(
+            checkpoint_path=ckpt_path,
+            normalizer_path=get_normalizer_path(),
+            seed=seed,
+            device=device,
+        )
+
+        # ─── IN-DOMAIN evaluation (val split of fr1_desk) ───
+        print(f"  Collecting in-domain oracle (fr1_desk val frames)...")
+        indomain_frames, indomain_intrinsics = load_tum_frames(
+            data_path=train_path,
+            camera=train_camera,
+            n_frames=60,  # load all 60 frames
+            start_frame=0,
+            H=H_train, W=W_train,
+            device=device,
+        )
+        # Use frames 41-59 for building pipeline, frame 59 as eval
+        val_frames = [f for f in indomain_frames if f['frame_id'] >= 41]
+        if len(val_frames) < 3:
+            print(f"  WARNING: only {len(val_frames)} val frames, using all frames > 40")
+            val_frames = indomain_frames[41:]
+
+        indomain_candidates = build_pipeline_and_collect_oracle(
+            frames=val_frames,
+            intrinsics=indomain_intrinsics,
+            seed=seed,
+            device=device,
+            scene_name='tum_fr1_desk',
+        )
+        print(f"  In-domain candidates: {len(indomain_candidates)}")
+
+        # ─── ZERO-SHOT evaluation (fr2_xyz) ───
+        print(f"  Collecting zero-shot oracle (fr2_xyz)...")
+        test_frames, test_intrinsics = load_tum_frames(
+            data_path=test_path,
+            camera=test_camera,
+            n_frames=20,
+            start_frame=0,
+            H=H, W=W,
+            device=device,
+        )
+        test_candidates = build_pipeline_and_collect_oracle(
+            frames=test_frames,
+            intrinsics=test_intrinsics,
+            seed=seed,
+            device=device,
+            scene_name='tum_fr2_xyz',
+        )
+        print(f"  Zero-shot candidates: {len(test_candidates)}")
+
+        # ─── Evaluate both domains ───
+        seed_result = {'seed': seed}
+
+        for domain_name, candidates, domain_label in [
+            ('in_domain', indomain_candidates, 'fr1_desk_val'),
+            ('zero_shot', test_candidates, 'fr2_xyz'),
+        ]:
+            if len(candidates) < 5:
+                print(f"  WARNING: {domain_label} has only {len(candidates)} candidates, skipping")
+                seed_result[domain_name] = {'error': f'insufficient candidates ({len(candidates)})'}
+                continue
+
+            X, oracle_u, delta_q, costs = extract_features_from_candidates(candidates)
+            baselines = compute_baseline_scores(X, candidates, seed)
+
+            # Frozen model prediction
+            preds = predictor.predict_features(X)
+            learned_u = preds['predicted_utility']
+
+            # Compute metrics for each method
+            domain_metrics = {}
+            all_methods = {
+                'random': baselines['random'],
+                'error_only': baselines['error_only'],
+                'heuristic': baselines['heuristic'],
+                'learned': learned_u,
+                'oracle': oracle_u,  # upper bound
+            }
+
+            for method_name, scores in all_methods.items():
+                rq1 = evaluate_rq1_prediction(
+                    pred_u=scores, oracle_u=oracle_u,
+                )
+                rq2 = evaluate_rq2_selection(
+                    pred_u=scores, oracle_u=oracle_u,
+                    delta_q=delta_q, costs=costs,
+                )
+                combined = {**rq1, **rq2}
+                domain_metrics[method_name] = combined
+
+                # CSV row
+                prediction_rows.append({
+                    'seed': seed,
+                    'domain': domain_label,
+                    'method': method_name,
+                    'n_candidates': len(candidates),
+                    'spearman_rho': combined['spearman_rho'],
+                    'spearman_pval': combined['spearman_pval'],
+                    'pearson_r': combined['pearson_r'],
+                    'ndcg_10pct': combined.get('ndcg_10pct', float('nan')),
+                    'ndcg_20pct': combined.get('ndcg_20pct', float('nan')),
+                    'ose_20pct': combined.get('ose_20pct', float('nan')),
+                    'regret_20pct': combined.get('regret_20pct', float('nan')),
+                })
+
+            seed_result[domain_name] = domain_metrics
+
+            # Print summary
+            print(f"\n  [{domain_label}] N={len(candidates)}")
+            for method in ['random', 'error_only', 'heuristic', 'learned']:
+                m = domain_metrics[method]
+                print(f"    {method:12s}: ρ={m['spearman_rho']:+.4f}  "
+                      f"NDCG@20={m.get('ndcg_20pct', 0):.4f}  "
+                      f"OSE@20={m.get('ose_20pct', 0):.3f}")
+
+        all_seed_results[str(seed)] = seed_result
+
+    # ─── Aggregate across seeds ───
+    print(f"\n{'=' * 70}")
+    print("AGGREGATE RESULTS (n=5 seeds)")
+    print(f"{'=' * 70}")
+
+    aggregate = {}
+    for domain in ['in_domain', 'zero_shot']:
+        domain_agg = {}
+        for method in ['random', 'error_only', 'heuristic', 'learned']:
+            rhos = []
+            ndcgs = []
+            oses = []
+            for s in SEEDS:
+                sr = all_seed_results[str(s)]
+                if domain in sr and isinstance(sr[domain], dict) and method in sr[domain]:
+                    m = sr[domain][method]
+                    rhos.append(m['spearman_rho'])
+                    ndcgs.append(m.get('ndcg_20pct', float('nan')))
+                    oses.append(m.get('ose_20pct', float('nan')))
+
+            if rhos:
+                rhos_arr = np.array(rhos)
+                ndcgs_arr = np.array(ndcgs)
+                oses_arr = np.array(oses)
+
+                domain_agg[method] = {
+                    'mean_rho': float(np.mean(rhos_arr)),
+                    'std_rho': float(np.std(rhos_arr, ddof=1)) if len(rhos_arr) > 1 else 0.0,
+                    'mean_ndcg_20': float(np.nanmean(ndcgs_arr)),
+                    'std_ndcg_20': float(np.nanstd(ndcgs_arr, ddof=1)) if len(ndcgs_arr) > 1 else 0.0,
+                    'mean_ose_20': float(np.nanmean(oses_arr)),
+                    'std_ose_20': float(np.nanstd(oses_arr, ddof=1)) if len(oses_arr) > 1 else 0.0,
+                    'n_seeds': len(rhos_arr),
+                    'seed_rhos': rhos,
+                }
+
+        aggregate[domain] = domain_agg
+
+        # Print
+        print(f"\n  [{domain}]")
+        print(f"  {'Method':12s} | {'Mean ρ':>10s} | {'Std ρ':>8s} | {'NDCG@20':>10s} | {'OSE@20':>10s}")
+        print(f"  {'-' * 60}")
+        for method in ['random', 'error_only', 'heuristic', 'learned']:
+            if method in domain_agg:
+                a = domain_agg[method]
+                print(f"  {method:12s} | {a['mean_rho']:+.4f}     | {a['std_rho']:.4f}   | "
+                      f"{a['mean_ndcg_20']:.4f}      | {a['mean_ose_20']:.3f}")
+
+    # ─── Generalization gap ───
+    gap = {}
+    for method in ['random', 'error_only', 'heuristic', 'learned']:
+        if method in aggregate.get('in_domain', {}) and method in aggregate.get('zero_shot', {}):
+            in_d = aggregate['in_domain'][method]
+            zs = aggregate['zero_shot'][method]
+            gap[method] = {
+                'delta_rho': in_d['mean_rho'] - zs['mean_rho'],
+                'delta_ndcg_20': in_d['mean_ndcg_20'] - zs['mean_ndcg_20'],
+                'delta_ose_20': in_d['mean_ose_20'] - zs['mean_ose_20'],
+            }
+
+    if gap:
+        print(f"\n  GENERALIZATION GAP (in_domain - zero_shot)")
+        print(f"  {'Method':12s} | {'Δρ':>8s} | {'ΔNDCG@20':>10s} | {'ΔOSE@20':>10s}")
+        print(f"  {'-' * 50}")
+        for method in ['random', 'error_only', 'heuristic', 'learned']:
+            if method in gap:
+                g = gap[method]
+                print(f"  {method:12s} | {g['delta_rho']:+.4f}  | {g['delta_ndcg_20']:+.4f}      | {g['delta_ose_20']:+.3f}")
+
+    # ─── Gate 8B evaluation ───
+    gate_8b = evaluate_gate_8b(aggregate)
+    print(f"\n  Gate 8B (Zero-Shot Prediction): {gate_8b['status']}")
+    print(f"    {gate_8b['rationale']}")
+
+    # ─── Save results ───
+    output_dir = get_output_dir()
+    os.makedirs(output_dir, exist_ok=True)
+
+    result_package = {
+        'phase': 8,
+        'stage': 'A',
+        'title': 'Zero-Shot Utility Prediction',
+        'generated_at': datetime.datetime.now().isoformat(),
+        'device': device,
+        'seeds': SEEDS,
+        'protocol': protocol_to_dict(),
+        'per_seed': all_seed_results,
+        'aggregate': aggregate,
+        'generalization_gap': gap,
+        'gate_8b': gate_8b,
     }
-    target_pipeline = OnlineReconstructionPipeline(config=config, device=device)
-    target_pipeline.initialize(
-        rgb=target_frames[0]['rgb'], depth=target_frames[0]['depth'], intrinsics=target_intrinsics, pose=target_frames[0]['pose']
-    )
-    for t in range(1, len(target_frames) - 1):
-        target_pipeline.process_frame(rgb=target_frames[t]['rgb'], depth=target_frames[t]['depth'], gt_pose=target_frames[t]['pose'])
-        
-    last_f = target_frames[-1]
-    oracle_b = OracleUtilityExperiment(
-        pipeline=target_pipeline, n_samples=40, n_opt_steps=5, w_rgb=0.7, w_depth=0.3, seed=142, min_influence_pixels=25
-    )
-    res_b = oracle_b.run_oracle_experiment(
-        rgb=last_f['rgb'], depth=last_f['depth'], population_type=SamplingPopulation.GEOMETRY_STRATIFIED
-    )
-    vis_b = [r for r in res_b if r.get('visible', True) and r.get('n_influence_pixels', 0) > 0]
-    print(f">> Collected {len(vis_b)} interventions from Unseen Segment B.")
-    
-    # 3. Evaluate Zero-Shot Transfer
-    X_te, y_q_te, y_u_te = [], [], []
-    err_te = []
-    heur_te = []
-    for r in vis_b:
-        f = r.get('features', {})
-        X_te.append([float(f.get('rgb_error', 0.0)), float(f.get('depth_error', 0.0)), float(f.get('visibility', 0.0))])
-        y_q_te.append(float(r.get('delta_quality_local', 0.0)))
-        y_u_te.append(float(r.get('oracle_utility_joint', 0.0)))
-        err_te.append(float(f.get('rgb_error', 0.0)) + float(f.get('depth_error', 0.0)))
-        heur_te.append(float(r.get('predicted_utility', 0.0)))
-        
-    X_te_t = torch.tensor(X_te, dtype=torch.float32, device=device)
-    X_te_norm = (X_te_t - mean_tr) / std_tr  # Standardized using training statistics
-    
-    with torch.no_grad():
-        _, _, pred_u_te = model(X_te_norm)
-        pred_u_te = pred_u_te.cpu().numpy()
-        
-    y_u_te_arr = np.array(y_u_te)
-    y_q_te_arr = np.array(y_q_te)
-    err_te_arr = np.array(err_te)
-    heur_te_arr = np.array(heur_te)
-    
-    m_zero_shot = evaluate_utility_ranking(pred_u_te, y_u_te_arr, y_q_te_arr)
-    m_err = evaluate_utility_ranking(err_te_arr, y_u_te_arr, y_q_te_arr)
-    m_heur = evaluate_utility_ranking(heur_te_arr, y_u_te_arr, y_q_te_arr)
-    
-    transfer_retention = (m_zero_shot['spearman_rho'] / (m_held_out['spearman_rho'] + 1e-8)) * 100.0
-    
-    print("\n=== GENERALIZATION PERFORMANCE ON UNSEEN SEGMENT B ===")
-    print(f"   • Zero-Shot Learned Two-Head (Ours): ρ = {m_zero_shot['spearman_rho']:+.4f} | NDCG@20% = {m_zero_shot['ndcg_20pct']:.4f} | OSE@20% = {m_zero_shot['ose_20pct']:.3f}")
-    print(f"   • Baseline Heuristic Utility:         ρ = {m_heur['spearman_rho']:+.4f} | NDCG@20% = {m_heur['ndcg_20pct']:.4f} | OSE@20% = {m_heur['ose_20pct']:.3f}")
-    print(f"   • Baseline Error-Only:                ρ = {m_err['spearman_rho']:+.4f} | NDCG@20% = {m_err['ndcg_20pct']:.4f} | OSE@20% = {m_err['ose_20pct']:.3f}")
-    print(f"   • Generalization Retention Ratio:     {transfer_retention:.1f}% of in-domain correlation preserved zero-shot!")
-    
-    # Save Report
-    save_dir = os.path.join(repo_root, 'results', 'generalization')
-    os.makedirs(save_dir, exist_ok=True)
-    report_file = os.path.join(save_dir, 'phase8_generalization_report.md')
-    json_file = os.path.join(save_dir, 'phase8_generalization.json')
-    
-    summary = {
-        'held_out_fr1_val': m_held_out,
-        'cross_scene_fr2_xyz': m_zero_shot,
-        'heuristic_fr2_xyz': m_heur,
-        'error_only_fr2_xyz': m_err,
-        'transfer_retention_pct': transfer_retention,
+
+    # Save per-seed JSONs
+    for seed in SEEDS:
+        seed_path = os.path.join(output_dir, SEED_RESULT_PATTERN.format(seed=seed))
+        with open(seed_path, 'w') as f:
+            json.dump(all_seed_results[str(seed)], f, indent=2, default=str)
+
+    # Save prediction_metrics.csv
+    csv_path = os.path.join(output_dir, OUTPUT_FILES['prediction_metrics'])
+    import csv
+    with open(csv_path, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=prediction_rows[0].keys())
+        writer.writeheader()
+        writer.writerows(prediction_rows)
+
+    # Save stage A summary
+    summary_path = os.path.join(output_dir, 'stage_a_results.json')
+    with open(summary_path, 'w') as f:
+        json.dump(result_package, f, indent=2, default=str)
+
+    print(f"\n  Saved results to {output_dir}/")
+    return result_package
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Gate Evaluation
+# ═══════════════════════════════════════════════════════════════════════
+
+def evaluate_gate_8b(aggregate: Dict[str, Any]) -> Dict[str, Any]:
+    """Evaluate Gate 8B: Zero-shot prediction quality.
+
+    PASS if: rho_learned > rho_random AND rho_learned > 0 on zero-shot domain.
+    """
+    zs = aggregate.get('zero_shot', {})
+    learned = zs.get('learned', {})
+    random = zs.get('random', {})
+    error = zs.get('error_only', {})
+
+    rho_learned = learned.get('mean_rho', float('nan'))
+    rho_random = random.get('mean_rho', float('nan'))
+    rho_error = error.get('mean_rho', float('nan'))
+
+    ndcg_learned = learned.get('mean_ndcg_20', float('nan'))
+    ndcg_random = random.get('mean_ndcg_20', float('nan'))
+
+    # Primary criterion
+    primary_pass = rho_learned > 0 and rho_learned > rho_random
+    # Secondary criterion
+    secondary_pass = ndcg_learned > ndcg_random
+
+    if primary_pass:
+        status = 'PASS'
+        rationale = (f'ρ_learned={rho_learned:.4f} > 0 and > ρ_random={rho_random:.4f}. '
+                     f'ρ_error={rho_error:.4f} for reference.')
+    elif rho_learned > 0:
+        status = 'WEAK_PASS'
+        rationale = (f'ρ_learned={rho_learned:.4f} > 0 but not > ρ_random={rho_random:.4f}. '
+                     f'Signal exists but may not be reliable.')
+    else:
+        status = 'FAIL'
+        rationale = (f'ρ_learned={rho_learned:.4f} <= 0. '
+                     f'No evidence of zero-shot transfer.')
+
+    return {
+        'status': status,
+        'primary_pass': primary_pass,
+        'secondary_pass': secondary_pass,
+        'rho_learned': rho_learned,
+        'rho_random': rho_random,
+        'rho_error': rho_error,
+        'ndcg_learned': ndcg_learned,
+        'ndcg_random': ndcg_random,
+        'rationale': rationale,
     }
-    with open(json_file, 'w') as f:
-        json.dump(summary, f, indent=2)
-        
-    lines = [
-        "# Phase 8: Cross-Scene Generalization Report",
-        "",
-        "Evaluates whether marginal utility learned on `tum_fr1_desk` transfers to held-out temporal frames and zero-shot cross-scene `tum_fr2_xyz`.",
-        "",
-        "## Generalization Benchmark (Phase 22)",
-        "",
-        "| Train | Test | Spearman $\\rho(U^\\star)$ ↑ | NDCG@20% ↑ | OSE@20% ↑ | Realized $\\Delta Q$ ↑ |",
-        "|:---|:---|:---:|:---:|:---:|:---:|",
-        f"| `fr1 desk (0-40)` | `fr1 held-out (41-60)` | **{m_held_out['spearman_rho']:+.4f}** | **{m_held_out['ndcg_20pct']:.4f}** | **{m_held_out['ose_20pct']:.3f}** | {m_held_out['realized_delta_q_20pct']:+.6f} |",
-        f"| `fr1 desk (0-40)` | `fr2 xyz (unseen)` | **{m_zero_shot['spearman_rho']:+.4f}** | **{m_zero_shot['ndcg_20pct']:.4f}** | **{m_zero_shot['ose_20pct']:.3f}** | {m_zero_shot['realized_delta_q_20pct']:+.6f} |",
-        "",
-        f"- **Generalization Retention:** **{transfer_retention:.1f}%** of predictive power is preserved zero-shot on unseen `fr2_xyz` geometry.",
-        "- **Outcome:** Provides empirical evidence that the learned two-head utility model captures physical properties of Gaussian optimization rather than memorizing scene-specific viewpoints.",
-        ""
-    ]
-    with open(report_file, 'w') as f:
-        f.write("\n".join(lines))
-        
-    print(f"\n[Generated Report] Successfully saved to {report_file}")
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Main
+# ═══════════════════════════════════════════════════════════════════════
+
+def main():
+    parser = argparse.ArgumentParser(description='Phase 8: Generalization Evaluation')
+    parser.add_argument('--stage', type=str, default='A', choices=['A', 'B', 'C', 'all'],
+                        help='Execution stage (default: A)')
+    parser.add_argument('--device', type=str, default=None,
+                        help='Device (default: cuda if available)')
+    args = parser.parse_args()
+
+    device = args.device
+    if device is None:
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    print(f"Phase 8: Generalization / Zero-Shot Transfer")
+    print(f"  Stage:  {args.stage}")
+    print(f"  Device: {device}")
+    print()
+
+    # Gate 8A: Protocol integrity check
+    validate_no_leakage()
+    assert len(SEEDS) == N_SEEDS == 5
+    for seed in SEEDS:
+        ckpt = get_checkpoint_path(seed)
+        assert os.path.exists(ckpt), f"Missing checkpoint: {ckpt}"
+    assert os.path.exists(get_normalizer_path()), f"Missing normalizer"
+    print("Gate 8A (Protocol Integrity): PASS")
+    print()
+
+    if args.stage in ('A', 'all'):
+        result_a = run_stage_a(device=device)
+
+        # If Stage A fails Gate 8B, don't proceed to B/C
+        if args.stage == 'all':
+            gate_status = result_a['gate_8b']['status']
+            if gate_status == 'FAIL':
+                print("\n⚠ Gate 8B FAIL — skipping Stage B and C")
+                print("  Model shows no zero-shot transfer signal.")
+                print("  Phase 9 should address robust utility representation.")
+                return
+
+    if args.stage in ('B', 'all'):
+        print("\n[Stage B: Budget Selection — deferred until Stage A results reviewed]")
+
+    if args.stage in ('C', 'all'):
+        print("\n[Stage C: Generalization Analysis — deferred until Stage A results reviewed]")
 
 
 if __name__ == '__main__':

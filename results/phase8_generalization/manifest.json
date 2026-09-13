@@ -1,0 +1,185 @@
+{
+  "phase": "Phase 8: Generalization / Zero-Shot Transfer",
+  "status": "frozen",
+  "generated_at": "2026-09-13T22:57:07.176541",
+  "protocol_version": "1.0.0",
+  "git_branch": "phase8-generalization",
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "train_scene": "tum_fr1_desk",
+  "test_scene": "tum_fr2_xyz",
+  "budgets": [
+    0.1,
+    0.2,
+    0.4,
+    0.6,
+    0.8
+  ],
+  "gates_status": {
+    "Gate_8A_protocol_integrity": "PASS",
+    "Gate_8B_zero_shot_prediction": "PASS",
+    "Gate_8C_zero_shot_selection": "PASS",
+    "Gate_8D_transfer_robustness": "PASS (Measurement Complete)"
+  },
+  "gate_8b_details": {
+    "status": "PASS",
+    "primary_pass": true,
+    "secondary_pass": true,
+    "rho_learned": 0.17455909943714826,
+    "rho_random": -0.07594746716697937,
+    "rho_error": 0.30983114446529086,
+    "ndcg_learned": 0.48331419186359365,
+    "ndcg_random": 0.3525766354510494,
+    "rationale": "\u03c1_learned=0.1746 > 0 and > \u03c1_random=-0.0759. \u03c1_error=0.3098 for reference."
+  },
+  "gate_8c_details": {
+    "status": "PASS",
+    "budgets_tested": [
+      0.1,
+      0.2,
+      0.4,
+      0.6,
+      0.8
+    ],
+    "budgets_passed": [
+      0.1,
+      0.4,
+      0.6,
+      0.8
+    ],
+    "pass_ratio": "4/5",
+    "criteria": "delta_q_learned >= delta_q_error_only at >= 3/5 budgets on tum_fr2_xyz",
+    "details": {
+      "10pct": {
+        "budget_fraction": 0.1,
+        "mean_delta_q_learned": 0.03847734238952398,
+        "std_delta_q_learned": 0.036117574201403435,
+        "mean_delta_q_error_only": 0.029549526795744897,
+        "std_delta_q_error_only": 0.026368864805831248,
+        "advantage": 0.008927815593779084,
+        "passed": true
+      },
+      "20pct": {
+        "budget_fraction": 0.2,
+        "mean_delta_q_learned": 0.06659816652536392,
+        "std_delta_q_learned": 0.03273593209198207,
+        "mean_delta_q_error_only": 0.06852974165230989,
+        "std_delta_q_error_only": 0.03917152973106461,
+        "advantage": -0.0019315751269459724,
+        "passed": false
+      },
+      "40pct": {
+        "budget_fraction": 0.4,
+        "mean_delta_q_learned": 0.15959929227828978,
+        "std_delta_q_learned": 0.043022562828555384,
+        "mean_delta_q_error_only": 0.12324903085827828,
+        "std_delta_q_error_only": 0.04930856315261509,
+        "advantage": 0.036350261420011507,
+        "passed": true
+      },
+      "60pct": {
+        "budget_fraction": 0.6,
+        "mean_delta_q_learned": 0.25520636439323424,
+        "std_delta_q_learned": 0.10604412671433085,
+        "mean_delta_q_error_only": 0.17824981808662416,
+        "std_delta_q_error_only": 0.043929759207159504,
+        "advantage": 0.07695654630661009,
+        "passed": true
+      },
+      "80pct": {
+        "budget_fraction": 0.8,
+        "mean_delta_q_learned": 0.312529656291008,
+        "std_delta_q_learned": 0.12598615974090355,
+        "mean_delta_q_error_only": 0.29640275835990904,
+        "std_delta_q_error_only": 0.08394048508502444,
+        "advantage": 0.01612689793109895,
+        "passed": true
+      }
+    },
+    "rationale": "Learned utility achieves delta_q >= error_only at 4/5 budgets (10%: +0.0090, 40%: +0.0364, 60%: +0.0770, 80%: +0.0161 on tum_fr2_xyz)."
+  },
+  "gate_8d_details": {
+    "status": "PASS (Measurement Complete)",
+    "in_domain_scene": "tum_fr1_desk_val",
+    "zero_shot_scene": "tum_fr2_xyz",
+    "learned_gap": {
+      "rho_in_domain": 0.2113320825515948,
+      "rho_zero_shot": 0.17455909943714826,
+      "delta_rho": 0.036772983114446545,
+      "ndcg_20_in_domain": 0.48483297080789534,
+      "ndcg_20_zero_shot": 0.48331419186359365,
+      "delta_ndcg_20": 0.0015187789443016908,
+      "ose_20_in_domain": 0.5081756820051085,
+      "ose_20_zero_shot": 0.4579904432569105,
+      "delta_ose_20": 0.050185238748198024
+    },
+    "findings": "Learned utility exhibits minimal degradation under distribution shift: delta_rho = +0.0368 (rho stays positive at +0.1746), delta_ndcg_20 = +0.0015, delta_ose_20 = +0.050. However, Error-only (rho=0.3098) and Heuristic (rho=0.3393) hold higher rank correlation on fr2_xyz, revealing an observable feature-shift penalty for the learned multi-feature estimator."
+  },
+  "artifacts": {
+    "protocol.json": {
+      "sha256": "970f5273791fceefed5bb0e51758f3dad77a02ef31abad599369e6b365d57f41",
+      "size_bytes": 4398
+    },
+    "generalization_summary.md": {
+      "sha256": "0c05608d8ae70f01159ba23f01376a51d92e18df055c25c46f9ae3151cb2c14a",
+      "size_bytes": 7651
+    },
+    "prediction_metrics.csv": {
+      "sha256": "33587b0e4a732ec47b85ff24115f82c23d5221a4567b7937ff45221b93b4c471",
+      "size_bytes": 7715
+    },
+    "selection_metrics.csv": {
+      "sha256": "ebdd39dd85857443a649fc68e62223ff861450d1bb29e2033ad126dba41266d0",
+      "size_bytes": 43253
+    },
+    "regret_metrics.csv": {
+      "sha256": "d637e40e259d03394a46ba0e1cb1f4dcfcdc7e122601b45c12536088aeba5ecb",
+      "size_bytes": 26738
+    },
+    "stage_a_results.json": {
+      "sha256": "c59e2d354f19008c74e0f441155d7f391994aa557ed801617a8f86ef26aeaa62",
+      "size_bytes": 151354
+    },
+    "seed_42.json": {
+      "sha256": "3c95017dbc6c6c834beefb9393e1f2dee24ff664eebaefd5477dd68efad7a0a1",
+      "size_bytes": 25945
+    },
+    "seed_43.json": {
+      "sha256": "0426fe04189b468918d211f0ea7b7c7ab0517dd3b0dbf1137f68bcfdb2b4e2f7",
+      "size_bytes": 25918
+    },
+    "seed_44.json": {
+      "sha256": "d6177db75531e2b3b2cca59bde6d6959e75d4fbea9f1b6bb1a6dbd1851bc18a7",
+      "size_bytes": 25914
+    },
+    "seed_45.json": {
+      "sha256": "b60bfcd6d2977aca4d81c059e42723d3ff14859db18218cd96b67365553f3071",
+      "size_bytes": 25842
+    },
+    "seed_46.json": {
+      "sha256": "aeda5ac9a4188fd20611f6eacc2e56a99b8bcf0663c4a33fe1f221134595ccda",
+      "size_bytes": 25934
+    },
+    "figures/fig12_rank_generalization.png": {
+      "sha256": "b261ec35c786ec9e3f0cae5832afa6361b3a75c10acd55f88a125e19a5db5e2f",
+      "size_bytes": 159542
+    },
+    "figures/fig13_ndcg_generalization.png": {
+      "sha256": "5ada57a24e3cc69c40c805e5b91036a185d4706ac3f85ff93787a556a2e93220",
+      "size_bytes": 461203
+    },
+    "figures/fig14_budget_selection.png": {
+      "sha256": "219f8d202062a4ea366fbfb6f930635e92e40ed55b36b9c3f6a2f80653b12689",
+      "size_bytes": 670036
+    },
+    "figures/fig15_generalization_gap.png": {
+      "sha256": "2f93e9014516480f66ed33795927f15b25b1be9e516113b15edb78b27a15b950",
+      "size_bytes": 150489
+    }
+  }
+}
