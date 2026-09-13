@@ -1,7 +1,7 @@
 {
   "phase": "Phase 8: Generalization / Zero-Shot Transfer",
   "status": "frozen",
-  "generated_at": "2026-09-13T22:57:07.176541",
+  "generated_at": "2026-09-13T23:30:37.078685",
   "protocol_version": "1.0.0",
   "git_branch": "phase8-generalization",
   "seeds": [
@@ -24,7 +24,7 @@
     "Gate_8A_protocol_integrity": "PASS",
     "Gate_8B_zero_shot_prediction": "PASS",
     "Gate_8C_zero_shot_selection": "PASS",
-    "Gate_8D_transfer_robustness": "PASS (Measurement Complete)"
+    "Gate_8D_transfer_robustness": "PASS (Descriptive Transfer Measurement Complete)"
   },
   "gate_8b_details": {
     "status": "PASS",
@@ -104,7 +104,8 @@
     "rationale": "Learned utility achieves delta_q >= error_only at 4/5 budgets (10%: +0.0090, 40%: +0.0364, 60%: +0.0770, 80%: +0.0161 on tum_fr2_xyz)."
   },
   "gate_8d_details": {
-    "status": "PASS (Measurement Complete)",
+    "status": "PASS (Descriptive Transfer Measurement Complete)",
+    "type": "descriptive transfer measurement",
     "in_domain_scene": "tum_fr1_desk_val",
     "zero_shot_scene": "tum_fr2_xyz",
     "learned_gap": {
@@ -118,7 +119,7 @@
       "ose_20_zero_shot": 0.4579904432569105,
       "delta_ose_20": 0.050185238748198024
     },
-    "findings": "Learned utility exhibits minimal degradation under distribution shift: delta_rho = +0.0368 (rho stays positive at +0.1746), delta_ndcg_20 = +0.0015, delta_ose_20 = +0.050. However, Error-only (rho=0.3098) and Heuristic (rho=0.3393) hold higher rank correlation on fr2_xyz, revealing an observable feature-shift penalty for the learned multi-feature estimator."
+    "findings": "Descriptive transfer measurement on unseen target tum_fr2_xyz: Learned utility exhibits minimal degradation under distribution shift: delta_rho = +0.0368 (rho stays positive at +0.1746), delta_ndcg_20 = +0.0015, delta_ose_20 = +0.050. However, Error-only (rho=0.3098) and Heuristic (rho=0.3393) hold higher rank correlation on fr2_xyz, revealing an observable feature-shift penalty for the learned multi-feature estimator."
   },
   "artifacts": {
     "protocol.json": {
@@ -126,8 +127,8 @@
       "size_bytes": 4398
     },
     "generalization_summary.md": {
-      "sha256": "0c05608d8ae70f01159ba23f01376a51d92e18df055c25c46f9ae3151cb2c14a",
-      "size_bytes": 7651
+      "sha256": "bf8651be74dcd0e20e2dcc2ba6dde3f69602fa3e360708114e24c69c643f3a62",
+      "size_bytes": 7846
     },
     "prediction_metrics.csv": {
       "sha256": "33587b0e4a732ec47b85ff24115f82c23d5221a4567b7937ff45221b93b4c471",

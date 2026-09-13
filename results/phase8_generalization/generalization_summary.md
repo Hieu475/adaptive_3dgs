@@ -1,8 +1,8 @@
 # Phase 8: Generalization & Zero-Shot Transfer Report
 
-**Phase Status:** COMPLETE & FROZEN  
-**Generated at:** 2026-09-13T22:57:07.174371  
-**Protocol Version:** 1.0.0 (Frozen)  
+**Phase Status:** COMPLETE & FROZEN
+**Generated at:** 2026-09-13T23:30:37.076299
+**Protocol Version:** 1.0.0 (Frozen)
 **Primary Objective:** Evaluate whether Gaussian marginal utility learned on `tum_fr1_desk` transfers zero-shot to an unseen scene (`tum_fr2_xyz`) without fine-tuning.
 
 ---
@@ -14,30 +14,30 @@
 | **Gate 8A** | Protocol Integrity | Checklist | **PASS** | Train/Test strictly separated; Frozen Phase 4 checkpoint (`N=375`); Train-only normalizer. |
 | **Gate 8B** | Zero-Shot Prediction | Quantitative | **PASS** | Zero-shot $\bar{\rho}_{\mathrm{learned}} = +0.1746 > 0$ and $> \rho_{\mathrm{random}} (-0.0759)$. |
 | **Gate 8C** | Zero-Shot Budget Selection | Quantitative | **PASS** | Realized $\Delta Q_{\mathrm{learned}} \ge \Delta Q_{\mathrm{error\_only}}$ at **4/5** budgets ($B \in \{10\%, 40\%, 60\%, 80\%\}$). |
-| **Gate 8D** | Transfer Robustness | Descriptive | **PASS (Measurement Complete)** | Minimal drop: $\Delta\rho = +0.0368$, $\Delta\mathrm{NDCG}@20 = +0.0015$, $\Delta\mathrm{OSE}@20 = +0.050$. |
+| **Gate 8D** | Transfer Robustness | Descriptive | **PASS (Descriptive Transfer Measurement Complete)** | Minimal drop: $\Delta\rho = +0.0368$, $\Delta\mathrm{NDCG}@20 = +0.0015$, $\Delta\mathrm{OSE}@20 = +0.050$. |
 
 > [!NOTE]
 > **Scientific Finding (Phase 8 Dual-Nature Transfer):**
-> 1. **Signal Generalization Confirmed (Gate 8B PASS):** The frozen Phase 4 TwoHeadMLP preserves positive rank correlation ($\bar{\rho} = +0.1746 \pm 0.1706$) and non-trivial selection power ($\mathrm{NDCG}@20 = 0.4833$, $\mathrm{OSE}@20 = 0.458$) on `tum_fr2_xyz` without any retraining or domain adaptation.
-> 2. **Selection Quality Advantage Maintained (Gate 8C PASS):** At equal compute budgets, Learned utility selects candidates that achieve higher or equal realized $\Delta Q$ than Error-Only at 4 out of 5 budgets (10%, 40%, 60%, 80%).
-> 3. **The Heuristic Baseline Paradox:** While Learned utility transfers robustly (generalization gap $\Delta\rho = +0.0368$), Error-Only ($\rho = +0.3098$) and Heuristic ($\rho = +0.3393$) show higher absolute correlations on `fr2_xyz` than Learned. This reveals that the 11-feature state representation suffers a feature-shift penalty across camera/motion distributions, whereas simple photometric/geometric residuals remain scale-invariant.
+> 1. **Zero-Shot Transferable Utility Signal (Gate 8B PASS):** The frozen Phase 4 TwoHeadMLP preserves positive rank correlation ($\bar{\rho} = +0.1746 \pm 0.1706$, 95% CI: [0.0250, 0.3241]) and non-trivial selection power ($\mathrm{NDCG}@20 = 0.4833$, $\mathrm{OSE}@20 = 0.458$) on `tum_fr2_xyz` without fine-tuning or domain adaptation (Wilcoxon vs Random $p = 0.0625$).
+> 2. **Selection Quality Directional Parity/Advantage (Gate 8C PASS):** Under equal compute budgets ($k$ candidates optimized), Learned utility selects primitives achieving equal or superior realized $\Delta Q$ vs Error-Only at 4 out of 5 budgets (10%, 40%, 60%, 80%).
+> 3. **Heuristic Baseline Paradox & Feature-Shift Sensitivity:** While Learned utility transfers with minimal degradation (generalization gap $\Delta\rho = +0.0368$), simple Error-Only ($\rho = +0.3098$) and Heuristic ($\rho = +0.3393$) achieve higher absolute correlation on `fr2_xyz`. This establishes that the handcrafted 11-feature state vector suffers distribution shift across camera geometries, whereas unnormalized photometric errors remain scale-invariant.
 
 ---
 
 ## 2. Research Questions Resolution
 
 ### RQ8.1: Rank Correlation on Unseen Scene
-$$\boxed{ \hat{U}_i \text{ maintains positive rank correlation with } U_i^\star \text{ on unseen scene } (\bar{\rho} = +0.1746 > 0) }$$
-- **Seed breakdown (Zero-Shot $\rho$):**
+$$\boxed{ \hat{U}_i \text{ preserves transferable ranking signal on unseen scene } (\bar{\rho} = +0.1746 > 0) }$$
+- **Seed breakdown (Zero-Shot $\rho$, $n=5$):**
   - Seed 42: $\rho = +0.1118$
   - Seed 43: $\rho = +0.2379$
   - Seed 44: $\rho = -0.0921$
   - Seed 45: $\rho = +0.3388$
   - Seed 46: $\rho = +0.2764$
-- **Conclusion:** 4 out of 5 seeds exhibit positive correlation on unseen geometry. Seed 44 shows slight inversion ($-0.0921$) due to extreme depth variance on `fr2_xyz`.
+- **Statistical inference ($n=5$ seeds):** 4 out of 5 seeds exhibit positive correlation on unseen geometry. Seed 44 shows slight inversion ($-0.0921$) due to depth scale shift.
 
 ### RQ8.2: Budget Selection Efficacy on Unseen Scene
-$$\boxed{ \hat{U}_i \to S_B \text{ achieves equal or superior selection to Error-Only at 4/5 budgets} }$$
+$$\boxed{ \hat{U}_i \to S_B \text{ achieves equal or superior selection to Error-Only at 4/5 budgets under equal compute} }$$
 
 | Budget Level | Random $\Delta Q$ | Error-Only $\Delta Q$ | Heuristic $\Delta Q$ | **Learned $\Delta Q$ (Ours)** | Oracle $U^\star$ | Advantage vs Error |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -90,7 +90,7 @@ $$\text{Gap} = \text{Metric}_{\mathrm{in\text{-}domain}} - \text{Metric}_{\mathr
 
 ## 4. Scientific Conclusion & Implications for Phase 9
 
-1. **Learned Utility Demonstrates Legitimate Physics Learning:** The model does not merely memorize fr1/desk coordinates. It transfers zero-shot to fr2/xyz with $\bar\rho = +0.1746$ and achieves competitive or superior selection efficiency vs Error-Only.
+1. **Zero-Shot Transferable Utility Signal:** The learned utility predictor preserves non-zero selection-relevant signal under cross-scene distribution shift ($\bar\rho = +0.1746 > 0$, 95% CI: [+0.0250, +0.3241]) without fine-tuning, achieving directional parity/advantage vs Error-Only at 4/5 budgets.
 2. **Distribution Shift on Handcrafted State Factors:** The 11-feature state normalizer was calibrated on 375 training interventions of fr1. On fr2, differences in depth range and speed induce feature drift, blunting the model's advantage relative to error-only.
 3. **Recommendation for Phase 9:**
    - Rather than jumping straight into CUDA kernel optimization (Phase 10), Phase 9 should investigate **Robust Utility Representation**:

@@ -178,11 +178,12 @@ def main():
         )
     }
 
-    # Gate 8D: Transfer Robustness
+    # Gate 8D: Transfer Robustness (Descriptive Transfer Measurement)
     agg = stage_a["aggregate"]
     gap = stage_a["generalization_gap"]
     gate_8d = {
-        "status": "PASS (Measurement Complete)",
+        "status": "PASS (Descriptive Transfer Measurement Complete)",
+        "type": "descriptive transfer measurement",
         "in_domain_scene": "tum_fr1_desk_val",
         "zero_shot_scene": "tum_fr2_xyz",
         "learned_gap": {
@@ -197,6 +198,7 @@ def main():
             "delta_ose_20": gap["learned"]["delta_ose_20"],
         },
         "findings": (
+            "Descriptive transfer measurement on unseen target tum_fr2_xyz: "
             "Learned utility exhibits minimal degradation under distribution shift: "
             f"delta_rho = {gap['learned']['delta_rho']:+.4f} (rho stays positive at +0.1746), "
             f"delta_ndcg_20 = {gap['learned']['delta_ndcg_20']:+.4f}, delta_ose_20 = {gap['learned']['delta_ose_20']:+.3f}. "
@@ -404,9 +406,9 @@ def main():
     lines = [
         "# Phase 8: Generalization & Zero-Shot Transfer Report",
         "",
-        "**Phase Status:** COMPLETE & FROZEN  ",
-        f"**Generated at:** {datetime.datetime.now().isoformat()}  ",
-        "**Protocol Version:** 1.0.0 (Frozen)  ",
+        "**Phase Status:** COMPLETE & FROZEN",
+        f"**Generated at:** {datetime.datetime.now().isoformat()}",
+        "**Protocol Version:** 1.0.0 (Frozen)",
         "**Primary Objective:** Evaluate whether Gaussian marginal utility learned on `tum_fr1_desk` transfers zero-shot to an unseen scene (`tum_fr2_xyz`) without fine-tuning.",
         "",
         "---",
@@ -422,26 +424,26 @@ def main():
         "",
         "> [!NOTE]",
         "> **Scientific Finding (Phase 8 Dual-Nature Transfer):**",
-        f"> 1. **Signal Generalization Confirmed (Gate 8B PASS):** The frozen Phase 4 TwoHeadMLP preserves positive rank correlation ($\\bar{{\\rho}} = {zs_lrn_rho:+.4f} \\pm {agg['zero_shot']['learned']['std_rho']:.4f}$) and non-trivial selection power ($\\mathrm{{NDCG}}@20 = {agg['zero_shot']['learned']['mean_ndcg_20']:.4f}$, $\\mathrm{{OSE}}@20 = {agg['zero_shot']['learned']['mean_ose_20']:.3f}$) on `tum_fr2_xyz` without any retraining or domain adaptation.",
-        "> 2. **Selection Quality Advantage Maintained (Gate 8C PASS):** At equal compute budgets, Learned utility selects candidates that achieve higher or equal realized $\\Delta Q$ than Error-Only at 4 out of 5 budgets (10%, 40%, 60%, 80%).",
-        f"> 3. **The Heuristic Baseline Paradox:** While Learned utility transfers robustly (generalization gap $\\Delta\\rho = {gap['learned']['delta_rho']:+.4f}$), Error-Only ($\\rho = {agg['zero_shot']['error_only']['mean_rho']:+.4f}$) and Heuristic ($\\rho = {agg['zero_shot']['heuristic']['mean_rho']:+.4f}$) show higher absolute correlations on `fr2_xyz` than Learned. This reveals that the 11-feature state representation suffers a feature-shift penalty across camera/motion distributions, whereas simple photometric/geometric residuals remain scale-invariant.",
+        f"> 1. **Zero-Shot Transferable Utility Signal (Gate 8B PASS):** The frozen Phase 4 TwoHeadMLP preserves positive rank correlation ($\\bar{{\\rho}} = {zs_lrn_rho:+.4f} \\pm {agg['zero_shot']['learned']['std_rho']:.4f}$, 95% CI: [{zs_lrn_rho-compute_ci95(agg['zero_shot']['learned']['seed_rhos']):.4f}, {zs_lrn_rho+compute_ci95(agg['zero_shot']['learned']['seed_rhos']):.4f}]) and non-trivial selection power ($\\mathrm{{NDCG}}@20 = {agg['zero_shot']['learned']['mean_ndcg_20']:.4f}$, $\\mathrm{{OSE}}@20 = {agg['zero_shot']['learned']['mean_ose_20']:.3f}$) on `tum_fr2_xyz` without fine-tuning or domain adaptation (Wilcoxon vs Random $p = 0.0625$).",
+        "> 2. **Selection Quality Directional Parity/Advantage (Gate 8C PASS):** Under equal compute budgets ($k$ candidates optimized), Learned utility selects primitives achieving equal or superior realized $\\Delta Q$ vs Error-Only at 4 out of 5 budgets (10%, 40%, 60%, 80%).",
+        f"> 3. **Heuristic Baseline Paradox & Feature-Shift Sensitivity:** While Learned utility transfers with minimal degradation (generalization gap $\\Delta\\rho = {gap['learned']['delta_rho']:+.4f}$), simple Error-Only ($\\rho = {agg['zero_shot']['error_only']['mean_rho']:+.4f}$) and Heuristic ($\\rho = {agg['zero_shot']['heuristic']['mean_rho']:+.4f}$) achieve higher absolute correlation on `fr2_xyz`. This establishes that the handcrafted 11-feature state vector suffers distribution shift across camera geometries, whereas unnormalized photometric errors remain scale-invariant.",
         "",
         "---",
         "",
         "## 2. Research Questions Resolution",
         "",
         "### RQ8.1: Rank Correlation on Unseen Scene",
-        f"$$\\boxed{{ \\hat{{U}}_i \\text{{ maintains positive rank correlation with }} U_i^\\star \\text{{ on unseen scene }} (\\bar{{\\rho}} = {zs_lrn_rho:+.4f} > 0) }}$$",
-        "- **Seed breakdown (Zero-Shot $\\rho$):**",
+        f"$$\\boxed{{ \\hat{{U}}_i \\text{{ preserves transferable ranking signal on unseen scene }} (\\bar{{\\rho}} = {zs_lrn_rho:+.4f} > 0) }}$$",
+        "- **Seed breakdown (Zero-Shot $\\rho$, $n=5$):**",
         f"  - Seed 42: $\\rho = {per_seed['42']['zero_shot']['learned']['spearman_rho']:+.4f}$",
         f"  - Seed 43: $\\rho = {per_seed['43']['zero_shot']['learned']['spearman_rho']:+.4f}$",
         f"  - Seed 44: $\\rho = {per_seed['44']['zero_shot']['learned']['spearman_rho']:+.4f}$",
         f"  - Seed 45: $\\rho = {per_seed['45']['zero_shot']['learned']['spearman_rho']:+.4f}$",
         f"  - Seed 46: $\\rho = {per_seed['46']['zero_shot']['learned']['spearman_rho']:+.4f}$",
-        "- **Conclusion:** 4 out of 5 seeds exhibit positive correlation on unseen geometry. Seed 44 shows slight inversion ($-0.0921$) due to extreme depth variance on `fr2_xyz`.",
+        "- **Statistical inference ($n=5$ seeds):** 4 out of 5 seeds exhibit positive correlation on unseen geometry. Seed 44 shows slight inversion ($-0.0921$) due to depth scale shift.",
         "",
         "### RQ8.2: Budget Selection Efficacy on Unseen Scene",
-        "$$\\boxed{ \\hat{U}_i \\to S_B \\text{ achieves equal or superior selection to Error-Only at 4/5 budgets} }$$",
+        "$$\\boxed{ \\hat{U}_i \\to S_B \\text{ achieves equal or superior selection to Error-Only at 4/5 budgets under equal compute} }$$",
         "",
         "| Budget Level | Random $\\Delta Q$ | Error-Only $\\Delta Q$ | Heuristic $\\Delta Q$ | **Learned $\\Delta Q$ (Ours)** | Oracle $U^\\star$ | Advantage vs Error |",
         "| :--- | :---: | :---: | :---: | :---: | :---: | :---: |",
@@ -499,7 +501,7 @@ def main():
         "",
         "## 4. Scientific Conclusion & Implications for Phase 9",
         "",
-        "1. **Learned Utility Demonstrates Legitimate Physics Learning:** The model does not merely memorize fr1/desk coordinates. It transfers zero-shot to fr2/xyz with $\\bar\\rho = +0.1746$ and achieves competitive or superior selection efficiency vs Error-Only.",
+        "1. **Zero-Shot Transferable Utility Signal:** The learned utility predictor preserves non-zero selection-relevant signal under cross-scene distribution shift ($\\bar\\rho = +0.1746 > 0$, 95% CI: [+0.0250, +0.3241]) without fine-tuning, achieving directional parity/advantage vs Error-Only at 4/5 budgets.",
         "2. **Distribution Shift on Handcrafted State Factors:** The 11-feature state normalizer was calibrated on 375 training interventions of fr1. On fr2, differences in depth range and speed induce feature drift, blunting the model's advantage relative to error-only.",
         "3. **Recommendation for Phase 9:**",
         "   - Rather than jumping straight into CUDA kernel optimization (Phase 10), Phase 9 should investigate **Robust Utility Representation**:",
