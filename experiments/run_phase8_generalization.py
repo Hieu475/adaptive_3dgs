@@ -578,53 +578,76 @@ def evaluate_gate_8b(aggregate: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Main
+# Main CLI
 # ═══════════════════════════════════════════════════════════════════════
 
 def main():
-    parser = argparse.ArgumentParser(description='Phase 8: Generalization Evaluation')
-    parser.add_argument('--stage', type=str, default='A', choices=['A', 'B', 'C', 'all'],
-                        help='Execution stage (default: A)')
+    parser = argparse.ArgumentParser(
+        description='Phase 8: Generalization / Zero-Shot Transfer Evaluation Pipeline',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Execution Workflow:
+  1. evaluate (Stage A):
+     Reconstructs tum_fr1_desk and tum_fr2_xyz pipelines, collects ground-truth
+     oracle utility U*, evaluates frozen Phase 4 TwoHeadMLP predictions and baselines
+     across n=5 seeds, and writes stage_a_results.json, seed_*.json, and prediction_metrics.csv.
+
+  2. process (Stage B/C & Freeze):
+     Aggregates selection and regret metrics across all 5 budgets, generates publication
+     figures (fig12-fig15), evaluates Gates 8A-8D, writes generalization_summary.md,
+     and computes SHA256 checksums in manifest.json.
+
+  3. all:
+     Executes evaluate followed by process.
+        """
+    )
+    parser.add_argument(
+        '--stage', type=str, default='evaluate',
+        choices=['evaluate', 'process', 'all', 'A'],
+        help="Stage to execute: 'evaluate' (or 'A', live GPU evaluation), 'process' (post-process & freeze), 'all' (both)"
+    )
     parser.add_argument('--device', type=str, default=None,
                         help='Device (default: cuda if available)')
     args = parser.parse_args()
+
+    # Map legacy alias
+    stage = 'evaluate' if args.stage == 'A' else args.stage
 
     device = args.device
     if device is None:
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    print(f"Phase 8: Generalization / Zero-Shot Transfer")
-    print(f"  Stage:  {args.stage}")
+    print("=" * 70)
+    print("PHASE 8: GENERALIZATION / ZERO-SHOT TRANSFER")
+    print(f"  Stage:  {stage} (raw arg: {args.stage})")
     print(f"  Device: {device}")
+    print("=" * 70)
     print()
 
     # Gate 8A: Protocol integrity check
     validate_no_leakage()
-    assert len(SEEDS) == N_SEEDS == 5
+    assert len(SEEDS) == N_SEEDS == 5, f"Expected {N_SEEDS} seeds, found {len(SEEDS)}"
     for seed in SEEDS:
         ckpt = get_checkpoint_path(seed)
         assert os.path.exists(ckpt), f"Missing checkpoint: {ckpt}"
-    assert os.path.exists(get_normalizer_path()), f"Missing normalizer"
+    assert os.path.exists(get_normalizer_path()), f"Missing normalizer: {get_normalizer_path()}"
     print("Gate 8A (Protocol Integrity): PASS")
     print()
 
-    if args.stage in ('A', 'all'):
+    if stage in ('evaluate', 'all'):
         result_a = run_stage_a(device=device)
+        gate_status = result_a['gate_8b']['status']
+        if gate_status == 'FAIL':
+            print("\n⚠ Gate 8B FAIL — model shows no zero-shot transfer signal.")
+            print("  Phase 9 should address robust utility representation.")
+            return
 
-        # If Stage A fails Gate 8B, don't proceed to B/C
-        if args.stage == 'all':
-            gate_status = result_a['gate_8b']['status']
-            if gate_status == 'FAIL':
-                print("\n⚠ Gate 8B FAIL — skipping Stage B and C")
-                print("  Model shows no zero-shot transfer signal.")
-                print("  Phase 9 should address robust utility representation.")
-                return
-
-    if args.stage in ('B', 'all'):
-        print("\n[Stage B: Budget Selection — deferred until Stage A results reviewed]")
-
-    if args.stage in ('C', 'all'):
-        print("\n[Stage C: Generalization Analysis — deferred until Stage A results reviewed]")
+    if stage in ('process', 'all'):
+        print("\n" + "=" * 70)
+        print("RUNNING POST-PROCESSING, FIGURES GENERATION & FREEZE MANIFEST")
+        print("=" * 70)
+        from experiments.process_phase8_results import main as process_main
+        process_main()
 
 
 if __name__ == '__main__':

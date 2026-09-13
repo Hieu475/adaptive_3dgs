@@ -80,7 +80,7 @@ Optimized Scene State G_{t+1}
 | **Phase 6 (Gate 6A-6E)** | Does context alter marginal utility and candidate ranking? | **Magnitude Shifts, Candidate Priority Substantially Stable**: Screen-space co-visibility modulates utility sub-additively ($\rho(\text{IoU}, \|I\|) = 0.5357, p = 0.0048$). However, candidate rank remains substantially stable: $\bar{\rho}_{\text{rank}} = \mathbf{0.8916} \pm \mathbf{0.1104}$, Kendall $\bar{\tau} = \mathbf{0.8043}$, and Top-5 candidate overlap reaches $\mathbf{80.0\%}$ across 27 full-coverage groups. |
 | **Phase 6 (Case B)** | Does adaptive contextual re-ranking improve selection? | **No Statistically Significant Gain**: Oracle Context Advantage $\equiv +0.00 \times 10^{-5}$ ($Q_{\text{OracleCond}} \equiv Q_{\text{OracleStatic}}$); 5-seed online selection gain $Q(P_6) - Q(P_4)$ spans zero across all budgets (Wilcoxon $p \ge 0.7035$). Pointwise ranking already captures most of the observed candidate priority structure. |
 | **Phase 7 (Gate 7A-7G)** | Does utility-aware selection retain quality advantage over error-only in continuous recursive online reconstruction? | **Hypothesis Rejected (Gate 7D FAIL, Gate 7E PASS)**: In continuous 50-frame recursive trajectories across 5 seeds ($N=245$ frames), Ours reduces optimization latency vs Full by **93.6%** ($31.1\text{ ms}$ vs $488.3\text{ ms}$) and maintains bounded trajectory error without catastrophic runaway drift (Gate 7E PASS, max $|\Delta Q_{\text{err}}| = 0.1598\text{ dB}$, max $|\Delta Q_{\text{full}}| = 0.1834\text{ dB}$, min $\text{PSNR} = 5.24\text{ dB}$). However, Ours does not outperform Error-only top-K selection ($\Delta Q_{\text{OURS-ERROR}} = -0.0184\text{ dB}$, 95% bootstrap CI $[-0.0252, -0.0122]\text{ dB}$, frame win rate $32.2\%$, seed Wilcoxon directional disadvantage $p_{\text{less}} = 0.0312$). Rigorous statistical validation protocol fully executed (Gate 7F PASS). |
-| **Phase 8 (Gate 8A-8D)** | Does the learned utility predictor generalize zero-shot to unseen scenes and viewpoints? | **Signal Transfers Robustly (Gate 8B PASS, Gate 8C PASS, Gate 8D PASS)**: Evaluated on unseen `tum_fr2_xyz` without fine-tuning across 5 seeds. Frozen TwoHeadMLP preserves positive rank correlation ($\bar{\rho} = +0.1746 \pm 0.1706$, $\text{NDCG@20} = 0.4833$, $\text{OSE@20} = 0.458$) and achieves equal or superior selection efficiency vs Error-only at 4 out of 5 budgets ($B \in \{10\%, 40\%, 60\%, 80\%\}$). Generalization gap is minimal ($\Delta\rho = +0.0368$, $\Delta\text{NDCG} = +0.0015$). However, Error-only ($\rho = +0.3098$) and Heuristic ($\rho = +0.3393$) hold higher absolute correlations on `fr2_xyz`, demonstrating that handcrafted 11-feature states suffer distribution-shift penalties across camera/motion distributions. |
+| **Phase 8 (Gate 8A-8D)** | Does the learned utility predictor generalize zero-shot to unseen scenes and viewpoints? | **Zero-Shot Transferable Signal Preserved (Gate 8B PASS, Gate 8C PASS, Gate 8D PASS)**: Evaluated on unseen `tum_fr2_xyz` without fine-tuning across 5 seeds. Frozen TwoHeadMLP preserves positive rank correlation ($\bar{\rho} = +0.1746 \pm 0.1706$, 95% CI: $[+0.0250, +0.3241]$, Wilcoxon vs Random $p = 0.0625$, $\text{NDCG@20} = 0.4833$, $\text{OSE@20} = 0.458$) and achieves higher mean realized $\Delta Q$ than Error-only at 4 out of 5 budgets ($B \in \{10\%, 40\%, 60\%, 80\%\}$). Measured generalization gap on this evaluated cross-scene transfer setting is small ($\Delta\rho = +0.0368$, $\Delta\text{NDCG} = +0.0015$). However, Error-only ($\rho = +0.3098$) and Heuristic ($\rho = +0.3393$) hold higher absolute rank correlations on `fr2_xyz`, demonstrating that handcrafted 11-feature state normalizers suffer distribution-shift penalties across differing camera motions and scene textures. |
 
 ---
 
@@ -258,11 +258,12 @@ python3 experiments/export_phase7_summary.py
 
 ### Reproducing Authoritative Phase 8 Artifacts
 ```bash
-# 1. Zero-shot generalization evaluation across 5 seeds
-python3 experiments/run_phase8_generalization.py --stage A
+# 1. Zero-shot generalization evaluation across 5 seeds (Stage A live GPU run)
+python3 experiments/run_phase8_generalization.py --stage evaluate
 
-# 2. Post-processing, figures, and manifest freeze
-python3 experiments/process_phase8_results.py
+# 2. Post-processing, figures generation, gate validation & freeze manifest
+python3 experiments/run_phase8_generalization.py --stage process
+# (Or run both stages end-to-end: python3 experiments/run_phase8_generalization.py --stage all)
 ```
 
 ---

@@ -1,7 +1,7 @@
 {
   "phase": "Phase 8: Generalization / Zero-Shot Transfer",
   "status": "frozen",
-  "generated_at": "2026-09-13T23:30:37.078685",
+  "generated_at": "2026-09-14T00:06:45.834640",
   "protocol_version": "1.0.0",
   "git_branch": "phase8-generalization",
   "seeds": [
@@ -127,7 +127,7 @@
       "size_bytes": 4398
     },
     "generalization_summary.md": {
-      "sha256": "bf8651be74dcd0e20e2dcc2ba6dde3f69602fa3e360708114e24c69c643f3a62",
+      "sha256": "d72cca88010ec2a0746dce842995f601bcebd2a7d8ff53df67d662e0ff308e27",
       "size_bytes": 7846
     },
     "prediction_metrics.csv": {
