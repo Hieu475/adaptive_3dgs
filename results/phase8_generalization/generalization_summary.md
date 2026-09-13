@@ -1,7 +1,7 @@
 # Phase 8: Generalization & Zero-Shot Transfer Report
 
 **Phase Status:** COMPLETE & FROZEN
-**Generated at:** 2026-09-14T00:06:45.832417
+**Generated at:** 2026-09-14T00:10:20.374570
 **Protocol Version:** 1.0.0 (Frozen)
 **Primary Objective:** Evaluate whether Gaussian marginal utility learned on `tum_fr1_desk` transfers zero-shot to an unseen scene (`tum_fr2_xyz`) without fine-tuning.
 
