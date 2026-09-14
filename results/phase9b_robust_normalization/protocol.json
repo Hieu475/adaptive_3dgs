@@ -1,0 +1,87 @@
+{
+  "phase": "Phase 9B: Robust Normalization",
+  "protocol_version": "1.0.0",
+  "status": "frozen",
+  "base_representation": "geometry_relative",
+  "normalization_variants": [
+    "A1_standard",
+    "A1_robust_static",
+    "A1_online_adaptive"
+  ],
+  "b2_ema_beta": 0.9,
+  "eps": 1e-06,
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "scenes": {
+    "train": "tum_fr1_desk",
+    "val": "tum_fr1_desk",
+    "test": "tum_fr2_xyz"
+  },
+  "model": {
+    "in_features": 11,
+    "hidden_dim": 64,
+    "eps_cost": 0.001
+  },
+  "training": {
+    "epochs": 200,
+    "learning_rate": 0.005,
+    "loss_lambda_rank": 1.0,
+    "loss_lambda_q": 0.25,
+    "loss_lambda_t": 0.125
+  },
+  "budgets": [
+    0.1,
+    0.2,
+    0.4,
+    0.6,
+    0.8
+  ],
+  "gate_criteria": {
+    "Gate_9B_1_protocol_integrity": {
+      "description": "A1 representation strictly fixed; no oracle leakage; train-only fitting for B0/B1; online unlabeled stats only for B2; identical splits, architecture, seeds, and loss.",
+      "type": "checklist",
+      "criteria": [
+        "fixed_a1_representation",
+        "no_oracle_leakage",
+        "no_future_frame_access",
+        "train_only_fit_b0_b1",
+        "unlabeled_online_stats_b2",
+        "same_training_protocol",
+        "frozen_model_weights_at_test"
+      ]
+    },
+    "Gate_9B_2_numerical_stability": {
+      "description": "Zero NaN/Inf across all variants and seeds; safe fallback for MAD=0 or std=0.",
+      "type": "quantitative",
+      "criteria": [
+        "no_nan_or_inf_in_features",
+        "no_nan_or_inf_in_predictions",
+        "all_5_seeds_converge",
+        "stable_mad_and_std_fallback"
+      ]
+    },
+    "Gate_9B_3_in_domain_recovery": {
+      "description": "In-domain recovery: rho_in_B >= rho_in_A1 - 0.05 (target: rho_in_B > rho_in_A1 = 0.1911).",
+      "type": "quantitative_decision",
+      "baseline_metric": "rho_in_A1 = 0.1911",
+      "margin": 0.05
+    },
+    "Gate_9B_4_transfer_preservation": {
+      "description": "Transfer robustness preserved: rho_zs_B >= rho_zs_A1 - 0.03 (A1 zero-shot rho = 0.2709).",
+      "type": "quantitative_decision",
+      "baseline_metric": "rho_zs_A1 = 0.2709",
+      "tolerance": 0.03
+    },
+    "Gate_9B_5_selection_protection": {
+      "description": "Selection quality maintained on unseen test scene: OSE@20_zs_B >= OSE@20_zs_A1 - 0.05 (A1 OSE = 0.560).",
+      "type": "quantitative_decision",
+      "baseline_metric": "ose_zs_A1 = 0.560",
+      "tolerance": 0.05
+    }
+  }
+}

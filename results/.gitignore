@@ -36,3 +36,8 @@ phase6_context_utility/ablation/*.pt
 !phase9a_scale_invariant/figures/*.png
 !phase9a_scale_invariant/eval_candidates_cache/*.json
 !phase9a_scale_invariant/normalizers/*.json
+!phase9b_robust_normalization/*.json
+!phase9b_robust_normalization/*.csv
+!phase9b_robust_normalization/*.md
+!phase9b_robust_normalization/figures/*.png
+!phase9b_robust_normalization/normalizers/*.json

@@ -1,0 +1,62 @@
+{
+  "normalizer_type": "RobustMADNormalizer",
+  "n_samples_fit": 375,
+  "eps": 1e-06,
+  "features": {
+    "rgb_error": {
+      "median": 0.28366386890411377,
+      "scale": 0.26219913363456726,
+      "raw_mad": 0.17685063183307648
+    },
+    "depth_error": {
+      "median": 0.9999951124191284,
+      "scale": 1.3088635206222534,
+      "raw_mad": 0.8828150033950806
+    },
+    "gradient_norm": {
+      "median": 3.8303277492523193,
+      "scale": 4.436455726623535,
+      "raw_mad": 2.9923439025878906
+    },
+    "visibility_count": {
+      "median": 63.0,
+      "scale": 32.61724853515625,
+      "raw_mad": 22.0
+    },
+    "influence_mass": {
+      "median": 6.818631172180176,
+      "scale": 4.904303550720215,
+      "raw_mad": 3.3079023361206055
+    },
+    "position_drift": {
+      "median": 0.0,
+      "scale": 1.0,
+      "raw_mad": 0.0
+    },
+    "residual_drift_ema": {
+      "median": 0.0,
+      "scale": 1.0,
+      "raw_mad": 0.0
+    },
+    "uncertainty_var": {
+      "median": 0.3584100008010864,
+      "scale": 0.16365943849086761,
+      "raw_mad": 0.11038661003112793
+    },
+    "projected_area": {
+      "median": 0.9999998807907104,
+      "scale": 0.7197763323783875,
+      "raw_mad": 0.48548173904418945
+    },
+    "update_frequency": {
+      "median": 0.0,
+      "scale": 1.0,
+      "raw_mad": 0.0
+    },
+    "age": {
+      "median": 0.0,
+      "scale": 1.0,
+      "raw_mad": 0.0
+    }
+  }
+}
