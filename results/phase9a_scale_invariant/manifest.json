@@ -1,7 +1,7 @@
 {
   "phase": "Phase 9A: Scale-Invariant Features",
   "status": "complete",
-  "generated_at": "2026-09-14T18:48:37.841423",
+  "generated_at": "2026-09-14T18:58:50.817882",
   "variants": [
     "raw",
     "geometry_relative",
@@ -151,7 +151,7 @@
     "generalization_gap.csv": "fd4368f8b7f15243852616422fa85dd478d9255809419f7f6f7627d77006240d",
     "protocol.json": "6c4438d4909ad88609fb1bb79469a382ecf8f4b81459553b72359ebd3396b7d2",
     "seed_43.json": "2f48b1363237e482ad7f034a8b5723f07fb1f6758169da46f16ebfea79aa09bd",
-    "summary.md": "f7ab9fd88fec12368075d73ba24bb8a7f1de4b92e23d27ee048cd52fb4c3cba4",
+    "summary.md": "583de4673c24585e413a50158c05114961de61329cc45a0cc68926987fb1490f",
     "selection_metrics.csv": "23f75d8e592aa86c0ba83586a7d090e0190c3457269ae1c04abb147cb62dcd0a",
     "seed_45.json": "26e489bee5f2c4c69a5360478c64a1c2b0dcafee8fe04b98eba25be05d84d3ff"
   }
