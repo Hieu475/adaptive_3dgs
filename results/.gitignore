@@ -30,3 +30,9 @@ phase6_context_utility/ablation/*.pt
 !phase8_generalization/*.csv
 !phase8_generalization/*.md
 !phase8_generalization/figures/*.png
+!phase9a_scale_invariant/*.json
+!phase9a_scale_invariant/*.csv
+!phase9a_scale_invariant/*.md
+!phase9a_scale_invariant/figures/*.png
+!phase9a_scale_invariant/eval_candidates_cache/*.json
+!phase9a_scale_invariant/normalizers/*.json

@@ -377,6 +377,11 @@ def train_phase9_model(
     )
     trainer = UtilityModelTrainer(config=training_cfg)
 
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
     model = TwoHeadMLP(
         in_features=MODEL_IN_FEATURES,
         hidden_dim=MODEL_HIDDEN_DIM,
@@ -480,8 +485,9 @@ def run_phase9a(
                 X, oracle_u, delta_q, costs = extract_features_from_candidates(cands)
                 baselines = compute_baseline_scores(X, cands, seed)
 
-                # Transform raw candidates with variant representation
-                Z = transform_features_array(X, variant=variant_norm)
+                # Transform raw candidates with variant representation (grouped by scene/frame)
+                cand_keys = [(c.get('scene', ''), c.get('frame', 0)) for c in cands]
+                Z = transform_grouped_features(X, cand_keys, variant=variant_norm)
                 # Standardize using train normalizer
                 Z_norm = normalizer.transform(Z)
 

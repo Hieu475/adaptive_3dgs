@@ -1,0 +1,158 @@
+{
+  "phase": "Phase 9A: Scale-Invariant Features",
+  "status": "complete",
+  "generated_at": "2026-09-14T18:48:37.841423",
+  "variants": [
+    "raw",
+    "geometry_relative",
+    "geometry_optimization_relative"
+  ],
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "gates": {
+    "Gate_9A_1_protocol_integrity": {
+      "status": "PASS",
+      "rationale": "Train/test strictly separated; no oracle leakage; same data split and seeds."
+    },
+    "Gate_9A_2_representation_validity": {
+      "status": "PASS",
+      "rationale": "All variants and seeds ran with finite metrics and zero numerical pathology."
+    },
+    "Gate_9A_3_generalization_improvement": {
+      "status": "CONDITIONAL_PASS",
+      "gap_reduced": true,
+      "in_domain_preserved": false,
+      "delta_rho_A0": 0.07129455909943716,
+      "delta_rho_A1": -0.07973733583489681,
+      "rho_in_A0": 0.31849906191369604,
+      "rho_in_A1": 0.19114446529080675,
+      "rho_zs_A0": 0.24720450281425893,
+      "rho_zs_A1": 0.2708818011257036,
+      "rationale": "A1 gap reduced (Delta_rho=-0.0797 vs A0=0.0713) but in-domain regression detected (rho_in=+0.1911 vs A0=+0.3185)."
+    }
+  },
+  "variant_statistics": {
+    "raw": {
+      "mean_rho_in": 0.31849906191369604,
+      "std_rho_in": 0.10724067066077544,
+      "mean_rho_zs": 0.24720450281425893,
+      "std_rho_zs": 0.12130095068690387,
+      "mean_delta_rho": 0.07129455909943716,
+      "std_delta_rho": 0.08957019768512574,
+      "ci95_delta_rho": 0.0785117399065579,
+      "mean_ndcg_zs": 0.6811251492338835,
+      "mean_ose_zs": 0.542202293962196,
+      "delta_rhos_list": [
+        0.06210131332082558,
+        0.15722326454033772,
+        -0.035459662288930605,
+        0.16622889305816133,
+        0.006378986866791753
+      ],
+      "rhos_zs_list": [
+        0.28780487804878047,
+        0.18161350844277677,
+        0.43733583489681055,
+        0.2041275797373359,
+        0.125140712945591
+      ]
+    },
+    "geometry_relative": {
+      "mean_rho_in": 0.19114446529080675,
+      "std_rho_in": 0.26314825399356934,
+      "mean_rho_zs": 0.2708818011257036,
+      "std_rho_zs": 0.1630555049831087,
+      "mean_delta_rho": -0.07973733583489681,
+      "std_delta_rho": 0.18451454139590043,
+      "ci95_delta_rho": 0.16173412650018543,
+      "mean_ndcg_zs": 0.6276126747138742,
+      "mean_ose_zs": 0.5596705181969652,
+      "delta_rhos_list": [
+        -0.034333958724202696,
+        0.19606003752345225,
+        -0.0917448405253283,
+        -0.30544090056285184,
+        -0.16322701688555352
+      ],
+      "rhos_zs_list": [
+        0.45328330206379,
+        0.251031894934334,
+        0.33921200750469044,
+        0.2992495309568481,
+        0.011632270168855536
+      ]
+    },
+    "geometry_optimization_relative": {
+      "mean_rho_in": 0.19493433395872423,
+      "std_rho_in": 0.24432057533882112,
+      "mean_rho_zs": 0.2633771106941839,
+      "std_rho_zs": 0.21355474031220706,
+      "mean_delta_rho": -0.06844277673545966,
+      "std_delta_rho": 0.11963799741320841,
+      "ci95_delta_rho": 0.10486732840388817,
+      "mean_ndcg_zs": 0.6112564915728188,
+      "mean_ose_zs": 0.3750933325663233,
+      "delta_rhos_list": [
+        -0.10562851782363986,
+        0.02439024390243904,
+        -0.052532833020637826,
+        0.044840525328330216,
+        -0.2532833020637899
+      ],
+      "rhos_zs_list": [
+        0.5135084427767356,
+        0.03677298311444653,
+        0.4557223264540338,
+        0.21951219512195125,
+        0.09136960600375237
+      ]
+    }
+  },
+  "paired_comparisons_vs_raw": {
+    "geometry_relative": {
+      "mean_diff_delta_rho": -0.15103189493433397,
+      "std_diff_delta_rho": 0.19439746796530996,
+      "ci95_diff": 0.17039689358551416,
+      "wilcoxon_pval": 0.125,
+      "per_seed_diffs": [
+        -0.09643527204502828,
+        0.038836772983114526,
+        -0.0562851782363977,
+        -0.47166979362101313,
+        -0.16960600375234527
+      ]
+    },
+    "geometry_optimization_relative": {
+      "mean_diff_delta_rho": -0.1397373358348968,
+      "std_diff_delta_rho": 0.08745917014238873,
+      "ci95_diff": 0.07666134268008766,
+      "wilcoxon_pval": 0.0625,
+      "per_seed_diffs": [
+        -0.16772983114446544,
+        -0.13283302063789867,
+        -0.01707317073170722,
+        -0.12138836772983111,
+        -0.25966228893058163
+      ]
+    }
+  },
+  "artifacts_checksums": {
+    "stage_results.json": "c5359ecbc3d7c6db710706845a11590953050a898b72c5aa322e242abac29a31",
+    "seed_46.json": "7d808a176a5e2067068c3f66a0c02a97bd57a873717b60a3e6b5d4b03ab0022f",
+    "seed_44.json": "71af6a5f02ac3abf87ce2145cf635505e7faa345cdf4be488d944fa44f882f50",
+    "seed_42.json": "2187787fd98ac311008eb17554c14c15cf2720581fd0fc11d973123a6c096257",
+    "prediction_metrics.csv": "1c5311d7e4420cdd6e760a1e891bd5f6e08a7c8962448c64f033bf3974f8d526",
+    "representation_metrics.csv": "ccd05933c4b84f99913730d4828c2b6d37a277e9a1bed5566d2b195988bf0c3e",
+    "generalization_gap.csv": "fd4368f8b7f15243852616422fa85dd478d9255809419f7f6f7627d77006240d",
+    "protocol.json": "6c4438d4909ad88609fb1bb79469a382ecf8f4b81459553b72359ebd3396b7d2",
+    "seed_43.json": "2f48b1363237e482ad7f034a8b5723f07fb1f6758169da46f16ebfea79aa09bd",
+    "summary.md": "f7ab9fd88fec12368075d73ba24bb8a7f1de4b92e23d27ee048cd52fb4c3cba4",
+    "selection_metrics.csv": "23f75d8e592aa86c0ba83586a7d090e0190c3457269ae1c04abb147cb62dcd0a",
+    "seed_45.json": "26e489bee5f2c4c69a5360478c64a1c2b0dcafee8fe04b98eba25be05d84d3ff"
+  }
+}

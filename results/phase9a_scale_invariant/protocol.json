@@ -1,0 +1,91 @@
+{
+  "phase": "Phase 9A: Scale-Invariant Features",
+  "primary_objective": "Make utility representation robust under distribution shift",
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "train_scene": "tum_fr1_desk",
+  "train_frame_range": [
+    0,
+    40
+  ],
+  "val_scene": "tum_fr1_desk",
+  "val_frame_range": [
+    41,
+    60
+  ],
+  "test_scene": "tum_fr2_xyz",
+  "budgets": [
+    0.1,
+    0.2,
+    0.4,
+    0.6,
+    0.8
+  ],
+  "top_k_fractions": [
+    0.1,
+    0.2
+  ],
+  "feature_variants": [
+    "raw",
+    "geometry_relative",
+    "geometry_optimization_relative"
+  ],
+  "canonical_feature_schema": [
+    "rgb_error",
+    "depth_error",
+    "gradient_norm",
+    "visibility_count",
+    "influence_mass",
+    "position_drift",
+    "residual_drift_ema",
+    "uncertainty_var",
+    "projected_area",
+    "update_frequency",
+    "age"
+  ],
+  "model_params": {
+    "in_features": 11,
+    "hidden_dim": 64,
+    "eps_cost": 0.001
+  },
+  "training_params": {
+    "epochs": 200,
+    "learning_rate": 0.005,
+    "lambda_rank": 1.0,
+    "lambda_q": 0.25,
+    "lambda_t": 0.125
+  },
+  "gate_criteria": {
+    "Gate_9A_1_protocol_integrity": {
+      "description": "Train/test strictly separated; no oracle leakage; same data split, loss, architecture, and seeds.",
+      "type": "checklist",
+      "criteria": [
+        "no_oracle_leakage",
+        "same_split_as_phase4",
+        "same_oracle_utility_definition",
+        "same_training_protocol",
+        "feature_transform_unlabeled_only"
+      ]
+    },
+    "Gate_9A_2_representation_validity": {
+      "description": "Representation validity across all 5 seeds without numerical pathology.",
+      "type": "quantitative",
+      "criteria": [
+        "no_nan_or_inf_in_features",
+        "all_5_seeds_converge",
+        "deterministic_transforms"
+      ]
+    },
+    "Gate_9A_3_generalization_improvement": {
+      "description": "Generalization gap reduction: Delta_rho_A1 < Delta_rho_A0 while preserving in-domain selection quality (regression protection).",
+      "type": "decision_matrix",
+      "primary_metric": "delta_rho = rho_in_domain - rho_zero_shot",
+      "regression_protection": "rho_in_domain_A1 >= rho_in_domain_A0 - 0.05"
+    }
+  }
+}
