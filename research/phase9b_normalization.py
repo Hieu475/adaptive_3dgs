@@ -60,9 +60,12 @@ class StandardNormalizer:
         if isinstance(X, torch.Tensor):
             X = X.detach().cpu().numpy()
         self.mean = np.mean(X, axis=0).astype(np.float32)
-        std_val = np.std(X, axis=0).astype(np.float32)
-        self.std = np.maximum(std_val, self.eps).astype(np.float32)
+        self.std = (np.std(X, axis=0) + self.eps).astype(np.float32)
         self.n_samples_fit = len(X)
+        return self
+
+    def reset(self) -> "StandardNormalizer":
+        """No-op for static normalizer to maintain uniform interface."""
         return self
 
     def transform(self, X: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:
@@ -180,6 +183,10 @@ class RobustMADNormalizer:
         self.n_samples_fit = n
         return self
 
+    def reset(self) -> "RobustMADNormalizer":
+        """No-op for static normalizer to maintain uniform interface."""
+        return self
+
     def transform(self, X: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:
         if self.median is None or self.scale is None:
             raise RuntimeError("RobustMADNormalizer must be fit before calling transform.")
@@ -280,8 +287,7 @@ class OnlineEMANormalizer:
             X = X.detach().cpu().numpy()
         X_clean = np.asarray(X, dtype=np.float32)
         self.mu_init = np.mean(X_clean, axis=0).astype(np.float32)
-        std_val = np.std(X_clean, axis=0).astype(np.float32)
-        self.sigma_init = np.maximum(std_val, self.eps).astype(np.float32)
+        self.sigma_init = (np.std(X_clean, axis=0) + self.eps).astype(np.float32)
         self.n_samples_fit = len(X_clean)
         self.reset()
         return self

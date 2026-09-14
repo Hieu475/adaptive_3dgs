@@ -254,6 +254,10 @@ def evaluate_temporal_stability(
 ) -> List[Dict[str, Any]]:
     """Run sequential frame normalization on evaluation scenes to track stability and latency."""
     raw_dataset = load_canonical_oracle_dataset()
+    train_raw = raw_dataset.get_split("train")
+    train_keys = [(m.scene, m.frame) for m in train_raw.metadata]
+    Z_train = transform_grouped_features(train_raw.X_np, train_keys, variant=BASE_REPRESENTATION)
+
     val_raw = raw_dataset.get_split("validation")
     val_keys = [(m.scene, m.frame) for m in val_raw.metadata]
     Z_val = transform_grouped_features(val_raw.X_np, val_keys, variant=BASE_REPRESENTATION)
@@ -264,7 +268,8 @@ def evaluate_temporal_stability(
     stability_rows = []
     for var in NORMALIZATION_VARIANTS:
         normalizer = create_normalizer(var, eps=EPS, beta=B2_EMA_BETA)
-        normalizer.fit(Z_val)  # reference fit
+        normalizer.fit(Z_train)
+        normalizer.reset()
 
         for step, fr in enumerate(unique_frames):
             indices = [i for i, m in enumerate(val_raw.metadata) if m.frame == fr]
@@ -381,17 +386,33 @@ def run_phase9b(
                 # 2. Normalize features with variant normalizer
                 t_norm_start = time.perf_counter()
                 if variant_norm == "A1_online_adaptive":
-                    # Unsupervised test-time online adaptation
+                    # Unsupervised test-time online adaptation frame-by-frame
                     normalizer.reset()
-                    frame_idx = cands[0].get('frame', 0) if cands else 0
-                    Z_norm, step_m = normalizer.update_and_transform_frame(Z, frame_id=frame_idx)
-                    d_norm = step_m["d_norm"]
-                    mu_shift = step_m["mu_l2_shift"]
+                    unique_frames = sorted(list(set(c.get('frame', 0) for c in cands)))
+                    Z_norm = np.zeros_like(Z)
+                    total_d_norm = 0.0
+                    total_mu_shift = 0.0
+                    for fr in unique_frames:
+                        idx = [i for i, c in enumerate(cands) if c.get('frame', 0) == fr]
+                        fr_norm, step_m = normalizer.update_and_transform_frame(Z[idx], frame_id=fr)
+                        Z_norm[idx] = fr_norm
+                        total_d_norm += step_m["d_norm"]
+                        total_mu_shift += step_m["mu_l2_shift"]
+                    d_norm = total_d_norm / max(len(unique_frames), 1)
+                    mu_shift = total_mu_shift / max(len(unique_frames), 1)
                 else:
                     Z_norm = normalizer.transform(Z)
                     d_norm = 0.0
                     mu_shift = 0.0
                 t_norm_ms = (time.perf_counter() - t_norm_start) * 1000.0
+
+                # 3. Model inference
+                t_infer_start = time.perf_counter()
+                with torch.no_grad():
+                    Z_tensor = torch.from_numpy(Z_norm).float().to(device)
+                    _, _, pred_u_t = model(Z_tensor)
+                    learned_u = pred_u_t.cpu().numpy()
+                t_infer_ms = (time.perf_counter() - t_infer_start) * 1000.0
 
                 runtime_rows.append({
                     "seed": seed,
@@ -400,15 +421,11 @@ def run_phase9b(
                     "n_candidates": len(cands),
                     "t_norm_ms": t_norm_ms,
                     "t_norm_per_candidate_us": (t_norm_ms / max(len(cands), 1)) * 1000.0,
+                    "t_infer_ms": t_infer_ms,
+                    "t_infer_per_candidate_us": (t_infer_ms / max(len(cands), 1)) * 1000.0,
                     "d_norm": d_norm,
                     "mu_shift": mu_shift,
                 })
-
-                # 3. Model inference
-                with torch.no_grad():
-                    Z_tensor = torch.from_numpy(Z_norm).float().to(device)
-                    _, _, pred_u_t = model(Z_tensor)
-                    learned_u = pred_u_t.cpu().numpy()
 
                 dom_metrics = {}
                 methods_to_eval = {

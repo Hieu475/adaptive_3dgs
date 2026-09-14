@@ -114,7 +114,7 @@ def test_ema_initialization(sample_features):
     ema.fit(sample_features)
 
     expected_mu = np.mean(sample_features, axis=0)
-    expected_sigma = np.maximum(np.std(sample_features, axis=0), EPS)
+    expected_sigma = (np.std(sample_features, axis=0) + EPS).astype(np.float32)
 
     np.testing.assert_allclose(ema.mu_current, expected_mu, atol=1e-5)
     np.testing.assert_allclose(ema.sigma_current, expected_sigma, atol=1e-5)
@@ -218,3 +218,56 @@ def test_finite_output():
             if isinstance(norm, OnlineEMANormalizer):
                 Z_frame, _ = norm.update_and_transform_frame(X_deg, frame_id=0)
                 assert np.all(np.isfinite(Z_frame)), f"NaN/Inf produced by {var} in online step"
+
+
+def test_reset_to_train_stats(sample_features):
+    """Verify that reset() restores OnlineEMANormalizer exactly to train reference statistics."""
+    ema = OnlineEMANormalizer(beta=0.90, eps=EPS)
+    ema.fit(sample_features)
+
+    mu_init = ema.mu_init.copy()
+    sigma_init = ema.sigma_init.copy()
+
+    # Apply multiple shifts
+    for i in range(5):
+        frame = np.random.randn(20, 11).astype(np.float32) + float(i * 10.0)
+        ema.update_and_transform_frame(frame, frame_id=i)
+
+    # State must have shifted
+    assert not np.allclose(ema.mu_current, mu_init)
+    assert len(ema.history) == 5
+
+    # Reset
+    ema.reset()
+    np.testing.assert_array_equal(ema.mu_current, mu_init)
+    np.testing.assert_array_equal(ema.sigma_current, sigma_init)
+    assert len(ema.history) == 0
+
+
+def test_frozen_weights(sample_features):
+    """Verify that TwoHeadMLP model weights remain strictly frozen during online normalization and inference."""
+    import copy
+    from research.utility_models import TwoHeadMLP
+
+    torch.manual_seed(42)
+    model = TwoHeadMLP(in_features=11, hidden_dim=64)
+    model.eval()
+
+    state_before = copy.deepcopy(model.state_dict())
+
+    ema = OnlineEMANormalizer(beta=0.90, eps=EPS)
+    ema.fit(sample_features)
+
+    # Simulate 10 frames of online evaluation
+    rng = np.random.default_rng(42)
+    for fr in range(10):
+        frame = rng.normal(loc=fr * 0.5, scale=1.0, size=(25, 11)).astype(np.float32)
+        Z_norm, _ = ema.update_and_transform_frame(frame, frame_id=fr)
+        with torch.no_grad():
+            x_t = torch.from_numpy(Z_norm).float()
+            _ = model(x_t)
+
+    state_after = model.state_dict()
+
+    for key in state_before:
+        assert torch.equal(state_before[key], state_after[key]), f"Model weight '{key}' was modified during test-time inference!"
