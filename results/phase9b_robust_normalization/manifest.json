@@ -1,7 +1,7 @@
 {
   "phase": "Phase 9B: Robust Normalization",
   "status": "complete",
-  "generated_at": "2026-09-14T23:46:43.511129",
+  "generated_at": "2026-09-15T00:28:25.425779",
   "base_representation": "geometry_relative",
   "variants": [
     "A1_standard",
@@ -200,19 +200,178 @@
       ]
     }
   },
+  "b0_vs_b2_head_to_head": [
+    {
+      "metric_id": "rho_in",
+      "metric_label": "In-Domain Spearman \u03c1",
+      "b0_mean": 0.19114446529080675,
+      "b0_std": 0.26314825399356934,
+      "b0_ci95": 0.23065961456328057,
+      "b2_mean": 0.20090056285178237,
+      "b2_std": 0.26489312896231354,
+      "b2_ci95": 0.23218906490788177,
+      "diff_mean": 0.009756097560975596,
+      "wilcoxon_pval": 0.625
+    },
+    {
+      "metric_id": "rho_zs",
+      "metric_label": "Zero-Shot Spearman \u03c1",
+      "b0_mean": 0.2708818011257036,
+      "b0_std": 0.1630555049831087,
+      "b0_ci95": 0.1429244517531324,
+      "b2_mean": 0.2637148217636023,
+      "b2_std": 0.1539395108682193,
+      "b2_ci95": 0.13493393060396713,
+      "diff_mean": -0.007166979362101314,
+      "wilcoxon_pval": 1.0
+    },
+    {
+      "metric_id": "ndcg_20",
+      "metric_label": "Zero-Shot NDCG@20",
+      "b0_mean": 0.6276126747138742,
+      "b0_std": 0.17118558372217282,
+      "b0_ci95": 0.15005077997253785,
+      "b2_mean": 0.63041465248097,
+      "b2_std": 0.16952719551459483,
+      "b2_ci95": 0.14859713861656834,
+      "diff_mean": 0.0028019777670957426,
+      "wilcoxon_pval": 1.0
+    },
+    {
+      "metric_id": "ose_20",
+      "metric_label": "Zero-Shot OSE@20",
+      "b0_mean": 0.5596705181969652,
+      "b0_std": 0.08729748214815702,
+      "b0_ci95": 0.07651961690435856,
+      "b2_mean": 0.5792514911612852,
+      "b2_std": 0.08969155669816524,
+      "b2_ci95": 0.07861811577167063,
+      "diff_mean": 0.01958097296431991,
+      "wilcoxon_pval": 0.10880943004054568
+    },
+    {
+      "metric_id": "delta_rho",
+      "metric_label": "Generalization Gap \u0394\u03c1",
+      "b0_mean": -0.07973733583489681,
+      "b0_std": 0.18451454139590043,
+      "b0_ci95": 0.16173412650018543,
+      "b2_mean": -0.06281425891181991,
+      "b2_std": 0.1932272163620022,
+      "b2_ci95": 0.16937112282829064,
+      "diff_mean": 0.01692307692307691,
+      "wilcoxon_pval": 0.1875
+    },
+    {
+      "metric_id": "dq_10",
+      "metric_label": "Quality Gain \u0394Q @ 10%",
+      "b0_mean": 0.05148616582155228,
+      "b0_std": 0.01905328621194473,
+      "b0_ci95": 0.016700941720549808,
+      "b2_mean": 0.05071544498205185,
+      "b2_std": 0.018328951476223886,
+      "b2_ci95": 0.016066034331195637,
+      "diff_mean": -0.0007707208395004272,
+      "wilcoxon_pval": 0.31731050786291415
+    },
+    {
+      "metric_id": "dq_20",
+      "metric_label": "Quality Gain \u0394Q @ 20%",
+      "b0_mean": 0.08910838589072227,
+      "b0_std": 0.024234594670975548,
+      "b0_ci95": 0.021242558827850543,
+      "b2_mean": 0.09273598343133926,
+      "b2_std": 0.02708259443006179,
+      "b2_ci95": 0.02373894068384873,
+      "diff_mean": 0.0036275975406169893,
+      "wilcoxon_pval": 0.10880943004054568
+    },
+    {
+      "metric_id": "dq_40",
+      "metric_label": "Quality Gain \u0394Q @ 40%",
+      "b0_mean": 0.144857457280159,
+      "b0_std": 0.043426805865379205,
+      "b0_ci95": 0.0380652736645844,
+      "b2_mean": 0.1426287606358528,
+      "b2_std": 0.04050588481580593,
+      "b2_ci95": 0.03550497347927209,
+      "diff_mean": -0.0022286966443061827,
+      "wilcoxon_pval": 0.28504940740261275
+    },
+    {
+      "metric_id": "dq_60",
+      "metric_label": "Quality Gain \u0394Q @ 60%",
+      "b0_mean": 0.23387051820755006,
+      "b0_std": 0.07230088147885234,
+      "b0_ci95": 0.06337451684138878,
+      "b2_mean": 0.23044173121452333,
+      "b2_std": 0.08176375676961546,
+      "b2_ci95": 0.07166909274718655,
+      "diff_mean": -0.0034287869930267334,
+      "wilcoxon_pval": 0.5929800980174267
+    },
+    {
+      "metric_id": "dq_80",
+      "metric_label": "Quality Gain \u0394Q @ 80%",
+      "b0_mean": 0.2779548019170761,
+      "b0_std": 0.1200864204365049,
+      "b0_ci95": 0.1052603885140928,
+      "b2_mean": 0.27841555774211885,
+      "b2_std": 0.12054164276459971,
+      "b2_ci95": 0.10565940847772712,
+      "diff_mean": 0.0004607558250427246,
+      "wilcoxon_pval": 0.31731050786291415
+    },
+    {
+      "metric_id": "latency",
+      "metric_label": "Normalization Latency (\u03bcs/cand)",
+      "b0_mean": 0.4254999839758966,
+      "b0_std": 0.256935523106932,
+      "b0_ci95": 0.22521391583661463,
+      "b2_mean": 2.348139987589093,
+      "b2_std": 0.44362487001409806,
+      "b2_ci95": 0.3888543434175243,
+      "diff_mean": 1.9226400036131963,
+      "wilcoxon_pval": 0.0625
+    },
+    {
+      "metric_id": "drift",
+      "metric_label": "Temporal Drift D_t^norm",
+      "b0_mean": 0.0,
+      "b0_std": 0.0,
+      "b0_ci95": 0.0,
+      "b2_mean": 0.113830616697669,
+      "b2_std": 0.0,
+      "b2_ci95": 0.0,
+      "diff_mean": 0.113830616697669,
+      "wilcoxon_pval": 0.0625
+    }
+  ],
+  "b2_temporal_dynamics": {
+    "mean_d_norm": 0.113830616697669,
+    "std_d_norm": 0.04716443760965877,
+    "ci95_d_norm": 0.02067072616868596,
+    "mean_sigma_shift": 2.3991445749998093,
+    "std_sigma_shift": 1.7081390340549356,
+    "ci95_sigma_shift": 0.7486249390528622,
+    "mean_overlap_20": 0.6,
+    "std_overlap_20": 0.4171078366183271,
+    "ci95_overlap_20": 0.18280556941878526,
+    "mean_latency_us": 0.5694915991625749,
+    "std_latency_us": 0.08479655450373064
+  },
   "artifacts_checksums": {
-    "stage_results.json": "53490a85cf60a27f2c1bf37316a2bb8774f29f50620bcc74e2a4f66a18437b05",
+    "stage_results.json": "7ef498045b94e190509a933eab09eed394f3b22314f5c3f0bb76ab66be6c8d37",
     "seed_46.json": "1aa9a006afef09230d53e80d5bb53bb501cfb7f26a3ce38c5b55d0d309e3473d",
     "seed_44.json": "d2e95024e3a6239a3657a8ebd27ce407f01c4c35054c1d87ed87120f7537a46e",
-    "runtime_overhead.csv": "5a8ae612b0168b758082d0eba097054bab0b2eb0a737adc14eaad0879899287b",
+    "runtime_overhead.csv": "50c8e10b3694403a21bbbfd1895c7dab37c8d139e3f294894f5989574143067f",
     "seed_42.json": "4e73303bf9eae68ecc5494233ce5ead2a2b8a0d259d455abf0f4ab3ab7ec50d9",
     "prediction_metrics.csv": "ae16d2e5bb108a030df287d43684e5bd436651b5b84fc3410535a0d895f247e6",
     "generalization_gap.csv": "74fd47e5e3ecfc9712dd53926cd2470e90dc165663ee98781afb6fbe9aa16d05",
     "protocol.json": "ba6c26624ca2dd75684cfdfc9f3be2c09dc34b46c0984c32980fb7d9fc62d4a2",
     "seed_43.json": "c1baba0d3f82b3683247a8fb968a83e6a4a1bb0a79633ee29f276b89cdb83677",
-    "summary.md": "726e6de8fcc4d4f9477c3e408fc00c7af16b51399bf7a2f7fc558cc9529c8293",
+    "summary.md": "f8ddd58a7573f2c1f14d4eb4def621436fab81ba8571ddce09dd218a9b59ef9c",
     "selection_metrics.csv": "04d11a019f868917284f8fa82c1fa722c81edc4847ce7795a5b1c9dfb7b34854",
     "seed_45.json": "d95b893f0749d00bdd881072f1118e8395289ee88530dbb508722f2834a4f6ba",
-    "normalization_stability.csv": "397f3f2b8a2d51dbb709154fe0ea6c7d143ab48641f279f6ad703623319b86aa"
+    "normalization_stability.csv": "992b8da859d9eaa0b37fca9028f5d16aec54164dcea9e23c5d220ac56f8ed8d3"
   }
 }

@@ -250,9 +250,17 @@ def train_phase9b_model(
 
 def evaluate_temporal_stability(
     seed: int,
+    trained_models: Optional[Dict[str, Any]] = None,
     device: str = 'cuda',
 ) -> List[Dict[str, Any]]:
-    """Run sequential frame normalization on evaluation scenes to track stability and latency."""
+    """Run sequential frame normalization on evaluation scenes to track stability and latency.
+
+    Measures:
+        1. D_t^{norm} = ||mu_t - mu_{t-1}||_2
+        2. D_t^{sigma} = ||sigma_t - sigma_{t-1}||_2
+        3. Overlap@20(t, t-1) ranking stability
+        4. T_{norm} / N_{candidate} (microseconds per candidate)
+    """
     raw_dataset = load_canonical_oracle_dataset()
     train_raw = raw_dataset.get_split("train")
     train_keys = [(m.scene, m.frame) for m in train_raw.metadata]
@@ -262,52 +270,83 @@ def evaluate_temporal_stability(
     val_keys = [(m.scene, m.frame) for m in val_raw.metadata]
     Z_val = transform_grouped_features(val_raw.X_np, val_keys, variant=BASE_REPRESENTATION)
 
-    # Group by frame
-    unique_frames = sorted(list(set(m.frame for m in val_raw.metadata)))
-    
+    test_raw = raw_dataset.get_split("test")
+    test_keys = [(m.scene, m.frame) for m in test_raw.metadata]
+    Z_test = transform_grouped_features(test_raw.X_np, test_keys, variant=BASE_REPRESENTATION)
+
+    eval_splits = [
+        ("tum_fr1_desk_val", val_raw, Z_val),
+        ("tum_fr2_xyz", test_raw, Z_test),
+    ]
+
     stability_rows = []
     for var in NORMALIZATION_VARIANTS:
-        normalizer = create_normalizer(var, eps=EPS, beta=B2_EMA_BETA)
-        normalizer.fit(Z_train)
-        normalizer.reset()
+        model = trained_models.get(var) if trained_models else None
 
-        for step, fr in enumerate(unique_frames):
-            indices = [i for i, m in enumerate(val_raw.metadata) if m.frame == fr]
-            if not indices:
-                continue
-            X_frame = Z_val[indices]
+        for dom_label, split_raw, Z_split in eval_splits:
+            normalizer = create_normalizer(var, eps=EPS, beta=B2_EMA_BETA)
+            normalizer.fit(Z_train)
+            if hasattr(normalizer, "reset"):
+                normalizer.reset()
 
-            t0 = time.perf_counter()
-            if var == "A1_online_adaptive":
-                Z_norm, step_m = normalizer.update_and_transform_frame(X_frame, frame_id=fr)
-                d_norm = step_m["d_norm"]
-                mu_shift = step_m["mu_l2_shift"]
-                sigma_shift = step_m["sigma_l2_shift"]
-                mean_mu = step_m["mean_mu"]
-                mean_sigma = step_m["mean_sigma"]
-            else:
-                Z_norm = normalizer.transform(X_frame)
-                d_norm = 0.0
-                mu_shift = 0.0
-                sigma_shift = 0.0
-                mean_mu = float(np.mean(getattr(normalizer, "mean", getattr(normalizer, "median", np.zeros(11)))))
-                mean_sigma = float(np.mean(getattr(normalizer, "std", getattr(normalizer, "scale", np.ones(11)))))
+            unique_frames = sorted(list(set(m.frame for m in split_raw.metadata)))
+            prev_top_k = None
 
-            lat_ms = (time.perf_counter() - t0) * 1000.0
+            for step, fr in enumerate(unique_frames):
+                indices = [i for i, m in enumerate(split_raw.metadata) if m.frame == fr]
+                if not indices:
+                    continue
+                X_frame = Z_split[indices]
 
-            stability_rows.append({
-                "seed": seed,
-                "variant": var,
-                "step": step,
-                "frame": fr,
-                "n_samples": len(indices),
-                "latency_ms": lat_ms,
-                "d_norm": d_norm,
-                "mu_l2_shift": mu_shift,
-                "sigma_l2_shift": sigma_shift,
-                "mean_mu": mean_mu,
-                "mean_sigma": mean_sigma,
-            })
+                t0 = time.perf_counter()
+                if var == "A1_online_adaptive":
+                    Z_norm, step_m = normalizer.update_and_transform_frame(X_frame, frame_id=fr)
+                    d_norm = step_m["d_norm"]
+                    mu_shift = step_m["mu_l2_shift"]
+                    sigma_shift = step_m["sigma_l2_shift"]
+                    mean_mu = step_m["mean_mu"]
+                    mean_sigma = step_m["mean_sigma"]
+                else:
+                    Z_norm = normalizer.transform(X_frame)
+                    d_norm = 0.0
+                    mu_shift = 0.0
+                    sigma_shift = 0.0
+                    mean_mu = float(np.mean(getattr(normalizer, "mean", getattr(normalizer, "median", np.zeros(11)))))
+                    mean_sigma = float(np.mean(getattr(normalizer, "std", getattr(normalizer, "scale", np.ones(11)))))
+
+                lat_ms = (time.perf_counter() - t0) * 1000.0
+                t_norm_per_cand_us = (lat_ms / max(len(indices), 1)) * 1000.0
+
+                overlap_20 = 1.0
+                if model is not None:
+                    with torch.no_grad():
+                        Z_t = torch.from_numpy(Z_norm).float().to(device)
+                        _, _, pred_u_t = model(Z_t)
+                        pred_u = pred_u_t.cpu().numpy()
+                    k = max(1, int(0.20 * len(pred_u)))
+                    top_k_indices = set(np.argsort(-pred_u)[:k])
+                    if prev_top_k is not None and len(top_k_indices) > 0 and len(prev_top_k) > 0:
+                        overlap_20 = len(top_k_indices & prev_top_k) / float(len(top_k_indices))
+                    else:
+                        overlap_20 = 1.0
+                    prev_top_k = top_k_indices
+
+                stability_rows.append({
+                    "seed": seed,
+                    "variant": var,
+                    "domain": dom_label,
+                    "step": step,
+                    "frame": fr,
+                    "n_samples": len(indices),
+                    "latency_ms": lat_ms,
+                    "t_norm_per_candidate_us": t_norm_per_cand_us,
+                    "d_norm": d_norm,
+                    "mu_l2_shift": mu_shift,
+                    "sigma_l2_shift": sigma_shift,
+                    "overlap_20": overlap_20,
+                    "mean_mu": mean_mu,
+                    "mean_sigma": mean_sigma,
+                })
 
     return stability_rows
 
@@ -346,6 +385,7 @@ def run_phase9b(
     prediction_rows = []
     all_stability_rows = []
     runtime_rows = []
+    trained_models: Dict[Tuple[str, int], Any] = {}
 
     all_results: Dict[str, Any] = {
         "phase": "Phase 9B: Robust Normalization",
@@ -369,6 +409,7 @@ def run_phase9b(
             print(f"\n--- Training & Evaluating: {variant_norm} | Seed {seed} ---")
             t0 = time.time()
             model, normalizer = train_phase9b_model(variant_norm, seed=seed, device=device)
+            trained_models[(variant_norm, seed)] = model
             t_train = time.time() - t0
             print(f"    Trained {variant_norm} seed {seed} in {t_train:.2f}s")
 
@@ -471,7 +512,8 @@ def run_phase9b(
     # Evaluate temporal stability across sequence of frames
     print("\n>> Evaluating temporal stability and adaptation dynamics...")
     for seed in seeds:
-        stab_rows = evaluate_temporal_stability(seed=seed, device=device)
+        seed_models = {var: trained_models.get((var, seed)) for var in variants}
+        stab_rows = evaluate_temporal_stability(seed=seed, trained_models=seed_models, device=device)
         all_stability_rows.extend(stab_rows)
 
     # Save per-seed combined result JSONs
