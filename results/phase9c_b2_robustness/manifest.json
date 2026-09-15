@@ -1,0 +1,58 @@
+{
+  "phase": "Phase 9C: B2 Robustness & Adaptation Necessity",
+  "generated_at": "2026-09-15T10:18:21.714515",
+  "files": {
+    "protocol.json": {
+      "sha256": "dd9fbc8b1c59326903386f528da65773b44366f5cfc7a8d6ce6843d67af5fb5e",
+      "size_bytes": 3053
+    },
+    "stage_results.json": {
+      "sha256": "6ce56add6966b18d4b03d9a6b60f1ee65aa1ad5eeb4fde414c77bc66ea4b9769",
+      "size_bytes": 313640
+    },
+    "sensitivity_metrics.csv": {
+      "sha256": "64a5c5957aad357a501da07b87483ef99003080ac23a3eaff368ec048d41811d",
+      "size_bytes": 11434
+    },
+    "ablation_metrics.csv": {
+      "sha256": "600e117f60bc53eacdd11d4d90bb848646deda112a42d8367f1cc3854a56ca09",
+      "size_bytes": 9114
+    },
+    "temporal_dynamics.csv": {
+      "sha256": "2e2e1a0370fca84a1c940199a1d9eb871e86bf25b5974405d11f03dc6e73622b",
+      "size_bytes": 51849
+    },
+    "perturbation_metrics.csv": {
+      "sha256": "0a3e470e8fe5fd6e946e6dd28043123456cc2caebdc8b97e4d059172ae521999",
+      "size_bytes": 12450
+    },
+    "selection_metrics.csv": {
+      "sha256": "2be776057e55c8beba57aafbf05904713cf8b02d8ba9711fd58cdd20c6c7e28f",
+      "size_bytes": 36518
+    },
+    "runtime_metrics.csv": {
+      "sha256": "998a8ce1f4ae05ee57eb204c488a9254a3fd22a13025cce7d82dd1c12a187717",
+      "size_bytes": 4266
+    },
+    "summary.md": {
+      "sha256": "bef7a57cf8e3610f702f09dd1d4552e99c002f7f96f97b95f3988e62b3c61bea",
+      "size_bytes": 6851
+    },
+    "figures/fig25_ema_sensitivity.png": {
+      "sha256": "260c82c3cdc1b3f6dc163260a7d2b39310d05e47a72dcba3d326ddff3c674562",
+      "size_bytes": 397818
+    },
+    "figures/fig26_adaptation_ablation.png": {
+      "sha256": "2bfb9b66d797ab01c35604c72d68cd9451746d032e608a1daf047543c7feaf8a",
+      "size_bytes": 211664
+    },
+    "figures/fig27_temporal_dynamics.png": {
+      "sha256": "95e2269818d1c5ae854845f33d20ef2e247236c35064ff048d3c1826f067516c",
+      "size_bytes": 306367
+    },
+    "figures/fig28_perturbation_robustness.png": {
+      "sha256": "c51a005d50f1b040f5f3fedefe27a2f4bd5d338ca34cc8fcea0753e2268c7900",
+      "size_bytes": 214797
+    }
+  }
+}

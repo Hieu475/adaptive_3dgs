@@ -1,0 +1,120 @@
+{
+  "phase": "Phase 9C: B2 Robustness & Adaptation Necessity",
+  "protocol_version": "1.0.0",
+  "status": "frozen",
+  "base_representation": "geometry_relative",
+  "default_b2_beta": 0.9,
+  "beta_values": [
+    0.8,
+    0.9,
+    0.95
+  ],
+  "ablation_variants": [
+    "B0",
+    "B2",
+    "B2_static"
+  ],
+  "perturbation_scales": [
+    0.8,
+    1.0,
+    1.2
+  ],
+  "perturbation_offsets": [
+    -0.2,
+    0.0,
+    0.2
+  ],
+  "eps": 1e-06,
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "scenes": {
+    "train": "tum_fr1_desk",
+    "val": "tum_fr1_desk",
+    "test": "tum_fr2_xyz"
+  },
+  "model": {
+    "in_features": 11,
+    "hidden_dim": 64,
+    "eps_cost": 0.001
+  },
+  "training": {
+    "epochs": 200,
+    "learning_rate": 0.005,
+    "loss_lambda_rank": 1.0,
+    "loss_lambda_q": 0.25,
+    "loss_lambda_t": 0.125
+  },
+  "budgets": [
+    0.1,
+    0.2,
+    0.4,
+    0.6,
+    0.8
+  ],
+  "gate_criteria": {
+    "Gate_9C_1_protocol_integrity": {
+      "description": "A1 representation strictly fixed; same dataset, architecture, loss, oracle, and seeds; no future frame access; no test tuning; frozen models evaluated.",
+      "type": "checklist",
+      "criteria": [
+        "fixed_a1_representation",
+        "same_dataset_and_splits",
+        "same_architecture_and_loss",
+        "same_oracle_u_star",
+        "same_5_seeds",
+        "no_future_frame_access",
+        "no_test_tuning"
+      ]
+    },
+    "Gate_9C_2_sensitivity": {
+      "description": "Assess sensitivity across beta in {0.80, 0.90, 0.95}. Valid scientific result whether performance is stable or sensitive.",
+      "type": "quantitative_analysis",
+      "beta_values": [
+        0.8,
+        0.9,
+        0.95
+      ],
+      "criteria": [
+        "report_spearman_rho",
+        "report_ndcg_20",
+        "report_ose_20",
+        "report_delta_q",
+        "report_drift_metrics",
+        "report_runtime"
+      ]
+    },
+    "Gate_9C_3_adaptation_necessity": {
+      "description": "Adaptation necessity & equivalence check: 1. B2_static (update off) must be numerically equivalent to B0 within floating-point tolerance (< 1e-5). 2. Observe B2_update vs B2_static to verify active adaptation.",
+      "type": "quantitative_equivalence",
+      "tolerance": 1e-05
+    },
+    "Gate_9C_4_temporal_stability": {
+      "description": "Temporal dynamics verification: zero NaN/Inf, bounded drift D_t^norm and D_t^sigma, no diverging statistics, smooth stabilization towards steady state.",
+      "type": "quantitative",
+      "criteria": [
+        "zero_nan_or_inf",
+        "bounded_mean_drift",
+        "bounded_scale_drift",
+        "non_zero_selection_overlap"
+      ]
+    },
+    "Gate_9C_5_perturbation_robustness": {
+      "description": "Under controlled feature perturbations (a in {0.8, 1.0, 1.2}, b in {-0.2, 0.0, +0.2}), B2 must not degrade systematically worse than B0.",
+      "type": "comparative_robustness",
+      "scale_factors": [
+        0.8,
+        1.0,
+        1.2
+      ],
+      "offset_values": [
+        -0.2,
+        0.0,
+        0.2
+      ]
+    }
+  }
+}

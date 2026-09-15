@@ -41,3 +41,7 @@ phase6_context_utility/ablation/*.pt
 !phase9b_robust_normalization/*.md
 !phase9b_robust_normalization/figures/*.png
 !phase9b_robust_normalization/normalizers/*.json
+!phase9c_b2_robustness/*.json
+!phase9c_b2_robustness/*.csv
+!phase9c_b2_robustness/*.md
+!phase9c_b2_robustness/figures/*.png
