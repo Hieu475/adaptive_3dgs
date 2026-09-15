@@ -45,8 +45,10 @@
     "Gate_10A_integration": {
       "description": "Model checkpoint loaded properly; B2 normalizer runs online; StateStore updates per frame; selector uses B2 output; zero oracle/test labels.",
       "type": "verification",
-      "criteria": [
-        "frozen_checkpoint_loaded",
+      "evidence_required": [
+        "checkpoint_sha256_verified",
+        "model_eval_mode_verified",
+        "all_params_requires_grad_false",
         "online_b2_normalizer_active",
         "statestore_updated_per_frame",
         "b2_utility_guides_selection",
@@ -54,44 +56,49 @@
       ]
     },
     "Gate_10B_closed_loop_correctness": {
-      "description": "Continuous stateful trajectory S_t -> S_{t+1} across entire sequence. No Gaussian state reset between frames.",
+      "description": "Continuous stateful trajectory S_t -> S_{t+1} across entire sequence. No Gaussian state reset between frames. Population dynamics audited.",
       "type": "verification",
-      "criteria": [
+      "evidence_required": [
         "continuous_map_state",
         "no_per_frame_state_reset",
-        "all_frames_completed_without_crash"
+        "statestore_model_synchronization",
+        "population_dynamics_logged",
+        "zero_crashes_and_zero_nans"
       ]
     },
     "Gate_10C_budget_accounting": {
       "description": "Every frame logs predicted cost \\hat{C}_t, scheduled cost C_t^{scheduled}, and actual wall-clock latency C_t^{actual}. Distinctly reports scheduler budget vs physical wall-clock budget.",
       "type": "accounting",
-      "criteria": [
+      "evidence_required": [
         "log_predicted_cost",
         "log_scheduled_cost",
         "log_actual_opt_time",
         "log_total_frame_time",
+        "log_fine_grained_latency_breakdown",
         "distinguish_scheduler_vs_physical_budget"
       ]
     },
     "Gate_10D_scientific_validity": {
-      "description": "Fixed protocol, fixed seeds [42,43,44,45,46], frozen checkpoint, test sequence untouched, reproducible logs, zero hidden oracle.",
-      "type": "reproducibility",
-      "criteria": [
-        "fixed_seeds_evaluated",
-        "frozen_checkpoint_unaltered",
-        "test_sequence_untouched",
-        "checksums_and_manifest_generated"
+      "description": "Evidence-driven audit: checkpoint hashes verified, model weights strictly immutable (\\|\\theta_T - \\theta_0\\| = 0), zero oracle access in decision path, zero future frame leakage, and multi-seed reproducibility.",
+      "type": "audit",
+      "evidence_required": [
+        "checkpoint_hash_match",
+        "model_weight_immutability_zero_diff",
+        "zero_oracle_runtime_audit_pass",
+        "zero_future_leakage_audit_pass",
+        "fixed_5_seeds_evaluated"
       ]
     },
     "Gate_10E_performance_characterization": {
-      "description": "Objective characterization of B2 vs ERROR_ONLY and B2 vs FULL. Valid scientific result regardless of whether B2 outperforms or matches baseline.",
+      "description": "Objective characterization of B2 vs ERROR_ONLY and B2 vs FULL across all seeds. Valid scientific result regardless of whether B2 outperforms or matches baseline.",
       "type": "characterization",
-      "criteria": [
-        "report_psnr_trajectory",
+      "evidence_required": [
+        "evaluate_all_4_policies",
+        "report_psnr_trajectory_and_ci",
         "report_delta_q_and_cumulative_q",
         "report_selection_dynamics",
         "report_systems_and_memory_metrics",
-        "paired_statistical_testing"
+        "paired_statistical_tests_wilcoxon_bootstrap"
       ]
     }
   },

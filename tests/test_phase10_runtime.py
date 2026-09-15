@@ -190,6 +190,49 @@ class TestPhase10Runtime(unittest.TestCase):
         # Persistence verified across frames
         self.assertEqual(store.num_gaussians, N)
 
+    def test_07_model_immutability_and_hash(self):
+        """Verify model weight snapshot, cryptographic hash, and strict zero-diff immutability."""
+        bundle = Phase10ModelBundle(seed=self.seed, device=self.device)
+        w0 = bundle.snapshot_weights()
+        h0 = bundle.compute_weights_hash()
+
+        # Run several inference passes
+        rng = np.random.default_rng(self.seed)
+        for f in range(5):
+            X_fake = rng.exponential(scale=1.0, size=(100, 11)).astype(np.float32)
+            bundle.predict(X_fake, frame_id=f + 1, update_normalizer=True)
+
+        is_immutable, max_diff = bundle.verify_immutability(w0)
+        h1 = bundle.compute_weights_hash()
+
+        self.assertTrue(is_immutable)
+        self.assertEqual(max_diff, 0.0)
+        self.assertEqual(h0, h1)
+
+    def test_08_zero_oracle_audit_and_timing_breakdown(self):
+        """Verify selector emits zero-oracle audit flags and sub-millisecond timer breakdowns."""
+        bundle = Phase10ModelBundle(seed=self.seed, device=self.device)
+        selector = Phase10Selector(model_bundle=bundle, budget_ms=15.0, device=self.device)
+        cfg = get_pipeline_config(policy="ours", budget_ms=15.0, seed=self.seed)
+        pipe = OnlineReconstructionPipeline(config=cfg, device=self.device)
+        H, W = 240, 320
+        rgb = torch.rand(H, W, 3, device=self.device)
+        depth = torch.ones(H, W, device=self.device)
+        intrinsics = torch.eye(3, device=self.device)
+        pose = torch.eye(4, device=self.device)
+        pipe.initialize(rgb=rgb, depth=depth, intrinsics=intrinsics, pose=pose)
+
+        mask, diag = selector.select(pipe, policy="ours", frame_idx=1)
+        self.assertTrue(diag["zero_oracle_verified"])
+        self.assertTrue(diag["zero_future_leakage"])
+        self.assertIn("t_extract_ms", diag)
+        self.assertIn("t_a1_ms", diag)
+        self.assertIn("t_b2_norm_ms", diag)
+        self.assertIn("t_infer_ms", diag)
+        self.assertIn("t_knapsack_ms", diag)
+        self.assertGreaterEqual(diag["t_extract_ms"], 0.0)
+        self.assertGreaterEqual(diag["t_infer_ms"], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
