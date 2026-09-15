@@ -5,8 +5,8 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.1%2B-orange.svg)](https://pytorch.org/)
 [![CUDA](https://img.shields.io/badge/CUDA-12.8-green.svg)](docs/environment.md)
 [![Phase 10 Status](https://img.shields.io/badge/Phase%2010-FROZEN%20(Gates%2010A--10E%20PASS)-success.svg)](results/phase10_e2e/manifest.json)
-[![Phase 11 Status](https://img.shields.io/badge/Phase%2011-IMPLEMENTED%20%2F%20VERIFYING-yellow.svg)](results/phase11_reproducibility/manifest.json)
-[![Tag](https://img.shields.io/badge/tag-phase10--frozen-blue.svg)](https://github.com/Hieu475/adaptive_3dgs/releases/tag/phase10-frozen)
+[![Phase 11 Status](https://img.shields.io/badge/Phase%2011-FROZEN%20(Gates%2011A--11F%20PASS)-success.svg)](results/phase11_reproducibility/manifest.json)
+[![Tag](https://img.shields.io/badge/tag-phase11--frozen-blueviolet.svg)](https://github.com/Hieu475/adaptive_3dgs/releases/tag/phase11-frozen)
 
 ---
 
@@ -126,7 +126,7 @@ flowchart TD
 | **Phase 8** | Zero-Shot Cross-Scene Transfer | Evaluated generalization across differing indoor environments; identified feature-shift vulnerability under fixed standard normalizers. | **FROZEN** |
 | **Phase 9** | Robust Representations (A1 + B2) | Proved $A1 \text{ (geometry\_relative)} + B2 \text{ (Online EMA } \beta=0.90)$ stabilizes cross-scene moment drift. | **FROZEN** |
 | **Phase 10** | End-to-End Closed-Loop System | Successfully integrated frozen $A1 + B2 + \text{TwoHeadMLP}$ into a continuous online trajectory without frame resets across 5 seeds. | **FROZEN (tag: phase10-frozen)** |
-| **Phase 11** | Reproducibility Pipeline & Audit | Automated smoke testing, cryptographic manifest verification, comprehensive environment/dataset/checkpoint documentation, and regression hardening. | **IMPLEMENTED / VERIFYING** |
+| **Phase 11** | Reproducibility Pipeline & Audit | Automated smoke testing, cryptographic manifest verification, comprehensive environment/dataset/checkpoint documentation, and regression hardening. | **FROZEN (tag: phase11-frozen)** |
 
 ---
 
