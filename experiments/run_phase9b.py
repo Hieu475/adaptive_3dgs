@@ -424,36 +424,48 @@ def run_phase9b(
                 cand_keys = [(c.get('scene', ''), c.get('frame', 0)) for c in cands]
                 Z = transform_grouped_features(X, cand_keys, variant=BASE_REPRESENTATION)
 
-                # 2. Normalize features with variant normalizer
-                t_norm_start = time.perf_counter()
+                # 2. Normalize features and run inference
+                learned_u = np.zeros(len(cands), dtype=np.float32)
+                t_norm_ms = 0.0
+                t_infer_ms = 0.0
+
                 if variant_norm == "A1_online_adaptive":
-                    # Unsupervised test-time online adaptation frame-by-frame
+                    # Unsupervised test-time online adaptation frame-by-frame:
+                    # frame t -> get feature frame t -> update EMA -> normalize -> model inference
                     normalizer.reset()
                     unique_frames = sorted(list(set(c.get('frame', 0) for c in cands)))
-                    Z_norm = np.zeros_like(Z)
                     total_d_norm = 0.0
                     total_mu_shift = 0.0
                     for fr in unique_frames:
                         idx = [i for i, c in enumerate(cands) if c.get('frame', 0) == fr]
+                        t0 = time.perf_counter()
                         fr_norm, step_m = normalizer.update_and_transform_frame(Z[idx], frame_id=fr)
-                        Z_norm[idx] = fr_norm
+                        t_norm_ms += (time.perf_counter() - t0) * 1000.0
                         total_d_norm += step_m["d_norm"]
                         total_mu_shift += step_m["mu_l2_shift"]
+
+                        t1 = time.perf_counter()
+                        with torch.no_grad():
+                            fr_tensor = torch.from_numpy(fr_norm).float().to(device)
+                            _, _, pred_u_fr = model(fr_tensor)
+                            learned_u[idx] = pred_u_fr.cpu().numpy()
+                        t_infer_ms += (time.perf_counter() - t1) * 1000.0
+
                     d_norm = total_d_norm / max(len(unique_frames), 1)
                     mu_shift = total_mu_shift / max(len(unique_frames), 1)
                 else:
+                    t_norm_start = time.perf_counter()
                     Z_norm = normalizer.transform(Z)
+                    t_norm_ms = (time.perf_counter() - t_norm_start) * 1000.0
                     d_norm = 0.0
                     mu_shift = 0.0
-                t_norm_ms = (time.perf_counter() - t_norm_start) * 1000.0
 
-                # 3. Model inference
-                t_infer_start = time.perf_counter()
-                with torch.no_grad():
-                    Z_tensor = torch.from_numpy(Z_norm).float().to(device)
-                    _, _, pred_u_t = model(Z_tensor)
-                    learned_u = pred_u_t.cpu().numpy()
-                t_infer_ms = (time.perf_counter() - t_infer_start) * 1000.0
+                    t_infer_start = time.perf_counter()
+                    with torch.no_grad():
+                        Z_tensor = torch.from_numpy(Z_norm).float().to(device)
+                        _, _, pred_u_t = model(Z_tensor)
+                        learned_u = pred_u_t.cpu().numpy()
+                    t_infer_ms = (time.perf_counter() - t_infer_start) * 1000.0
 
                 runtime_rows.append({
                     "seed": seed,

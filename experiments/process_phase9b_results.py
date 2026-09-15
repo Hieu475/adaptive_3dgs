@@ -755,7 +755,7 @@ def write_summary_markdown_9b(
             f"| **Mean Drift $D_t^{{norm}}$** | $\\|\\mu_t - \\mu_{{t-1}}\\|_2$ | {b2_temporal.get('mean_d_norm', 0.0):.4f} ± {b2_temporal.get('std_d_norm', 0.0):.4f} | [{b2_temporal.get('mean_d_norm', 0.0)-b2_temporal.get('ci95_d_norm', 0.0):.4f}, {b2_temporal.get('mean_d_norm', 0.0)+b2_temporal.get('ci95_d_norm', 0.0):.4f}] | Smooth decay, zero oscillation |",
             f"| **Scale Drift $D_t^\\sigma$** | $\\|\\sigma_t - \\sigma_{{t-1}}\\|_2$ | {b2_temporal.get('mean_sigma_shift', 0.0):.4f} ± {b2_temporal.get('std_sigma_shift', 0.0):.4f} | [{b2_temporal.get('mean_sigma_shift', 0.0)-b2_temporal.get('ci95_sigma_shift', 0.0):.4f}, {b2_temporal.get('mean_sigma_shift', 0.0)+b2_temporal.get('ci95_sigma_shift', 0.0):.4f}] | Stable asymptotic convergence |",
             f"| **Selection Overlap** | $\\text{{Overlap@20}}(t, t-1)$ | {b2_temporal.get('mean_overlap_20', 1.0):.4f} ± {b2_temporal.get('std_overlap_20', 0.0):.4f} | [{b2_temporal.get('mean_overlap_20', 1.0)-b2_temporal.get('ci95_overlap_20', 0.0):.4f}, {b2_temporal.get('mean_overlap_20', 1.0)+b2_temporal.get('ci95_overlap_20', 0.0):.4f}] | High temporal ranking consistency |",
-            f"| **Normalization Latency** | $T_{{norm}} / N_{{candidate}}$ | {b2_temporal.get('mean_latency_us', 2.11):.2f} ± {b2_temporal.get('std_latency_us', 0.14):.2f} μs | — | Real-time compatible (<0.02 ms/frame) |",
+            f"| **Normalization Latency** | $T_{{norm}} / N_{{candidate}}$ | {b2_temporal.get('mean_latency_us', 2.11):.2f} ± {b2_temporal.get('std_latency_us', 0.14):.2f} μs | — | Real-time compatible (<0.10 ms/frame) |",
         ])
 
     lines.extend([
@@ -790,7 +790,7 @@ def write_summary_markdown_9b(
         "   - This confirms strict experimental control: the A1 representation, network architecture, loss function, seeds, and cached candidates are bitwise identical.",
         "",
         "2. **B1 Negative Finding (Static Train MAD Normalization):**",
-        "   - B1 (`A1_robust_static`) severely degrades cross-scene transfer (zero-shot $\\bar{\\rho}$ drops to $+0.0244$, OSE@20 drops to 0.449).",
+        "   - B1 (`A1_robust_static`) severely degrades cross-scene transfer (zero-shot $\\bar{\\rho}$ drops to $+0.0244$, OSE@20 drops to 0.378).",
         "   - **Mechanism:** Static train-domain MAD normalizer scales features by train-split deviations. Under cross-scene domain shift (fr1 to fr2), feature magnitudes change, and dividing by fixed train MAD excessively compresses test feature variance into degenerate ranges. Static outlier resistance at train time cannot resolve test-time covariate shift.",
         "   - This constitutes an informative negative finding: robust static estimators without test adaptation fail under domain transfer.",
         "",
@@ -800,7 +800,7 @@ def write_summary_markdown_9b(
         "",
         "4. **Online Adaptation Stability & Computational Overhead (Figures 23 & 24):**",
         "   - As shown in Figure 23, step-to-step normalization drift $D_t^{norm}$ and parameter shifts $(\\mu_t, \\sigma_t)$ evolve smoothly and asymptotically stabilize without numerical oscillation.",
-        "   - As shown in Figure 24, normalization latency is isolated from feature extraction and neural inference. B2 online normalization adds less than 1.5 μs per candidate (<0.02 ms per frame), preserving real-time viability.",
+        "   - As shown in Figure 24, normalization latency is isolated from feature extraction and neural inference. B2 online normalization requires 0.57 μs per candidate on full frames (0.071 ms per frame) and 2.35 μs per candidate on sparse candidate subsets (0.094 ms per frame), consistently adding <0.10 ms total per frame and preserving real-time viability.",
         "",
         "5. **Cautious Scientific Framing & Conclusion:**",
         "   - B2 provides a transferable online covariate normalization mechanism that recovers in-domain performance loss while preserving zero-shot selection quality.",

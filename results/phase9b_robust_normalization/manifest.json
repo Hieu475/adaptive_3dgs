@@ -1,7 +1,7 @@
 {
   "phase": "Phase 9B: Robust Normalization",
   "status": "complete",
-  "generated_at": "2026-09-15T00:28:25.425779",
+  "generated_at": "2026-09-15T10:02:37.292876",
   "base_representation": "geometry_relative",
   "variants": [
     "A1_standard",
@@ -324,13 +324,13 @@
     {
       "metric_id": "latency",
       "metric_label": "Normalization Latency (\u03bcs/cand)",
-      "b0_mean": 0.4254999839758966,
-      "b0_std": 0.256935523106932,
-      "b0_ci95": 0.22521391583661463,
-      "b2_mean": 2.348139987589093,
-      "b2_std": 0.44362487001409806,
-      "b2_ci95": 0.3888543434175243,
-      "diff_mean": 1.9226400036131963,
+      "b0_mean": 0.24952498279162683,
+      "b0_std": 0.016186683266089723,
+      "b0_ci95": 0.014188253452388095,
+      "b2_mean": 1.992960005736677,
+      "b2_std": 0.6092550762163964,
+      "b2_ci95": 0.5340356202942176,
+      "diff_mean": 1.7434350229450502,
       "wilcoxon_pval": 0.0625
     },
     {
@@ -356,22 +356,22 @@
     "mean_overlap_20": 0.6,
     "std_overlap_20": 0.4171078366183271,
     "ci95_overlap_20": 0.18280556941878526,
-    "mean_latency_us": 0.5694915991625749,
-    "std_latency_us": 0.08479655450373064
+    "mean_latency_us": 0.543406001816038,
+    "std_latency_us": 0.07266682122299321
   },
   "artifacts_checksums": {
-    "stage_results.json": "7ef498045b94e190509a933eab09eed394f3b22314f5c3f0bb76ab66be6c8d37",
+    "stage_results.json": "e2d9f5ba07c2afb587db1bab5bedf6f6a595026a225c5288aba5d4dbe837bcff",
     "seed_46.json": "1aa9a006afef09230d53e80d5bb53bb501cfb7f26a3ce38c5b55d0d309e3473d",
     "seed_44.json": "d2e95024e3a6239a3657a8ebd27ce407f01c4c35054c1d87ed87120f7537a46e",
-    "runtime_overhead.csv": "50c8e10b3694403a21bbbfd1895c7dab37c8d139e3f294894f5989574143067f",
+    "runtime_overhead.csv": "4b44a39fd2afbdd3dd99a3ee327bbd6efa5c8cf4fb528cc277ccfb19dc853ce4",
     "seed_42.json": "4e73303bf9eae68ecc5494233ce5ead2a2b8a0d259d455abf0f4ab3ab7ec50d9",
     "prediction_metrics.csv": "ae16d2e5bb108a030df287d43684e5bd436651b5b84fc3410535a0d895f247e6",
     "generalization_gap.csv": "74fd47e5e3ecfc9712dd53926cd2470e90dc165663ee98781afb6fbe9aa16d05",
     "protocol.json": "ba6c26624ca2dd75684cfdfc9f3be2c09dc34b46c0984c32980fb7d9fc62d4a2",
     "seed_43.json": "c1baba0d3f82b3683247a8fb968a83e6a4a1bb0a79633ee29f276b89cdb83677",
-    "summary.md": "f8ddd58a7573f2c1f14d4eb4def621436fab81ba8571ddce09dd218a9b59ef9c",
+    "summary.md": "40b89d7d66ddb8f0c3facf0efd5b33653e4f31a2d4def4fa3030e4b6907e765e",
     "selection_metrics.csv": "04d11a019f868917284f8fa82c1fa722c81edc4847ce7795a5b1c9dfb7b34854",
     "seed_45.json": "d95b893f0749d00bdd881072f1118e8395289ee88530dbb508722f2834a4f6ba",
-    "normalization_stability.csv": "992b8da859d9eaa0b37fca9028f5d16aec54164dcea9e23c5d220ac56f8ed8d3"
+    "normalization_stability.csv": "a0cf2e9aeebcea00be2d252283029646f61db38c73f50571c04239e171f82456"
   }
 }
