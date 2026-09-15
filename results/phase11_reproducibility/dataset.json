@@ -1,0 +1,60 @@
+{
+  "benchmark": "TUM RGB-D Benchmark (Sturm et al., IROS 2012)",
+  "train_scene": {
+    "name": "rgbd_dataset_freiburg1_desk (tum_fr1_desk)",
+    "camera": "FR1",
+    "frames": 150,
+    "role": "Oracle utility generation & TwoHeadMLP training"
+  },
+  "val_scene": {
+    "name": "rgbd_dataset_freiburg1_desk (tum_fr1_desk)",
+    "camera": "FR1",
+    "frames": 50,
+    "role": "Hyperparameter validation (A1 representation & B2 beta)"
+  },
+  "test_scene": {
+    "name": "rgbd_dataset_freiburg2_xyz (tum_fr2_xyz)",
+    "camera": "FR2",
+    "frames_evaluated": 30,
+    "total_sequence_frames": 464,
+    "role": "Zero-shot closed-loop end-to-end confirmatory benchmark",
+    "zero_shot_separation_guarantee": "Unseen room, distinct textures, distinct FR2 intrinsics, distinct motion dynamics. Zero test-set tuning."
+  },
+  "resolution": {
+    "width": 320,
+    "height": 240,
+    "downsample_factor": 2
+  },
+  "depth_calibration": {
+    "scale_factor": 5000.0,
+    "valid_range_meters": [
+      0.1,
+      5.0
+    ],
+    "invalid_depth_handling": "Masked out during geometric error computation"
+  },
+  "camera_intrinsics_320x240": {
+    "FR1": {
+      "fx": 258.65,
+      "fy": 258.25,
+      "cx": 159.3,
+      "cy": 127.65
+    },
+    "FR2": {
+      "fx": 260.45,
+      "fy": 260.5,
+      "cx": 162.55,
+      "cy": 124.85
+    }
+  },
+  "pose_format": "SE(3) 4x4 matrix, nearest-neighbor causal synchronization (+/- 10 ms)",
+  "evaluation_seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "scheduler_budget_ms": 15.0,
+  "scheduler_safety_factor": 1.1
+}

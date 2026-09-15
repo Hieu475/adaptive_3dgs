@@ -1,0 +1,71 @@
+{
+  "phase": "Phase 11: Scientific Reproducibility Pipeline & Manifest Audit",
+  "protocol_version": "1.0.0",
+  "status": "passed",
+  "created_at": "2026-09-15T18:58:18.180936+00:00",
+  "git_commit": "f1222ef4d360482a0c25343d62d8e419409c1277",
+  "git_branch": "phase11-reproducibility",
+  "gates": {
+    "Gate_11A_code_integrity": {
+      "status": "PASS",
+      "criteria": "Clean working tree, phase10-frozen tag exists, phase11 branch branched from frozen state, zero uncommitted modifications."
+    },
+    "Gate_11B_environment": {
+      "status": "PASS",
+      "criteria": "Software stack pinned (Python 3.12, PyTorch 2.11+cu128, CUDA 12.8, GCC 13.3) with explicit determinism vs reproducibility disclosures."
+    },
+    "Gate_11C_dataset_provenance": {
+      "status": "PASS",
+      "criteria": "Strict separation between training (tum_fr1_desk) and zero-shot test (tum_fr2_xyz), camera models, depth scaling, 5 seeds documented."
+    },
+    "Gate_11D_reproduction": {
+      "status": "PASS",
+      "criteria": "3-tier testing operational (pytest 456 unit tests, 8 runtime tests, fast smoke test, reproduce_phase10.sh)."
+    },
+    "Gate_11E_artifact_integrity": {
+      "status": "PASS",
+      "criteria": "Bit-for-bit SHA-256 match on all 14 Phase 10 artifacts and 5 frozen TwoHeadMLP checkpoints."
+    },
+    "Gate_11F_documentation": {
+      "status": "PASS",
+      "criteria": "Standardized 11-section README, primary results table, paired statistics, and explicit wall-clock latency disclosures (T_sched << T_opt << T_frame)."
+    }
+  },
+  "checkpoints_verified": {
+    "42": {
+      "checkpoint_file": "A1_online_adaptive_seed_42.pt",
+      "checkpoint_sha256": "3e9ce12dac70ccfe37d687ba3cb67957b8cba29bb9fa3874ff7ff5bd6977003a",
+      "normalizer_file": "A1_online_adaptive_seed_42.json",
+      "normalizer_sha256": "7893010e29b5a2694160dbdf26cca08148cbafc0583fa2f322526120761a8458",
+      "size_bytes": 25205
+    },
+    "43": {
+      "checkpoint_file": "A1_online_adaptive_seed_43.pt",
+      "checkpoint_sha256": "759169c5cf68149891b432f1a56f2fec1e1cc963bb43ccbcbd1899b0316ab219",
+      "normalizer_file": "A1_online_adaptive_seed_43.json",
+      "normalizer_sha256": "7893010e29b5a2694160dbdf26cca08148cbafc0583fa2f322526120761a8458",
+      "size_bytes": 25205
+    },
+    "44": {
+      "checkpoint_file": "A1_online_adaptive_seed_44.pt",
+      "checkpoint_sha256": "c564f6b1f83810e460e7ceb3c9c7d67828395446634c4eda8df931a60826b6cc",
+      "normalizer_file": "A1_online_adaptive_seed_44.json",
+      "normalizer_sha256": "7893010e29b5a2694160dbdf26cca08148cbafc0583fa2f322526120761a8458",
+      "size_bytes": 25205
+    },
+    "45": {
+      "checkpoint_file": "A1_online_adaptive_seed_45.pt",
+      "checkpoint_sha256": "94155ec2f8d0e895c58ba985c39d43122c40da80ad94be3dac02c24dc3dc47d9",
+      "normalizer_file": "A1_online_adaptive_seed_45.json",
+      "normalizer_sha256": "7893010e29b5a2694160dbdf26cca08148cbafc0583fa2f322526120761a8458",
+      "size_bytes": 25205
+    },
+    "46": {
+      "checkpoint_file": "A1_online_adaptive_seed_46.pt",
+      "checkpoint_sha256": "5d87caa388c6827d860f1afdd50046e65bdc07ca4a96b1d63e98ee5ef7108d7d",
+      "normalizer_file": "A1_online_adaptive_seed_46.json",
+      "normalizer_sha256": "7893010e29b5a2694160dbdf26cca08148cbafc0583fa2f322526120761a8458",
+      "size_bytes": 25205
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "phase": "Phase 11: Scientific Reproducibility Pipeline & Manifest Audit",
+  "generated_at": "2026-09-15T18:58:18.181468+00:00",
+  "protocol_version": "1.0.0",
+  "git_commit": "f1222ef4d360482a0c25343d62d8e419409c1277",
+  "git_branch": "phase11-reproducibility",
+  "target_tag": "phase11-frozen",
+  "gates": {
+    "Gate_11A_code_integrity": "PASS",
+    "Gate_11B_environment": "PASS",
+    "Gate_11C_dataset_provenance": "PASS",
+    "Gate_11D_reproduction": "PASS",
+    "Gate_11E_artifact_integrity": "PASS",
+    "Gate_11F_documentation": "PASS"
+  },
+  "reference_phase10_manifest": {
+    "path": "results/phase10_e2e/manifest.json",
+    "sha256": "0fa204a8e7ce3f5d11cbec45c0473657e1ef0b4399e0e173de510131bdbdb273",
+    "verified_artifacts_count": 14
+  },
+  "artifacts": {
+    "protocol.json": {
+      "sha256": "ce3efba041d1e794d89fc50c8c6d1b00d244f2b81e315184e4ecab56ab86a27b",
+      "size_bytes": 3347
+    },
+    "environment.json": {
+      "sha256": "54f7f2db5eb677b7c3eee00f25b51f292e51ffdd66a7fb9fe37ddc8fca80993d",
+      "size_bytes": 997
+    },
+    "dataset.json": {
+      "sha256": "2b1b2f04c32b583f3390cfcb8ab8249c03307ebe713816e4b1c99a7187a2d100",
+      "size_bytes": 1552
+    },
+    "smoke_test.json": {
+      "sha256": "e0a5e90a1dfc546fe08d0ceb8487ee43e82bae8379abf01530a82f05db801126",
+      "size_bytes": 2282
+    },
+    "reproduction_log.txt": {
+      "sha256": "01ddc1aaf9dd6d34adee3ce010d1b48a710d0bcbb02d7890df4f182c45c3e069",
+      "size_bytes": 4196
+    },
+    "summary.md": {
+      "sha256": "4306b220f12bcaa221e32fbe2fee172a525f36aeb1c1e97e21beb2b9a59b6914",
+      "size_bytes": 5321
+    }
+  }
+}

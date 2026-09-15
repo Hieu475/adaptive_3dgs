@@ -1,0 +1,76 @@
+{
+  "status": "PASS",
+  "timestamp_utc": "2026-09-15T18:58:05.879641+00:00",
+  "wall_time_seconds": 22.99,
+  "device": "cuda",
+  "scene": "tum_fr2_xyz",
+  "seed": 42,
+  "frames_evaluated": 5,
+  "initial_gaussians": 3502,
+  "final_gaussians": 3786,
+  "invariants_checked": {
+    "checkpoint_load": "PASS",
+    "eval_mode_and_frozen_grad": "PASS",
+    "b2_ema_normalizer_online": "PASS",
+    "observable_11d_causal_features": "PASS",
+    "twoheadmlp_forward_and_bounds": "PASS",
+    "knapsack_budget_enforcement": "PASS",
+    "statestore_closed_loop_sync": "PASS",
+    "continuous_trajectory_no_reset": "PASS",
+    "numerical_stability_no_nans": "PASS",
+    "model_weight_immutability_zero_diff": "PASS"
+  },
+  "model_immutability": {
+    "max_parameter_diff": 0.0,
+    "initial_weights_sha256": "ab30387c2af8c4a2dfabe8cfca78053b1e398a7c273a9b831c0f504dbbc127b9",
+    "final_weights_sha256": "ab30387c2af8c4a2dfabe8cfca78053b1e398a7c273a9b831c0f504dbbc127b9",
+    "is_identical": true
+  },
+  "normalizer_history_length": 4,
+  "frame_transitions": [
+    {
+      "frame": 1,
+      "gaussians_before": 3502,
+      "gaussians_after": 3570,
+      "gaussians_selected": 1,
+      "psnr_db": 13.463119268417358,
+      "scheduled_cost_ms": 13.940108299255371,
+      "frame_wall_ms": 5986.304863999976,
+      "statestore_synced": true,
+      "zero_oracle_verified": true
+    },
+    {
+      "frame": 2,
+      "gaussians_before": 3570,
+      "gaussians_after": 3642,
+      "gaussians_selected": 0,
+      "psnr_db": 13.424195051193237,
+      "scheduled_cost_ms": 0.0,
+      "frame_wall_ms": 5486.931219000326,
+      "statestore_synced": true,
+      "zero_oracle_verified": true
+    },
+    {
+      "frame": 3,
+      "gaussians_before": 3642,
+      "gaussians_after": 3714,
+      "gaussians_selected": 0,
+      "psnr_db": 13.296811580657959,
+      "scheduled_cost_ms": 0.0,
+      "frame_wall_ms": 5451.161998000316,
+      "statestore_synced": true,
+      "zero_oracle_verified": true
+    },
+    {
+      "frame": 4,
+      "gaussians_before": 3714,
+      "gaussians_after": 3786,
+      "gaussians_selected": 0,
+      "psnr_db": 13.117586374282837,
+      "scheduled_cost_ms": 0.0,
+      "frame_wall_ms": 5366.863047000152,
+      "statestore_synced": true,
+      "zero_oracle_verified": true
+    }
+  ]
+}

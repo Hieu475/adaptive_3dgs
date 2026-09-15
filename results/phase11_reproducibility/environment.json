@@ -1,0 +1,25 @@
+{
+  "os": "Linux-6.8.0-94-generic-x86_64-with-glibc2.39",
+  "kernel": "#96-Ubuntu SMP PREEMPT_DYNAMIC Fri Jan  9 20:36:55 UTC 2026",
+  "arch": "x86_64",
+  "python_version": "3.12.13",
+  "python_details": "3.12.13 | packaged by conda-forge | (main, Mar  5 2026, 16:50:00) [GCC 14.3.0]",
+  "pytorch_version": "2.11.0+cu128",
+  "cuda_available": true,
+  "cuda_version_torch": "12.8",
+  "gpu_name": "NVIDIA GeForce RTX 4050 Laptop GPU",
+  "gpu_compute_capability": [
+    8,
+    9
+  ],
+  "numpy_version": "2.2.6",
+  "scipy_version": "1.13.1",
+  "pandas_version": "3.0.5",
+  "matplotlib_version": "3.11.1",
+  "gcc_version": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+  "cmake_version": "cmake version 4.0.1",
+  "ninja_version": "1.11.1",
+  "nvcc_version": "nvcc: NVIDIA (R) Cuda compiler driver",
+  "determinism_policy": "Pinned Environment + Fixed Protocol + Fixed Seeds => Reproducible Evaluation (torch.use_deterministic_algorithms=False)",
+  "timestamp_utc": "2026-09-15T18:57:42.891899+00:00"
+}

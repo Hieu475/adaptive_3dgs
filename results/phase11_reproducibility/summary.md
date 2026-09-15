@@ -12,7 +12,7 @@ $$\boxed{\text{Pinned Environment + Fixed Protocol + Fixed Seeds} \implies \text
 
 | Gate | Focus | Evaluation Criteria | Result | Evidence |
 | :--- | :--- | :--- | :---: | :--- |
-| **Gate 11A** | Code Integrity | Clean git state, tag `phase10-frozen` verified, active branch `phase11-reproducibility` | :white_check_mark: **PASS** | Commit `f3a55ea174`, working tree clean |
+| **Gate 11A** | Code Integrity | Clean git state, tag `phase10-frozen` verified, active branch `phase11-reproducibility` | :white_check_mark: **PASS** | Commit `f1222ef4d3`, working tree clean |
 | **Gate 11B** | Environment | Python, PyTorch, CUDA, GCC, CMake, dependencies documented with determinism disclosures | :white_check_mark: **PASS** | [`environment.json`](environment.json), [`docs/environment.md`](../../docs/environment.md) |
 | **Gate 11C** | Dataset Provenance | TUM FR1/FR2 splits, camera models, depth scaling, SE(3) causal pose sync, 5 seeds | :white_check_mark: **PASS** | [`dataset.json`](dataset.json), [`docs/dataset.md`](../../docs/dataset.md) |
 | **Gate 11D** | Reproduction | 3-tier testing (456 unit tests, 8 runtime tests, fast smoke test, master reproduction script) | :white_check_mark: **PASS** | [`smoke_test.json`](smoke_test.json), [`reproduction_log.txt`](reproduction_log.txt) |
@@ -25,8 +25,8 @@ $$\boxed{\text{Pinned Environment + Fixed Protocol + Fixed Seeds} \implies \text
 
 1. **Tier 1 (Unit Tests)**: `pytest tests/ -q` $\implies$ **456 passed in 8.8s** (100% pass rate).
 2. **Tier 2 (Phase 10 Tests)**: `pytest tests/test_phase10_runtime.py -v` $\implies$ **8 passed in 1.7s**.
-3. **Tier 3 (Runtime Smoke Test)**: `python experiments/run_phase10_smoke.py` $\implies$ **Passed in 21.15s**:
-   - Initial primitives: $N = 3502$ $\to$ Final primitives: $N = 3780$
+3. **Tier 3 (Runtime Smoke Test)**: `python experiments/run_phase10_smoke.py` $\implies$ **Passed in 22.99s**:
+   - Initial primitives: $N = 3502$ $\to$ Final primitives: $N = 3786$
    - Model parameter freeze verified: `requires_grad=False`
    - Strict weight immutability: $\|\theta_T - \theta_0\|_\infty = 0.0$ (SHA-256: `ab30387c2af8c4a2...`)
    - Zero-oracle verified: `True`

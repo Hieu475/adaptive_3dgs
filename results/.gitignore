@@ -50,3 +50,7 @@ phase6_context_utility/ablation/*.pt
 !phase10_e2e/*.md
 !phase10_e2e/figures/*.png
 !phase10_e2e/checkpoints/*.json
+!phase11_reproducibility/*.json
+!phase11_reproducibility/*.txt
+!phase11_reproducibility/*.md
+
