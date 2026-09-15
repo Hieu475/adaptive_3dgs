@@ -146,10 +146,10 @@ GATE_CRITERIA_9C: Dict[str, Dict[str, Any]] = {
             "report_runtime",
         ],
     },
-    "Gate_9C_3_adaptation_necessity": {
-        "description": "Adaptation necessity & equivalence check: "
-                       "1. B2_static (update off) must be numerically equivalent to B0 within floating-point tolerance (< 1e-5). "
-                       "2. Observe B2_update vs B2_static to verify active adaptation.",
+    "Gate_9C_3_adaptation_ablation": {
+        "description": "Adaptation ablation & implementation check: "
+                       "1. B2_static (update off) must be numerically equivalent to B0 within floating-point tolerance (< 1e-5), validating implementation isolation. "
+                       "2. Observe B2_update vs B2_static to demonstrate that active test adaptation materially alters features and predictions.",
         "type": "quantitative_equivalence",
         "tolerance": 1e-5,
     },

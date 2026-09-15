@@ -1,6 +1,6 @@
 {
   "phase": "Phase 9C: B2 Robustness & Adaptation Necessity",
-  "generated_at": "2026-09-15T10:18:21.714515",
+  "generated_at": "2026-09-15T10:32:02.026511",
   "files": {
     "protocol.json": {
       "sha256": "dd9fbc8b1c59326903386f528da65773b44366f5cfc7a8d6ce6843d67af5fb5e",
@@ -35,8 +35,8 @@
       "size_bytes": 4266
     },
     "summary.md": {
-      "sha256": "bef7a57cf8e3610f702f09dd1d4552e99c002f7f96f97b95f3988e62b3c61bea",
-      "size_bytes": 6851
+      "sha256": "d91f016c97273952ff6d2543def97fa5ad8044aa0b14cfd4eabe763f543afa60",
+      "size_bytes": 9017
     },
     "figures/fig25_ema_sensitivity.png": {
       "sha256": "260c82c3cdc1b3f6dc163260a7d2b39310d05e47a72dcba3d326ddff3c674562",
