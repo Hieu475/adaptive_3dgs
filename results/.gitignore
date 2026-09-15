@@ -45,3 +45,8 @@ phase6_context_utility/ablation/*.pt
 !phase9c_b2_robustness/*.csv
 !phase9c_b2_robustness/*.md
 !phase9c_b2_robustness/figures/*.png
+!phase10_e2e/*.json
+!phase10_e2e/*.csv
+!phase10_e2e/*.md
+!phase10_e2e/figures/*.png
+!phase10_e2e/checkpoints/*.json

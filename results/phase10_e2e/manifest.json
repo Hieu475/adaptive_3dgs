@@ -1,0 +1,62 @@
+{
+  "phase": "Phase 10: End-to-End Adaptive 3DGS Integration",
+  "generated_at": "2026-09-15T19:46:27.190798",
+  "protocol_version": "1.0.0",
+  "gates": {
+    "Gate_10A_integration": "PASS",
+    "Gate_10B_closed_loop_correctness": "PASS",
+    "Gate_10C_budget_accounting": "PASS",
+    "Gate_10D_scientific_validity": "PASS",
+    "Gate_10E_performance_characterization": "PASS"
+  },
+  "artifacts": {
+    "protocol.json": {
+      "sha256": "c601f02df0cc9ce07392efed1ef0fd1a097e3139d534162bb2ec32fd061a562b",
+      "size_bytes": 3704
+    },
+    "trajectory_metrics.csv": {
+      "sha256": "63e89cec0767441321b8d520b570d560d9f24d650b39698701ca2efdf8ba0dfb",
+      "size_bytes": 5486
+    },
+    "frame_metrics.csv": {
+      "sha256": "2040278907a440308d9ef1c0d093f55f00562d3523dc4d5009ec06ae678d7237",
+      "size_bytes": 130328
+    },
+    "selection_metrics.csv": {
+      "sha256": "35ed079319768b28a1f0a77143bfdee4af444a2db2be39554e338ca2305af23a",
+      "size_bytes": 29655
+    },
+    "runtime_metrics.csv": {
+      "sha256": "a3663897a40a142d2c439c1c40d3090ad73a7619daaf78575ab0393038749333",
+      "size_bytes": 35205
+    },
+    "memory_metrics.csv": {
+      "sha256": "c294043a1c2388ce99762f4723a9188cba2c572afc049db8262fb218a0cf1eca",
+      "size_bytes": 19713
+    },
+    "summary.md": {
+      "sha256": "e8a7aec2da2d6b5424e15602d8d32d3c4ead8557695af9f44db59d7234289fc2",
+      "size_bytes": 4753
+    },
+    "figures/quality_vs_frame.png": {
+      "sha256": "4f4a1e5a5203326bb74c50b4a2ed18de9afdb659863925c4f1d6d12278184762",
+      "size_bytes": 290898
+    },
+    "figures/latency_vs_frame.png": {
+      "sha256": "ef38c5c486855e7232c75410cac52f26cc5c2693b9f9aef77d0cff1169966bf9",
+      "size_bytes": 270246
+    },
+    "figures/budget_vs_actual.png": {
+      "sha256": "3c2fda486d6646c8c12573c6d4a8b4a8a41eebd1a8affd11d1258dc7be66d8ff",
+      "size_bytes": 300736
+    },
+    "figures/gaussian_selection.png": {
+      "sha256": "8b9a64b1927556b1cd03b8167aa1c27c9e97c362e3fc39b8ade781b409c616b9",
+      "size_bytes": 183461
+    },
+    "figures/trajectory_comparison.png": {
+      "sha256": "eaa19c81f01d8c3870dfaf8d03e7c7d5bf023bed48cfe6e7791c2cf8abc010c9",
+      "size_bytes": 304068
+    }
+  }
+}

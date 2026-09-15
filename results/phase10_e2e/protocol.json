@@ -1,0 +1,121 @@
+{
+  "phase": "Phase 10: End-to-End Adaptive 3DGS Integration",
+  "protocol_version": "1.0.0",
+  "status": "frozen",
+  "invariants": {
+    "base_representation": "geometry_relative",
+    "b2_beta": 0.9,
+    "model_architecture": "TwoHeadMLP(in_features=11, hidden_dim=64)",
+    "model_eps_cost": 0.001,
+    "eps": 1e-06,
+    "safety_factor": 1.1,
+    "zero_oracle_at_test": true,
+    "zero_test_tuning": true
+  },
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "scenes": {
+    "primary_test": "tum_fr2_xyz",
+    "reference_train": "tum_fr1_desk"
+  },
+  "budget_ms": 15.0,
+  "default_trajectory_frames": 30,
+  "resolution": [
+    240,
+    320
+  ],
+  "policies": [
+    "no_op",
+    "error_only",
+    "ours",
+    "full"
+  ],
+  "policy_descriptions": {
+    "no_op": "No optimization; pass-through tracking, rendering, and state accumulation",
+    "error_only": "Strong heuristic baseline selecting Gaussians by combined RGB+depth error under budget",
+    "ours": "End-to-end Adaptive 3DGS with A1 geometry-relative + B2 online normalizer + TwoHeadMLP under budget",
+    "full": "Unconstrained full-scene optimization (reference upper bound)"
+  },
+  "gate_criteria": {
+    "Gate_10A_integration": {
+      "description": "Model checkpoint loaded properly; B2 normalizer runs online; StateStore updates per frame; selector uses B2 output; zero oracle/test labels.",
+      "type": "verification",
+      "criteria": [
+        "frozen_checkpoint_loaded",
+        "online_b2_normalizer_active",
+        "statestore_updated_per_frame",
+        "b2_utility_guides_selection",
+        "zero_oracle_access"
+      ]
+    },
+    "Gate_10B_closed_loop_correctness": {
+      "description": "Continuous stateful trajectory S_t -> S_{t+1} across entire sequence. No Gaussian state reset between frames.",
+      "type": "verification",
+      "criteria": [
+        "continuous_map_state",
+        "no_per_frame_state_reset",
+        "all_frames_completed_without_crash"
+      ]
+    },
+    "Gate_10C_budget_accounting": {
+      "description": "Every frame logs predicted cost \\hat{C}_t, scheduled cost C_t^{scheduled}, and actual wall-clock latency C_t^{actual}. Distinctly reports scheduler budget vs physical wall-clock budget.",
+      "type": "accounting",
+      "criteria": [
+        "log_predicted_cost",
+        "log_scheduled_cost",
+        "log_actual_opt_time",
+        "log_total_frame_time",
+        "distinguish_scheduler_vs_physical_budget"
+      ]
+    },
+    "Gate_10D_scientific_validity": {
+      "description": "Fixed protocol, fixed seeds [42,43,44,45,46], frozen checkpoint, test sequence untouched, reproducible logs, zero hidden oracle.",
+      "type": "reproducibility",
+      "criteria": [
+        "fixed_seeds_evaluated",
+        "frozen_checkpoint_unaltered",
+        "test_sequence_untouched",
+        "checksums_and_manifest_generated"
+      ]
+    },
+    "Gate_10E_performance_characterization": {
+      "description": "Objective characterization of B2 vs ERROR_ONLY and B2 vs FULL. Valid scientific result regardless of whether B2 outperforms or matches baseline.",
+      "type": "characterization",
+      "criteria": [
+        "report_psnr_trajectory",
+        "report_delta_q_and_cumulative_q",
+        "report_selection_dynamics",
+        "report_systems_and_memory_metrics",
+        "paired_statistical_testing"
+      ]
+    }
+  },
+  "execution_args": {
+    "budget_ms": 15.0,
+    "n_frames": 30,
+    "scene": "tum_fr2_xyz",
+    "seeds": [
+      42,
+      43,
+      44,
+      45,
+      46
+    ],
+    "policies": [
+      "no_op",
+      "error_only",
+      "ours",
+      "full"
+    ],
+    "full_seeds": [
+      42
+    ],
+    "device": "cuda",
+    "output_dir": "results/phase10_e2e"
+  }
+}
