@@ -2,7 +2,7 @@
 
 This document specifies the exact software and hardware environment used to develop, train, and validate the **Adaptive 3D Gaussian Splatting (Adaptive 3DGS)** research pipeline.
 
-$$\boxed{\text{Identical Environment} \implies \text{Reproducible Execution & Bit-for-Bit Determinism}}$$
+$$\boxed{\text{Pinned Environment + Fixed Protocol + Fixed Seeds} \implies \text{Reproducible Evaluation}}$$
 
 ---
 
@@ -108,8 +108,12 @@ python experiments/run_phase10_smoke.py
 
 ---
 
-## 5. Determinism & Multi-Seed Protocol
+## 5. Reproducibility vs. Numerical Determinism
 
 All experiments fix random seeds across PyTorch, NumPy, and Python standard random libraries:
 - Default multi-seed confirmatory evaluation suite: `seeds = [42, 43, 44, 45, 46]`
-- Model checkpoints and evaluation protocol enforce `torch.use_deterministic_algorithms(False)` for standard CuDNN speed while guaranteeing exact stateful reproducibility via persistent seeds.
+- Model checkpoints and evaluation protocols set `torch.use_deterministic_algorithms(False)` for standard CuDNN speed while ensuring stateful experimental reproducibility via persistent seeds and frozen model weights.
+
+> [!NOTE]
+> **Reproducibility $\neq$ Absolute Bit-for-Bit Determinism**:
+> While static deliverable artifacts (CSVs, figures, summary reports, and frozen model weights) are verified bit-for-bit via cryptographic SHA-256 digests against the manifest, active CUDA/cuDNN neural execution inherently exhibits minor floating-point non-associativity across parallel warp reduction orders and GPU architectures. We guarantee rigorous experimental reproducibility (consistent rankings, effect sizes, statistical significance, and invariant adherence) through pinned dependencies, fixed data splits, and explicit evaluation protocols.

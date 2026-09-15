@@ -1,0 +1,85 @@
+ADAPTIVE 3DGS — PHASE 11 REPRODUCIBILITY AUDIT LOG
+Generated at: 2026-09-15T18:48:28.610216+00:00
+Git Commit:   f3a55ea1741d653f8dfeff30e5d8f5c15ca2ca74
+Git Branch:   phase11-reproducibility
+================================================================================
+
+1. ENVIRONMENT AUDIT
+----------------------------------------
+os: Linux-6.8.0-94-generic-x86_64-with-glibc2.39
+kernel: #96-Ubuntu SMP PREEMPT_DYNAMIC Fri Jan  9 20:36:55 UTC 2026
+arch: x86_64
+python_version: 3.12.13
+python_details: 3.12.13 | packaged by conda-forge | (main, Mar  5 2026, 16:50:00) [GCC 14.3.0]
+pytorch_version: 2.11.0+cu128
+cuda_available: True
+cuda_version_torch: 12.8
+gpu_name: NVIDIA GeForce RTX 4050 Laptop GPU
+gpu_compute_capability: [8, 9]
+numpy_version: 2.2.6
+scipy_version: 1.13.1
+pandas_version: 3.0.5
+matplotlib_version: 3.11.1
+gcc_version: gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+cmake_version: cmake version 4.0.1
+ninja_version: 1.11.1
+nvcc_version: nvcc: NVIDIA (R) Cuda compiler driver
+determinism_policy: Pinned Environment + Fixed Protocol + Fixed Seeds => Reproducible Evaluation (torch.use_deterministic_algorithms=False)
+timestamp_utc: 2026-09-15T18:47:55.810179+00:00
+
+2. TEST SUITE OUTPUTS
+----------------------------------------
+A. pytest tests/ -q:
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+........................................................................ [ 47%]
+........................................................................ [ 63%]
+........................................................................ [ 78%]
+........................................................................ [ 94%]
+........................                                                 [100%]
+456 passed in 8.03s
+
+B. pytest tests/test_phase10_runtime.py -v:
+........                                                                 [100%]
+8 passed in 1.64s
+
+
+3. SMOKE TEST RUNTIME LOG
+----------------------------------------
+>> [Step 1/6] Capturing Environment & Software Stack...
+   [PASS] Saved environment specification: environment.json
+>> [Step 2/6] Recording Dataset Provenance & Split Invariants...
+   [PASS] Saved dataset specification: dataset.json
+>> [Step 3/6] Running Fast Closed-Loop Smoke Test...
+   Frame 01: N=3575 | Selected=1 | PSNR=13.46 dB | Sched=13.95 ms
+   Frame 02: N=3645 | Selected=0 | PSNR=13.42 dB | Sched=0.00 ms
+   Frame 03: N=3717 | Selected=0 | PSNR=13.30 dB | Sched=0.00 ms
+   Frame 04: N=3780 | Selected=0 | PSNR=13.12 dB | Sched=0.00 ms
+   [PASS] Smoke test completed in 21.15s: smoke_test.json
+>> [Step 4/6] Verifying Checkpoints and Phase 10 Manifest...
+   Seed 42: CKPT=A1_online_adaptive_seed_42.pt (3e9ce12dac70...) | NORM=A1_online_adaptive_seed_42.json
+   Seed 43: CKPT=A1_online_adaptive_seed_43.pt (759169c5cf68...) | NORM=A1_online_adaptive_seed_43.json
+   Seed 44: CKPT=A1_online_adaptive_seed_44.pt (c564f6b1f838...) | NORM=A1_online_adaptive_seed_44.json
+   Seed 45: CKPT=A1_online_adaptive_seed_45.pt (94155ec2f8d0...) | NORM=A1_online_adaptive_seed_45.json
+   Seed 46: CKPT=A1_online_adaptive_seed_46.pt (5d87caa388c6...) | NORM=A1_online_adaptive_seed_46.json
+   [PASS] Verified all 14 Phase 10 artifacts against manifest.json
+>> [Step 5/6] Running Test Suites & Logging Reproduction Chain...
+   PyTest Full Suite: 456 passed in 8.03s
+   PyTest Phase 10 Suite: 8 passed in 1.64s
+
+4. PHASE 10 MANIFEST CHECKSUMS (14/14 PASS)
+----------------------------------------
+protocol.json                            PASS
+trajectory_metrics.csv                   PASS
+frame_metrics.csv                        PASS
+selection_metrics.csv                    PASS
+runtime_metrics.csv                      PASS
+memory_metrics.csv                       PASS
+latency_breakdown.csv                    PASS
+audit_metrics.csv                        PASS
+summary.md                               PASS
+figures/quality_vs_frame.png             PASS
+figures/latency_vs_frame.png             PASS
+figures/budget_vs_actual.png             PASS
+figures/gaussian_selection.png           PASS
+figures/trajectory_comparison.png        PASS

@@ -5,7 +5,7 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.1%2B-orange.svg)](https://pytorch.org/)
 [![CUDA](https://img.shields.io/badge/CUDA-12.8-green.svg)](docs/environment.md)
 [![Phase 10 Status](https://img.shields.io/badge/Phase%2010-FROZEN%20(Gates%2010A--10E%20PASS)-success.svg)](results/phase10_e2e/manifest.json)
-[![Phase 11 Status](https://img.shields.io/badge/Phase%2011-REPRODUCIBLE%20(Gates%2011A--11F%20PASS)-blueviolet.svg)](results/phase10_e2e/manifest.json)
+[![Phase 11 Status](https://img.shields.io/badge/Phase%2011-IMPLEMENTED%20%2F%20VERIFYING-yellow.svg)](results/phase11_reproducibility/manifest.json)
 [![Tag](https://img.shields.io/badge/tag-phase10--frozen-blue.svg)](https://github.com/Hieu475/adaptive_3dgs/releases/tag/phase10-frozen)
 
 ---
@@ -21,10 +21,12 @@ $$\max_{A_t \subseteq G_t} \Delta Q(A_t) \quad \text{subject to} \quad \sum_{i \
 where candidate Gaussians $i \in A_t$ are selected via a learned utility predictor that scores the expected marginal reconstruction gain per unit computation.
 
 > [!IMPORTANT]
-> **Authoritative Phase 10 & 11 Reproducibility Freeze**:
-> The system operates as a fully integrated, stateful, closed-loop reconstruction system ($S_t \to X_t \to \hat{X}_t \to \hat{U}_t \to A_t \to S_{t+1}$). All Phase 10 artifacts, models, checkpoints, and benchmark metrics are cryptographically frozen at tag [`phase10-frozen`](https://github.com/Hieu475/adaptive_3dgs/releases/tag/phase10-frozen) and verified under Phase 11.
-> - Authoritative Manifest: [`results/phase10_e2e/manifest.json`](results/phase10_e2e/manifest.json)
-> - Executive Summary Report: [`results/phase10_e2e/summary.md`](results/phase10_e2e/summary.md)
+> **Authoritative Phase 10 Frozen Benchmark & Phase 11 Reproducibility Artifacts**:
+> The system operates as a fully integrated, stateful, closed-loop reconstruction system ($S_t \to X_t \to \hat{X}_t \to \hat{U}_t \to A_t \to S_{t+1}$). All Phase 10 artifacts, models, checkpoints, and benchmark metrics are cryptographically frozen at tag [`phase10-frozen`](https://github.com/Hieu475/adaptive_3dgs/releases/tag/phase10-frozen). Phase 11 formalizes independent reproducibility verification:
+> - Phase 10 Authoritative Manifest: [`results/phase10_e2e/manifest.json`](results/phase10_e2e/manifest.json)
+> - Phase 10 Executive Report: [`results/phase10_e2e/summary.md`](results/phase10_e2e/summary.md)
+> - Phase 11 Reproducibility Manifest: [`results/phase11_reproducibility/manifest.json`](results/phase11_reproducibility/manifest.json)
+> - Phase 11 Audit Report: [`results/phase11_reproducibility/summary.md`](results/phase11_reproducibility/summary.md)
 > - Checkpoint Registry: [`docs/checkpoints.md`](docs/checkpoints.md)
 > - Environment Specification: [`docs/environment.md`](docs/environment.md)
 > - Dataset Specification: [`docs/dataset.md`](docs/dataset.md)
@@ -124,7 +126,7 @@ flowchart TD
 | **Phase 8** | Zero-Shot Cross-Scene Transfer | Evaluated generalization across differing indoor environments; identified feature-shift vulnerability under fixed standard normalizers. | **FROZEN** |
 | **Phase 9** | Robust Representations (A1 + B2) | Proved $A1 \text{ (geometry\_relative)} + B2 \text{ (Online EMA } \beta=0.90)$ stabilizes cross-scene moment drift. | **FROZEN** |
 | **Phase 10** | End-to-End Closed-Loop System | Successfully integrated frozen $A1 + B2 + \text{TwoHeadMLP}$ into a continuous online trajectory without frame resets across 5 seeds. | **FROZEN (tag: phase10-frozen)** |
-| **Phase 11** | Reproducibility Pipeline & Audit | Automated smoke testing, cryptographic manifest verification, comprehensive environment/dataset/checkpoint documentation, and regression hardening. | **FROZEN (tag: phase11-frozen)** |
+| **Phase 11** | Reproducibility Pipeline & Audit | Automated smoke testing, cryptographic manifest verification, comprehensive environment/dataset/checkpoint documentation, and regression hardening. | **IMPLEMENTED / VERIFYING** |
 
 ---
 
@@ -202,9 +204,13 @@ bash scripts/reproduce_phase10.sh
 ```
 
 ### 4. Cryptographic Manifest Verification
-Verifies bit-for-bit SHA-256 integrity of all 14 Phase 10 deliverable artifacts:
+Verifies bit-for-bit SHA-256 integrity of both Phase 10 benchmark deliverables and Phase 11 reproducibility audit artifacts:
 ```bash
+# Verify Phase 10 benchmark deliverables (14 artifacts)
 python scripts/verify_phase10_manifest.py --manifest results/phase10_e2e/manifest.json
+
+# Verify Phase 11 reproducibility audit deliverables (6 artifacts)
+python scripts/verify_phase11_manifest.py --manifest results/phase11_reproducibility/manifest.json
 ```
 
 ---
