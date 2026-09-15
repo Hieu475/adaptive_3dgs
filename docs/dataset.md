@@ -71,3 +71,16 @@ Automated download and preparation script:
 ```bash
 bash scripts/download_tum.sh
 ```
+
+---
+
+## 5. Multi-Seed Protocol & Trajectory Configuration
+
+To ensure statistical rigor and eliminate stochastic cherry-picking, evaluations across all policies are repeated over 5 predefined seeds:
+
+- **Seeds**: `42`, `43`, `44`, `45`, `46`
+- **Resolution**: $320 \times 240$ (downsampled by $2\times$)
+- **Frame Range (Phase 10 E2E)**: Frames `[0, 29]` (30 continuous streaming steps on `tum_fr2_xyz`)
+- **Full Sequence Availability**: `tum_fr2_xyz` contains 464 total frames available for extended long-horizon tests
+- **Budget**: $B = 15.0\text{ ms}$ per frame with safety factor $\alpha = 1.1$
+

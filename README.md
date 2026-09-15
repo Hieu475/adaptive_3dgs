@@ -3,13 +3,14 @@
 [![Tests](https://img.shields.io/badge/tests-456%20passed-brightgreen.svg)](tests/)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.1%2B-orange.svg)](https://pytorch.org/)
-[![CUDA](https://img.shields.io/badge/CUDA-12.8-green.svg)](csrc/)
+[![CUDA](https://img.shields.io/badge/CUDA-12.8-green.svg)](docs/environment.md)
 [![Phase 10 Status](https://img.shields.io/badge/Phase%2010-FROZEN%20(Gates%2010A--10E%20PASS)-success.svg)](results/phase10_e2e/manifest.json)
-[![Tag](https://img.shields.io/badge/tag-phase10--frozen-blueviolet.svg)](https://github.com/Hieu475/adaptive_3dgs/releases/tag/phase10-frozen)
+[![Phase 11 Status](https://img.shields.io/badge/Phase%2011-REPRODUCIBLE%20(Gates%2011A--11F%20PASS)-blueviolet.svg)](results/phase10_e2e/manifest.json)
+[![Tag](https://img.shields.io/badge/tag-phase10--frozen-blue.svg)](https://github.com/Hieu475/adaptive_3dgs/releases/tag/phase10-frozen)
 
 ---
 
-## 1. Project Overview
+## 1. Project
 
 Dense online 3D reconstruction from streaming RGB-D sensors requires maintaining photometric and geometric fidelity under rigid per-frame execution deadlines (e.g., $15\text{–}33\text{ ms}$). While 3D Gaussian Splatting (3DGS) enables interactive differentiable rendering, existing SLAM and mapping pipelines optimize Gaussians indiscriminately or rely on heuristic residual thresholds (e.g., *"high rendering error $\Rightarrow$ optimize"*).
 
@@ -20,14 +21,17 @@ $$\max_{A_t \subseteq G_t} \Delta Q(A_t) \quad \text{subject to} \quad \sum_{i \
 where candidate Gaussians $i \in A_t$ are selected via a learned utility predictor that scores the expected marginal reconstruction gain per unit computation.
 
 > [!IMPORTANT]
-> **Phase 10 Current Frozen Status**:
-> The system has transitioned from isolated offline research prototypes to a fully integrated, stateful, closed-loop reconstruction system ($S_t \to X_t \to \hat{X}_t \to \hat{U}_t \to A_t \to S_{t+1}$). All Phase 10 artifacts, models, checkpoints, and benchmark metrics are cryptographically frozen at tag [`phase10-frozen`](https://github.com/Hieu475/adaptive_3dgs/releases/tag/phase10-frozen).
+> **Authoritative Phase 10 & 11 Reproducibility Freeze**:
+> The system operates as a fully integrated, stateful, closed-loop reconstruction system ($S_t \to X_t \to \hat{X}_t \to \hat{U}_t \to A_t \to S_{t+1}$). All Phase 10 artifacts, models, checkpoints, and benchmark metrics are cryptographically frozen at tag [`phase10-frozen`](https://github.com/Hieu475/adaptive_3dgs/releases/tag/phase10-frozen) and verified under Phase 11.
 > - Authoritative Manifest: [`results/phase10_e2e/manifest.json`](results/phase10_e2e/manifest.json)
 > - Executive Summary Report: [`results/phase10_e2e/summary.md`](results/phase10_e2e/summary.md)
+> - Checkpoint Registry: [`docs/checkpoints.md`](docs/checkpoints.md)
+> - Environment Specification: [`docs/environment.md`](docs/environment.md)
+> - Dataset Specification: [`docs/dataset.md`](docs/dataset.md)
 
 ---
 
-## 2. Research Questions (RQs)
+## 2. Research Question
 
 | Research Question | Core Hypothesis | Empirical Finding & Authoritative Status |
 | :--- | :--- | :--- |
@@ -38,7 +42,7 @@ where candidate Gaussians $i \in A_t$ are selected via a learned utility predict
 
 ---
 
-## 3. Method Architecture
+## 3. Method
 
 The online reconstruction pipeline executes a strictly causal, closed-loop cycle on each streaming RGB-D frame:
 
@@ -96,7 +100,7 @@ TwoHeadMLP Forward Pass (Frozen checkpoint, requires_grad=False)
 
 ---
 
-## 4. Phase 1–10 Research Roadmap
+## 4. Experimental Roadmap
 
 ```mermaid
 flowchart TD
@@ -107,6 +111,7 @@ flowchart TD
     P7 --> P8["Phase 8: Zero-Shot Generalization<br/>(Unseen scene transfer on tum_fr2_xyz)"]
     P8 --> P9["Phase 9: Robust Representation A1 + B2<br/>(Geometry-relative + Online EMA beta=0.90)"]
     P9 --> P10["Phase 10: End-to-End Closed-Loop Integration<br/>(Frozen S_t -> S_{t+1}, n=5 seeds, Gates 10A-10E PASS)"]
+    P10 --> P11["Phase 11: Reproducibility Pipeline & Hardening<br/>(Smoke test, manifest verification, Gates 11A-11F PASS)"]
 ```
 
 | Phase | Focus | Core Outcome & Finding | Status |
@@ -119,154 +124,162 @@ flowchart TD
 | **Phase 8** | Zero-Shot Cross-Scene Transfer | Evaluated generalization across differing indoor environments; identified feature-shift vulnerability under fixed standard normalizers. | **FROZEN** |
 | **Phase 9** | Robust Representations (A1 + B2) | Proved $A1 \text{ (geometry\_relative)} + B2 \text{ (Online EMA } \beta=0.90)$ stabilizes cross-scene moment drift. | **FROZEN** |
 | **Phase 10** | End-to-End Closed-Loop System | Successfully integrated frozen $A1 + B2 + \text{TwoHeadMLP}$ into a continuous online trajectory without frame resets across 5 seeds. | **FROZEN (tag: phase10-frozen)** |
+| **Phase 11** | Reproducibility Pipeline & Audit | Automated smoke testing, cryptographic manifest verification, comprehensive environment/dataset/checkpoint documentation, and regression hardening. | **FROZEN (tag: phase11-frozen)** |
 
 ---
 
-## 5. Authoritative Results: Phase 10 End-to-End Benchmark
+## 5. Authoritative Results
 
-Evaluated on the unseen zero-shot test scene `tum_fr2_xyz` across **$n=5$ random seeds** (`[42, 43, 44, 45, 46]`) under a per-frame budget deadline $B = 15.0$ ms (464 continuous frame transitions, zero crashes):
+Evaluated on the zero-shot unseen test scene `tum_fr2_xyz` across **5 seeds** (`[42, 43, 44, 45, 46]`) under a per-frame budget deadline $B = 15.0\text{ ms}$ (30 continuous trajectory frames, 464 evaluated steps, zero crashes):
 
-### Closed-Loop Reconstruction Trajectory Performance
-| Policy | Mean PSNR (dB) | Final PSNR (dB) | Cumulative $\Delta Q$ (dB) | Mean SSIM | Mean Depth L1 | Mean Opt (ms) | Mean Frame (ms) |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **NO_OP** | 12.34 ± 0.01 | 12.15 ± 0.01 | -1.28 ± 0.01 | 0.5146 ± 0.0007 | 1.389 ± 0.000 | 0.0 ± 0.0 | 6505.6 ± 410.2 |
-| **ERROR_ONLY** | 12.34 ± 0.01 | 12.14 ± 0.02 | -1.29 ± 0.02 | 0.5144 ± 0.0008 | 1.389 ± 0.000 | 10.4 ± 18.6 | 6805.5 ± 966.1 |
-| **OURS (B2)** | **12.34 ± 0.01** | **12.15 ± 0.02** | **-1.28 ± 0.02** | **0.5149 ± 0.0004** | 1.389 ± 0.000 | 9.3 ± 15.6 | 7005.3 ± 1458.2 |
-| **FULL (Ref Bound)** | 12.36 ± nan | 12.18 ± nan | -1.25 ± nan | 0.5156 ± nan | 1.389 ± nan | 467.6 ± nan | 7057.8 ± nan |
+### Primary Benchmark Comparison
+| Policy | Mean PSNR | Final PSNR | Mean Opt | Mean Frame |
+| :--- | :---: | :---: | :---: | :---: |
+| **NO_OP** | 12.34 dB | 12.15 dB | 0 ms | 6505.6 ms |
+| **ERROR_ONLY** | 12.34 dB | 12.14 dB | 10.36 ms | 6805.5 ms |
+| **OURS** | **12.34 dB** | **12.15 dB** | **9.25 ms** | **7005.3 ms** |
+| **FULL** | 12.36 dB | 12.18 dB | 467.6 ms | 7057.8 ms |
 
-### Paired Statistical Validation: OURS (B2) vs ERROR_ONLY ($N=145$ paired frames)
-- **Mean $\Delta Q$**: $\mathbf{+0.0047}$ dB
-- **Median $\Delta Q$**: $\mathbf{+0.0037}$ dB
-- **95% Bootstrap Confidence Interval**: $[\mathbf{+0.0024}, \mathbf{+0.0070}]$ dB *(strictly positive)*
-- **Cohen's d Effect Size**: $\mathbf{+0.337}$ *(positive advantage)*
-- **Wilcoxon Signed-Rank Test (Two-Sided)**: $\text{stat} = 3269.0$, $p = \mathbf{2.32 \times 10^{-4}}$ *(statistically significant)*
-- **Frame Win Rate ($\Delta Q \ge 0$)**: $\mathbf{63.4\%}$ (92/145 frames)
+### Paired Statistical Evidence: OURS vs ERROR_ONLY ($N = 145$ Paired Frames)
+
+$$\Delta Q_{\text{OURS-ERROR}} = +0.0047\text{ dB}$$
+$$95\%\text{ CI} = [+0.0024, +0.0070]\text{ dB}$$
+$$p = 2.3245 \times 10^{-4}$$
+$$d = 0.337$$
+
+- **Win Rate ($\Delta Q \ge 0$)**: **63.4%** (92/145 frames)
+- **Wilcoxon Signed-Rank Test (Two-Sided)**: $\text{statistic} = 3269.0, p = 2.3245 \times 10^{-4}$ (statistically significant advantage)
+- **Bootstrap Effect Size**: Cohen's $d = 0.337$ (positive, non-trivial advantage under tight compute budget)
 
 > [!NOTE]
-> **Scientific Narrative Calibration**:
+> **Calibrated Scientific Narrative**:
 > Observable Gaussian state contains predictive information about marginal optimization utility. Under the evaluated closed-loop online trajectory, OURS achieves a **statistically significant but modest improvement** over the strong ERROR_ONLY heuristic ($d = 0.337$). We report this finding objectively without exaggerated superiority claims.
 
-### Formal Gate Matrix (Gates 10A–10E)
-- **Gate 10A (Integration)**: ✅ **PASS** — Frozen weights, eval mode, B2 online normalizer active, StateStore synced, zero oracle access.
-- **Gate 10B (Closed-Loop Correctness)**: ✅ **PASS** — 464 frames continuous evolution without reset, zero crashes, complete population dynamics logged.
-- **Gate 10C (Dual Budget Accounting)**: ✅ **PASS** — Modeled vs physical latency concurrently logged, fine-grained breakdown recorded, scheduler budget strictly enforced.
-- **Gate 10D (Scientific Validity)**: ✅ **PASS** — Mathematical weight immutability ($\|\theta_T - \theta_0\|_\infty = 0.0$, SHA-256 identical before & after), zero oracle verification, zero future leakage, 5 seeds evaluated.
-- **Gate 10E (Performance Characterization)**: ✅ **PASS** — Objective paired statistical characterization across all policies and seeds completed.
+### Formal Gate Matrix (Phase 10: Gates 10A–10E)
+- **Gate 10A (Integration)**: :white_check_mark: **PASS** — Frozen weights, eval mode, B2 online normalizer active, StateStore synced, zero oracle access.
+- **Gate 10B (Closed-Loop Correctness)**: :white_check_mark: **PASS** — Continuous map evolution without state reset, zero crashes, complete population dynamics logged.
+- **Gate 10C (Dual Budget Accounting)**: :white_check_mark: **PASS** — Modeled vs physical latency concurrently logged, fine-grained breakdown recorded, scheduler budget strictly enforced.
+- **Gate 10D (Scientific Validity)**: :white_check_mark: **PASS** — Mathematical weight immutability ($\|\theta_T - \theta_0\|_\infty = 0.0$, SHA-256 identical before & after), zero oracle verification, zero future leakage, 5 seeds evaluated.
+- **Gate 10E (Performance Characterization)**: :white_check_mark: **PASS** — Objective paired statistical characterization across all policies and seeds completed.
 
 ---
 
 ## 6. Reproduction
 
-### Master Reproduction Script (Single Entry Point)
-To reproduce the complete Phase 10 benchmark, verification, testing, and cryptographic checksum audit from scratch:
+Phase 11 defines a rigorous 3-tier regression and reproduction protocol:
+
+```
+Tier 1: Unit Tests (pytest tests/ -q)
+          ↓
+Tier 2: Phase 10 Tests (pytest tests/test_phase10_runtime.py -q)
+          ↓
+Tier 3: Runtime Smoke Test (python experiments/run_phase10_smoke.py)
+          ↓
+Full Reproduction Pipeline (bash scripts/reproduce_phase10.sh)
+          ↓
+Cryptographic Manifest Verification (python scripts/verify_phase10_manifest.py)
+```
+
+### 1. Fast Tier 1 & 2 Unit Tests
+```bash
+# Tier 1: Full repository regression suite (456 tests)
+pytest tests/ -q
+
+# Tier 2: Phase 10 runtime & closed-loop tests (8 tests)
+pytest tests/test_phase10_runtime.py -v
+```
+
+### 2. Fast Tier 3 Smoke Test (< 30 seconds)
+Verifies checkpoint loading, A1 representation, B2 online normalizer, TwoHeadMLP forward pass, knapsack scheduler, StateStore closed-loop persistence, and strict zero-diff weight immutability on real RGB-D data:
+```bash
+python experiments/run_phase10_smoke.py
+```
+
+### 3. Master Reproduction Pipeline
+Executes the full end-to-end multi-seed benchmark, regenerates all figures, updates summary tables, and runs manifest verification:
 ```bash
 bash scripts/reproduce_phase10.sh
 ```
-This script executes:
-1. Environment and CUDA hardware verification
-2. TUM RGB-D dataset verification
-3. Frozen checkpoint SHA-256 integrity check
-4. Test suite execution (`pytest -q`)
-5. Fast runtime smoke test (`experiments/run_phase10_smoke.py`)
-6. Full 5-seed closed-loop benchmark (`experiments/run_phase10_e2e.py`)
-7. Results processing & figure rendering (`experiments/process_phase10_results.py`)
-8. Bit-for-bit checksum verification against `manifest.json`
 
-### Fast Runtime Smoke Test (< 30 seconds)
-Before running the full benchmark, verify all closed-loop invariants via:
+### 4. Cryptographic Manifest Verification
+Verifies bit-for-bit SHA-256 integrity of all 14 Phase 10 deliverable artifacts:
 ```bash
-python3 experiments/run_phase10_smoke.py
-```
-
-### Full Unit Test Suite (456 Tests)
-```bash
-pytest -q
-# Expected: 456 passed in ~9s (100% PASS)
+python scripts/verify_phase10_manifest.py --manifest results/phase10_e2e/manifest.json
 ```
 
 ---
 
-## 7. Dataset Provenance
+## 7. Dataset
 
-Reconstruction fidelity is evaluated on the standard **TUM RGB-D Benchmark** (Sturm et al., IROS 2012):
-- **Training Sequence**: `tum_fr1_desk` (150 frames, FR1 camera) — utilized for offline oracle collection and TwoHeadMLP training.
-- **Validation Sequence**: `tum_fr1_desk` (50 held-out frames) — hyperparameter tuning.
-- **Zero-Shot Test Sequence**: `tum_fr2_xyz` (30 continuous frames, FR2 camera) — strictly unseen during training, distinct geometry, intrinsics, and motion dynamics.
+Reconstruction fidelity is benchmarked on streaming sequences from the **TUM RGB-D Benchmark** (Sturm et al., IROS 2012):
 
-Complete sensor calibration, depth scaling, and split details are documented in [`docs/dataset.md`](docs/dataset.md).
+$$\boxed{ \text{Training: tum\_fr1\_desk} \quad\neq\quad \text{Validation: tum\_fr1\_desk (held-out)} \quad\neq\quad \text{Zero-Shot Test: tum\_fr2\_xyz} }$$
 
----
+- **Training Sequence**: `tum_fr1_desk` (150 frames, FR1 sensor) — Oracle utility generation & TwoHeadMLP offline training.
+- **Validation Sequence**: `tum_fr1_desk` (50 held-out frames) — Hyperparameter validation (A1 representation & B2 $\beta$).
+- **Zero-Shot Test Sequence**: `tum_fr2_xyz` (30 continuous frames, FR2 sensor) — Strictly unseen during training; different room, textures, camera intrinsics, and motion dynamics.
+- **Evaluation Resolution**: $320 \times 240$ (downsampled $2\times$ from native $640 \times 480$).
+- **Evaluation Seeds**: `42`, `43`, `44`, `45`, `46`.
 
-## 8. Environment Setup
-
-### Option A: Conda (Recommended)
-```bash
-conda env create -f environment.yml
-conda activate adaptive_3dgs
-```
-
-### Option B: Pip
-```bash
-pip install -r requirements.txt
-```
-
-### Tested System Hardware & Toolchain
-- **OS**: Linux (x86_64)
-- **Python**: 3.12.13
-- **PyTorch**: 2.11.0 with CUDA 12.8
-- **GPU**: NVIDIA RTX 4050 Laptop GPU (6GB VRAM)
-- **Compiler**: GCC 13.2 / NVCC 13.2
-
-See [`environment.yml`](environment.yml) and [`requirements.txt`](requirements.txt) for pinned dependencies.
+Detailed camera intrinsics, depth preprocessing, scale calibration, and SE(3) pose handling are documented in [`docs/dataset.md`](docs/dataset.md).
 
 ---
 
-## 9. Artifacts & Deliverables Registry
+## 8. Checkpoints
 
-All Phase 10 artifacts are cryptographically hashed and verified in [`results/phase10_e2e/manifest.json`](results/phase10_e2e/manifest.json):
+All utility model checkpoints are frozen and cryptographically registered in [`docs/checkpoints.md`](docs/checkpoints.md):
 
-| Artifact File | Description | SHA-256 Hash |
-| :--- | :--- | :--- |
-| [`summary.md`](results/phase10_e2e/summary.md) | Formal Phase 10 research report | `78717dd0d9fd...` |
-| [`audit_metrics.csv`](results/phase10_e2e/audit_metrics.csv) | Weight immutability & zero-oracle evidence | `c4ffe38eb9e2...` |
-| [`latency_breakdown.csv`](results/phase10_e2e/latency_breakdown.csv) | Fine-grained sub-millisecond stage breakdown | `a660d48bfe6c...` |
-| [`trajectory_metrics.csv`](results/phase10_e2e/trajectory_metrics.csv) | Aggregate trajectory metrics (PSNR, SSIM, latency) | `f0c2fefab69f...` |
-| [`frame_metrics.csv`](results/phase10_e2e/frame_metrics.csv) | Per-frame quality and population logs (464 frames) | `2f62d143f2d4...` |
-| [`selection_metrics.csv`](results/phase10_e2e/selection_metrics.csv) | Knapsack budget selection dynamics | `0fe357cb6df6...` |
-| [`runtime_metrics.csv`](results/phase10_e2e/runtime_metrics.csv) | Modeled cost vs wall-clock latency tracking | `c60fd349c4f2...` |
-| [`memory_metrics.csv`](results/phase10_e2e/memory_metrics.csv) | GPU VRAM memory allocation logs | `2a245dc14239...` |
-| [`figures/quality_vs_frame.png`](results/phase10_e2e/figures/quality_vs_frame.png) | Online reconstruction quality trajectory | `afd93418e228...` |
-| [`figures/latency_vs_frame.png`](results/phase10_e2e/figures/latency_vs_frame.png) | Wall-clock optimization latency vs frame | `1fff0dd244a0...` |
-| [`figures/budget_vs_actual.png`](results/phase10_e2e/figures/budget_vs_actual.png) | Modeled scheduler cost vs physical latency | `eeff2a56aacd...` |
-| [`figures/gaussian_selection.png`](results/phase10_e2e/figures/gaussian_selection.png) | Gaussian map evolution & selected subset count | `3f3b4e116b20...` |
-| [`figures/trajectory_comparison.png`](results/phase10_e2e/figures/trajectory_comparison.png) | Multi-seed paired difference trajectories | `1ce864435ec3...` |
+$$\boxed{ \text{Paper Result} \longrightarrow \text{Model Checkpoint} \longrightarrow \text{Cryptographic SHA-256} }$$
 
-See [`docs/checkpoints.md`](docs/checkpoints.md) for frozen model weight hashes.
+| Seed | Architecture | Checkpoint File | Checkpoint SHA-256 Digest |
+| :---: | :---: | :--- | :--- |
+| **42** | TwoHeadMLP | `A1_online_adaptive_seed_42.pt` | `3e9ce12dac70ccfe37d687ba3cb67957b8cba29bb9fa3874ff7ff5bd6977003a` |
+| **43** | TwoHeadMLP | `A1_online_adaptive_seed_43.pt` | `759169c5cf68149891b432f1a56f2fec1e1cc963bb43ccbcbd1899b0316ab219` |
+| **44** | TwoHeadMLP | `A1_online_adaptive_seed_44.pt` | `c564f6b1f83810e460e7ceb3c9c7d67828395446634c4eda8df931a60826b6cc` |
+| **45** | TwoHeadMLP | `A1_online_adaptive_seed_45.pt` | `94155ec2f8d0e895c58ba985c39d43122c40da80ad94be3dac02c24dc3dc47d9` |
+| **46** | TwoHeadMLP | `A1_online_adaptive_seed_46.pt` | `5d87caa388c6827d860f1afdd50046e65bdc07ca4a96b1d63e98ee5ef7108d7d` |
+
+- **Representation**: A1 (`geometry_relative`)
+- **Normalizer**: B2 (`OnlineEMANormalizer`, $\beta = 0.90$, SHA: `7893010e29b5a2694160dbdf26cca08148cbafc0583fa2f322526120761a8458`)
+- **Immutability Guarantee**: During closed-loop execution, parameters are frozen (`requires_grad=False`). Zero parameter mutation is mathematically asserted ($\|\theta_T - \theta_0\| = 0$).
 
 ---
 
-## 10. AI Systems Finding & Limitations
+## 9. Runtime / Systems
 
-### The Physical Latency Gap ($C_{\text{scheduled}} \neq T_{\text{wall}}$)
-Phase 10 highlights an essential finding for real-time AI Systems:
-$$\boxed{ \text{modeled scheduler cost } (4.32\text{ ms}) \;\ll\; \text{actual optimization latency } (9.25\text{ ms}) \;\ll\; \text{total frame latency } (7005\text{ ms}) }$$
+Complete system environment, software toolchain, and dependency specifications are documented in [`docs/environment.md`](docs/environment.md).
 
-| Stage | OURS (B2) Latency | Percentage | Bottleneck Nature |
-| :--- | :---: | :---: | :--- |
-| **Feature Extraction ($T_{extract}$)** | 0.383 ms | 0.01% | Causal state querying |
-| **A1 Transform ($T_{A1}$)** | 0.349 ms | 0.01% | Geometry-relative scaling |
-| **B2 Normalization ($T_{norm}$)** | 0.404 ms | 0.01% | Streaming EMA moment update |
-| **TwoHeadMLP Inference ($T_{infer}$)** | 0.456 ms | 0.01% | PyTorch forward pass (frozen) |
-| **Knapsack Selection ($T_{knapsack}$)** | 0.769 ms | 0.01% | Greedy budget sorting |
-| **Total Selection Subsystem** | **2.538 ms** | **0.04%** | Fast scheduler overhead |
-| **Gaussian Optimization ($T_{opt}$)** | **9.25 ms** | **0.13%** | Selective Adam backward pass + CUDA autodiff |
-| **StateStore Update ($T_{state}$)** | 0.385 ms | 0.01% | Closed-loop state persistence |
-| **Render & Attribution Overhead** | **~6992 ms** | **99.8%** | Python reference rasterizer & pixel-level attribution tracing |
-| **Total End-to-End Frame Wall-Clock** | **7005.3 ms** | **100.0%** | Dominated by non-optimized Python attribution |
+### Sub-Millisecond Scheduler Timing Breakdown (OURS B2)
+| Stage | Subsystem | Latency ($T_{\text{stage}}$) | Fraction of Frame |
+| :--- | :--- | :---: | :---: |
+| **Observable State Extraction** | $T_{\text{extract}}$ | 0.383 ms | 0.005% |
+| **A1 Geometry-Relative Transform** | $T_{\text{A1}}$ | 0.349 ms | 0.005% |
+| **B2 Online EMA Moment Adaptation** | $T_{\text{norm}}$ | 0.404 ms | 0.006% |
+| **TwoHeadMLP Dual Forward Pass** | $T_{\text{infer}}$ | 0.456 ms | 0.007% |
+| **Knapsack Budget Ordering & Pruning** | $T_{\text{knapsack}}$ | 0.769 ms | 0.011% |
+| **Total Utility Scheduler Overhead** | $T_{\text{scheduler}}$ | **2.538 ms** | **0.036%** |
+| **Selective Gaussian Gradient Descent** | $T_{\text{opt}}$ | **9.25 ms** | **0.132%** |
+| **Closed-Loop StateStore Persistence** | $T_{\text{state}}$ | 0.385 ms | 0.005% |
+| **Reference Python Rasterizer & Attribution** | $T_{\text{render}}$ | 6992.4 ms | 99.816% |
+| **Total End-to-End Frame Latency** | $T_{\text{frame}}$ | **7005.3 ms** | **100.0%** |
 
-### Core Project Limitations:
-1. **Attribution Tracing Bottleneck**: The reference Python attribution tracer (`render_with_attribution`) accounts for $>99\%$ of frame latency. Full real-time execution ($>30\text{ FPS}$) requires fusing attribution tracing directly into the CUDA rasterization kernel.
-2. **Instantaneous Greedy Horizon**: Utility is estimated based on short trial horizons. Incorporating multi-frame temporal credit assignment across sliding windows remains a promising direction for future work.
+---
+
+## 10. Limitations
+
+Phase 10 & 11 formalize the distinction between algorithmic scheduler compliance and complete system wall-clock throughput:
+
+$$T_{\text{scheduler}} \approx 4.32\text{ ms}$$
+$$T_{\text{opt}} \approx 9.25\text{ ms}$$
+$$T_{\text{frame}} \approx 7005\text{ ms}$$
+
+> [!WARNING]
+> **Essential AI Systems Finding**:
+> **The scheduler satisfies the modeled 15 ms budget, but the current Python/PyTorch implementation is not a real-time 15 ms end-to-end system.**
+
+### Key Engineering & Scientific Limitations:
+1. **Reference Python Attribution Bottleneck**: The reference implementation computes Gaussian-to-pixel attribution masks using unoptimized PyTorch tensor operations (`render_with_attribution`), requiring $\approx 6992\text{ ms}$ per frame. Fusing attribution tracing into a native CUDA rasterization kernel (Phase 13) is required for real-time $>30\text{ FPS}$ deployment.
+2. **Instantaneous Greedy Horizon**: Utility is estimated based on short trial horizons. Incorporating multi-frame temporal credit assignment across sliding windows remains a direction for future work.
 3. **Modest Quality Headroom**: Because online Gaussian maps continuously densify with fresh observations, selective optimization yields incremental improvements ($\Delta Q = +0.0047$ dB). The primary value of learned selection lies in avoiding harmful negative-utility updates under rigid compute constraints.
 
 ---

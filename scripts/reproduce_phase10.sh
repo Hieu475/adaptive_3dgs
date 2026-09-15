@@ -116,26 +116,8 @@ echo "   [PASS] Figures, summary.md, and manifest.json updated."
 # 8. Cryptographic Checksum Verification
 echo ""
 echo ">> [8/8] Cryptographic Checksum Verification against Manifest..."
-$PY_BIN -c "
-import json, hashlib
-from pathlib import Path
-
-out_dir = Path('results/phase10_e2e')
-manifest_file = out_dir / 'manifest.json'
-assert manifest_file.exists(), 'Manifest not found'
-
-with open(manifest_file) as f:
-    manifest = json.load(f)
-
-for rel_path, meta in manifest['artifacts'].items():
-    fp = out_dir / rel_path
-    assert fp.exists(), f'Missing deliverable artifact: {fp}'
-    actual_hash = hashlib.sha256(fp.read_bytes()).hexdigest()
-    assert actual_hash == meta['sha256'], f'Hash mismatch on {rel_path}'
-    print(f'   [OK] {rel_path} (SHA: {actual_hash[:12]}...)')
-
-print('   [PASS] All 14 deliverable artifacts verified bit-for-bit!')
-"
+$PY_BIN scripts/verify_phase10_manifest.py --manifest results/phase10_e2e/manifest.json
+echo "   [PASS] All deliverable artifacts verified bit-for-bit!"
 
 echo ""
 echo "========================================================================"
