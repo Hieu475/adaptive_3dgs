@@ -545,14 +545,17 @@ def load_phase10_sequence(
     Ensures f_x', f_y', c_x', c_y' camera intrinsic scaling.
     """
     repo = get_repo_root()
-    if scene_name == "tum_fr2_xyz":
-        data_path = str(repo / "datasets/TUM/rgbd_dataset_freiburg2_xyz")
-        cam = "freiburg2"
-    elif scene_name == "tum_fr1_desk":
-        data_path = str(repo / "datasets/TUM/rgbd_dataset_freiburg1_desk")
-        cam = "freiburg1"
-    else:
-        raise ValueError(f"Unknown scene '{scene_name}'")
+    scene_map = {
+        "tum_fr2_xyz": ("datasets/TUM/rgbd_dataset_freiburg2_xyz", "freiburg2"),
+        "tum_fr1_desk": ("datasets/TUM/rgbd_dataset_freiburg1_desk", "freiburg1"),
+        "tum_fr1_rpy": ("datasets/TUM/rgbd_dataset_freiburg1_rpy", "freiburg1"),
+        "tum_fr1_xyz": ("datasets/TUM/rgbd_dataset_freiburg1_xyz", "freiburg1"),
+        "tum_fr3_sitting_static": ("datasets/TUM/rgbd_dataset_freiburg3_sitting_static", "freiburg3"),
+    }
+    if scene_name not in scene_map:
+        raise ValueError(f"Unknown scene '{scene_name}'. Available: {list(scene_map.keys())}")
+    rel_path, cam = scene_map[scene_name]
+    data_path = str(repo / rel_path)
 
     dataset = TUMDataset(data_path, max_frames=n_frames, camera=cam)
     frames = []

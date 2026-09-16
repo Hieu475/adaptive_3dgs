@@ -21,15 +21,22 @@ if [ -d "$DATA_DIR/$SEQUENCE" ]; then
     exit 0
 fi
 
-BASE_URL="https://cvg.cit.tum.de/rgbd/dataset/freiburg1"
+if [[ "$SEQUENCE" == *freiburg2* ]]; then
+    BASE_URL="https://cvg.cit.tum.de/rgbd/dataset/freiburg2"
+elif [[ "$SEQUENCE" == *freiburg3* ]]; then
+    BASE_URL="https://cvg.cit.tum.de/rgbd/dataset/freiburg3"
+else
+    BASE_URL="https://cvg.cit.tum.de/rgbd/dataset/freiburg1"
+fi
+
 FILE="$SEQUENCE.tgz"
 
-echo "Downloading $SEQUENCE..."
+echo "Downloading $SEQUENCE from $BASE_URL..."
 
-if command -v wget &> /dev/null; then
-    wget -c "$BASE_URL/$FILE" -O "$DATA_DIR/$FILE"
-elif command -v curl &> /dev/null; then
+if command -v curl &> /dev/null; then
     curl -L -C - "$BASE_URL/$FILE" -o "$DATA_DIR/$FILE"
+elif command -v wget &> /dev/null; then
+    wget -c "$BASE_URL/$FILE" -O "$DATA_DIR/$FILE"
 else
     echo "ERROR: wget or curl required"
     exit 1
