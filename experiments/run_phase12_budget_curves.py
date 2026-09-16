@@ -110,6 +110,27 @@ def run_budget_sweep(
         except Exception:
             all_data = {}
 
+    # Pre-populate B=15.0 ms baseline data across all seeds
+    if "15.0" not in all_data:
+        all_data["15.0"] = {}
+    for seed in seeds:
+        s_key = str(seed)
+        if s_key not in all_data["15.0"]:
+            all_data["15.0"][s_key] = {}
+        ext_file = ext_dir / f"seed_{seed}.json"
+        p10_file = p10_dir / f"seed_{seed}.json"
+        source_file = ext_file if ext_file.exists() else p10_file
+        if source_file.exists():
+            try:
+                with open(source_file, "r") as f:
+                    src_data = json.load(f)
+                for p in policies:
+                    if p in src_data.get("policies", {}) and p not in all_data["15.0"][s_key]:
+                        all_data["15.0"][s_key][p] = src_data["policies"][p]
+                        print(f"   [PRE-LOAD B=15] Seed {seed} policy {p.upper()} imported.")
+            except Exception:
+                pass
+
     for b in budgets:
         b_key = f"{b:.1f}"
         if b_key not in all_data:
@@ -119,22 +140,6 @@ def run_budget_sweep(
             s_key = str(seed)
             if s_key not in all_data[b_key]:
                 all_data[b_key][s_key] = {}
-
-            # Check if we can reuse B=15.0 ms data from Phase 10 / external baselines
-            if abs(b - 15.0) < 1e-5:
-                ext_file = ext_dir / f"seed_{seed}.json"
-                p10_file = p10_dir / f"seed_{seed}.json"
-                source_file = ext_file if ext_file.exists() else p10_file
-                if source_file.exists():
-                    try:
-                        with open(source_file, "r") as f:
-                            src_data = json.load(f)
-                        for p in policies:
-                            if p in src_data.get("policies", {}) and p not in all_data[b_key][s_key]:
-                                all_data[b_key][s_key][p] = src_data["policies"][p]
-                                print(f"   [REUSE B=15] Seed {seed} policy {p.upper()} imported.")
-                    except Exception:
-                        pass
 
             # Budget-independent policies (no_op and full) can be reused across all budgets
             if "15.0" in all_data and s_key in all_data["15.0"]:
@@ -257,14 +262,16 @@ def compile_budget_sweep_report(
         }
 
     # Generate Markdown Report
+    b_headers = " | ".join([f"$B={b:.1f}\\text{{ms}}$ PSNR" for b in budgets_sorted])
+    b_aligns = " | ".join([":---:" for _ in budgets_sorted])
     summary_md = [
         "# Phase 12: Quality vs. Budget Pareto Analysis & Robustness",
         "",
-        "## 1. Quality Across Compute Budgets ($B \\in \\{5, 10, 15, 20, 30\\}\\text{ ms}$)",
-        f"Evaluated on `{scene_name}` across **5 seeds** with the frozen utility model:",
+        f"## 1. Quality Across Compute Budgets",
+        f"Evaluated on `{scene_name}` with the frozen utility model:",
         "",
-        "| Policy | $B=5\\text{ms}$ PSNR | $B=10\\text{ms}$ PSNR | $B=15\\text{ms}$ PSNR | $B=20\\text{ms}$ PSNR | $B=30\\text{ms}$ PSNR | Normalized $\\text{AUC}_{Q-B}$ | Mean Violation Rate (%) |",
-        "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
+        f"| Policy | {b_headers} | Normalized $\\text{{AUC}}_{{Q-B}}$ | Mean Violation Rate (%) |",
+        f"| :--- | {b_aligns} | :---: | :---: |",
     ]
 
     for pol in POLICIES_IN_SWEEP:
@@ -285,8 +292,9 @@ def compile_budget_sweep_report(
 
         auc_val = f"{auc_results.get(pol, {}).get('auc_psnr', 0.0):.2f} dB"
         viol_rate = f"{sub['opt_violation_rate_pct'].mean():.2f}%" if pol not in ("full", "no_op") else "0.00%"
+        p_cols = " | ".join(p_strs)
 
-        summary_md.append(f"| {d_name} | {p_strs[0]} | {p_strs[1]} | {p_strs[2]} | {p_strs[3]} | {p_strs[4]} | **{auc_val}** | {viol_rate} |")
+        summary_md.append(f"| {d_name} | {p_cols} | **{auc_val}** | {viol_rate} |")
 
     summary_md.extend([
         "",
