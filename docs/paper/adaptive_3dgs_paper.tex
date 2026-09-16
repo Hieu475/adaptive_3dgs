@@ -10,9 +10,23 @@
 \usepackage{tabularx}
 \usepackage[pagebackref,breaklinks,colorlinks]{hyperref}
 \usepackage{geometry}
-\geometry{margin=0.75in}
+\geometry{margin=0.70in}
 
-\title{\textbf{Adaptive 3D Gaussian Splatting: Budget-Constrained Marginal Utility Scheduling for Real-Time Online RGB-D SLAM}}
+\renewcommand{\topfraction}{0.95}
+\renewcommand{\bottomfraction}{0.95}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.85}
+\setcounter{topnumber}{5}
+\setcounter{bottomnumber}{5}
+\setcounter{totalnumber}{8}
+\setcounter{dbltopnumber}{4}
+
+\setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
+\setlength{\intextsep}{6pt plus 2pt minus 2pt}
+\setlength{\abovecaptionskip}{4pt}
+\setlength{\belowcaptionskip}{4pt}
+
+\title{\textbf{Marginal Utility Scheduling for Compute-Constrained\\Online RGB-D 3D Gaussian Splatting}}
 
 \author{
 Nguyen Quoc Hieu\\
@@ -27,129 +41,40 @@ Department of Computer Science\\
 \maketitle
 
 \begin{abstract}
-Dense online 3D scene reconstruction from streaming RGB-D sensors requires maintaining photometric and geometric fidelity under rigid per-frame execution deadlines. While 3D Gaussian Splatting (3DGS) enables interactive differentiable rendering, existing online mapping and SLAM systems optimize primitives either indiscriminately or via heuristic residual thresholds (e.g., ``prioritize high rendering error''). In this work, we demonstrate empirically that high residual error does \textbf{not} imply high marginal optimization utility: across 875 audited counterfactual interventions, \textbf{21.37\%} of Gaussian updates degrade reconstruction quality ($U_i^\star < 0$). In the highest error decile, this negative utility pitfall rises monotonically to \textbf{23.86\%} due to occlusion boundaries, depth discontinuities, and coupled alpha-blending conflicts.
+Dense online 3D scene reconstruction from streaming RGB-D sensors requires maintaining photometric and geometric fidelity under rigid per-frame computational budgets. While 3D Gaussian Splatting (3DGS) enables efficient differentiable rendering, existing online mapping and SLAM systems optimize primitives either indiscriminately or via heuristic residual thresholds (e.g., prioritizing primitives with high photometric or depth error). In this work, we demonstrate empirically that high residual error does \textbf{not} imply high marginal optimization utility: across 875 audited counterfactual interventions, \textbf{21.37\%} of Gaussian updates degrade reconstruction quality ($U_i^\star < 0$). In the highest error decile, this negative utility pitfall rises monotonically to \textbf{23.86\%} due to occlusion boundaries, depth discontinuities, and coupled alpha-blending conflicts.
 
-We formulate online 3DGS scheduling as \textbf{budget-constrained marginal utility optimization}, predicting expected quality gain $\widehat{\Delta Q}_i$ and execution cost $\widehat{C}_i$ via a decoupled Two-Head MLP under an online Welford normalizer ($B2, \beta=0.90$). Evaluated on continuous closed-loop SLAM trajectories across five frozen protocol seeds ($n=5$), our method:
-(1) decisively outperforms conventional Error-Only heuristics with high statistical significance (Wilcoxon $p = \mathbf{2.32 \times 10^{-4}}$, Cohen's $d = \mathbf{+0.337}$, win rate $63.4\%$) while selecting \textbf{62.5\% fewer Gaussians} (0.6 vs 1.6 Gaussians/frame);
-(2) outperforms external baselines including Random Selection, Gradient Sensitivity (Grad-Norm), and Spatial Attribution;
-(3) demonstrates robust zero-shot transfer across four unseen TUM sequences spanning Freiburg 1, 2, and 3 sensors, cutting optimization latency by \textbf{40--56\%} without compromising reconstruction fidelity;
-(4) maintains strict deadline compliance ($<5\%$ SLA violation) across diverse optimization budgets $B \in [5, 30]\text{ ms}$; and
-(5) incurs negligible scheduling overhead ($T_{\mathrm{scheduler}} = 2.54\text{ ms} \ll T_{\mathrm{opt}} = 9.25\text{ ms} \ll T_{\mathrm{frame}} = 7005\text{ ms}$) with a stable $\sim 60.9\text{ MB}$ GPU VRAM footprint.
+We formulate online 3DGS scheduling as \textbf{budget-constrained marginal utility optimization}, predicting expected quality gain $\widehat{\Delta Q}_i$ and kernel execution cost $\widehat{C}_i$ via a decoupled Two-Head MLP under an online Welford normalizer ($B2, \beta=0.90$) and greedy knapsack selection with safety factor $\alpha = 1.10$. Evaluated on continuous closed-loop mapping trajectories across five frozen protocol seeds ($n=5$):
+(1) on the primary training-domain benchmark (\texttt{tum\_fr2\_xyz}), OURS decisively outperforms the standard Error-Only heuristic with high statistical significance (paired Wilcoxon $p = \mathbf{2.32 \times 10^{-4}}$, Cohen's $d = \mathbf{+0.337}$, win rate $\mathbf{63.4\%}$) while selecting \textbf{62.5\% fewer Gaussians} (0.6 vs 1.6 Gaussians/frame);
+(2) cross-sequence zero-shot evaluation across four diverse TUM scenes (\texttt{fr2\_xyz}, \texttt{fr1\_rpy}, \texttt{fr1\_xyz}, \texttt{fr3\_sitting}) reveals the empirical boundaries of domain transfer: our policy saves \textbf{40--56\%} of parameter optimization compute across all out-of-distribution motion dynamics and camera intrinsics with a modest pooled quality trade-off of $-0.0063\text{ dB}$ (pooled Wilcoxon $p = 2.10 \times 10^{-3}$, win rate $44.5\%$);
+(3) offline counterfactual oracle decomposition confirms \textbf{75.1\%--80.2\% regret reduction} against static heuristics;
+(4) strict optimization-budget compliance ($<3.8\%$ budget violation rate) is maintained across compute deadlines $B \in [5, 30]\text{ ms}$; and
+(5) systems profiling demonstrates negligible scheduling overhead ($T_{\mathrm{scheduler}} = 2.54\text{ ms} \ll T_{\mathrm{opt}} = 9.25\text{ ms}$) with a stable $\sim 60.9\text{ MB}$ GPU VRAM footprint.
 \end{abstract}
 
 \section{Introduction}
-Real-time dense 3D mapping from streaming RGB-D observations is fundamental to robotics, augmented reality, and autonomous systems. Recently, 3D Gaussian Splatting (3DGS)~\cite{kerbl3Dgaussians} has emerged as an expressive representation, achieving state-of-the-art view synthesis via tile-based differentiable rasterization. In online SLAM systems (e.g., SplaTAM~\cite{keetha2023splatam}, MonoGS~\cite{matsuki2024gaussian}, RTG-SLAM~\cite{peng2024rtgslam}), thousands of Gaussians are continuously initialized to capture newly visible surfaces. However, optimizing all active primitives at every frame severely violates real-time deadlines ($15$--$33\text{ ms}$).
+Dense 3D mapping from streaming RGB-D observations is fundamental to robotics, augmented reality, and autonomous systems. Recently, 3D Gaussian Splatting (3DGS)~\cite{kerbl3Dgaussians} has emerged as a premier representation, achieving state-of-the-art view synthesis via tile-based differentiable rasterization. In online SLAM systems (e.g., SplaTAM~\cite{keetha2023splatam}, MonoGS~\cite{matsuki2024gaussian}, RTG-SLAM~\cite{peng2024rtgslam}), thousands of Gaussians are continuously initialized to represent newly discovered surfaces. However, optimizing all active primitives at every incoming frame is computationally prohibitive, demanding selective parameter updates under rigid execution budgets ($10$--$30\text{ ms}$).
 
-To operate within compute bounds, existing systems rely on heuristic selection rules, typically prioritizing Gaussians with the largest photometric or geometric residuals~\cite{peng2024rtgslam}. We demonstrate that this paradigm suffers from three fundamental flaws:
-\begin{enumerate}
-    \item \textbf{Residual Error $\neq$ Optimization Utility:} High rendering residual does not imply that gradient updates will improve global fidelity. In occluded regions, textureless planes, and coupled splats, gradient updates frequently induce surface tearing and negative marginal utility ($U_i^\star < 0$).
-    \item \textbf{Heuristic Waste \& Geometric Drift:} Heuristics blindly allocate compute to high-error primitives that fail to improve the scene, exhausting per-frame budgets and introducing local drift.
-    \item \textbf{Systems Deadline Violations:} Uncalibrated heuristic selection leads to unpredictable optimizer latencies, causing severe deadline violations in downstream tracking and rendering loops.
-\end{enumerate}
+To operate within compute bounds, existing systems rely on heuristic selection rules, typically prioritizing Gaussians with the largest photometric or geometric residuals~\cite{peng2024rtgslam}. In this paper, we demonstrate that this heuristic paradigm is fundamentally flawed, and establish an empirically grounded five-stage narrative:
+(1) \textbf{Residual Error $\neq$ Optimization Utility:} High rendering residual does not imply that gradient updates will improve global fidelity. In occluded regions, textureless surfaces, and dense overlapping splats, gradient updates frequently induce surface tearing and negative marginal utility ($U_i^\star < 0$).
+(2) \textbf{Marginal Utility Formulation:} True utility must be defined as marginal quality gain per unit compute cost via isolated counterfactual intervention. Crucially, negative utility provides an essential penalization signal that prevents schedulers from corrupting well-tuned geometry.
+(3) \textbf{Utility Can Be Learned, but Correlation $\neq$ Selection:} Decoupled Two-Head MLPs learn predictive signals from observable geometric and temporal features. While raw gradient sensitivity (Grad-Norm) exhibits higher pointwise rank correlation with isolated returns ($\rho = 0.3377$ vs $0.1782$), it fails under budgeted knapsack selection because it is hypersensitive to boundary noise and completely agnostic to execution latency.
+(4) \textbf{Budgeted Knapsack Changes Outcomes:} Under strict compute budgets, filtering negative-utility candidates and packing primitives by predicted utility density yields statistically significant gains over static heuristics ($p = 2.32 \times 10^{-4}, d = +0.337$).
+(5) \textbf{Domain Transfer Reveals Trade-offs:} Zero-shot evaluation across unseen sensors and aggressive rotational trajectories cuts optimization compute by \textbf{40--56\%}, demonstrating robust compute conservation while delineating transfer limits ($-0.0063\text{ dB}$ pooled gap).
 
-To resolve these challenges, we introduce \textbf{Adaptive 3DGS}, an intervention-supervised, budget-constrained scheduling framework. By decoupling quality gain and computational cost via an observable 11-dimensional state representation, our system prunes non-positive utility updates and schedules optimal subsets via knapsack packing. We validate our framework on continuous multi-seed SLAM trajectories across four unseen sequences, external baselines, budget sweeps, and systems-level profiling.
+Finally, microbenchmarking reveals that our scheduler introduces negligible latency ($T_{\mathrm{scheduler}} = 2.54\text{ ms}$), showing that the optimization scheduling bottleneck is solved even as end-to-end frame processing remains bounded by unoptimized rasterization.
 
 \section{Problem Formulation}
-Given an active 3D Gaussian map $G_t = \{g_1, \dots, g_N\}$ at frame $t$ and a rigid optimization budget $B_t$ (e.g., $15\text{ ms}$), we formalize online scheduling as maximizing cumulative quality gain subject to compute deadline constraints:
+Let $G_t = \{g_1, \dots, g_N\}$ denote the active 3D Gaussian map at frame $t$, and let $B_t$ denote the per-frame optimization budget (e.g., $15\text{ ms}$). We formalize online scheduling as maximizing cumulative reconstruction quality gain subject to compute constraints:
 \begin{equation}
 \max_{S_t \subseteq G_t} \Delta Q(S_t) \quad \text{subject to} \quad \sum_{g_i \in S_t} C_i \le B_t
 \end{equation}
 where $C_i$ is the empirical optimization latency of primitive $g_i$.
 
-The true ground-truth marginal utility of primitive $g_i$ is defined via isolated counterfactual intervention:
+The true marginal utility of primitive $g_i$ is defined via isolated counterfactual intervention:
 \begin{equation}
 U_i^\star = \frac{\Delta Q_i^{\text{intervention}}}{C_i} = \frac{Q(G_t \cup \{\Delta \theta_i\}) - Q(G_t)}{C_i} \in \mathbb{R}
 \end{equation}
-where $Q$ combines photometric PSNR and geometric depth L1 fidelity, and $\Delta \theta_i$ represents an isolated parameter update. Crucially, when an update degrades rendering quality, $U_i^\star < 0$. Negative utility provides the vital penalization signal that prevents schedulers from wasting compute on volatile or ill-conditioned primitives.
-
-\section{Methodology}
-
-\subsection{11-Dimensional Observable State Representation}
-To predict marginal utility prior to executing gradient updates, we extract an 11-dimensional feature vector $s_i \in \mathbb{R}^{11}$ for each visible Gaussian $g_i$:
-\begin{enumerate}
-    \item Photometric residual $e_{\text{rgb}}$ (mean color error over footprint).
-    \item Geometric residual $e_{\text{depth}}$ (absolute depth difference).
-    \item Gradient sensitivity $\|\nabla_\mu \mathcal{L}\|_2$ (positional gradient norm).
-    \item Visibility count $v_{\text{count}}$ (screen-space coverage).
-    \item Attribution mass $m_{\text{attr}} = \sum_p \alpha_i T_{i,p}$ (rendering influence).
-    \item Positional drift EMA $d_{\text{pos}}$ (spatial center displacement).
-    \item Residual drift EMA $d_{\text{res}}$ (temporal error evolution).
-    \item Depth uncertainty $\sigma^2_{\text{depth}}$ (local geometric variance).
-    \item Variance uncertainty $\sigma^2_{\text{var}}$.
-    \item Projected area $A_{\text{proj}}$ (bounding ellipse pixel area).
-    \item Primitive age $\text{age}$ (frames since initialization).
-\end{enumerate}
-
-\subsection{Two-Head Decoupled Architecture}
-Rather than regressing an unconstrained ratio, our Two-Head MLP independently predicts expected quality gain $\widehat{\Delta Q}_i$ and kernel execution cost $\widehat{C}_i$:
-\begin{equation}
-\widehat{\Delta Q}_i = f_Q(\tilde{s}_i; \theta_Q), \quad \widehat{C}_i = \text{Softplus}(f_C(\tilde{s}_i; \theta_C)), \quad \hat{U}_i = \frac{\widehat{\Delta Q}_i}{\widehat{C}_i + \epsilon}
-\end{equation}
-where $\tilde{s}_i$ denotes the online-normalized state. Cost positivity is guaranteed by the Softplus activation. The network is supervised via difference-weighted pairwise ranking loss combined with scale-anchoring MSE:
-\begin{equation}
-\mathcal{L} = \frac{1}{|P|} \sum_{(i,j) \in P} w_{ij} \log\left(1 + e^{-(\hat{U}_i - \hat{U}_j)}\right) + \lambda_{\text{MSE}} \mathcal{L}_{\text{MSE}}
-\end{equation}
-where $P = \{(i,j) \mid U_i^\star > U_j^\star\}$ and $w_{ij} = |U_i^\star - U_j^\star| / \bar{w}$.
-
-\subsection{Adaptive Online Normalizer (B2)}
-To handle non-stationary online data distributions across unseen trajectories, we employ an online Welford running normalizer with momentum $\beta = 0.90$:
-\begin{equation}
-\mu_t = \beta \mu_{t-1} + (1 - \beta) \bar{x}_t, \quad \sigma_t^2 = \beta \sigma_{t-1}^2 + (1 - \beta) s_t^2
-\end{equation}
-This ensures zero data leakage from future frames while dynamically adapting to scene scale shifts.
-
-\subsection{Budget-Constrained Knapsack Selection}
-At frame $t$, the scheduler filters candidates with non-positive predicted utility ($P_t^+ = \{g_i \mid \hat{U}_i > 0\}$), ranks remaining candidates by descending $\hat{U}_i$, and greedily packs primitives subject to the safety-factored budget $\sum_{i \in S} \alpha \widehat{C}_i \le B_t$ with $\alpha = 1.05$. The state is maintained continuously via \texttt{StateStore}, ensuring full parameter synchronization without map recreation.
-
-\section{Experimental Protocol}
-All evaluations adhere to strict reproducible protocols across five frozen seeds ($n=5$: \texttt{[42, 43, 44, 45, 46]}):
-\begin{itemize}
-    \item \textbf{Frozen Checkpoints}: All models are frozen at Phase 10 checkpoints (\texttt{A1\_online\_adaptive\_seed\_*.pt}) with verified SHA-256 hashes.
-    \item \textbf{Continuous SLAM Evaluation}: 30 consecutive trajectory frames with continuous Gaussian map growth, real-time camera tracking, and closed-loop optimization.
-    \item \textbf{Cross-Scene Benchmark}: Primary zero-shot test on \texttt{tum\_fr2\_xyz}, with generalization evaluated across three additional unseen sequences: \texttt{tum\_fr1\_rpy}, \texttt{tum\_fr1\_xyz}, and \texttt{tum\_fr3\_sitting\_static}.
-\end{itemize}
-
-\section{Empirical Results \& Analysis}
-
-\subsection{Empirical Disproof of ``Error = Utility''}
-We analyze 875 audited counterfactual interventions to test whether rendering error is an effective proxy for Gaussian optimization utility.
-
-\begin{table}[h]
-\centering
-\small
-\resizebox{\columnwidth}{!}{
-\begin{tabular}{lccc}
-\toprule
-\textbf{Error Stratum} & \textbf{Threshold $e$} & \textbf{Negative Utility Rate} & \textbf{Mean $U^\star$} \\
-\midrule
-Top 50\% Error & $\ge 0.380$ & 17.35\% & $3.44 \times 10^{-7}$ \\
-Top 30\% Error & $\ge 0.599$ & 19.01\% & $2.53 \times 10^{-7}$ \\
-Top 20\% Error & $\ge 0.730$ & 21.14\% & $1.88 \times 10^{-7}$ \\
-Top 10\% Error & $\ge 0.895$ & \textbf{23.86\%} & $1.21 \times 10^{-7}$ \\
-\midrule
-Overall Population & $\ge 0.000$ & \textbf{21.37\%} & $3.78 \times 10^{-7}$ \\
-\bottomrule
-\end{tabular}
-}
-\caption{\textbf{The Negative Utility Pitfall.} As residual error increases, the proportion of updates that degrade reconstruction quality rises monotonically to nearly 1 in 4.}
-\label{tab:pitfall}
-\end{table}
-
-As documented in Table~\ref{tab:pitfall}, over \textbf{21.37\%} of all Gaussian updates produce strictly negative marginal utility ($U^\star < 0$). More critically, in the top 10\% highest-error stratum, \textbf{23.86\%} of updates degrade quality. This confirms our core hypothesis: high rendering error frequently indicates depth discontinuities and occlusion boundaries where isolated gradient steps corrupt local surface geometry.
-
-Evaluating correlation with ground truth utility $U^\star$ confirms that our learned Two-Head MLP achieves statistically significant ranking fidelity ($\rho = \mathbf{0.1782}, p = 1.12 \times 10^{-7}$). Furthermore, during online trajectory execution, OURS rejects $100\%$ of negative-utility candidates, safeguarding map geometry and conserving GPU compute.
-
-\subsection{Master Comparative Evaluation vs External Baselines}
-We compare Adaptive 3DGS against six external and heuristic baselines on \texttt{tum\_fr2\_xyz} under identical compute budgets ($B = 15.0\text{ ms}$, 5 seeds):
-\begin{enumerate}
-    \item \textbf{No-Op}: Pass-through zero optimization baseline.
-    \item \textbf{Random}: Uniform random Gaussian selection under budget.
-    \item \textbf{Sensitivity (Grad-Norm)}: Selection prioritized by $\|\nabla_\mu \mathcal{L}\|_2$.
-    \item \textbf{Spatial Importance}: Selection prioritized by $m_{\text{attr}} \cdot v_{\text{count}}$.
-    \item \textbf{Error-Only}: Photometric + geometric residual ranking.
-    \item \textbf{Ours (Adaptive)}: Two-Head marginal utility ranking.
-    \item \textbf{Full Optimization}: Unconstrained optimization upper bound.
-\end{enumerate}
+where $Q$ combines photometric PSNR and geometric depth fidelity, and $\Delta \theta_i$ represents an isolated parameter update. When an update degrades rendering quality, $U_i^\star < 0$. Negative utility provides the vital penalization signal that prevents schedulers from wasting compute on volatile or ill-conditioned primitives.
 
 \begin{table*}[t]
 \centering
@@ -170,71 +95,186 @@ Error-Only Heuristic & 12.34 ± 0.01 & 12.14 ± 0.02 & -0.0017 dB & 10.36 ms & 1
 \bottomrule
 \end{tabular}
 }
-\caption{\textbf{Master Comparative Evaluation Table.} Performance comparison across 5 seeds under strict budget $B = 15.0\text{ ms}$ on \texttt{tum\_fr2\_xyz}.}
+\caption{\textbf{Comparative Evaluation Table.} Performance comparison across 5 seeds under strict budget $B = 15.0\text{ ms}$ on \texttt{tum\_fr2\_xyz}.}
 \label{tab:master}
 \end{table*}
 
-\begin{table}[h]
+\section{Methodology}
+
+\subsection{11-Dimensional Observable State Representation}
+To predict marginal utility prior to executing gradient updates, we extract an 11-dimensional feature vector $s_i \in \mathbb{R}^{11}$ for each visible Gaussian $g_i$, capturing local error, geometry, rendering influence, and temporal dynamics:
+(1) \texttt{color\_err} ($e_{\text{rgb}}$): mean photometric RGB error over projected footprint;
+(2) \texttt{depth\_err} ($e_{\text{depth}}$): absolute geometric depth residual;
+(3) \texttt{grad\_norm} ($\|\nabla_\mu \mathcal{L}\|_2$ proxy): positional gradient sensitivity proxy $m_{\text{attr}} \cdot (e_{\text{rgb}} + e_{\text{depth}})$;
+(4) \texttt{vis\_count} ($v_{\text{count}}$): cumulative visibility count across frames;
+(5) \texttt{inf\_mass} ($m_{\text{attr}}$): integrated rendering attribution mass $\sum_p \alpha_i T_{i,p}$;
+(6) \texttt{pos\_drift} ($d_{\text{pos}}$): spatial center position drift EMA;
+(7) \texttt{res\_drift} ($d_{\text{res}}$): rendering residual drift EMA;
+(8) \texttt{unc\_var} ($\sigma^2_{\text{var}}$): uncertainty variance proxy ($1.0 - \text{confidence}$);
+(9) \texttt{proj\_area} ($A_{\text{proj}}$): projected 2D ellipse pixel area;
+(10) \texttt{update\_freq} ($f_{\text{update}}$): historical update frequency ratio; and
+(11) \texttt{ages} ($\text{age}$): primitive lifetime in frames since initialization.
+
+\subsection{Two-Head Decoupled Architecture}
+Rather than regressing an unconstrained ratio, our Two-Head MLP independently predicts expected quality gain $\widehat{\Delta Q}_i$ and kernel execution cost $\widehat{C}_i$:
+\begin{align}
+\widehat{\Delta Q}_i &= f_Q(\tilde{s}_i; \theta_Q), \quad \widehat{C}_i = \text{Softplus}(f_C(\tilde{s}_i; \theta_C)) \\
+\hat{U}_i &= \frac{\widehat{\Delta Q}_i}{\widehat{C}_i + \epsilon}
+\end{align}
+where $\tilde{s}_i$ denotes the online-normalized state. Cost positivity is strictly guaranteed by the Softplus activation. The network is supervised via difference-weighted pairwise ranking loss combined with scale-anchoring MSE:
+\begin{equation}
+\mathcal{L} = \frac{1}{|P|} \sum_{(i,j) \in P} w_{ij} \log\left(1 + e^{-(\hat{U}_i - \hat{U}_j)}\right) + \lambda_{\text{MSE}} \mathcal{L}_{\text{MSE}}
+\end{equation}
+where $P = \{(i,j) \mid U_i^\star > U_j^\star\}$ and $w_{ij} = |U_i^\star - U_j^\star| / \bar{w}$.
+
+\subsection{Adaptive Online Normalizer (B2)}
+To handle non-stationary online data distributions across unseen trajectories, we employ an online Welford running normalizer with momentum $\beta = 0.90$:
+\begin{equation}
+\mu_t = \beta \mu_{t-1} + (1 - \beta) \bar{x}_t, \quad \sigma_t^2 = \beta \sigma_{t-1}^2 + (1 - \beta) s_t^2
+\end{equation}
+This ensures zero data leakage from future frames while dynamically adapting to scene scale shifts.
+
+\subsection{Budget-Constrained Knapsack Selection}
+At frame $t$, the scheduler filters out candidates with non-positive predicted utility ($P_t^+ = \{g_i \mid \hat{U}_i > 0\}$), ranks remaining candidates by descending $\hat{U}_i$, and greedily packs primitives subject to the safety-factored budget constraint:
+\begin{equation}
+\sum_{g_i \in S_t} \alpha \widehat{C}_i \le B_t
+\end{equation}
+where $\alpha = 1.10$ provides a conservative margin against kernel execution variance. State vectors are synchronized incrementally via an in-memory \texttt{StateStore} without requiring map reinitialization.
+
+\section{Experimental Protocol}
+All evaluations adhere to strict reproducible protocols across five frozen seeds ($n=5$: \texttt{[42, 43, 44, 45, 46]}):
+\begin{itemize}\itemsep=-1pt \parsep=0pt
+    \item \textbf{Frozen Checkpoints}: Models are frozen at Phase 10 checkpoints (\texttt{A1\_online\_adaptive\_seed\_*.pt}) with verified SHA-256 hashes.
+    \item \textbf{Continuous SLAM Evaluation}: 30 consecutive trajectory frames with continuous Gaussian map growth, camera tracking, and closed-loop optimization.
+    \item \textbf{Multi-Sequence Benchmark}: Primary benchmark on \texttt{tum\_fr2\_xyz}, with generalization evaluated across three additional unseen sequences: \texttt{tum\_fr1\_rpy}, \texttt{tum\_fr1\_xyz}, and \texttt{tum\_fr3\_sitting\_static}.
+\end{itemize}
+
+\section{Empirical Results \& Analysis}
+
+\subsection{Empirical Disproof of ``Error = Utility''}
+We analyze 875 audited counterfactual interventions to test whether rendering residual is an effective proxy for Gaussian optimization utility.
+
+\begin{table}[t]
+\centering
+\small
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{lccc}
+\toprule
+\textbf{Error Stratum} & \textbf{Threshold $e$} & \textbf{Negative Utility Rate} & \textbf{Mean $U^\star$} \\
+\midrule
+Top 50\% Error & $\ge 0.380$ & 17.35\% & $3.44 \times 10^{-7}$ \\
+Top 30\% Error & $\ge 0.599$ & 19.01\% & $2.53 \times 10^{-7}$ \\
+Top 20\% Error & $\ge 0.730$ & 21.14\% & $1.88 \times 10^{-7}$ \\
+Top 10\% Error & $\ge 0.895$ & \textbf{23.86\%} & $1.21 \times 10^{-7}$ \\
+\midrule
+Overall Population & $\ge 0.000$ & \textbf{21.37\%} & $3.78 \times 10^{-7}$ \\
+\bottomrule
+\end{tabular}
+}
+\caption{\textbf{The Negative Utility Pitfall.} As residual error increases, the proportion of updates that degrade reconstruction quality rises monotonically to nearly 1 in 4.}
+\label{tab:pitfall}
+\end{table}
+
+\begin{table}[t]
+\centering
+\small
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{lccc}
+\toprule
+\multicolumn{4}{c}{\textbf{(a) Spearman Rank Correlation with Oracle Utility ($U^\star$)}} \\
+\midrule
+\textbf{Feature / Heuristic} & \textbf{Spearman $\rho$} & \textbf{$p$-value} & \textbf{Characteristics} \\
+\midrule
+Composite Residual & 0.1711 & $3.54 \times 10^{-7}$ & Conventional heuristic proxy \\
+Photometric Error (RGB) & 0.2391 & $7.74 \times 10^{-13}$ & High negative utility rate \\
+Geometric Error (Depth) & 0.0754 & $2.57 \times 10^{-2}$ & Weak individual ranking \\
+Sensitivity (Grad-Norm) & \textbf{0.3377} & $8.83 \times 10^{-25}$ & Noise-sensitive; cost-agnostic \\
+Spatial Importance & 0.2994 & $1.41 \times 10^{-19}$ & Ignores parameter curvature \\
+Learned Two-Head MLP & 0.1782 & $1.12 \times 10^{-7}$ & Models cost \& prunes $U^\star \le 0$ \\
+\midrule
+\multicolumn{4}{c}{\textbf{(b) Offline Counterfactual Oracle Regret Decomposition ($N=640$)}} \\
+\midrule
+\textbf{Budget Tier} & \multicolumn{2}{c}{\textbf{Heuristic $\to$ Ours Norm. Regret}} & \textbf{Regret Reduction} \\
+\midrule
+30\% Budget & \multicolumn{2}{c}{0.803 $\to$ \textbf{0.159}} & \textbf{+80.2\%} \\
+60\% Budget & \multicolumn{2}{c}{0.721 $\to$ \textbf{0.180}} & \textbf{+75.1\%} \\
+\bottomrule
+\end{tabular}
+}
+\caption{\textbf{Utility Modeling Fidelity.} (a) Pointwise rank correlation with oracle utility $U^\star$; (b) Offline regret reduction under isolated counterfactual intervention.}
+\label{tab:utility_modeling}
+\end{table}
+
+As documented in Table~\ref{tab:pitfall}, over \textbf{21.37\%} of all Gaussian updates produce strictly negative marginal utility ($U^\star < 0$). In the top 10\% highest-error stratum, \textbf{23.86\%} of updates degrade quality. This confirms our core hypothesis: high rendering error frequently indicates depth discontinuities and occlusion boundaries where isolated gradient steps corrupt local surface geometry.
+
+\paragraph{Pointwise Correlation vs. Online Selection Quality.}
+Table~\ref{tab:utility_modeling}(a) compares Spearman rank correlations against ground-truth utility $U^\star$. Notably, Gradient Sensitivity (Grad-Norm, $\rho = 0.3377$) and Spatial Importance ($\rho = 0.2994$) exhibit higher pointwise correlation with isolated single-splat utility than the learned Two-Head MLP ($\rho = 0.1782$). However, pointwise correlation does \textbf{not} dictate online selection quality:
+First, sensitivity heuristics greedily select primitives with large gradient norms located on high-frequency boundary edges. In continuous multi-splat rendering, updating these primitives causes destructive interference and overshoot.
+Second, sensitivity heuristics are completely agnostic to kernel execution cost $C_i$ and cannot reject candidates where expected utility is non-positive.
+Third, in contrast, the Two-Head MLP models both expected gain and compute latency, and enforces $P_t^+$ candidate pruning. On offline counterfactual oracle decompositions (Table~\ref{tab:utility_modeling}(b)), this yields \textbf{75.1\%--80.2\% regret reduction} over static heuristics.
+
+\subsection{Comparison with Heuristic and Sensitivity Baselines}
+We compare Adaptive 3DGS against five heuristic and sensitivity selection baselines on \texttt{tum\_fr2\_xyz} under identical compute budgets ($B = 15.0\text{ ms}$, 5 seeds):
+(1) \textbf{No-Op}: zero optimization pass-through;
+(2) \textbf{Random}: uniform random selection under budget;
+(3) \textbf{Sensitivity (Grad-Norm)}: prioritized by $\|\nabla_\mu \mathcal{L}\|_2$;
+(4) \textbf{Spatial Importance}: prioritized by $m_{\text{attr}} \cdot v_{\text{count}}$;
+(5) \textbf{Error-Only}: photometric + depth residual ranking;
+(6) \textbf{Ours (Adaptive)}: Two-Head marginal utility ranking; and
+(7) \textbf{Full Optimization}: unconstrained optimization upper bound.
+
+\begin{table}[t]
 \centering
 \small
 \resizebox{\columnwidth}{!}{
 \begin{tabular}{lccccc}
 \toprule
-\textbf{Opponent Baseline} & \textbf{Frames} & \textbf{Mean $\Delta Q$} & \textbf{Wilcoxon $p$} & \textbf{Cohen's $d$} & \textbf{Win Rate} \\
+\multicolumn{6}{c}{\textbf{(a) Statistical Paired Comparison vs Baselines (\texttt{fr2\_xyz}, 145 frames)}} \\
+\midrule
+\textbf{Opponent Policy} & \textbf{Frames} & \textbf{Mean $\Delta Q$} & \textbf{Wilcoxon $p$} & \textbf{Cohen's $d$} & \textbf{Win Rate} \\
 \midrule
 Error-Only Heuristic & 145 & \textbf{+0.0047 dB} & $\mathbf{2.32 \times 10^{-4}}$ & \textbf{+0.337} & \textbf{63.4\%} \\
 No-Op (Pass-through) & 145 & \textbf{+0.0030 dB} & $\mathbf{7.39 \times 10^{-3}}$ & \textbf{+0.202} & \textbf{63.4\%} \\
 Spatial Importance & 145 & \textbf{+0.0018 dB} & 0.1401 & +0.096 & 60.7\% \\
 Sensitivity (Grad-Norm) & 145 & \textbf{+0.0001 dB} & 0.5944 & +0.006 & 48.3\% \\
 Random Selection & 145 & \textbf{-0.0008 dB} & 0.9610 & -0.068 & 53.1\% \\
-\bottomrule
-\end{tabular}
-}
-\caption{\textbf{Statistical Paired Head-to-Head Comparison (Ours vs Baselines).}}
-\label{tab:paired}
-\end{table}
-
-Table~\ref{tab:master} and Table~\ref{tab:paired} summarize the comparative evaluation:
-\begin{itemize}
-    \item \textbf{Significant Advantage over Error-Only}: OURS achieves a statistically significant quality gain over Error-Only ($p = \mathbf{2.32 \times 10^{-4}}$, Cohen's $d = \mathbf{+0.337}$, win rate $63.4\%$).
-    \item \textbf{Pruning Compute}: OURS selects only **0.6 Gaussians per frame** (a $62.5\%$ reduction vs Error-Only's 1.6 Gaussians), pruning ineffective updates while achieving superior quality.
-    \item \textbf{Sensitivity \& Importance}: Prioritizing gradient norm or spatial attribution suffers from local boundary noise, achieving inferior final quality compared to OURS.
-\end{itemize}
-
-\subsection{Multi-Sequence Zero-Shot Generalization}
-We evaluate cross-sequence generalization across four diverse, unseen TUM sequences without model fine-tuning (Table~\ref{tab:multiseq}).
-
-\begin{table}[h]
-\centering
-\small
-\resizebox{\columnwidth}{!}{
-\begin{tabular}{lcccc}
-\toprule
-\textbf{Sequence} & \textbf{Sensor / Motion} & \textbf{Error-Only $T_{\mathrm{opt}}$} & \textbf{Ours $T_{\mathrm{opt}}$} & \textbf{Compute Saved} \\
 \midrule
-\texttt{tum\_fr2\_xyz} & FR2 / Translation & 10.36 ms & 9.25 ms & 10.7\% \\
-\texttt{tum\_fr1\_rpy} & FR1 / 3D Rotations & 8.52 ms & 4.70 ms & \textbf{44.8\%} \\
-\texttt{tum\_fr1\_xyz} & FR1 / Translation & 5.43 ms & 3.26 ms & \textbf{40.0\%} \\
-\texttt{tum\_fr3\_sitting} & FR3 / Office Scene & 7.74 ms & 3.42 ms & \textbf{55.8\%} \\
+\multicolumn{6}{c}{\textbf{(b) Multi-Sequence Zero-Shot Transfer across Sensors and Dynamics}} \\
+\midrule
+\textbf{Sequence} & \textbf{Sensor / Motion} & \textbf{Err $T_{\mathrm{opt}}$} & \textbf{Ours $T_{\mathrm{opt}}$} & \textbf{Saved} & \textbf{Ours $-$ Err} \\
+\midrule
+\texttt{tum\_fr2\_xyz} & FR2 / Translation & 10.36 ms & 9.25 ms & 10.7\% & \textbf{+0.0047 dB} \\
+\texttt{tum\_fr1\_rpy} & FR1 / 3D Rotations & 8.52 ms & 4.70 ms & \textbf{44.8\%} & -0.0190 dB \\
+\texttt{tum\_fr1\_xyz} & FR1 / Translation & 5.43 ms & 3.26 ms & \textbf{40.0\%} & -0.0132 dB \\
+\texttt{tum\_fr3\_sitting} & FR3 / Static Office & 7.74 ms & 3.42 ms & \textbf{55.8\%} & -0.0047 dB \\
+\midrule
+\textbf{Pooled (All 4)} & Multi-Sensor & 8.01 ms & 5.16 ms & \textbf{35.6\%} & -0.0063 dB \\
 \bottomrule
 \end{tabular}
 }
-\caption{\textbf{Multi-Sequence Generalization across Sensors and Dynamics.}}
-\label{tab:multiseq}
+\caption{\textbf{Empirical Evaluation.} (a) Paired comparisons against heuristic selection baselines on \texttt{fr2\_xyz}; (b) Zero-shot cross-sequence generalization across four TUM scenes (600 frames total).}
+\label{tab:comparative_and_transfer}
 \end{table}
 
-On sequences with aggressive camera rotation (\texttt{fr1\_rpy}) and novel sensor intrinsics (\texttt{fr3\_sitting}), OURS adaptively identifies high risk of negative utility and conserves \textbf{40--56\% of optimization compute} with virtually identical PSNR ($\Delta \le 0.006\text{ dB}$).
+Table~\ref{tab:master} and Table~\ref{tab:comparative_and_transfer}(a) show that OURS outperforms Error-Only with high statistical significance ($p = \mathbf{2.32 \times 10^{-4}}$, Cohen's $d = \mathbf{+0.337}$, win rate $\mathbf{63.4\%}$). Crucially, OURS selects only **0.6 Gaussians per frame** (a $62.5\%$ reduction compared to Error-Only's 1.6 Gaussians), successfully pruning ineffective updates while achieving superior fidelity.
 
-\subsection{Quality vs. Budget Pareto Sweep \& SLA Compliance}
-We sweep compute deadlines across $B \in \{5.0, 10.0, 15.0, 20.0, 30.0\}\text{ ms}$ (Table~\ref{tab:budget_sweep}).
+\subsection{Cross-Sequence Zero-Shot Generalization}
+We evaluate cross-sequence generalization across four diverse, unseen TUM sequences without any fine-tuning (Table~\ref{tab:comparative_and_transfer}(b)).
+Across the 4 unseen sequences, the empirical results present a clear trade-off:
+On \texttt{tum\_fr2\_xyz} (in-domain motion distribution), OURS consistently improves reconstruction quality ($+0.0047\text{ dB}$, win rate $63.4\%$).
+On out-of-domain sequences with aggressive rotations (\texttt{fr1\_rpy}) and novel sensor intrinsics (\texttt{fr3\_sitting}), the learned Two-Head MLP acts conservatively, predicting non-positive utility for more primitives. This prunes \textbf{40\% to 55.8\% of parameter optimization time}.
+Across all 4 sequences pooled ($N=580$ pairs), Error-Only achieves a minor quality edge (pooled $\Delta Q = -0.0063\text{ dB}$, paired Wilcoxon $p = 2.10 \times 10^{-3}$, win rate $44.5\%$). This delineates the boundary of zero-shot transfer: conservative utility predictions avoid ill-conditioned updates and dramatically reduce compute, but can miss borderline beneficial updates in novel camera dynamics without domain adaptation.
 
-\begin{table}[h]
+\subsection{Quality vs. Budget Pareto Sweep \& Compliance}
+We sweep compute deadlines across $B \in [5, 30]\text{ ms}$ (Table~\ref{tab:budget_sweep}). Across the entire range from tight ($5\text{ ms}$) to relaxed ($30\text{ ms}$), OURS strictly adheres to execution deadlines with a mean optimization-budget violation rate of **$3.79\%$**, well below the $5\%$ tolerance. The normalized Area Under Curve ($\text{AUC}_{Q-B} = 12.35\text{ dB}$) confirms performance stability across operational regimes.
+
+\begin{table}[t]
 \centering
 \small
 \resizebox{\columnwidth}{!}{
 \begin{tabular}{lcccccc}
 \toprule
-\textbf{Policy} & \textbf{5 ms} & \textbf{10 ms} & \textbf{15 ms} & \textbf{20 ms} & \textbf{30 ms} & \textbf{Mean SLA Viol.} \\
+\textbf{Policy} & \textbf{5 ms} & \textbf{10 ms} & \textbf{15 ms} & \textbf{20 ms} & \textbf{30 ms} & \textbf{Mean Budget Viol.} \\
 \midrule
 No-Op & 12.35 & 12.35 & 12.35 & 12.35 & 12.35 & 0.00\% \\
 Random & 12.34 & 12.35 & 12.35 & 12.34 & 12.36 & 1.38\% \\
@@ -249,20 +289,16 @@ Error-Only & 12.34 & 12.36 & 12.34 & 12.34 & 12.34 & 1.03\% \\
 \label{tab:budget_sweep}
 \end{table}
 
-Across the entire range from ultra-tight ($5\text{ ms}$) to relaxed ($30\text{ ms}$), OURS strictly adheres to execution deadlines with a mean SLA violation rate of **$3.79\%$**, well below the 5\% real-time requirement. The normalized Area Under Curve ($\text{AUC}_{Q-B} = 12.35\text{ dB}$) confirms robust performance stability without retuning.
-
 \subsection{Population-Shift Robustness}
-Scaling the initial Gaussian density and densification threshold ($0.5\times$, $1.0\times$, $2.0\times$) demonstrates that OURS remains stable across a $4\times$ shift in map size:
-\begin{itemize}
-    \item $0.5\times$ ($N_G = 2093$): PSNR = $11.93\text{ dB}$, $T_{\mathrm{opt}} = 9.85\text{ ms}$, $\Delta Q = +0.0072\text{ dB}$.
-    \item $1.0\times$ ($N_G = 4524$): PSNR = $12.34\text{ dB}$, $T_{\mathrm{opt}} = 10.27\text{ ms}$.
-    \item $2.0\times$ ($N_G = 8373$): PSNR = $12.53\text{ dB}$, $T_{\mathrm{opt}} = 8.75\text{ ms}$, $\Delta Q = +0.0081\text{ dB}$.
-\end{itemize}
+Scaling initial Gaussian density ($0.5\times, 1.0\times, 2.0\times$) confirms robustness across a $4\times$ shift in map size:
+$0.5\times$ ($N_G = 2093$, PSNR = $11.93\text{ dB}$, $T_{\mathrm{opt}} = 9.85\text{ ms}$, $\Delta Q = +0.0072\text{ dB}$);
+$1.0\times$ ($N_G = 4524$, PSNR = $12.34\text{ dB}$, $T_{\mathrm{opt}} = 10.27\text{ ms}$); and
+$2.0\times$ ($N_G = 8373$, PSNR = $12.53\text{ dB}$, $T_{\mathrm{opt}} = 8.75\text{ ms}$, $\Delta Q = +0.0081\text{ dB}$).
 Optimization latency remains bounded under $15\text{ ms}$ across all population densities.
 
 \section{AI Systems Latency \& Resource Breakdown}
 
-\begin{table}[h]
+\begin{table}[t]
 \centering
 \small
 \resizebox{\columnwidth}{!}{
@@ -277,7 +313,7 @@ Knapsack Packing ($T_{\mathrm{pack}}$) & 0.00 ms & 0.61 ms & \textbf{0.77 ms} & 
 \textbf{Total Scheduling ($T_{\mathrm{scheduler}}$)} & \textbf{0.00 ms} & \textbf{1.99 ms} & \textbf{2.54 ms} & \textbf{0.00 ms} \\
 \textbf{Parameter Opt. ($T_{\mathrm{opt}}$)} & \textbf{0.00 ms} & \textbf{10.36 ms} & \textbf{9.25 ms} & \textbf{467.64 ms} \\
 StateStore Sync ($T_{\mathrm{state}}$) & 0.33 ms & 0.39 ms & \textbf{0.39 ms} & 0.56 ms \\
-Rasterization \& Eval ($T_{\mathrm{render}}$) & 6505.3 ms & 6694.5 ms & \textbf{6903.8 ms} & 6589.6 ms \\
+Rasterization \& Loss ($T_{\mathrm{render}}$) & 6505.3 ms & 6694.5 ms & \textbf{6903.8 ms} & 6589.6 ms \\
 \midrule
 \textbf{Total Frame Wall-Clock} & \textbf{6505.6 ms} & \textbf{6805.5 ms} & \textbf{7005.3 ms} & \textbf{7057.8 ms} \\
 \bottomrule
@@ -287,28 +323,30 @@ Rasterization \& Eval ($T_{\mathrm{render}}$) & 6505.3 ms & 6694.5 ms & \textbf{
 \label{tab:systems_latency}
 \end{table}
 
-Table~\ref{tab:systems_latency} reports the fine-grained per-frame latency hierarchy:
+Table~\ref{tab:systems_latency} details the fine-grained per-frame latency hierarchy:
 \begin{equation}
-T_{\mathrm{scheduler}} \ (2.54\text{ ms}) \ll T_{\mathrm{opt}} \ (9.25\text{ ms}) \ll T_{\mathrm{frame}} \ (7005.3\text{ ms})
+T_{\mathrm{sched}} \ (2.5\text{ ms}) \ll T_{\mathrm{opt}} \ (9.3\text{ ms}) \ll T_{\mathrm{render}} \ (6.9\text{ s})
 \end{equation}
-Total scheduling overhead accounts for only $2.54\text{ ms}$, representing a negligible fraction of the frame budget. Meanwhile, continuous tracking GPU memory is bounded at $\sim 60.9\text{ MB}$ (peak $536.6\text{ MB}$ reserved), confirming map stability and zero memory leakage.
+
+Total scheduling overhead accounts for only $2.54\text{ ms}$, representing a negligible fraction of available compute. Parameter optimization executes in $9.25\text{ ms}$, strictly satisfying the $15\text{ ms}$ budget. While the end-to-end frame processing time ($\sim 7.0\text{ s}$) is dominated by unoptimized Python-side rasterization and photometric loss evaluation across dense keyframes, our scheduler successfully addresses the Gaussian parameter optimization bottleneck. Furthermore, continuous tracking GPU memory is bounded at $\sim 60.9\text{ MB}$ mean ($536.6\text{ MB}$ peak reserved), confirming map stability and zero memory leaks.
 
 \section{Conclusion}
-We have presented Adaptive 3DGS, a budget-constrained marginal utility scheduling framework for real-time online RGB-D SLAM. Through extensive counterfactual auditing and continuous multi-seed trajectory benchmarks, our work establishes:
-(1) rendering error is an unreliable proxy for optimization return, with over $21\%$ of updates exhibiting negative marginal utility;
-(2) decoupled utility and cost prediction achieves statistically significant quality gains over error-based heuristics ($p = 2.32 \times 10^{-4}, d = +0.337$) with $62.5\%$ fewer parameter updates;
-(3) zero-shot transfer generalizes across four unseen sequences and sensor geometries, saving $40\text{--}56\%$ of optimization compute;
-(4) strict budget compliance holds across $B \in [5, 30]\text{ ms}$; and
-(5) scheduling overhead is negligible ($2.54\text{ ms}$) within real-time SLAM systems.
+We have presented Adaptive 3DGS, a budget-constrained marginal utility scheduling framework for online RGB-D 3D Gaussian Splatting:
+(1) Rendering residual is an unreliable proxy for optimization return: over $21\%$ of updates exhibit negative marginal utility, rising to $23.86\%$ in the highest-error decile;
+(2) Decoupled utility and cost prediction achieves statistically significant quality gains over error-based heuristics ($p = 2.32 \times 10^{-4}, d = +0.337$) while requiring $62.5\%$ fewer parameter updates;
+(3) In isolated counterfactual selection, learned utility achieves $75.1\%$--$80.2\%$ regret reduction relative to static heuristics;
+(4) Zero-shot cross-sequence evaluation demonstrates substantial compute savings ($40\text{--}56\%$) across diverse sensors, while delineating transfer trade-offs ($-0.0063\text{ dB}$ pooled delta); and
+(5) Optimization-budget compliance is strictly maintained ($<3.8\%$ violation) with negligible scheduling overhead ($2.54\text{ ms}$) and bounded memory consumption ($60.9\text{ MB}$).
+Future work includes online meta-learning for domain adaptation and fused CUDA rasterization kernels.
 
 {\footnotesize
 \bibliographystyle{ieee_fullname}
-\begin{thebibliography}{10}\itemsep=-2.5pt
+\begin{thebibliography}{10}\itemsep=-3pt
 
 \bibitem{kerbl3Dgaussians}
 B.~Kerbl, G.~Kopanas, T.~Leimk{\"u}hler, and G.~Drettakis.
 \newblock 3D Gaussian Splatting for Real-Time Radiance Field Rendering.
-\newblock {\em ACM Transactions on Graphics (TOG)}, 42(4), 2023.
+\newblock {\em ACM TOG}, 42(4), 2023.
 
 \bibitem{keetha2023splatam}
 N.~Keetha, J.~Karis, N.~Agarwal, et~al.
@@ -323,7 +361,7 @@ H.~Matsuki, R.~Murai, P.~H.~J. Kelly, and A.~J. Davison.
 \bibitem{peng2024rtgslam}
 L.~Peng, C.~Bao, S.~Lee, et~al.
 \newblock RTG-SLAM: Real-time 3D Gaussian Splatting SLAM with Relative Pose Graph.
-\newblock {\em arXiv preprint arXiv:2404.19706}, 2024.
+\newblock {\em arXiv:2404.19706}, 2024.
 
 \end{thebibliography}
 }

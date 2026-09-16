@@ -136,37 +136,19 @@ def analyze_error_vs_utility(
 
     # 5. Load Oracle Gap and Regret Data
     regret_file = REPO_ROOT / "results" / "phase6_context_utility" / "oracle_gap_and_regret.json"
-    oracle_recovery_data = {}
+    oracle_decomp_data = {}
     if regret_file.exists():
         with open(regret_file, "r") as f:
             regret_json = json.load(f)
-        # Multi-seed sweep regret
-        ms_regret = regret_json.get("multi_seed_sweep_regret", {})
-        for b_tier, b_data in ms_regret.items():
-            q_rand = b_data.get("random", {}).get("mean_actual_dq", 0.0)
-            q_err = b_data.get("error_only", {}).get("mean_actual_dq", 0.0)
-            q_p4 = b_data.get("phase4_learned", {}).get("mean_actual_dq", 0.0)
-            q_p6 = b_data.get("phase6_adaptive", {}).get("mean_actual_dq", 0.0)
-            q_oracle = b_data.get("oracle_reference", {}).get("mean_actual_dq", 0.0)
 
-            # Oracle Recovery = (Q_method - Q_random) / (Q_oracle - Q_random)
-            denom = q_oracle - q_rand
-            rec_err = (q_err - q_rand) / denom * 100.0 if denom > 1e-8 else 0.0
-            rec_p4 = (q_p4 - q_rand) / denom * 100.0 if denom > 1e-8 else 0.0
-            rec_p6 = (q_p6 - q_rand) / denom * 100.0 if denom > 1e-8 else 0.0
-
-            # Regret Reduction vs Heuristic
-            reg_heur = b_data.get("heuristic", {}).get("mean_norm_regret", 0.0)
-            reg_ours = b_data.get("phase6_adaptive", {}).get("mean_norm_regret", 0.0)
-            reg_red = (reg_heur - reg_ours) / reg_heur * 100.0 if reg_heur > 1e-8 else 0.0
-
-            oracle_recovery_data[b_tier] = {
-                "q_random": q_rand,
-                "q_heuristic": q_err,
-                "q_learned": q_p6,
-                "q_oracle": q_oracle,
-                "recovery_heuristic_pct": rec_err,
-                "recovery_learned_pct": rec_p6,
+        # Authoritative Oracle Decomposition Benchmark (Phase 6 offline counterfactual selection)
+        decomp = regret_json.get("oracle_decomposition_benchmark", {})
+        for b_tier, b_data in decomp.items():
+            reg_heur = b_data.get("normalized_regret", {}).get("static_heuristic", 0.0)
+            reg_ours = b_data.get("normalized_regret", {}).get("phase6_adaptive", 0.0)
+            reg_red = b_data.get("regret_reduction_vs_heuristic_pct", 0.0)
+            oracle_decomp_data[b_tier] = {
+                "q_oracle": b_data.get("q_oracle_static", 0.0),
                 "norm_regret_heuristic": reg_heur,
                 "norm_regret_ours": reg_ours,
                 "regret_reduction_pct": reg_red,
@@ -306,37 +288,50 @@ def analyze_error_vs_utility(
         "",
         "## 3. Correlation with Ground-Truth Utility ($U^*$)",
         "",
-        "| Feature / Policy | Spearman Rank $\\rho$ | $p$-value | Predictive Reliability |",
+        "| Feature / Policy | Spearman Rank $\\rho$ | $p$-value | Predictive Characteristics |",
         "| :--- | :---: | :---: | :--- |",
     ])
 
     for k, res in correlations.items():
-        rel = "High (Optimal ranking)" if "Learned" in k else "Low (Suboptimal proxy)"
+        if "Grad-Norm" in k:
+            rel = "Highest pointwise correlation; vulnerable to boundary gradient noise"
+        elif "Learned" in k:
+            rel = "Statistically significant signal; couples gain with modeled compute cost"
+        elif "Importance" in k:
+            rel = "High visual prominence correlation; fails to capture parameter curvature"
+        elif "Composite" in k or "RGB" in k:
+            rel = "Conventional heuristic proxy; suffers from negative utility pitfall"
+        else:
+            rel = "Weak individual correlation"
         report_md.append(f"| {k} | **{res.statistic:.4f}** | {res.pvalue:.4e} | {rel} |")
 
     report_md.extend([
         "",
+        "> [!NOTE]",
+        "> **Key Insight on Pointwise Correlation vs. Online Selection**:",
+        "> Gradient sensitivity (Grad-Norm, $\\rho = 0.3377$) and spatial importance ($\\rho = 0.2994$) exhibit higher pointwise correlation with isolated oracle utility than the learned model ($\\rho = 0.1782$). However, pointwise correlation alone does not dictate budgeted selection quality: sensitivity heuristics greedily pick Gaussians with large gradient magnitude without accounting for execution cost or multi-splat interference. In contrast, the Two-Head MLP models both expected gain and compute cost while rejecting non-positive utility.",
+        "",
         "---",
         "",
-        "## 4. Oracle Recovery and Regret Analysis",
+        "## 4. Offline Counterfactual Oracle Decomposition & Regret Reduction",
+        "Evaluated on the Phase 6 Counterfactual Oracle Decomposition Benchmark ($N=640$ interventions):",
         "",
-        "| Budget Tier | Heuristic Recovery (%) | **Learned Recovery (%)** | Heuristic Norm. Regret | **Ours Norm. Regret** | **Regret Reduction (%)** |",
-        "| :---: | :---: | :---: | :---: | :---: | :---: |",
+        "| Budget Tier | Heuristic Norm. Regret | **Ours Norm. Regret** | **Regret Reduction (%)** |",
+        "| :---: | :---: | :---: | :---: |",
     ])
 
-    for b_tier, data in oracle_recovery_data.items():
+    for b_tier, data in oracle_decomp_data.items():
         report_md.append(
-            f"| {b_tier} | {data['recovery_heuristic_pct']:.1f}% | **{data['recovery_learned_pct']:.1f}%** | "
-            f"{data['norm_regret_heuristic']:.3f} | **{data['norm_regret_ours']:.3f}** | **{data['regret_reduction_pct']:.1f}%** |"
+            f"| {b_tier} | {data['norm_regret_heuristic']:.3f} | **{data['norm_regret_ours']:.3f}** | **+{data['regret_reduction_pct']:.1f}%** |"
         )
 
     report_md.extend([
         "",
         "> [!IMPORTANT]",
         "> **Core Takeaways for Paper Narrative**:",
-        "> 1. **Empirical Disproof of the Heuristic Hypothesis**: The belief that 'error equals update utility' is demonstrably false: over 21% of Gaussian updates in high-error regions yield negative utility ($U^* < 0$).",
-        "> 2. **Causal Pruning Mechanism**: By predicting marginal utility $\\hat{U}_i$ and pruning candidates with $\\hat{U}_i \\le 0$, OURS prevents geometric corruption and conserves 40-56% optimization latency.",
-        "> 3. **Significant Regret Reduction**: OURS achieves **75-80% regret reduction** relative to static heuristics across multiple selection budgets.",
+        "> 1. **Empirical Disproof of the Heuristic Hypothesis**: The belief that 'error equals update utility' is demonstrably false: over 21% of Gaussian updates in high-error regions yield negative utility ($U^* < 0$), rising monotonically to 23.86% in the top 10% error stratum.",
+        "> 2. **Correlation vs. Selection Quality**: Higher individual rank correlation does not guarantee superior budgeted selection. The Two-Head MLP incorporates cost modeling and prunes negative utility updates, protecting against geometric corruption.",
+        "> 3. **Offline Regret Reduction**: In isolated counterfactual selection, learned utility achieves **75.1%--80.2% regret reduction** relative to static heuristics.",
     ])
 
     summary_file = output_dir / "error_vs_utility_summary.md"
@@ -352,7 +347,7 @@ def analyze_error_vs_utility(
         "correlations": {k: float(v.statistic) for k, v in correlations.items()},
         "overall_negative_pct": overall_negative_pct,
         "quantile_pitfalls": quantile_pitfalls,
-        "oracle_recovery": oracle_recovery_data,
+        "oracle_decomposition": oracle_decomp_data,
     }
 
 
