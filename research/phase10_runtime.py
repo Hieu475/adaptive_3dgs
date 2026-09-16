@@ -64,27 +64,33 @@ class Phase10ModelBundle:
         normalizer_path: Optional[Union[str, Path]] = None,
         device: str = "cuda",
         beta: float = B2_BETA,
+        model_instance: Optional[nn.Module] = None,
     ):
         self.seed = seed
         self.device = torch.device(device if torch.cuda.is_available() and device == "cuda" else "cpu")
         self.beta = beta
 
         # 1. Initialize model architecture (strictly frozen)
-        self.model = TwoHeadMLP(
-            in_features=MODEL_IN_FEATURES,
-            hidden_dim=MODEL_HIDDEN_DIM,
-            eps_cost=MODEL_EPS_COST,
-        ).to(self.device)
+        if model_instance is not None:
+            self.model = model_instance.to(self.device)
+            self.checkpoint_path = "custom_instance"
+            self.checkpoint_sha256 = "custom_instance"
+        else:
+            self.model = TwoHeadMLP(
+                in_features=MODEL_IN_FEATURES,
+                hidden_dim=MODEL_HIDDEN_DIM,
+                eps_cost=MODEL_EPS_COST,
+            ).to(self.device)
 
-        # 2. Load checkpoint weights
-        ckpt_p = Path(checkpoint_path) if checkpoint_path else get_checkpoint_path_for_seed(seed)
-        UtilityModelTrainer.load_checkpoint(self.model, str(ckpt_p))
+            # 2. Load checkpoint weights
+            ckpt_p = Path(checkpoint_path) if checkpoint_path else get_checkpoint_path_for_seed(seed)
+            UtilityModelTrainer.load_checkpoint(self.model, str(ckpt_p))
+            self.checkpoint_path = str(ckpt_p)
+            self.checkpoint_sha256 = self._compute_file_sha256(ckpt_p)
+
         self.model.eval()
         for param in self.model.parameters():
             param.requires_grad = False
-
-        self.checkpoint_path = str(ckpt_p)
-        self.checkpoint_sha256 = self._compute_file_sha256(ckpt_p)
 
         # 3. Load online normalizer initialized from train reference statistics
         norm_p = Path(normalizer_path) if normalizer_path else get_normalizer_path_for_seed(seed)
@@ -144,26 +150,29 @@ class Phase10ModelBundle:
         X_raw: np.ndarray,
         frame_id: Optional[int] = None,
         update_normalizer: bool = True,
+        c_t: Optional[np.ndarray] = None,
     ) -> Dict[str, Any]:
-        r"""Runs the full A1 + B2 + TwoHeadMLP inference pipeline.
+        r"""Runs the full A1 + B2 + TwoHeadMLP/TwoStageUtilityModel inference pipeline.
 
         Steps:
             1. Scale-invariant A1 transformation: X_raw -> Z_a1 (geometry_relative).
             2. Online covariate adaptation: Z_a1 -> \hat{X} (OnlineEMANormalizer update & transform).
-            3. Model forward pass: \hat{X} -> (\hat{\Delta Q}, \hat{\Delta T}, \hat{U}).
+            3. Model forward pass: (\hat{X}, c_t) -> (\hat{P}, \hat{\Delta Q}, \hat{\Delta T}, \hat{U}).
 
         Args:
             X_raw: [N, 11] raw observable feature matrix.
             frame_id: video frame index for tracking temporal dynamics.
             update_normalizer: whether to update online statistics with current frame.
+            c_t: [12] optional global frame context vector.
 
         Returns:
-            Dict containing predicted_utility, predicted_cost, predicted_quality, norm_metrics, and timings.
+            Dict containing predicted_utility, predicted_cost, predicted_quality, predicted_positive_prob, norm_metrics, and timings.
         """
         N = len(X_raw)
         if N == 0:
             return {
                 "predicted_utility": np.empty(0, dtype=np.float32),
+                "predicted_positive_prob": np.empty(0, dtype=np.float32),
                 "predicted_cost": np.empty(0, dtype=np.float32),
                 "predicted_quality": np.empty(0, dtype=np.float32),
                 "norm_metrics": {},
@@ -186,15 +195,31 @@ class Phase10ModelBundle:
             norm_metrics = {}
         t_b2_norm_ms = (time.perf_counter() - t_b2_start) * 1000.0
 
-        # 3. TwoHeadMLP inference (strictly no_grad)
+        # 3. Model inference (strictly no_grad)
         t_infer_start = time.perf_counter()
         Z_tensor = torch.tensor(Z_norm, dtype=torch.float32, device=self.device)
         with torch.no_grad():
-            pred_q, pred_t, pred_u = self.model(Z_tensor)
+            if c_t is not None and getattr(self.model, "use_global", False):
+                c_tensor = torch.tensor(c_t, dtype=torch.float32, device=self.device)
+                out = self.model(Z_tensor, c_tensor)
+            elif c_t is not None and "x_glob" in getattr(self.model, "forward", lambda: None).__code__.co_varnames:
+                c_tensor = torch.tensor(c_t, dtype=torch.float32, device=self.device)
+                out = self.model(Z_tensor, c_tensor)
+            else:
+                out = self.model(Z_tensor)
+
+        if len(out) == 4:
+            pred_p, pred_q, pred_t, pred_u = out
+            p_np = pred_p.detach().cpu().numpy().astype(np.float32)
+        else:
+            pred_q, pred_t, pred_u = out
+            p_np = None
+
         t_infer_ms = (time.perf_counter() - t_infer_start) * 1000.0
 
         return {
             "predicted_utility": pred_u.detach().cpu().numpy().astype(np.float32),
+            "predicted_positive_prob": p_np,
             "predicted_cost": pred_t.detach().cpu().numpy().astype(np.float32),
             "predicted_quality": pred_q.detach().cpu().numpy().astype(np.float32),
             "norm_metrics": norm_metrics,
@@ -281,6 +306,34 @@ def extract_online_features(
         mat_np = np.nan_to_num(mat_np, nan=0.0, posinf=1.0, neginf=0.0)
 
     return mat_np
+
+
+def extract_global_context(
+    pipeline: OnlineReconstructionPipeline,
+    budget_ms: float = DEFAULT_BUDGET_MS,
+) -> np.ndarray:
+    """Extracts canonical 12-dimensional global frame context vector c_t (Phase 12D).
+
+    Schema:
+        0: glob_gaussian_count        (total active Gaussians N_G)
+        1: glob_visible_count         (visible Gaussians N_vis)
+        2: glob_visible_fraction      (N_vis / N_G)
+        3: glob_mean_rgb_err          (frame mean color error)
+        4: glob_std_rgb_err           (frame std color error)
+        5: glob_mean_depth_err        (frame mean depth error)
+        6: glob_std_depth_err         (frame std depth error)
+        7: glob_mean_grad_norm        (frame mean gradient norm)
+        8: glob_std_grad_norm         (frame std gradient norm)
+        9: glob_mean_influence        (frame mean influence mass)
+        10: glob_selected_fraction    (mean historical update frequency)
+        11: glob_normalized_frame_idx (normalized frame index t / 60.0)
+
+    Returns:
+        c_t: [12] float32 numpy array.
+    """
+    if hasattr(pipeline, "get_global_context"):
+        return pipeline.get_global_context(budget_ms=budget_ms)
+    return np.zeros(12, dtype=np.float32)
 
 
 def update_statestore_closed_loop(
@@ -441,15 +494,20 @@ class Phase10Selector:
         assert X.shape == (N, 11), f"Expected feature shape ({N}, 11), got {X.shape}"
         assert np.all(np.isfinite(X)), "Non-finite values encountered in observable feature matrix"
 
+        # Extract canonical 12-D global frame context c_t (Phase 12D)
+        c_t = extract_global_context(pipeline, self.budget_ms)
+
         # 2. Predict cost & utility using frozen model bundle
         # Both ERROR_ONLY and OURS share the exact same cost head for fair packing
         preds = self.model_bundle.predict(
             X_raw=X,
             frame_id=frame_idx,
-            update_normalizer=(pol == "ours"),  # Only B2 updates its online normalizer
+            update_normalizer=(pol in ("ours", "b2", "learned_utility", "mlp_positive", "mlp_positive_global")),
+            c_t=c_t,
         )
         pred_costs = preds["predicted_cost"]
         pred_utils = preds["predicted_utility"]
+        pred_pos_probs = preds.get("predicted_positive_prob", None)
         norm_metrics = preds.get("norm_metrics", {})
         t_a1_ms = preds.get("t_a1_ms", 0.0)
         t_b2_norm_ms = preds.get("t_b2_norm_ms", 0.0)
@@ -463,7 +521,7 @@ class Phase10Selector:
         cur_scheduled_cost = 0.0
         rejected_neg = 0
 
-        if pol in ("error_only", "error"):
+        if pol in ("error_only", "error", "m0", "m0_error"):
             # Score = rgb_error + depth_error
             err_scores = X[:, 0] + X[:, 1]
             order = np.argsort(-err_scores)
@@ -473,7 +531,7 @@ class Phase10Selector:
                     selected_indices.append(int(idx))
                     cur_scheduled_cost += c
 
-        elif pol in ("grad_norm", "sensitivity", "gradient"):
+        elif pol in ("grad_norm", "sensitivity", "gradient", "m1", "m1_gradnorm"):
             # Gradient sensitivity score: X[:, 2] (grad_norm proxy: influence_weight * error)
             grad_scores = X[:, 2]
             order = np.argsort(-grad_scores)
@@ -503,8 +561,64 @@ class Phase10Selector:
                     selected_indices.append(int(idx))
                     cur_scheduled_cost += c
 
-        elif pol in ("ours", "b2", "learned_utility"):
+        elif pol in ("ours", "b2", "learned_utility", "m2", "m2_currentmlp"):
             # Rank by TwoHeadMLP utility; reject non-positive utility
+            order = np.argsort(-pred_utils)
+            for idx in order:
+                u_val = float(pred_utils[idx])
+                if u_val <= 0.0:
+                    rejected_neg += 1
+                    continue
+                c = float(scheduled_costs[idx])
+                if cur_scheduled_cost + c <= self.budget_ms + 1e-7:
+                    selected_indices.append(int(idx))
+                    cur_scheduled_cost += c
+
+        elif pol in ("mlp_positive", "m3", "m3_positivehead"):
+            # Rank by TwoStageModel utility (which incorporates P(U* > 0))
+            order = np.argsort(-pred_utils)
+            for idx in order:
+                u_val = float(pred_utils[idx])
+                if u_val <= 0.0:
+                    rejected_neg += 1
+                    continue
+                c = float(scheduled_costs[idx])
+                if cur_scheduled_cost + c <= self.budget_ms + 1e-7:
+                    selected_indices.append(int(idx))
+                    cur_scheduled_cost += c
+
+        elif pol in ("mlp_positive_global", "m4", "m4_positiveglobal"):
+            # Rank by full TwoStageModel with Global Context f(s_i, c_t)
+            order = np.argsort(-pred_utils)
+            for idx in order:
+                u_val = float(pred_utils[idx])
+                if u_val <= 0.0:
+                    rejected_neg += 1
+                    continue
+                c = float(scheduled_costs[idx])
+                if cur_scheduled_cost + c <= self.budget_ms + 1e-7:
+                    selected_indices.append(int(idx))
+                    cur_scheduled_cost += c
+
+        elif pol in ("prob_threshold", "prob_threshold_utility"):
+            # Thresholded policy: only consider candidates with P(U* > 0) > tau
+            tau = 0.50
+            if pred_pos_probs is not None:
+                eff_scores = np.where(pred_pos_probs > tau, pred_utils, -np.inf)
+            else:
+                eff_scores = pred_utils
+            order = np.argsort(-eff_scores)
+            for idx in order:
+                if eff_scores[idx] <= -1e8 or pred_utils[idx] <= 0.0:
+                    rejected_neg += 1
+                    continue
+                c = float(scheduled_costs[idx])
+                if cur_scheduled_cost + c <= self.budget_ms + 1e-7:
+                    selected_indices.append(int(idx))
+                    cur_scheduled_cost += c
+
+        elif pol in ("prob_aware", "prob_aware_utility"):
+            # Probability-aware utility ranking: score = p_i * (delta_q / cost)
             order = np.argsort(-pred_utils)
             for idx in order:
                 u_val = float(pred_utils[idx])

@@ -7,7 +7,9 @@ import torch
 import torch.optim as optim
 import time
 from typing import Dict, Optional, Any
+import numpy as np
 import yaml
+
 
 from .gaussian_repr import GaussianModel, GaussianState
 from .projection import world_to_camera, project_to_screen, compute_2d_covariance
@@ -866,6 +868,82 @@ class OnlineReconstructionPipeline:
             'measured_trial_cost_ms': float(measured_trial_cost_ms),
             'oracle_utility': float(delta_quality / (measured_trial_cost_ms + 1e-6)),
         }
+
+    def get_global_context(self, budget_ms: float = 15.0) -> np.ndarray:
+        """Extracts canonical 12D global frame context vector c_t (Phase 12D).
+
+        Schema:
+            0: glob_gaussian_count        (total active Gaussians N_G)
+            1: glob_visible_count         (visible Gaussians N_vis)
+            2: glob_visible_fraction      (N_vis / N_G)
+            3: glob_mean_rgb_err          (frame mean color error)
+            4: glob_std_rgb_err           (frame std color error)
+            5: glob_mean_depth_err        (frame mean depth error)
+            6: glob_std_depth_err         (frame std depth error)
+            7: glob_mean_grad_norm        (frame mean gradient norm)
+            8: glob_std_grad_norm         (frame std gradient norm)
+            9: glob_mean_influence        (frame mean influence mass)
+            10: glob_selected_fraction    (mean historical update frequency)
+            11: glob_normalized_frame_idx (normalized frame index t / 60.0)
+
+        Returns:
+            c_t: [12] float32 numpy array. Guaranteed finite.
+        """
+        N = self.gaussian_model.num_gaussians
+        if N == 0:
+            return np.zeros(12, dtype=np.float32)
+
+        est = self.importance_estimator
+        store = getattr(self.gaussian_model, "state_store", None)
+
+        color_err = est._running_color_error[:N] if est._running_color_error is not None else None
+        depth_err = est._running_depth_error[:N] if est._running_depth_error is not None else None
+        vis_count = est._visibility_count[:N] if est._visibility_count is not None else None
+        inf_mass = getattr(est, "_influence_weights", None)
+        inf_t = inf_mass[:N] if inf_mass is not None and inf_mass.shape[0] >= N else None
+
+        n_vis = float(torch.sum(vis_count > 0).item()) if vis_count is not None else float(N)
+        vis_frac = n_vis / max(float(N), 1.0)
+
+        mean_rgb = float(torch.mean(color_err).item()) if color_err is not None and len(color_err) > 0 else 0.0
+        std_rgb = float(torch.std(color_err).item()) if color_err is not None and len(color_err) > 0 else 0.0
+
+        mean_depth = float(torch.mean(depth_err).item()) if depth_err is not None and len(depth_err) > 0 else 0.0
+        std_depth = float(torch.std(depth_err).item()) if depth_err is not None and len(depth_err) > 0 else 0.0
+
+        if inf_t is not None and color_err is not None and depth_err is not None:
+            grad_norm = inf_t * (color_err + depth_err)
+            mean_grad = float(torch.mean(grad_norm).item())
+            std_grad = float(torch.std(grad_norm).item())
+        else:
+            mean_grad = 0.0
+            std_grad = 0.0
+
+        mean_inf = float(torch.mean(inf_t).item()) if inf_t is not None and len(inf_t) > 0 else 1.0
+
+        if store is not None and store.num_gaussians >= N:
+            mean_update_freq = float(torch.mean(store.get_update_frequency(self.frame_count)[:N]).item())
+        else:
+            mean_update_freq = 0.0
+
+        norm_frame = float(self.frame_count) / 60.0
+
+        ctx = np.array([
+            float(N),
+            float(n_vis),
+            float(vis_frac),
+            float(mean_rgb),
+            float(std_rgb),
+            float(mean_depth),
+            float(std_depth),
+            float(mean_grad),
+            float(std_grad),
+            float(mean_inf),
+            float(mean_update_freq),
+            float(norm_frame),
+        ], dtype=np.float32)
+
+        return np.nan_to_num(ctx, nan=0.0, posinf=1.0, neginf=0.0)
 
 
 
