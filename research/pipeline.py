@@ -522,11 +522,13 @@ class OnlineReconstructionPipeline:
             )
             
             # 4. Backward: only computes gradients for the active subset M <= N
-            losses['total'].backward()
-            
-            # 5. Selective Optimizer update (O(M) arithmetic & memory bandwidth)
-            self.optimizer.step(active_idx=active_subset['indices'])
-            n_optimized = optimize_mask.sum().item()
+            if losses['total'].requires_grad:
+                losses['total'].backward()
+                # 5. Selective Optimizer update (O(M) arithmetic & memory bandwidth)
+                self.optimizer.step(active_idx=active_subset['indices'])
+                n_optimized = optimize_mask.sum().item()
+            else:
+                n_optimized = 0
             opt_loss_val = losses['total'].item()
             opt_time = time.time() - opt_start
         
@@ -827,8 +829,9 @@ class OnlineReconstructionPipeline:
                 
             comp_out = trial_cache.composite_with_active(active_subset, pose, self.intrinsics, W, H)
             losses = total_loss(comp_out['color'], rgb, comp_out['depth'], depth, {'color': 1.0, 'depth': 0.5})
-            losses['total'].backward()
-            trial_opt.step(active_idx=active_subset['indices'])
+            if losses['total'].requires_grad:
+                losses['total'].backward()
+                trial_opt.step(active_idx=active_subset['indices'])
             
         if device == 'cuda':
             torch.cuda.synchronize()
