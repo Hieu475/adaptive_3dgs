@@ -78,6 +78,7 @@ def run_trajectory_for_policy(
     device: str = "cuda",
     W: int = DEFAULT_IMAGE_WIDTH,
     H: int = DEFAULT_IMAGE_HEIGHT,
+    population_scale: float = 1.0,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]], List[Dict[str, Any]], Dict[str, Any]]:
     """Runs a complete stateful closed-loop reconstruction trajectory for a single policy.
 
@@ -91,6 +92,7 @@ def run_trajectory_for_policy(
         device: execution device ('cuda' or 'cpu').
         W: image width.
         H: image height.
+        population_scale: scaling multiplier for Gaussian population (0.5, 1.0, 2.0).
 
     Returns:
         trajectory_summary: aggregate statistics for the entire trajectory.
@@ -104,12 +106,20 @@ def run_trajectory_for_policy(
 
     # 1. Pipeline configuration and initialization
     cfg = get_pipeline_config(
-        policy="budget_aware" if policy in ("ours", "error_only") else policy,
+        policy="budget_aware" if policy not in ("full", "no_op", "noop") else policy,
         budget_ms=budget_ms,
         seed=effective_seed,
         W=W,
         H=H,
     )
+
+    if population_scale != 1.0:
+        if population_scale <= 0.55:
+            cfg["gaussian"]["init_stride"] = 6
+            cfg["densification"]["max_new_per_frame"] = int(cfg["densification"]["max_new_per_frame"] * 0.5)
+        elif population_scale >= 1.75:
+            cfg["gaussian"]["init_stride"] = 3
+            cfg["densification"]["max_new_per_frame"] = int(cfg["densification"]["max_new_per_frame"] * 2.0)
 
     pipeline = OnlineReconstructionPipeline(config=cfg, device=device)
     pipeline.initialize(
@@ -338,6 +348,8 @@ def run_trajectory_for_policy(
         "frame_violation_rate_pct": float(np.mean(frame_times > budget_ms) * 100.0) if not is_full else 0.0,
         "max_norm_drift": float(np.max(drifts)) if len(drifts) > 0 else 0.0,
         "total_trajectory_time_s": total_trajectory_time_s,
+        "mean_vram_mb": float(np.mean([r["vram_allocated_mb"] for r in frame_logs])) if len(frame_logs) > 0 else 0.0,
+        "max_vram_mb": float(np.max([r["vram_max_mb"] for r in frame_logs])) if len(frame_logs) > 0 else 0.0,
         "catastrophic_failures": int(np.sum(np.isnan(psnrs) | np.isinf(psnrs))),
     }
 

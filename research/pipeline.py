@@ -208,7 +208,7 @@ class OnlineReconstructionPipeline:
         depth = depth.to(self.device)
         
         # Subsample pixels to create initial Gaussians
-        stride = 4  # Every 4th pixel
+        stride = self.config.get('gaussian', {}).get('init_stride', 4)  # Default: every 4th pixel
         v_coords = torch.arange(0, H, stride, device=self.device)
         u_coords = torch.arange(0, W, stride, device=self.device)
         vv, uu = torch.meshgrid(v_coords, u_coords, indexing='ij')

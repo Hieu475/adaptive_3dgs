@@ -473,6 +473,36 @@ class Phase10Selector:
                     selected_indices.append(int(idx))
                     cur_scheduled_cost += c
 
+        elif pol in ("grad_norm", "sensitivity", "gradient"):
+            # Gradient sensitivity score: X[:, 2] (grad_norm proxy: influence_weight * error)
+            grad_scores = X[:, 2]
+            order = np.argsort(-grad_scores)
+            for idx in order:
+                c = float(scheduled_costs[idx])
+                if cur_scheduled_cost + c <= self.budget_ms + 1e-7:
+                    selected_indices.append(int(idx))
+                    cur_scheduled_cost += c
+
+        elif pol in ("importance", "spatial_importance"):
+            # Spatial importance score: attribution mass * screen visibility
+            imp_scores = X[:, 4] * np.maximum(X[:, 3], 1.0)
+            order = np.argsort(-imp_scores)
+            for idx in order:
+                c = float(scheduled_costs[idx])
+                if cur_scheduled_cost + c <= self.budget_ms + 1e-7:
+                    selected_indices.append(int(idx))
+                    cur_scheduled_cost += c
+
+        elif pol in ("random", "rand"):
+            # Uniform random baseline under same budget
+            rng = np.random.default_rng(self.model_bundle.seed + frame_idx * 100)
+            order = rng.permutation(N)
+            for idx in order:
+                c = float(scheduled_costs[idx])
+                if cur_scheduled_cost + c <= self.budget_ms + 1e-7:
+                    selected_indices.append(int(idx))
+                    cur_scheduled_cost += c
+
         elif pol in ("ours", "b2", "learned_utility"):
             # Rank by TwoHeadMLP utility; reject non-positive utility
             order = np.argsort(-pred_utils)
