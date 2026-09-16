@@ -1,0 +1,46 @@
+{
+  "phase": 12,
+  "generated_at": "2026-09-16",
+  "artifacts": {
+    "multisequence/multisequence_benchmark.csv": {
+      "sha256": "ff1577dbabc43c82520cd9d3f86ee47426fd9549c114581dbc9179f645ba7345",
+      "size_bytes": 12802
+    },
+    "multisequence/multisequence_summary.md": {
+      "sha256": "f214d83dd2e494486b00a7dddbcf9a3f2f3f1cab997127403de229b6f02df327",
+      "size_bytes": 4452
+    },
+    "external_baselines/external_baselines_table.csv": {
+      "sha256": "57e58e64d44a71ae1a45f5516eccf5d644f210fe55f9979ba9ceeb0187b733bb",
+      "size_bytes": 6883
+    },
+    "external_baselines/external_baselines_summary.md": {
+      "sha256": "c52d3b0c433fa707319f09e339474e59b3d1baf6eb4bc309ac389aede9e24204",
+      "size_bytes": 2859
+    },
+    "budget_curves/budget_sweep_table.csv": {
+      "sha256": "bd82bfa951d7d8da9a79f2585c4456ca586c00a4614504a3906be9b859c832ed",
+      "size_bytes": 6951
+    },
+    "budget_curves/budget_curves_summary.md": {
+      "sha256": "7edf59550e06123c71809d3e2674e86ee8b4204daed3bbff1ff978de3a174cd5",
+      "size_bytes": 2019
+    },
+    "error_vs_utility/error_vs_utility_summary.md": {
+      "sha256": "225978195f8a0e00f62b1fe78f731b3944d3605e2707eb3a240ab2b54f61318f",
+      "size_bytes": 3942
+    },
+    "systems_profiling/systems_profiling_summary.md": {
+      "sha256": "b32593e17a43dcaed2f01a87b3b710b4f484cc205c0aef3fe805e920f94786d0",
+      "size_bytes": 2401
+    },
+    "population_shift/population_shift_table.csv": {
+      "sha256": "812b7517dcf185229523b5692669cc7733fbee714e290433d163ae6f0355b80c",
+      "size_bytes": 1762
+    },
+    "population_shift/population_shift_summary.md": {
+      "sha256": "c2cc92cd399243eee9634287cddf49990873719e8c763e7c3822337349fd91e9",
+      "size_bytes": 1857
+    }
+  }
+}
