@@ -53,4 +53,12 @@ phase6_context_utility/ablation/*.pt
 !phase11_reproducibility/*.json
 !phase11_reproducibility/*.txt
 !phase11_reproducibility/*.md
+!phase12_paper_evidence/**/*.json
+!phase12_paper_evidence/**/*.csv
+!phase12_paper_evidence/**/*.md
+!phase12_paper_evidence/**/*.png
+!phase12_paper_evidence/*.json
+!phase12_paper_evidence/*.csv
+!phase12_paper_evidence/*.md
+
 
