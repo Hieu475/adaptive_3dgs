@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-17T18:22:08.110496",
+  "timestamp": "2026-09-17T22:57:28.616391",
   "stage": "R2_decomposition",
   "summaries": [
     {
@@ -51,18 +51,18 @@
       "densification_enabled": true,
       "n_frames": 30,
       "N_init": 14073,
-      "N_final": 52329,
-      "N_new_total": 38256,
-      "mean_new_per_frame": 1275.2,
-      "max_new_per_frame": 1310,
+      "N_final": 52362,
+      "N_new_total": 38289,
+      "mean_new_per_frame": 1276.3,
+      "max_new_per_frame": 1305,
       "init_PSNR": 11.641901731491089,
-      "final_PSNR": 11.775764226913452,
-      "mean_PSNR": 11.735696911811829,
-      "mean_SSIM": 0.4678773502508799,
-      "mean_depth_L1": 1.3907307545344034,
-      "mean_coverage": 0.8504435976346334,
-      "final_coverage": 0.8601042032241821,
-      "mean_opt_ms": 1170.4829295476277,
+      "final_PSNR": 12.19849944114685,
+      "mean_PSNR": 12.005089600880941,
+      "mean_SSIM": 0.49496542314688363,
+      "mean_depth_L1": 1.3531471649805704,
+      "mean_coverage": 0.8616645157337188,
+      "final_coverage": 0.8782682418823242,
+      "mean_opt_ms": 1238.7867371241252,
       "catastrophic_failures": 0
     }
   ]
