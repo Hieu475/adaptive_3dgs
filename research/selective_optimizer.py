@@ -40,7 +40,7 @@ class SelectiveAdam:
     def _init_param_state(self, p: torch.nn.Parameter):
         """Initialize zero momentum and step counts for parameter p."""
         if p not in self.state:
-            N = p.shape[0] if p.numel() > 0 else 0
+            N = p.shape[0] if p.ndim > 0 else 0
             dev = p.device
             self.state[p] = {
                 'step': torch.zeros(N, dtype=torch.long, device=dev),
