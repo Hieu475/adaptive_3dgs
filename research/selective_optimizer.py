@@ -166,7 +166,7 @@ class SelectiveAdam:
             for p in group['params']:
                 if p in self.state:
                     state = self.state[p]
-                    k_mask = keep_mask[:state['step'].shape[0]]
+                    k_mask = keep_mask[:state['step'].shape[0]].to(p.device)
                     state['step'] = state['step'][k_mask]
                     state['exp_avg'] = state['exp_avg'][k_mask]
                     state['exp_avg_sq'] = state['exp_avg_sq'][k_mask]
