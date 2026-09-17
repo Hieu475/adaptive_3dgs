@@ -748,7 +748,8 @@ def main():
         )
 
     if args.stage == "R3" or args.stage == "all":
-        for n in [30, 75, 150]:
+        frame_lengths = [args.n_frames] if args.n_frames else [30, 75, 150]
+        for n in frame_lengths:
             if len(frames) < n + 1:
                 print(f"  [Skip] R3 at {n} frames: only {len(frames)} loaded.")
                 continue
