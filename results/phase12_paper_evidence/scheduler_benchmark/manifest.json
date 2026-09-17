@@ -1,0 +1,26 @@
+{
+    "timestamp": "2026-09-17 11:10:27",
+    "experiment": "phase12l_policy_benchmark",
+    "policies": [
+        "B0_Error",
+        "B1_GradNorm",
+        "B2_Pointwise",
+        "B3_PositiveHead",
+        "B4_InteractionGreedy",
+        "B5_RiskAware",
+        "Oracle"
+    ],
+    "budgets_ms": [
+        5.0,
+        10.0,
+        15.0,
+        20.0,
+        30.0
+    ],
+    "n_trials": 5,
+    "files": [
+        "benchmark_results.csv",
+        "benchmark_results.json",
+        "policy_comparison_report.md"
+    ]
+}

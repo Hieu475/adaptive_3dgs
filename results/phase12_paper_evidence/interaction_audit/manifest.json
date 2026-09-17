@@ -1,0 +1,25 @@
+{
+    "timestamp": "2026-09-17T00:51:36.745234",
+    "experiment": "phase12i_interaction_audit",
+    "files_generated": [
+        "interaction_pairs.csv",
+        "interaction_contexts.csv",
+        "interaction_summary.json",
+        "interaction_audit_report.md",
+        "manifest.json"
+    ],
+    "interaction_audit_analysis": {
+        "status": "completed",
+        "files_generated": [
+            "interaction_matrix.png",
+            "interaction_vs_iou.png",
+            "conditional_vs_isolated.png",
+            "sign_flip_by_overlap.png",
+            "rank_instability.png",
+            "interaction_distribution.png",
+            "rq_by_context_size.png",
+            "cost_interaction.png",
+            "interaction_summary.md"
+        ]
+    }
+}

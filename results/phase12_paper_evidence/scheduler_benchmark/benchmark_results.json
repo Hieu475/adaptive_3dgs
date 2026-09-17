@@ -1,0 +1,366 @@
+{
+    "B0_Error": {
+        "5.0ms": {
+            "mean_quality": 0.1574773371219635,
+            "std_quality": 0.024759666845695492,
+            "mean_cost_ms": 4.860280114746094,
+            "mean_utility_rate": 0.032375461866310934,
+            "mean_ose": 0.9345764792354341,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 19.27247540006647,
+            "mean_n_selected": 7.4
+        },
+        "10.0ms": {
+            "mean_quality": 0.2678696304559708,
+            "std_quality": 0.026103023459475103,
+            "mean_cost_ms": 9.710989331054687,
+            "mean_utility_rate": 0.027586816101571376,
+            "mean_ose": 0.9036146112853016,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 18.675569799961522,
+            "mean_n_selected": 14.4
+        },
+        "15.0ms": {
+            "mean_quality": 0.37606662125587464,
+            "std_quality": 0.021776239358924587,
+            "mean_cost_ms": 14.659602478027344,
+            "mean_utility_rate": 0.02566879983197794,
+            "mean_ose": 0.9200409362350082,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 18.98685519990977,
+            "mean_n_selected": 22.4
+        },
+        "20.0ms": {
+            "mean_quality": 0.46672984814643864,
+            "std_quality": 0.028556433615305743,
+            "mean_cost_ms": 19.867549731445315,
+            "mean_utility_rate": 0.023494869804821787,
+            "mean_ose": 0.9211639191028015,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 18.448919399907027,
+            "mean_n_selected": 30.4
+        },
+        "30.0ms": {
+            "mean_quality": 0.6261604617118836,
+            "std_quality": 0.030725036176549092,
+            "mean_cost_ms": 29.82511660766602,
+            "mean_utility_rate": 0.020998666589994622,
+            "mean_ose": 0.9040748989121582,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 18.93340580008953,
+            "mean_n_selected": 45.6
+        }
+    },
+    "B1_GradNorm": {
+        "5.0ms": {
+            "mean_quality": 0.13363438844680786,
+            "std_quality": 0.027906687487678467,
+            "mean_cost_ms": 4.954091094970703,
+            "mean_utility_rate": 0.02699001573135899,
+            "mean_ose": 0.7943440287963227,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 18.733232999875327,
+            "mean_n_selected": 7.4
+        },
+        "10.0ms": {
+            "mean_quality": 0.22101108431816102,
+            "std_quality": 0.03963336319131033,
+            "mean_cost_ms": 9.882238787841796,
+            "mean_utility_rate": 0.02234598782950199,
+            "mean_ose": 0.7422267840501997,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 19.132470399927115,
+            "mean_n_selected": 14.8
+        },
+        "15.0ms": {
+            "mean_quality": 0.3084564927577972,
+            "std_quality": 0.03743287714397335,
+            "mean_cost_ms": 14.885376678466795,
+            "mean_utility_rate": 0.020732667597683458,
+            "mean_ose": 0.7523185641855185,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 18.580428800032678,
+            "mean_n_selected": 22.8
+        },
+        "20.0ms": {
+            "mean_quality": 0.38973182682991026,
+            "std_quality": 0.039401562130549024,
+            "mean_cost_ms": 19.795767224121096,
+            "mean_utility_rate": 0.019694936549843285,
+            "mean_ose": 0.7675531885865523,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 18.58703380003135,
+            "mean_n_selected": 30.2
+        },
+        "30.0ms": {
+            "mean_quality": 0.5335943726539611,
+            "std_quality": 0.04156008605634271,
+            "mean_cost_ms": 29.904513952636723,
+            "mean_utility_rate": 0.017844306991599813,
+            "mean_ose": 0.7695296663181844,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 19.02158379989487,
+            "mean_n_selected": 45.4
+        }
+    },
+    "B2_Pointwise": {
+        "5.0ms": {
+            "mean_quality": 0.16623900830745697,
+            "std_quality": 0.015476116327362677,
+            "mean_cost_ms": 4.723709466552735,
+            "mean_utility_rate": 0.03531107254860632,
+            "mean_ose": 0.9939182852372849,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 18.618166000032943,
+            "mean_n_selected": 8.0
+        },
+        "10.0ms": {
+            "mean_quality": 0.28932791562080384,
+            "std_quality": 0.023107282765728328,
+            "mean_cost_ms": 9.916501007080077,
+            "mean_utility_rate": 0.029188195558415266,
+            "mean_ose": 0.977349328923131,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 18.937009400178795,
+            "mean_n_selected": 16.8
+        },
+        "15.0ms": {
+            "mean_quality": 0.3881153327465057,
+            "std_quality": 0.026390425691137503,
+            "mean_cost_ms": 14.787798608398438,
+            "mean_utility_rate": 0.02623993707721494,
+            "mean_ose": 0.9491037195150532,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 18.564000399965153,
+            "mean_n_selected": 24.8
+        },
+        "20.0ms": {
+            "mean_quality": 0.4862288558959961,
+            "std_quality": 0.027961001804291275,
+            "mean_cost_ms": 19.805690277099607,
+            "mean_utility_rate": 0.024548877969333437,
+            "mean_ose": 0.9597266413279268,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 19.185799800015957,
+            "mean_n_selected": 33.0
+        },
+        "30.0ms": {
+            "mean_quality": 0.6596635130882263,
+            "std_quality": 0.029110327172108822,
+            "mean_cost_ms": 29.70395990600586,
+            "mean_utility_rate": 0.022207775097323915,
+            "mean_ose": 0.9526634902567507,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 18.70600859992919,
+            "mean_n_selected": 49.4
+        }
+    },
+    "B3_PositiveHead": {
+        "5.0ms": {
+            "mean_quality": 0.16623900830745697,
+            "std_quality": 0.015476116327362677,
+            "mean_cost_ms": 4.723709466552735,
+            "mean_utility_rate": 0.03531107254860632,
+            "mean_ose": 0.9939182852372849,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 38.00065100012944,
+            "mean_n_selected": 8.0
+        },
+        "10.0ms": {
+            "mean_quality": 0.28932791562080384,
+            "std_quality": 0.023107282765728328,
+            "mean_cost_ms": 9.916501007080077,
+            "mean_utility_rate": 0.029188195558415266,
+            "mean_ose": 0.977349328923131,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 37.23560540001927,
+            "mean_n_selected": 16.8
+        },
+        "15.0ms": {
+            "mean_quality": 0.3881153327465057,
+            "std_quality": 0.026390425691137503,
+            "mean_cost_ms": 14.787798608398438,
+            "mean_utility_rate": 0.02623993707721494,
+            "mean_ose": 0.9491037195150532,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 38.28549780000685,
+            "mean_n_selected": 24.8
+        },
+        "20.0ms": {
+            "mean_quality": 0.4862288558959961,
+            "std_quality": 0.027961001804291275,
+            "mean_cost_ms": 19.805690277099607,
+            "mean_utility_rate": 0.024548877969333437,
+            "mean_ose": 0.9597266413279268,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 37.2426144000201,
+            "mean_n_selected": 33.0
+        },
+        "30.0ms": {
+            "mean_quality": 0.6596635130882263,
+            "std_quality": 0.029110327172108822,
+            "mean_cost_ms": 29.70395990600586,
+            "mean_utility_rate": 0.022207775097323915,
+            "mean_ose": 0.9526634902567507,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 38.532486999974935,
+            "mean_n_selected": 49.4
+        }
+    },
+    "B4_InteractionGreedy": {
+        "5.0ms": {
+            "mean_quality": 0.049105042964220046,
+            "std_quality": 0.013915537375961306,
+            "mean_cost_ms": 1.6967917114257816,
+            "mean_utility_rate": 0.028642340760180747,
+            "mean_ose": 0.29379121322615637,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 35.11527599985129,
+            "mean_n_selected": 2.6
+        },
+        "10.0ms": {
+            "mean_quality": 0.09762291522026062,
+            "std_quality": 0.014132089052604359,
+            "mean_cost_ms": 4.4580469299316405,
+            "mean_utility_rate": 0.022120745246108065,
+            "mean_ose": 0.3320607405595477,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 5.84741419988859,
+            "mean_n_selected": 6.8
+        },
+        "15.0ms": {
+            "mean_quality": 0.15106014819145203,
+            "std_quality": 0.019957131480606904,
+            "mean_cost_ms": 7.011944567871095,
+            "mean_utility_rate": 0.021578063539052218,
+            "mean_ose": 0.3709791684166812,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 8.507601600013004,
+            "mean_n_selected": 10.8
+        },
+        "20.0ms": {
+            "mean_quality": 0.20223182947635648,
+            "std_quality": 0.011545665408828242,
+            "mean_cost_ms": 9.770354364013674,
+            "mean_utility_rate": 0.02070467562150479,
+            "mean_ose": 0.4000704986924184,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 10.984396999992896,
+            "mean_n_selected": 14.8
+        },
+        "30.0ms": {
+            "mean_quality": 0.30567447752952576,
+            "std_quality": 0.023140547033502008,
+            "mean_cost_ms": 14.591483135986328,
+            "mean_utility_rate": 0.02092402352317738,
+            "mean_ose": 0.44111347561286857,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 16.243343799851573,
+            "mean_n_selected": 22.6
+        }
+    },
+    "B5_RiskAware": {
+        "5.0ms": {
+            "mean_quality": 0.03588491007685661,
+            "std_quality": 0.015572638076110938,
+            "mean_cost_ms": 1.1011592529296874,
+            "mean_utility_rate": 0.031024997567631434,
+            "mean_ose": 0.21289307203583827,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 2.068054199935432,
+            "mean_n_selected": 1.8
+        },
+        "10.0ms": {
+            "mean_quality": 0.04700165018439293,
+            "std_quality": 0.022333526325067694,
+            "mean_cost_ms": 1.4175349853515624,
+            "mean_utility_rate": 0.03203183991637247,
+            "mean_ose": 0.15657930021920388,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 3.2549092000408564,
+            "mean_n_selected": 2.4
+        },
+        "15.0ms": {
+            "mean_quality": 0.04700165018439293,
+            "std_quality": 0.022333526325067694,
+            "mean_cost_ms": 1.4175349853515624,
+            "mean_utility_rate": 0.03203183991637247,
+            "mean_ose": 0.11363972629319377,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 2.474121999966883,
+            "mean_n_selected": 2.4
+        },
+        "20.0ms": {
+            "mean_quality": 0.04700165018439293,
+            "std_quality": 0.022333526325067694,
+            "mean_cost_ms": 1.4175349853515624,
+            "mean_utility_rate": 0.03203183991637247,
+            "mean_ose": 0.09202395745296703,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 2.4140766000527947,
+            "mean_n_selected": 2.4
+        },
+        "30.0ms": {
+            "mean_quality": 0.04700165018439293,
+            "std_quality": 0.022333526325067694,
+            "mean_cost_ms": 1.4175349853515624,
+            "mean_utility_rate": 0.03203183991637247,
+            "mean_ose": 0.06738280021908863,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 2.7539504000742454,
+            "mean_n_selected": 2.4
+        }
+    },
+    "Oracle": {
+        "5.0ms": {
+            "mean_quality": 0.16703655929565428,
+            "std_quality": 0.014612104454112377,
+            "mean_cost_ms": 4.663140075683594,
+            "mean_utility_rate": 0.035910322365900256,
+            "mean_ose": 1.0,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 42.517742599829944,
+            "mean_n_selected": 8.0
+        },
+        "10.0ms": {
+            "mean_quality": 0.29603907079696656,
+            "std_quality": 0.023321936687894094,
+            "mean_cost_ms": 9.779745288085937,
+            "mean_utility_rate": 0.030248139421737652,
+            "mean_ose": 1.0,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 31.802785999934713,
+            "mean_n_selected": 16.8
+        },
+        "15.0ms": {
+            "mean_quality": 0.408740637922287,
+            "std_quality": 0.02309945103622521,
+            "mean_cost_ms": 14.875900427246094,
+            "mean_utility_rate": 0.027479216237381376,
+            "mean_ose": 1.0,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 32.5751303999823,
+            "mean_n_selected": 25.2
+        },
+        "20.0ms": {
+            "mean_quality": 0.506553869009018,
+            "std_quality": 0.026416553137100892,
+            "mean_cost_ms": 19.75123811035156,
+            "mean_utility_rate": 0.025645929548304684,
+            "mean_ose": 1.0,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 31.982630399943446,
+            "mean_n_selected": 33.4
+        },
+        "30.0ms": {
+            "mean_quality": 0.6924374608039856,
+            "std_quality": 0.028955138520297224,
+            "mean_cost_ms": 29.77659965820313,
+            "mean_utility_rate": 0.023254010494167986,
+            "mean_ose": 1.0,
+            "mean_neg_rate": 0.0,
+            "mean_latency_ms": 31.85271719985394,
+            "mean_n_selected": 50.2
+        }
+    }
+}

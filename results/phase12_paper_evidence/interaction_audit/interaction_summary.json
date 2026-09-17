@@ -1,0 +1,26 @@
+{
+    "total_pairs": 500,
+    "total_contexts": 750,
+    "mean_interaction": -0.0007740407655793162,
+    "mean_abs_interaction": 0.001428516401707604,
+    "sub_additive_percent": 64.2,
+    "super_additive_percent": 35.4,
+    "R_pair_mean": 1.7375331381998336,
+    "I_ij_low": 2.7891446277144774e-05,
+    "I_ij_med": -0.001018177449618163,
+    "I_ij_high": -0.002660165269285131,
+    "sub_add_low": 49.77777777777778,
+    "sub_add_med": 69.41747572815534,
+    "sub_add_high": 95.65217391304348,
+    "sign_flip_percent": 16.666666666666664,
+    "flip_low": 5.357142857142857,
+    "flip_med": 14.171122994652407,
+    "flip_high": 25.0,
+    "mean_abs_deviation": 0.002099952691343604,
+    "mean_ratio_rq": -1.1394108778155134,
+    "decision": "GO",
+    "reasons": [
+        "R_flip = 0.167 > 0.05",
+        "|I_ij| = 0.001429 > 1e-4"
+    ]
+}

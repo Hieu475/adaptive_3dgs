@@ -1,0 +1,41 @@
+{
+  "total_records": 1500,
+  "unique_scenes": [
+    "tum_fr1_desk"
+  ],
+  "total_frames": 10,
+  "context_size_stats": {
+    "0": {
+      "count": 300,
+      "mean_delta_q": 2.100483951141894,
+      "mean_delta_c": 1.7885884519150508,
+      "mean_utility": 1.4895383618540756
+    },
+    "1": {
+      "count": 300,
+      "mean_delta_q": 1.9937728641557464,
+      "mean_delta_c": 1.7773387475910718,
+      "mean_utility": 1.4127208191303966
+    },
+    "2": {
+      "count": 300,
+      "mean_delta_q": 1.8862511366261268,
+      "mean_delta_c": 1.7784091211791917,
+      "mean_utility": 1.3382436707309224
+    },
+    "4": {
+      "count": 300,
+      "mean_delta_q": 1.6789180865375708,
+      "mean_delta_c": 1.7731955944325084,
+      "mean_utility": 1.1939389034204628
+    },
+    "8": {
+      "count": 300,
+      "mean_delta_q": 1.148272570262765,
+      "mean_delta_c": 1.7830149686103873,
+      "mean_utility": 0.8122971108234958
+    }
+  },
+  "sign_flip_rate_pct": 1.6,
+  "utility_si0_correlation": 0.44595884197688496
+}
