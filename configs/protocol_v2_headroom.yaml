@@ -125,7 +125,7 @@ experiments:
       - name: "new_init_legacy_dense"
         init: "new"
         dense: "legacy"
-        max_gaussians: 30000
+        max_gaussians: 150000
       - name: "new_init_new_dense"
         init: "new"
         dense: "new"

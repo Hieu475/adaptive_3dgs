@@ -97,7 +97,7 @@ def build_pipeline_config(
             "attribution_top_k": 4,
         },
         "scheduler": {
-            "gpu_budget_ms": 500.0 if is_full else budget_ms,
+            "gpu_budget_ms": budget_ms,
             "policy": policy,
             "cost_per_gaussian_us": 2.0,
         },
@@ -232,10 +232,6 @@ def run_headroom_trajectory(
 
     # Hook for NO_OP: override the selector to select nothing
     is_noop = (policy == "no_op")
-    if is_noop:
-        # Reset scheduler budget to normal (not 500ms) — densification
-        # still happens before scheduling, so we need correct budget
-        cfg["scheduler"]["gpu_budget_ms"] = BUDGET_MS
 
     pipeline = OnlineReconstructionPipeline(config=cfg, device=device)
     pipeline.initialize(
@@ -372,14 +368,14 @@ def get_experiment_configs() -> Dict[str, Dict[str, Any]]:
             "max_new_per_frame": 80,
             "max_gaussians": 30000,
         },
-        # R1: New initialization, legacy densification
+        # R1 & R2: New initialization, legacy densification
         "new_init_legacy_dense": {
             "init_stride": 2,
             "scale_mode": "depth_adaptive",
             "initial_scale": 0.02,
             "scale_pixel_multiplier": 1.0,
             "max_new_per_frame": 80,
-            "max_gaussians": 30000,
+            "max_gaussians": 150000,
         },
         # R2: New initialization, demand-driven densification
         "new_init_new_dense": {

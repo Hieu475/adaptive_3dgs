@@ -64,16 +64,8 @@ pipeline_specification:
   gaussian:
     sh_degree: 0
     initial_opacity: 0.5
-    max_gaussians: 150000        # was 30000 — with denser init + demand-driven
-                                  # densification this is reached within ~10-30
-                                  # frames; raised so it stops being a silent new
-                                  # bottleneck. Tune based on actual VRAM/compute
-                                  # budget once running on real TUM sequences.
+    max_gaussians: 30000
     initial_scale: 0.02
-    init_stride: 2               # was 4; denser initial sampling (see Part 1 fix)
-    scale_mode: "depth_adaptive" # r = depth / focal_length per new Gaussian (SplaTAM-style),
-                                  # instead of the fixed initial_scale=0.02 constant for every point
-    scale_pixel_multiplier: 1.0
   rendering:
     tile_size: 16
     use_surface_aware_depth: true
@@ -83,19 +75,7 @@ pipeline_specification:
     cost_per_gaussian_us: 2.0
     budget_ms: 15.0
   densification:
-    # HARD SAFETY CEILING — not the routine binding constraint.
-    #
-    # The actual per-frame cap is:
-    #   min(max_new_per_frame,                          ← this value (4000)
-    #       BudgetScheduler.compute_max_new_gaussians(  ← budget + demand cap
-    #           n_error_pixels=...),
-    #       max_gaussians - current_count)               ← remaining capacity
-    #
-    # With budget_ms=15, densify_allocation=20%, cost_densify_us=2:
-    #   N_max_budget = (15 × 0.2 × 1000) / 2 = 1500
-    # so the budget-derived cap (~1500) is the routine binding constraint,
-    # and 4000 is only a safety ceiling for edge cases.
-    max_new_per_frame: 4000
+    max_new_per_frame: 80
     strategy: "importance"
     use_adaptive_thresholds: true
 
