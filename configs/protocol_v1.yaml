@@ -83,14 +83,18 @@ pipeline_specification:
     cost_per_gaussian_us: 2.0
     budget_ms: 15.0
   densification:
-    # This is now a *safety ceiling*, not the routine binding constraint.
-    # The actual per-frame cap is min(this, demand-driven budget from
-    # BudgetScheduler.compute_max_new_gaussians(n_error_pixels=...),
-    # remaining max_gaussians capacity). Previously this constant (80) WAS
-    # the binding constraint almost every frame, capping the entire online
-    # map at ~4.5k Gaussians regardless of how much unmodeled geometry was
-    # visible. Raised so genuine demand (error pixels), not an arbitrary
-    # constant, drives growth.
+    # HARD SAFETY CEILING — not the routine binding constraint.
+    #
+    # The actual per-frame cap is:
+    #   min(max_new_per_frame,                          ← this value (4000)
+    #       BudgetScheduler.compute_max_new_gaussians(  ← budget + demand cap
+    #           n_error_pixels=...),
+    #       max_gaussians - current_count)               ← remaining capacity
+    #
+    # With budget_ms=15, densify_allocation=20%, cost_densify_us=2:
+    #   N_max_budget = (15 × 0.2 × 1000) / 2 = 1500
+    # so the budget-derived cap (~1500) is the routine binding constraint,
+    # and 4000 is only a safety ceiling for edge cases.
     max_new_per_frame: 4000
     strategy: "importance"
     use_adaptive_thresholds: true

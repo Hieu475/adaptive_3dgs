@@ -1,0 +1,211 @@
+# ============================================================================
+# Phase 12-R: Reconstruction Headroom Audit
+# Protocol v2.0.0-headroom
+#
+# Purpose: Measure H_substrate = Q_FULL - Q_NOOP after fixing initialization
+#          and densification bottlenecks identified in Phase 12 audit.
+#
+# This is a NEW protocol — it must NOT overwrite Phase 12 v1 results.
+# All outputs go to results/phase12_headroom_audit/.
+# ============================================================================
+
+protocol_version: "2.0.0-headroom"
+
+experiment:
+  name: "Phase 12-R Reconstruction Headroom Audit"
+  description: >
+    After fixing Gaussian initialization (stride 4→2, constant→depth-adaptive scale)
+    and densification (fixed 80/frame→demand-driven), does Full optimization produce
+    a meaningfully larger quality gain over No-Op than before?
+
+dataset:
+  scene: "tum_fr2_xyz"
+  width: 320
+  height: 240
+  depth_scale: 5000.0
+
+evaluation:
+  # Smoke test uses pilot_frames; full experiments use extended_frames.
+  pilot_frames: 30
+  extended_frames: 150
+  smoke_frames: 10
+  seed: 42
+
+budget:
+  optimization_ms: 15.0
+  safety_factor: 1.10
+
+# --------------------------------------------------------------------------
+# Initialization configurations (compared in experiment R1)
+# --------------------------------------------------------------------------
+initialization:
+  legacy:
+    stride: 4
+    scale_mode: "constant"
+    initial_scale: 0.02
+  new:
+    stride: 2
+    scale_mode: "depth_adaptive"
+    pixel_multiplier: 1.0
+
+# --------------------------------------------------------------------------
+# Densification configurations (compared in experiment R2)
+# --------------------------------------------------------------------------
+densification:
+  legacy:
+    # Hard safety ceiling — the actual per-frame cap is
+    # min(max_new_per_frame, budget-derived cap from
+    # BudgetScheduler.compute_max_new_gaussians(n_error_pixels=...),
+    # remaining max_gaussians capacity).
+    max_new_per_frame: 80
+    demand_driven: false
+  new:
+    # Hard safety ceiling, NOT the routine binding constraint.
+    # With budget_ms=15, densify_allocation=20%, cost_densify_us=2:
+    #   N_max_budget = (15*0.2*1000)/2 = 1500
+    # So 4000 is a safety ceiling; actual per-frame cap is demand-driven.
+    max_new_per_frame: 4000
+    demand_driven: true
+  strategy: "importance"
+  use_adaptive_thresholds: true
+
+# --------------------------------------------------------------------------
+# Gaussian population limits
+# --------------------------------------------------------------------------
+population:
+  legacy_max_gaussians: 30000
+  new_max_gaussians: 150000
+
+# --------------------------------------------------------------------------
+# Policies evaluated (staged — not all at once)
+# --------------------------------------------------------------------------
+# Stage 1 (R1/R2): Only no_op + full to measure raw headroom
+# Stage 2 (R4):    Add error_only + ours only if headroom exists
+policies:
+  stage1:
+    - "no_op"
+    - "full"
+  stage2:
+    - "no_op"
+    - "error_only"
+    - "ours"
+    - "full"
+
+# --------------------------------------------------------------------------
+# Experiment matrix
+# --------------------------------------------------------------------------
+experiments:
+  smoke:
+    description: "10-frame sanity check before any real experiment"
+    frames: 10
+    seeds: [42]
+    configs: ["new_init_new_dense"]
+    policies: ["no_op", "full"]
+
+  R1_initialization:
+    description: "Isolate initialization impact (stride/scale) with legacy densification"
+    frames: 30
+    seeds: [42]
+    configs:
+      - name: "legacy_init"
+        init: "legacy"
+        dense: "legacy"
+        max_gaussians: 30000
+      - name: "new_init"
+        init: "new"
+        dense: "legacy"
+        max_gaussians: 30000
+    policies: ["no_op", "full"]
+
+  R2_densification:
+    description: "Isolate densification impact with new initialization"
+    frames: 30
+    seeds: [42]
+    configs:
+      - name: "new_init_legacy_dense"
+        init: "new"
+        dense: "legacy"
+        max_gaussians: 30000
+      - name: "new_init_new_dense"
+        init: "new"
+        dense: "new"
+        max_gaussians: 150000
+    policies: ["no_op", "full"]
+
+  R3_trajectory:
+    description: "Trajectory length scaling with best config from R1/R2"
+    frame_lengths: [30, 75, 150]
+    seeds: [42]
+    configs: ["new_init_new_dense"]
+    policies: ["no_op", "full"]
+    checkpoints: [10, 20, 30, 50, 75, 100, 150]
+
+  R4_scheduler:
+    description: "Only if R1-R3 show sufficient headroom"
+    frames: 150
+    seeds: [42]
+    configs: ["new_init_new_dense"]
+    policies: ["no_op", "error_only", "ours", "full"]
+
+# --------------------------------------------------------------------------
+# Decomposition baselines (Step XII from plan)
+# --------------------------------------------------------------------------
+decomposition:
+  description: >
+    Three-way decomposition to separate representation growth from
+    gradient optimization:
+      ΔQ_densify = Q(NoOp+Densify) - Q(NoOp+Static)
+      ΔQ_opt     = Q(Full+Densify) - Q(NoOp+Densify)
+  conditions:
+    - name: "noop_static"
+      policy: "no_op"
+      densification_enabled: false
+    - name: "noop_densify"
+      policy: "no_op"
+      densification_enabled: true
+    - name: "full_densify"
+      policy: "full"
+      densification_enabled: true
+
+# --------------------------------------------------------------------------
+# Metrics collected per frame
+# --------------------------------------------------------------------------
+metrics:
+  per_frame:
+    - "N_before"         # Gaussian count before densification
+    - "N_new"            # new Gaussians added this frame
+    - "N_after"          # Gaussian count after densification
+    - "N_visible"        # Gaussians with non-zero contribution
+    - "PSNR"
+    - "SSIM"
+    - "depth_L1"
+    - "coverage"         # fraction of pixels with Gaussian contribution > eps
+    - "opt_time_ms"      # actual optimization wall-clock time
+    - "dense_time_ms"    # actual densification wall-clock time
+    - "render_time_ms"   # actual render wall-clock time
+
+  summary:
+    - "N_init"
+    - "N_final"
+    - "N_new_total"
+    - "mean_new_per_frame"
+    - "max_new_per_frame"
+    - "mean_opt_ms"
+    - "PSNR_mean"
+    - "SSIM_mean"
+    - "depth_L1_mean"
+    - "coverage_mean"
+    - "H_substrate"      # PSNR_FULL - PSNR_NOOP (final)
+
+  derived:
+    - "PSNR_affected"    # quality in high-attribution regions only
+    - "dQ_per_N_new"     # ΔQ / N_new
+    - "dQ_per_opt_ms"    # ΔQ / T_opt
+
+# --------------------------------------------------------------------------
+# Decision gate thresholds (for reference, not hard-coded in runner)
+# --------------------------------------------------------------------------
+decision_gate:
+  outcome_A: "H_substrate substantially larger than v1; PSNR improves with population"
+  outcome_B: "Gaussian count increases but H_substrate still near zero"
+  outcome_C: "Gaussian count increases but absolute quality degrades"
