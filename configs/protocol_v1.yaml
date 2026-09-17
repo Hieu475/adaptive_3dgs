@@ -64,8 +64,16 @@ pipeline_specification:
   gaussian:
     sh_degree: 0
     initial_opacity: 0.5
-    max_gaussians: 30000
+    max_gaussians: 150000        # was 30000 — with denser init + demand-driven
+                                  # densification this is reached within ~10-30
+                                  # frames; raised so it stops being a silent new
+                                  # bottleneck. Tune based on actual VRAM/compute
+                                  # budget once running on real TUM sequences.
     initial_scale: 0.02
+    init_stride: 2               # was 4; denser initial sampling (see Part 1 fix)
+    scale_mode: "depth_adaptive" # r = depth / focal_length per new Gaussian (SplaTAM-style),
+                                  # instead of the fixed initial_scale=0.02 constant for every point
+    scale_pixel_multiplier: 1.0
   rendering:
     tile_size: 16
     use_surface_aware_depth: true
@@ -75,7 +83,15 @@ pipeline_specification:
     cost_per_gaussian_us: 2.0
     budget_ms: 15.0
   densification:
-    max_new_per_frame: 80
+    # This is now a *safety ceiling*, not the routine binding constraint.
+    # The actual per-frame cap is min(this, demand-driven budget from
+    # BudgetScheduler.compute_max_new_gaussians(n_error_pixels=...),
+    # remaining max_gaussians capacity). Previously this constant (80) WAS
+    # the binding constraint almost every frame, capping the entire online
+    # map at ~4.5k Gaussians regardless of how much unmodeled geometry was
+    # visible. Raised so genuine demand (error pixels), not an arbitrary
+    # constant, drives growth.
+    max_new_per_frame: 4000
     strategy: "importance"
     use_adaptive_thresholds: true
 

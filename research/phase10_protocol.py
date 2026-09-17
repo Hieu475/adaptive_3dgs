@@ -83,7 +83,13 @@ DEFAULT_BUDGET_MS: float = 15.0
 SAFETY_FACTOR: float = 1.10
 
 # Trajectory length (frames)
-DEFAULT_TRAJECTORY_FRAMES: int = 30
+# Was 30 — too short for a sparse map to densify/converge, and too short to
+# distinguish scheduling policies whose effect compounds over time. Raised to
+# 150 (5x). NOTE: this changes the confirmatory protocol's frozen value —
+# treat this as a new protocol version (e.g. protocol_v2), keep the v1
+# results/config archived for provenance, and re-run the full Phase 5-12
+# battery under the new value rather than silently overwriting prior results.
+DEFAULT_TRAJECTORY_FRAMES: int = 150
 
 # Image resolution
 DEFAULT_IMAGE_WIDTH: int = 320

@@ -247,6 +247,40 @@ def unproject_pixels(
     return points_world
 
 
+def compute_depth_adaptive_scale(
+    depths: torch.Tensor,
+    intrinsics: torch.Tensor,
+    pixel_multiplier: float = 1.0,
+    min_scale: float = 1e-4,
+    max_scale: float = 1.0,
+) -> torch.Tensor:
+    """Compute isotropic Gaussian scale so its footprint matches ~1 pixel at that depth.
+
+    Standard SLAM-3DGS initialization (SplaTAM, Keetha et al. 2024; reused by
+    VTGaussian-SLAM, SGAD-SLAM, FGS-SLAM): r = D_gt / f, i.e. the real-world size
+    covered by one pixel at the observed depth. This replaces a single global
+    constant (previously `initial_scale=0.01` for every point regardless of
+    depth) with a per-point, geometry-aware scale: near points get small
+    Gaussians, far points get proportionally larger ones.
+
+    Args:
+        depths: (K,) metric depth at each candidate pixel
+        intrinsics: (3, 3) camera intrinsic matrix
+        pixel_multiplier: multiply the 1-pixel footprint (e.g. 1.5-2.0 to allow
+            slight overlap between neighboring Gaussians, reducing gaps)
+        min_scale, max_scale: hard clamps to avoid degenerate scales from noisy
+            or out-of-range depth values
+
+    Returns:
+        scale: (K,) isotropic scale per candidate (same value applied to all 3 axes)
+    """
+    fx = intrinsics[0, 0]
+    fy = intrinsics[1, 1]
+    f_mean = 0.5 * (fx + fy)
+    scale = pixel_multiplier * depths / f_mean
+    return scale.clamp(min=min_scale, max=max_scale)
+
+
 def create_gaussians_from_candidates(
     candidates_uv: torch.Tensor,
     rgb_image: torch.Tensor,
@@ -255,6 +289,8 @@ def create_gaussians_from_candidates(
     extrinsics: torch.Tensor,
     initial_scale: float = 0.01,
     initial_opacity: float = 0.5,
+    scale_mode: str = 'depth_adaptive',
+    scale_pixel_multiplier: float = 1.0,
 ) -> Dict[str, torch.Tensor]:
     """Initialize new Gaussians from RGB-D data at candidate pixel locations.
     
@@ -264,8 +300,13 @@ def create_gaussians_from_candidates(
         depth_map: (H, W) depth map
         intrinsics: (3, 3) camera intrinsic matrix
         extrinsics: (4, 4) world-to-camera transform
-        initial_scale: initial Gaussian scale
+        initial_scale: fallback/constant Gaussian scale, used when
+            scale_mode='constant' (kept for backward compatibility)
         initial_opacity: initial opacity value
+        scale_mode: 'depth_adaptive' (default, recommended) computes scale from
+            depth/focal-length per point; 'constant' reproduces the old behavior.
+        scale_pixel_multiplier: passed to compute_depth_adaptive_scale when
+            scale_mode='depth_adaptive'.
     
     Returns:
         Dict with 'xyz', 'scaling', 'rotation', 'opacity', 'features_dc', 'normals'
@@ -314,8 +355,15 @@ def create_gaussians_from_candidates(
     colors_clamped = colors.clamp(1e-4, 1.0 - 1e-4)
     features_dc = torch.log(colors_clamped / (1.0 - colors_clamped)).unsqueeze(1)  # (K, 1, 3)
     
-    # Default parameters
-    scaling = torch.full((K, 3), math.log(initial_scale), device=device)
+    # Per-point, geometry-aware scale (default) instead of one global constant.
+    if scale_mode == 'depth_adaptive':
+        depths_valid = depth_map[v, u]  # (K,) — depth already re-filtered to `valid` above
+        point_scale = compute_depth_adaptive_scale(
+            depths_valid, intrinsics, pixel_multiplier=scale_pixel_multiplier,
+        )  # (K,)
+        scaling = torch.log(point_scale).unsqueeze(-1).expand(K, 3).contiguous()
+    else:
+        scaling = torch.full((K, 3), math.log(initial_scale), device=device)
     rotation = torch.zeros(K, 4, device=device)
     rotation[:, 0] = 1.0  # identity quaternion
     inv_sig = math.log(initial_opacity / (1.0 - initial_opacity + 1e-8))

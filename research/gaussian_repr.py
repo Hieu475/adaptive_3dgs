@@ -10,7 +10,7 @@ Each Gaussian G_i = (μ_i, Σ_i, α_i, SH_i) where:
 """
 import torch
 import torch.nn as nn
-from typing import Dict, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple, Any, Union
 import math
 from research.state_store import GaussianStateStore
 
@@ -253,7 +253,7 @@ class GaussianModel(nn.Module):
         points: torch.Tensor,
         colors: Optional[torch.Tensor] = None,
         normals: Optional[torch.Tensor] = None,
-        initial_scale: float = 0.01,
+        initial_scale: Union[float, torch.Tensor] = 0.01,
         initial_opacity: float = 0.1,
         initial_confidence: float = 0.5,
     ):
@@ -263,7 +263,12 @@ class GaussianModel(nn.Module):
             points: (N, 3) positions
             colors: (N, 3) RGB colors in [0,1], optional
             normals: (N, 3) surface normals, optional
-            initial_scale: initial isotropic scale
+            initial_scale: initial isotropic scale. Either a single float
+                (applied uniformly to every point — legacy behavior) or a
+                (N,) tensor of per-point scales (e.g. from
+                densification.compute_depth_adaptive_scale), which is strongly
+                recommended: a single global constant is geometrically wrong
+                for points at very different depths.
             initial_opacity: initial opacity (before sigmoid)
             initial_confidence: initial confidence score
         """
@@ -271,7 +276,14 @@ class GaussianModel(nn.Module):
         device = points.device
         
         self._xyz = nn.Parameter(points.clone())
-        self._scaling = nn.Parameter(torch.full((N, 3), math.log(initial_scale), device=device))
+        if torch.is_tensor(initial_scale):
+            assert initial_scale.shape[0] == N, (
+                f"initial_scale tensor length {initial_scale.shape[0]} must match N={N}"
+            )
+            log_scale = torch.log(initial_scale.to(device)).unsqueeze(-1).expand(N, 3).contiguous()
+        else:
+            log_scale = torch.full((N, 3), math.log(initial_scale), device=device)
+        self._scaling = nn.Parameter(log_scale)
         # Identity quaternion (w=1, x=0, y=0, z=0)
         rot = torch.zeros(N, 4, device=device)
         rot[:, 0] = 1.0

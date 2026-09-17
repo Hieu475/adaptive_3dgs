@@ -410,14 +410,42 @@ class BudgetScheduler:
         else:
             raise ValueError(f"Unknown optimization policy: {policy}")
     
-    def compute_max_new_gaussians(self) -> int:
+    def compute_max_new_gaussians(self, n_error_pixels: Optional[int] = None) -> int:
         """Compute maximum number of new Gaussians allowed this frame.
-        
+
+        Previously this was the *only* signal used to cap densification, and
+        was further overridden by a small fixed constant
+        (`densification.max_new_per_frame`, e.g. 80) in the calling code —
+        meaning the map's growth was bottlenecked by an arbitrary constant
+        almost every frame, regardless of how much unmodeled geometry was
+        actually visible. That constant cap is the dominant reason the online
+        maps stayed at only ~4-5k Gaussians for an entire room (20-200x
+        sparser than published SLAM-3DGS systems), which in turn is why
+        Full-Optimization barely beat No-Op (near-zero headroom).
+
+        This now additionally accepts the actual current *demand* — the
+        number of pixels flagged as needing new geometry this frame
+        (`error_masks['combined_mask'].sum()`) — and returns
+        min(compute-budget-derived cap, demand). Early frames with lots of
+        unobserved geometry get to add many Gaussians in one shot (bounded
+        only by the compute-time budget for densification); once the map
+        has converged and few pixels are flagged, growth naturally tapers to
+        near zero without needing a hand-tuned constant.
+
+        Args:
+            n_error_pixels: number of pixels currently flagged for
+                densification this frame (e.g. `combined_mask.sum()`). If
+                None, falls back to the pure compute-budget-derived cap
+                (legacy behavior).
+
         Returns:
-            max_new: maximum number of new Gaussians
+            max_new: maximum number of new Gaussians to create this frame
         """
         budget_us = self.gpu_budget_ms * 1000 * self.budget_allocation['densify']
-        return max(1, int(budget_us / self.cost_densify_us))
+        budget_cap = max(1, int(budget_us / self.cost_densify_us))
+        if n_error_pixels is None:
+            return budget_cap
+        return max(1, min(budget_cap, int(n_error_pixels)))
     
     def allocate_budget(self) -> Dict[str, float]:
         """Compute actual budget allocation in milliseconds.

@@ -42,7 +42,7 @@ SAFETY_FACTOR: float = 1.10
 # Dual Budget Accounting Definitions
 DEFAULT_BUDGET_MS: float = 15.0          # B_opt: Optimization kernel compute budget
 DEFAULT_KERNEL_BUDGET_MS: float = 15.0   # Alias for clarity: C_i^{kernel} knapsack limit
-DEFAULT_TRAJECTORY_FRAMES: int = 30
+DEFAULT_TRAJECTORY_FRAMES: int = 150  # was 30 — see research/phase10_protocol.py for rationale
 DEFAULT_IMAGE_WIDTH: int = 320
 DEFAULT_IMAGE_HEIGHT: int = 240
 

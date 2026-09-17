@@ -21,7 +21,8 @@ from .attribution import render_with_attribution, compute_gaussian_statistics
 from .scheduler import BudgetScheduler, OptimizationPolicy, estimate_gaussian_costs
 from .densification import (
     compute_error_masks, sample_candidates,
-    create_gaussians_from_candidates, prune_low_value
+    create_gaussians_from_candidates, prune_low_value,
+    compute_depth_adaptive_scale,
 )
 from .tracker import ICPTracker
 from .background_cache import FrozenBackgroundCache
@@ -209,8 +210,17 @@ class OnlineReconstructionPipeline:
         rgb = rgb.to(self.device)
         depth = depth.to(self.device)
         
-        # Subsample pixels to create initial Gaussians
-        stride = self.config.get('gaussian', {}).get('init_stride', 4)  # Default: every 4th pixel
+        # Subsample pixels to create initial Gaussians.
+        # NOTE: at 320x240 (post 2x downsample), stride=4 previously produced only
+        # ~4,800 initial Gaussians for an entire room — 20-200x sparser than
+        # published online 3DGS-SLAM systems (SplaTAM ~635k-969k, RTG-SLAM
+        # ~84k-273k on comparable TUM scenes), which was the dominant cause of
+        # both low absolute PSNR and near-zero headroom between No-Op and Full
+        # Optimization bounds. Default lowered to stride=2 (~4x more initial
+        # points); combined with adaptive per-frame densification (see
+        # process_frame below) this is expected to reach tens of thousands of
+        # Gaussians within the trajectory.
+        stride = self.config.get('gaussian', {}).get('init_stride', 2)
         v_coords = torch.arange(0, H, stride, device=self.device)
         u_coords = torch.arange(0, W, stride, device=self.device)
         vv, uu = torch.meshgrid(v_coords, u_coords, indexing='ij')
@@ -220,6 +230,7 @@ class OnlineReconstructionPipeline:
         d_vals = depth[uv[:, 1].long(), uv[:, 0].long()]
         valid = d_vals > 0
         uv = uv[valid]
+        d_vals = d_vals[valid]  # keep in sync with filtered uv (needed for depth-adaptive scale)
         
         # Unproject to 3D
         from .densification import unproject_pixels
@@ -228,10 +239,21 @@ class OnlineReconstructionPipeline:
         # Get colors
         colors = rgb[uv[:, 1].long(), uv[:, 0].long()]
         
+        # Geometry-aware initial scale: r = depth / focal_length (SplaTAM-style),
+        # instead of one global constant applied regardless of depth. Falls back
+        # to the legacy constant if explicitly disabled via config.
+        if self.config['gaussian'].get('scale_mode', 'depth_adaptive') == 'depth_adaptive':
+            init_scale = compute_depth_adaptive_scale(
+                d_vals, intrinsics,
+                pixel_multiplier=self.config['gaussian'].get('scale_pixel_multiplier', 1.0),
+            )
+        else:
+            init_scale = self.config['gaussian'].get('initial_scale', 0.01)
+        
         # Initialize Gaussians
         self.gaussian_model.initialize_from_points(
             points, colors=colors,
-            initial_scale=self.config['gaussian'].get('initial_scale', 0.01),
+            initial_scale=init_scale,
             initial_opacity=self.config['gaussian']['initial_opacity'],
         )
         
@@ -376,7 +398,9 @@ class OnlineReconstructionPipeline:
         
         max_new = min(
             dense_cfg['max_new_per_frame'],
-            self.scheduler.compute_max_new_gaussians(),
+            self.scheduler.compute_max_new_gaussians(
+                n_error_pixels=int(error_masks['combined_mask'].sum().item())
+            ),
             self.config['gaussian']['max_gaussians'] - self.gaussian_model.num_gaussians,
         )
         
@@ -396,6 +420,10 @@ class OnlineReconstructionPipeline:
                 new_gaussians = create_gaussians_from_candidates(
                     candidates, rgb, depth,
                     self.intrinsics, self.current_pose,
+                    scale_mode=self.config['gaussian'].get('scale_mode', 'depth_adaptive'),
+                    scale_pixel_multiplier=self.config['gaussian'].get('scale_pixel_multiplier', 1.0),
+                    initial_scale=self.config['gaussian'].get('initial_scale', 0.01),
+                    initial_opacity=self.config['gaussian'].get('initial_opacity', 0.5),
                 )
                 if new_gaussians['xyz'].shape[0] > 0:
                     self.gaussian_model.add_gaussians(new_gaussians)
