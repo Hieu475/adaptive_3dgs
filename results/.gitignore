@@ -60,5 +60,6 @@ phase6_context_utility/ablation/*.pt
 !phase12_paper_evidence/*.json
 !phase12_paper_evidence/*.csv
 !phase12_paper_evidence/*.md
+!phase12_headroom_audit/**
 
 
