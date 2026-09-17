@@ -430,8 +430,10 @@ class OnlineReconstructionPipeline:
                     self.importance_estimator.expand_buffers(
                         new_gaussians['xyz'].shape[0], self.device
                     )
-                    # Extend optimizer state continuously without destroying historical momentum
+                    # Re-register newly created Parameter objects and extend optimizer state
+                    # without destroying historical momentum/variance buffers
                     if self.optimizer is not None:
+                        self._reregister_optimizer_params()
                         self.optimizer.extend_state(new_gaussians['xyz'].shape[0], device=self.device)
                     else:
                         self._setup_optimizer()
