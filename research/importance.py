@@ -363,7 +363,12 @@ class GaussianImportanceEstimator:
         if self._running_depth_error is None or self._running_color_error is None:
             raise RuntimeError("Must call update_statistics before compute_error_influence_score")
         
-        error = self._running_depth_error + self._running_color_error
+        base_error = self._running_depth_error + self._running_color_error
+        if self._running_error_slow is not None and self._running_error_slow.shape[0] == base_error.shape[0]:
+            error = 0.6 * base_error + 0.4 * self._running_error_slow
+        else:
+            error = base_error
+
         influence = self._screen_areas if self._screen_areas is not None else self._visibility_count
         if influence is None:
             influence = torch.ones_like(error)

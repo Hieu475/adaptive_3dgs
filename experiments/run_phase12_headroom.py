@@ -525,6 +525,7 @@ def run_experiment(
     device: str,
     output_dir: Path,
     decomposition: bool = False,
+    budget_ms: float = BUDGET_MS,
 ):
     """Generic experiment runner for R1/R2/R3/R4 stages."""
     print(f"\n{'=' * 70}")
@@ -532,6 +533,7 @@ def run_experiment(
     print(f"  Configs: {config_names}")
     print(f"  Policies: {policies}")
     print(f"  Frames: {n_frames}")
+    print(f"  Budget: {budget_ms} ms")
     print(f"{'=' * 70}")
 
     exp_frames = frames[:min(n_frames + 1, len(frames))]
@@ -557,7 +559,7 @@ def run_experiment(
         for label, policy, dense_on in conditions:
             full_label = f"{config_name}/{label}" if decomposition else config_name
             cfg = build_pipeline_config(
-                policy=policy, seed=seed, **cfg_params
+                policy=policy, seed=seed, budget_ms=budget_ms, **cfg_params
             )
             summary, frame_logs = run_headroom_trajectory(
                 config_name=full_label,
@@ -646,6 +648,8 @@ def main():
     parser.add_argument("--device", type=str, default="cpu")
     parser.add_argument("--n_frames", type=int, default=None,
                         help="Override number of frames (default: stage-specific)")
+    parser.add_argument("--budget_ms", type=float, default=BUDGET_MS,
+                        help="GPU optimization budget in ms (default: 15.0)")
     parser.add_argument("--output_dir", type=str, default=None)
     args = parser.parse_args()
 
@@ -780,6 +784,7 @@ def main():
             intrinsics=intrinsics,
             device=args.device,
             output_dir=out_dir,
+            budget_ms=args.budget_ms,
         )
 
     print("\n" + "=" * 70)
