@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from datasets.tum_dataset import TUMDataset
 from research.pipeline import OnlineReconstructionPipeline
 from research.scheduler import OptimizationPolicy
+from research.reproducibility import create_provenance_manifest
 
 
 def load_tum_frames(data_path: str, max_frames: int = 10, H: int = 48, W: int = 64, device: str = 'cpu'):
@@ -71,13 +72,16 @@ def run_tum_policy_seed(policy_name: str, seed: int, frames, intrinsics, budget_
     ratio = 1.0 if is_full else 0.40
     
     config = {
+        'system': {'max_vram_fraction': 0.70, 'empty_cache_frequency': 2},
         'gaussian': {'sh_degree': 0, 'initial_opacity': 0.5, 'max_gaussians': 20000, 'initial_scale': 0.02},
         'rendering': {
             'tile_size': 16,
             'image_width': frames[0]['rgb'].shape[1],
             'image_height': frames[0]['rgb'].shape[0],
-            'use_surface_aware_depth': True,
-            'attribution_top_k': 4
+            'use_surface_aware_depth': False,
+            'attribution_top_k': 4,
+            'use_fast_attribution': True,
+            'backend': 'gsplat' if device == 'cuda' else 'reference',
         },
         'scheduler': {
             'gpu_budget_ms': budget_ms,
@@ -102,11 +106,17 @@ def run_tum_policy_seed(policy_name: str, seed: int, frames, intrinsics, budget_
         depth_l1s.append(res['depth_l1'])
         opt_times.append(res['opt_time_ms'])
         
+    final_gauss = pipeline.gaussian_model.num_gaussians
+    pipeline.cleanup()
+    del pipeline
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
     return {
         'avg_psnr': float(np.mean(psnrs)),
         'avg_depth_l1': float(np.mean(depth_l1s)),
         'avg_opt_ms': float(np.mean(opt_times)),
-        'final_gaussians': pipeline.gaussian_model.num_gaussians
+        'final_gaussians': final_gauss,
     }
 
 
@@ -119,7 +129,7 @@ def run_real_tum_benchmark(data_path: str, n_frames: int = 8, seeds=[42, 43, 44]
     frames, intrinsics = load_tum_frames(data_path, max_frames=n_frames, H=48, W=64, device=device)
     print(f"Loaded {len(frames)} TUM fr1/desk frames at 64x48 resolution.\n")
     
-    policies = ['full', 'random', 'error_only', 'error_influence', 'top_k', 'ours']
+    policies = ['full', 'random', 'error_only', 'error_influence', 'error_influence_temporal', 'top_k', 'ours']
     results_by_policy = {}
     
     for pol in policies:
@@ -173,9 +183,29 @@ def run_real_tum_benchmark(data_path: str, n_frames: int = 8, seeds=[42, 43, 44]
             f.write(f"| **{pol}** | {d['psnr_mean']:.2f} ± {d['psnr_std']:.2f} | {d['depth_mean']:.4f} ± {d['depth_std']:.4f} | {d['opt_ms_mean']:.1f} ± {d['opt_ms_std']:.1f} ms |\n")
         f.write("\n")
         
+    manifest = create_provenance_manifest(
+        dataset_name=os.path.basename(data_path),
+        renderer_backend=os.environ.get("ADAPTIVE_3DGS_RENDERER", "gsplat" if device == "cuda" else "reference"),
+        init_stride=2,
+        scale_pixel_multiplier=1.5,
+        initial_opacity=0.5,
+        n_micro_steps=1,
+        psnr_mask="valid_depth",
+        extra_metadata={
+            "experiment": "Real TUM RGB-D Multi-Seed Benchmark",
+            "policies": policies,
+            "seeds": seeds,
+            "n_frames": n_frames,
+            "device": device,
+        }
+    )
+    with open(os.path.join(save_dir, 'manifest.json'), 'w') as f:
+        json.dump(manifest, f, indent=2)
+
     print(f"Artifacts saved to:")
     print(f"  - {os.path.join(save_dir, 'tum_fr1_desk_results.json')}")
     print(f"  - {os.path.join(save_dir, 'tum_fr1_desk_summary.md')}")
+    print(f"  - {os.path.join(save_dir, 'manifest.json')}")
 
 
 def main():
@@ -184,7 +214,14 @@ def main():
     parser.add_argument('--frames', type=int, default=8)
     parser.add_argument('--device', type=str, default='cpu')
     args = parser.parse_args()
-    
+
+    # Memory Guard: cap CUDA allocation to prevent desktop compositor starvation
+    if args.device == 'cuda' and torch.cuda.is_available():
+        try:
+            torch.cuda.set_per_process_memory_fraction(0.70, 0)
+        except (RuntimeError, ValueError):
+            pass
+
     run_real_tum_benchmark(args.data_path, n_frames=args.frames, device=args.device)
 
 

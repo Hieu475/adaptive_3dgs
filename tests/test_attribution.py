@@ -338,6 +338,78 @@ class TestRenderWithAttribution:
 
         # At least some Gaussians should be visible
         # (depends on projection, but with our setup they should be)
-        # We just check the output is valid (no NaN)
         assert not torch.isnan(stats['color_error']).any()
         assert not torch.isnan(stats['depth_error']).any()
+
+
+class TestFastGaussianStatistics:
+    """Test fast vectorized Gaussian attribution."""
+
+    def test_fast_statistics_shapes_and_validity(self):
+        from research.attribution import compute_fast_gaussian_statistics
+
+        n = 10
+        means3D = torch.randn(n, 3)
+        means3D[:, 2] = torch.abs(means3D[:, 2]) + 2.0  # in front of camera
+        cov3D = torch.eye(3).unsqueeze(0).expand(n, -1, -1) * 0.01
+        opacities = torch.full((n,), 0.8)
+        extrinsics = torch.eye(4)
+        intrinsics = torch.tensor([[100.0, 0, 32.0], [0, 100.0, 32.0], [0, 0, 1.0]])
+        H, W = 64, 64
+
+        rendered_color = torch.rand(H, W, 3)
+        rendered_depth = torch.rand(H, W)
+        gt_color = torch.rand(H, W, 3)
+        gt_depth = torch.rand(H, W)
+
+        stats = compute_fast_gaussian_statistics(
+            means3D=means3D,
+            cov3D=cov3D,
+            opacities=opacities,
+            rendered_color=rendered_color,
+            rendered_depth=rendered_depth,
+            gt_color=gt_color,
+            gt_depth=gt_depth,
+            extrinsics=extrinsics,
+            intrinsics=intrinsics,
+        )
+
+        assert stats['color_error'].shape == (n,)
+        assert stats['depth_error'].shape == (n,)
+        assert stats['visibility'].shape == (n,)
+        assert stats['influence_mass'].shape == (n,)
+        assert stats['projected_area'].shape == (n,)
+        assert stats['screen_area'].shape == (n,)
+        assert stats['visibility_mask'].shape == (n,)
+        assert stats['visibility_mask'].dtype == torch.bool
+
+        assert not torch.isnan(stats['color_error']).any()
+        assert not torch.isnan(stats['depth_error']).any()
+        assert not torch.isnan(stats['projected_area']).any()
+        assert (stats['projected_area'] >= 0).all()
+
+    def test_fast_statistics_empty_gaussians(self):
+        from research.attribution import compute_fast_gaussian_statistics
+
+        means3D = torch.zeros(0, 3)
+        cov3D = torch.zeros(0, 3, 3)
+        opacities = torch.zeros(0)
+        extrinsics = torch.eye(4)
+        intrinsics = torch.eye(3)
+        H, W = 16, 16
+
+        stats = compute_fast_gaussian_statistics(
+            means3D=means3D,
+            cov3D=cov3D,
+            opacities=opacities,
+            rendered_color=torch.zeros(H, W, 3),
+            rendered_depth=torch.zeros(H, W),
+            gt_color=torch.zeros(H, W, 3),
+            gt_depth=torch.zeros(H, W),
+            extrinsics=extrinsics,
+            intrinsics=intrinsics,
+        )
+
+        assert stats['color_error'].shape == (0,)
+        assert stats['visibility_mask'].shape == (0,)
+

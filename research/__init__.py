@@ -8,6 +8,7 @@ from .importance import GaussianImportanceEstimator
 from .attribution import (
     render_with_attribution,
     compute_gaussian_statistics,
+    compute_fast_gaussian_statistics,
     compute_projected_area,
     normalize_importance_components,
 )

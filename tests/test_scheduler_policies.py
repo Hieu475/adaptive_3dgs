@@ -182,3 +182,25 @@ class TestOptimizationPolicies:
             assert mask_inst[top_inst].item() is True
             assert mask_temp[top_temp].item() is True
 
+    def test_allocate_adaptive_micro_steps(self, scheduler_setup):
+        """Test Multi-choice Knapsack allocate_adaptive_micro_steps."""
+        scheduler, importance, tiers, confidence, costs, N = scheduler_setup
+        max_k = 3
+        k_steps = scheduler.allocate_adaptive_micro_steps(
+            importance_scores=importance,
+            cost_estimates=costs,
+            max_k=max_k,
+        )
+        assert k_steps.shape == (N,)
+        assert k_steps.dtype == torch.long
+        assert (k_steps >= 0).all() and (k_steps <= max_k).all()
+        # Top ranked items should receive higher steps than low ranked
+        top_idx = torch.argmax(importance).item()
+        assert k_steps[top_idx].item() == max_k
+        # Ensure budget constraint is respected
+        step_cost_us = 0.50
+        total_spent = (costs[k_steps > 0] + (k_steps[k_steps > 0] - 1).float() * step_cost_us).sum().item()
+        budget_us = scheduler.gpu_budget_ms * 1000.0 * scheduler.budget_allocation['optimize']
+        assert total_spent <= budget_us + 1e-4
+
+

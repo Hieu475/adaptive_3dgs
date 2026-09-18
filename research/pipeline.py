@@ -17,7 +17,11 @@ from .rasterizer import render as rasterize_scene
 from .losses import total_loss, color_loss, depth_loss
 from .depth_render import render_depth_surface_aware
 from .importance import GaussianImportanceEstimator, Tier
-from .attribution import render_with_attribution, compute_gaussian_statistics
+from .attribution import (
+    render_with_attribution,
+    compute_gaussian_statistics,
+    compute_fast_gaussian_statistics,
+)
 from .scheduler import BudgetScheduler, OptimizationPolicy, estimate_gaussian_costs
 from .densification import (
     compute_error_masks, sample_candidates,
@@ -67,6 +71,15 @@ class OnlineReconstructionPipeline:
         self.config = self._merge_config(self._default_config(), config)
         self.device = device
         
+        # Memory Guard: Cap PyTorch allocation to protect OS and desktop compositor
+        if str(self.device).startswith('cuda') and torch.cuda.is_available():
+            max_vram_fraction = self.config.get('system', {}).get('max_vram_fraction', 0.70)
+            if max_vram_fraction is not None and 0.0 < max_vram_fraction <= 1.0:
+                try:
+                    torch.cuda.set_per_process_memory_fraction(max_vram_fraction, 0)
+                except (RuntimeError, ValueError):
+                    pass
+        
         # Core modules
         self.gaussian_model = GaussianModel(
             sh_degree=self.config['gaussian']['sh_degree'],
@@ -108,6 +121,10 @@ class OnlineReconstructionPipeline:
     def _default_config() -> Dict:
         return {
             'gaussian': {'sh_degree': 0, 'initial_opacity': 0.5, 'max_gaussians': 500000},
+            'system': {
+                'max_vram_fraction': 0.70,
+                'empty_cache_frequency': 0,
+            },
             'rendering': {
                 'tile_size': 16,
                 'image_width': 640,
@@ -115,6 +132,7 @@ class OnlineReconstructionPipeline:
                 'use_surface_aware_depth': False,
                 'depth_threshold_opaque': 0.5,
                 'attribution_top_k': 8,
+                'use_fast_attribution': True,
             },
             'losses': {'weight_color': 0.8, 'weight_depth': 0.5, 'weight_ssim': 0.2, 'weight_normal': 0.1, 'weight_regularization': 0.01},
             'importance': {'depth_error': 1.0, 'color_error': 1.0, 'normal_error': 0.5, 'visibility': 0.1, 'temporal': 0.5, 'screen_space': 0.2},
@@ -299,25 +317,46 @@ class OnlineReconstructionPipeline:
             self.current_pose = self.tracker.track_frame(rgb, depth, self.gaussian_model).to(self.device)
         
         # === 2. Render Current Map (with per-Gaussian attribution) ===
+        use_fast_attribution = self.config['rendering'].get(
+            'use_fast_attribution',
+            self.config.get('rendering', {}).get('backend', 'gsplat') == 'gsplat'
+        )
         with torch.no_grad():
             cov3D = self.gaussian_model.build_covariance()
-            render_result = render_with_attribution(
-                means3D=self.gaussian_model.positions,
-                cov3D=cov3D,
-                colors=self.gaussian_model.get_colors(),
-                opacities=self.gaussian_model.opacities.squeeze(-1),
-                extrinsics=self.current_pose,
-                intrinsics=self.intrinsics,
-                image_width=W,
-                image_height=H,
-                tile_size=self.config['rendering']['tile_size'],
-                top_k=self.config['rendering'].get('attribution_top_k', 8),
-            )
+            if use_fast_attribution:
+                renderer_backend = self.config.get('rendering', {}).get(
+                    'backend', 'gsplat' if str(self.device).startswith('cuda') else 'reference'
+                )
+                render_result = rasterize_scene(
+                    means3D=self.gaussian_model.positions,
+                    cov3D=cov3D,
+                    colors=self.gaussian_model.get_colors(),
+                    opacities=self.gaussian_model.opacities.squeeze(-1),
+                    extrinsics=self.current_pose,
+                    intrinsics=self.intrinsics,
+                    image_width=W,
+                    image_height=H,
+                    tile_size=self.config['rendering']['tile_size'],
+                    backend=renderer_backend,
+                )
+            else:
+                render_result = render_with_attribution(
+                    means3D=self.gaussian_model.positions,
+                    cov3D=cov3D,
+                    colors=self.gaussian_model.get_colors(),
+                    opacities=self.gaussian_model.opacities.squeeze(-1),
+                    extrinsics=self.current_pose,
+                    intrinsics=self.intrinsics,
+                    image_width=W,
+                    image_height=H,
+                    tile_size=self.config['rendering']['tile_size'],
+                    top_k=self.config['rendering'].get('attribution_top_k', 8),
+                )
             
             rendered_color = render_result['color']  # (H, W, 3)
             transmission = render_result['transmission']  # (H, W)
             
-            if self.config['rendering'].get('use_surface_aware_depth', True):
+            if self.config['rendering'].get('use_surface_aware_depth', False):
                 depth_result = render_depth_surface_aware(
                     means3D=self.gaussian_model.positions,
                     normals=self.gaussian_model._normals,
@@ -335,18 +374,31 @@ class OnlineReconstructionPipeline:
                 rendered_depth = render_result['depth']  # (H, W)
         
         # === 3. Per-Gaussian Error Attribution ===
-        # Compute true per-Gaussian statistics from pixel-level contributions
+        # Compute true per-Gaussian statistics
         N = self.gaussian_model.num_gaussians
         
-        gaussian_stats = compute_gaussian_statistics(
-            rendered_color=rendered_color,
-            rendered_depth=rendered_depth,
-            gt_color=rgb,
-            gt_depth=depth,
-            contrib_weights=render_result['contrib_weights'],
-            contrib_indices=render_result['contrib_indices'],
-            n_gaussians=N,
-        )
+        if use_fast_attribution:
+            gaussian_stats = compute_fast_gaussian_statistics(
+                means3D=self.gaussian_model.positions,
+                cov3D=cov3D,
+                opacities=self.gaussian_model.opacities.squeeze(-1),
+                rendered_color=rendered_color,
+                rendered_depth=rendered_depth,
+                gt_color=rgb,
+                gt_depth=depth,
+                extrinsics=self.current_pose,
+                intrinsics=self.intrinsics,
+            )
+        else:
+            gaussian_stats = compute_gaussian_statistics(
+                rendered_color=rendered_color,
+                rendered_depth=rendered_depth,
+                gt_color=rgb,
+                gt_depth=depth,
+                contrib_weights=render_result['contrib_weights'],
+                contrib_indices=render_result['contrib_indices'],
+                n_gaussians=N,
+            )
         
         per_gaussian_color_err = gaussian_stats['color_error']      # (N,)
         per_gaussian_depth_err = gaussian_stats['depth_error']      # (N,)
@@ -508,6 +560,18 @@ class OnlineReconstructionPipeline:
                 utility_scores=getattr(self, '_learned_utility_scores', None),
                 seed=self.config.get('seed', 42),
             )
+        use_adaptive_k = self.config.get('training', {}).get('use_adaptive_k', False)
+        k_alloc = None
+        if use_adaptive_k and self.optimizer is not None:
+            k_alloc = self.scheduler.allocate_adaptive_micro_steps(
+                importance_scores=error_influence_temporal_scores if error_influence_temporal_scores is not None else (
+                    error_influence_scores if error_influence_scores is not None else importance
+                ),
+                cost_estimates=cost_estimates,
+                max_k=self.config.get('training', {}).get('n_micro_steps', 3),
+            )
+            optimize_mask = (k_alloc > 0)
+
         self._last_optimize_mask = optimize_mask
         
         # === 7. True Selective Optimization with Frozen Background Cache (R21/R29) ===
@@ -536,7 +600,7 @@ class OnlineReconstructionPipeline:
                 
             # 2. Pure Selective Optimization Step (M only) with Multi-Step Convergence
             opt_start = time.time()
-            n_micro_steps = self.config.get('training', {}).get('n_micro_steps', 5)
+            n_micro_steps = int(k_alloc.max().item()) if (use_adaptive_k and k_alloc is not None and k_alloc.numel() > 0) else self.config.get('training', {}).get('n_micro_steps', 5)
             weights = {
                 'color': self.config.get('losses', {}).get('weight_color', 0.8),
                 'depth': self.config.get('losses', {}).get('weight_depth', 0.5),
@@ -545,8 +609,12 @@ class OnlineReconstructionPipeline:
             
             n_optimized = 0
             for step_i in range(n_micro_steps):
+                step_mask = (k_alloc > step_i) if (use_adaptive_k and k_alloc is not None) else optimize_mask
+                if not step_mask.any():
+                    break
+
                 self.optimizer.zero_grad()
-                active_subset = self.gaussian_model.get_optimization_subset(optimize_mask)
+                active_subset = self.gaussian_model.get_optimization_subset(step_mask)
                 
                 composite_opt = self.bg_cache.composite_with_active(
                     active_subset=active_subset,
@@ -573,7 +641,7 @@ class OnlineReconstructionPipeline:
                     losses['total'].backward()
                     # 5. Selective Optimizer update (O(M) arithmetic & memory bandwidth)
                     self.optimizer.step(active_idx=active_subset['indices'])
-                    n_optimized = optimize_mask.sum().item()
+                    n_optimized = max(n_optimized, step_mask.sum().item())
                 else:
                     break
                     
@@ -697,8 +765,21 @@ class OnlineReconstructionPipeline:
         }
         self.metrics_history.append(metrics)
         self.frame_count += 1
+
+        # Periodic VRAM hygiene to prevent fragmentation and desktop lag
+        empty_cache_freq = self.config.get('system', {}).get('empty_cache_frequency', 0)
+        if empty_cache_freq > 0 and self.frame_count % empty_cache_freq == 0:
+            if str(self.device).startswith('cuda') and torch.cuda.is_available():
+                torch.cuda.empty_cache()
         
         return metrics
+
+    def cleanup(self):
+        """Release cached GPU memory and optimizer states."""
+        self.optimizer = None
+        self.bg_cache.invalidate()
+        if str(self.device).startswith('cuda') and torch.cuda.is_available():
+            torch.cuda.empty_cache()
     
     def get_importance_diagnostics(self) -> Dict[str, torch.Tensor]:
         """Expose current research state and per-Gaussian diagnostics.

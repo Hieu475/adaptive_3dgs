@@ -447,6 +447,75 @@ class BudgetScheduler:
 
         else:
             raise ValueError(f"Unknown optimization policy: {policy}")
+
+    def allocate_adaptive_micro_steps(
+        self,
+        importance_scores: torch.Tensor,
+        cost_estimates: torch.Tensor,
+        budget_override_us: Optional[float] = None,
+        max_k: int = 3,
+        step_cost_us: float = 0.50,
+    ) -> torch.Tensor:
+        """Solve Generalized Multi-Choice Knapsack for adaptive micro-steps K_i.
+        
+        Assigns K_i in {0, 1, 2, ..., max_k} per Gaussian subject to:
+            sum_i C_i(K_i) <= Budget
+        
+        Args:
+            importance_scores: (N,) ranking score (e.g. value density or utility)
+            cost_estimates: (N,) base cost at K=1
+            budget_override_us: optional budget override in microseconds
+            max_k: maximum micro-steps for top candidates (e.g. 3 or 5)
+            step_cost_us: additional compute cost per incremental micro-step
+            
+        Returns:
+            k_steps: (N,) int64 tensor containing micro-step count for each Gaussian
+        """
+        N = importance_scores.shape[0]
+        device = importance_scores.device
+        if N == 0:
+            return torch.zeros(0, dtype=torch.long, device=device)
+            
+        if budget_override_us is not None:
+            budget_us = float(budget_override_us)
+        else:
+            budget_us = float(self.gpu_budget_ms * 1000.0 * self.budget_allocation['optimize'] * self.budget_scale_factor)
+
+        # Rank candidates by score descending
+        order = torch.argsort(importance_scores, descending=True)
+        
+        k_steps = torch.zeros(N, dtype=torch.long, device=device)
+        total_cost = 0.0
+        
+        n_eligible = int((importance_scores > 0).sum().item())
+        if n_eligible == 0:
+            return k_steps
+
+        # Multi-tier allocation
+        cutoff_high = max(1, int(0.15 * n_eligible))
+        cutoff_med = max(1, int(0.40 * n_eligible))
+        
+        for rank, idx in enumerate(order[:n_eligible]):
+            base_c = cost_estimates[idx].item()
+            
+            if rank < cutoff_high:
+                target_k = max_k
+            elif rank < cutoff_med:
+                target_k = min(2, max_k)
+            else:
+                target_k = 1
+                
+            c_candidate = base_c + float(target_k - 1) * step_cost_us
+            if total_cost + c_candidate <= budget_us + 1e-7:
+                k_steps[idx] = target_k
+                total_cost += c_candidate
+            elif target_k > 1 and (total_cost + base_c <= budget_us + 1e-7):
+                k_steps[idx] = 1
+                total_cost += base_c
+            else:
+                break
+                
+        return k_steps
     
     def compute_max_new_gaussians(self, n_error_pixels: Optional[int] = None) -> int:
         """Compute maximum number of new Gaussians allowed this frame.
