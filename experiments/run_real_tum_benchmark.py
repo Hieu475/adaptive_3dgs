@@ -213,6 +213,7 @@ def main():
     parser.add_argument('--data_path', type=str, default='datasets/TUM/rgbd_dataset_freiburg1_desk')
     parser.add_argument('--frames', type=int, default=8)
     parser.add_argument('--device', type=str, default='cpu')
+    parser.add_argument('--seeds', type=int, nargs='+', default=[42, 43, 44, 45, 46])
     args = parser.parse_args()
 
     # Memory Guard: cap CUDA allocation to prevent desktop compositor starvation
@@ -222,7 +223,7 @@ def main():
         except (RuntimeError, ValueError):
             pass
 
-    run_real_tum_benchmark(args.data_path, n_frames=args.frames, device=args.device)
+    run_real_tum_benchmark(args.data_path, n_frames=args.frames, seeds=args.seeds, device=args.device)
 
 
 if __name__ == '__main__':

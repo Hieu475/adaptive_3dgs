@@ -90,6 +90,11 @@ class TUMDataset(BaseDataset):
                     raw_assoc.append((parts[1], parts[3]))
                     raw_diffs.append(abs(t_rgb - t_d))
         
+        # Validate temporal alignment: if average diff > 50ms, the pre-computed file is desynchronized
+        if raw_diffs and (sum(raw_diffs) / len(raw_diffs) > 0.05):
+            self._auto_associate(max_tolerance_sec=0.05)
+            return
+
         self.associations = raw_assoc[::self.stride]
         self.timestamps = raw_times[::self.stride]
         self.association_diffs = raw_diffs[::self.stride]
