@@ -50,6 +50,7 @@ class TUMDataset(BaseDataset):
             self.cx, self.cy = self.DEFAULT_CX, self.DEFAULT_CY
         
         self.associations: List[Tuple[str, str]] = []
+        self.timestamps: List[float] = []
         self.poses: List[torch.Tensor] = []
         
         self._load_dataset()
@@ -73,19 +74,22 @@ class TUMDataset(BaseDataset):
     
     def _load_associations(self, assoc_file: Path):
         """Load pre-computed associations."""
+        raw_assoc = []
+        raw_times = []
         with open(assoc_file) as f:
             for line in f:
                 if line.startswith('#'):
                     continue
                 parts = line.strip().split()
                 if len(parts) >= 4:
-                    rgb_file = parts[1]
-                    depth_file = parts[3]
-                    self.associations.append((rgb_file, depth_file))
+                    raw_times.append(float(parts[0]))
+                    raw_assoc.append((parts[1], parts[3]))
         
-        self.associations = self.associations[::self.stride]
+        self.associations = raw_assoc[::self.stride]
+        self.timestamps = raw_times[::self.stride]
         if self.max_frames:
             self.associations = self.associations[:self.max_frames]
+            self.timestamps = self.timestamps[:self.max_frames]
     
     def _auto_associate(self):
         """Auto-associate RGB and depth by timestamp proximity."""
@@ -98,17 +102,26 @@ class TUMDataset(BaseDataset):
         rgb_files = sorted(rgb_dir.glob('*.png'))
         depth_files = sorted(depth_dir.glob('*.png'))
         
-        # Simple pairing by index
+        raw_assoc = []
+        raw_times = []
         for i, (rf, df) in enumerate(zip(rgb_files, depth_files)):
-            self.associations.append((str(rf.relative_to(self.data_path)), 
-                                     str(df.relative_to(self.data_path))))
+            try:
+                t = float(rf.stem)
+            except ValueError:
+                t = float(i)
+            raw_times.append(t)
+            raw_assoc.append((str(rf.relative_to(self.data_path)), 
+                              str(df.relative_to(self.data_path))))
         
-        self.associations = self.associations[::self.stride]
+        self.associations = raw_assoc[::self.stride]
+        self.timestamps = raw_times[::self.stride]
         if self.max_frames:
             self.associations = self.associations[:self.max_frames]
+            self.timestamps = self.timestamps[:self.max_frames]
     
     def _load_groundtruth(self, gt_file: Path):
-        """Load ground truth poses (tx ty tz qx qy qz qw format)."""
+        """Load ground truth poses synchronized by nearest timestamp."""
+        gt_times = []
         gt_data = []
         with open(gt_file) as f:
             for line in f:
@@ -116,12 +129,19 @@ class TUMDataset(BaseDataset):
                     continue
                 parts = [float(x) for x in line.strip().split()]
                 if len(parts) >= 8:
-                    gt_data.append(parts)
+                    gt_times.append(parts[0])
+                    gt_data.append(parts[1:])
         
-        # Convert to 4x4 matrices
-        for data in gt_data[::self.stride][:len(self.associations)]:
-            tx, ty, tz = data[1], data[2], data[3]
-            qx, qy, qz, qw = data[4], data[5], data[6], data[7]
+        if not gt_data:
+            self.poses = [torch.eye(4) for _ in range(len(self.associations))]
+            return
+
+        gt_times = np.array(gt_times)
+        for t_frame in self.timestamps:
+            closest_idx = int(np.argmin(np.abs(gt_times - t_frame)))
+            data = gt_data[closest_idx]
+            tx, ty, tz = data[0], data[1], data[2]
+            qx, qy, qz, qw = data[3], data[4], data[5], data[6]
             
             # Quaternion to rotation matrix
             R = self._quat_to_rot(qw, qx, qy, qz)

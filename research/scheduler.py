@@ -373,8 +373,9 @@ class BudgetScheduler:
             return _pack_by_scores(importance_scores, cost_estimates, budget_us, max_k=top_k)
 
         elif policy_str in ("budget_aware", "ours", "heuristic", OptimizationPolicy.BUDGET_AWARE.value, OptimizationPolicy.OURS.value):
-            # Knapsack heuristic value density: importance / cost
-            density = importance_scores / (cost_estimates + 1e-6)
+            # Knapsack heuristic value density: (Error × Influence Mass) / cost
+            base_score = error_influence_scores if error_influence_scores is not None else importance_scores
+            density = base_score / (cost_estimates + 1e-6)
             return _pack_by_scores(density, cost_estimates, budget_us, max_k=top_k)
 
         elif policy_str in ("learned_utility", OptimizationPolicy.LEARNED_UTILITY.value) or (policy_str in ("budget_aware", "ours") and utility_scores is not None):

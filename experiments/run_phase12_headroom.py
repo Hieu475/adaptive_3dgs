@@ -70,7 +70,7 @@ def build_pipeline_config(
     init_stride: int = 2,
     scale_mode: str = "depth_adaptive",
     initial_scale: float = 0.02,
-    scale_pixel_multiplier: float = 1.0,
+    scale_pixel_multiplier: float = 1.5,
     max_new_per_frame: int = 4000,
     max_gaussians: int = 150000,
     budget_ms: float = BUDGET_MS,
@@ -83,7 +83,7 @@ def build_pipeline_config(
         "seed": seed,
         "gaussian": {
             "sh_degree": 0,
-            "initial_opacity": 0.5,
+            "initial_opacity": 0.8,
             "max_gaussians": max_gaussians,
             "initial_scale": initial_scale,
             "init_stride": init_stride,
@@ -166,8 +166,12 @@ def compute_quality_metrics(
         rendered_color = rend["color"]
         rendered_depth = rend["depth"]
 
-        # PSNR
-        mse = ((rendered_color - rgb) ** 2).mean() + 1e-8
+        # PSNR (evaluated on valid surface geometry: depth > 0)
+        valid = depth > 0
+        if valid.any():
+            mse = ((rendered_color[valid] - rgb[valid]) ** 2).mean() + 1e-8
+        else:
+            mse = ((rendered_color - rgb) ** 2).mean() + 1e-8
         psnr = float(-10.0 * torch.log10(mse).item())
 
         # SSIM (simple global)

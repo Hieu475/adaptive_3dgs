@@ -624,14 +624,16 @@ class OnlineReconstructionPipeline:
         
         # Compute quality metrics (pre and post optimization)
         with torch.no_grad():
+            if depth_valid.any():
+                mse_pre = ((rendered_color[depth_valid] - rgb[depth_valid]) ** 2).mean() + 1e-8
+                mse_post = ((rendered_color_post[depth_valid] - rgb[depth_valid]) ** 2).mean() + 1e-8
+            else:
+                mse_pre = ((rendered_color - rgb) ** 2).mean() + 1e-8
+                mse_post = ((rendered_color_post - rgb) ** 2).mean() + 1e-8
             # Pre-optimization PSNR (diagnostic)
-            psnr_pre = -10 * torch.log10(
-                ((rendered_color - rgb) ** 2).mean() + 1e-8
-            ).item()
+            psnr_pre = -10 * torch.log10(mse_pre).item()
             # Post-optimization PSNR (primary metric)
-            psnr_post = -10 * torch.log10(
-                ((rendered_color_post - rgb) ** 2).mean() + 1e-8
-            ).item()
+            psnr_post = -10 * torch.log10(mse_post).item()
             psnr = psnr_post  # Primary metric is post-optimization
             depth_l1 = depth_err[depth_valid].mean().item() if depth_valid.any() else 0.0
             
