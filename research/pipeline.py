@@ -112,7 +112,7 @@ class OnlineReconstructionPipeline:
                 'tile_size': 16,
                 'image_width': 640,
                 'image_height': 480,
-                'use_surface_aware_depth': True,
+                'use_surface_aware_depth': False,
                 'depth_threshold_opaque': 0.5,
                 'attribution_top_k': 8,
             },

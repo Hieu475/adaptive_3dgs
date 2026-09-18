@@ -34,11 +34,17 @@ def _gaussian(window_size: int, sigma: float) -> torch.Tensor:
     return gauss / gauss.sum()
 
 
+_WINDOW_CACHE = {}
+
+
 def create_window(window_size: int, channel: int, device: torch.device) -> torch.Tensor:
-    _1D_window = _gaussian(window_size, 1.5).unsqueeze(1)
-    _2D_window = _1D_window.mm(_1D_window.t()).float().unsqueeze(0).unsqueeze(0)
-    window = _2D_window.expand(channel, 1, window_size, window_size).contiguous().to(device)
-    return window
+    key = (window_size, channel, device.type, device.index if device.index is not None else 0)
+    if key not in _WINDOW_CACHE:
+        _1D_window = _gaussian(window_size, 1.5).unsqueeze(1)
+        _2D_window = _1D_window.mm(_1D_window.t()).float().unsqueeze(0).unsqueeze(0)
+        window = _2D_window.expand(channel, 1, window_size, window_size).contiguous().to(device)
+        _WINDOW_CACHE[key] = window
+    return _WINDOW_CACHE[key]
 
 
 def ssim_loss(

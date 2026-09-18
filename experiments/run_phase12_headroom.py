@@ -94,7 +94,7 @@ def build_pipeline_config(
             "tile_size": 16,
             "image_width": W,
             "image_height": H,
-            "use_surface_aware_depth": True,
+            "use_surface_aware_depth": False,
             "attribution_top_k": 4,
         },
         "scheduler": {
