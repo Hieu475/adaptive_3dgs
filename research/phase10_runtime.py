@@ -689,6 +689,54 @@ def load_phase10_sequence(
     Ensures f_x', f_y', c_x', c_y' camera intrinsic scaling.
     """
     repo = get_repo_root()
+    if scene_name.startswith("replica_"):
+        sub = scene_name.replace("replica_", "")
+        data_dir = repo / "datasets" / "Replica" / sub
+        if not data_dir.exists():
+            raise FileNotFoundError(f"Replica scene directory not found: {data_dir}")
+        imgs = sorted(list((data_dir / "images").glob("*.jpg")))
+        depths_mmap = np.load(str(data_dir / "depth.npy"), mmap_mode="r")
+        exts_data = np.load(str(data_dir / "extrinsics.npy"))
+        ints_data = np.load(str(data_dir / "intrinsics.npy"))
+
+        dev = torch.device(device if torch.cuda.is_available() and device == "cuda" else "cpu")
+        orig_H, orig_W = 680.0, 1200.0
+        scale_x = W / orig_W
+        scale_y = H / orig_H
+
+        intrinsics = torch.tensor([
+            [float(ints_data[0, 0, 0]) * scale_x, 0.0, float(ints_data[0, 0, 2]) * scale_x],
+            [0.0, float(ints_data[0, 1, 1]) * scale_y, float(ints_data[0, 1, 2]) * scale_y],
+            [0.0, 0.0, 1.0]
+        ], dtype=torch.float32, device=dev)
+
+        frames = []
+        n_to_load = min(n_frames, len(imgs), len(depths_mmap), len(exts_data))
+        import cv2
+        for i in range(n_to_load):
+            rgb_np = cv2.imread(str(imgs[i]))
+            rgb_np = cv2.cvtColor(rgb_np, cv2.COLOR_BGR2RGB)
+            rgb_t = torch.from_numpy(rgb_np).float() / 255.0
+            rgb_scaled = torch.nn.functional.interpolate(
+                rgb_t.permute(2, 0, 1).unsqueeze(0), size=(H, W), mode="bilinear", align_corners=False
+            ).squeeze(0).permute(1, 2, 0).to(dev)
+
+            d_np = depths_mmap[i]
+            d_t = torch.from_numpy(d_np.copy()).float()
+            d_scaled = torch.nn.functional.interpolate(
+                d_t.unsqueeze(0).unsqueeze(0), size=(H, W), mode="nearest"
+            ).squeeze(0).squeeze(0).to(dev)
+
+            pose_t = torch.from_numpy(exts_data[i]).float().to(dev)
+
+            frames.append({
+                "frame_id": i,
+                "rgb": rgb_scaled,
+                "depth": d_scaled,
+                "pose": pose_t,
+            })
+        return frames, intrinsics
+
     scene_map = {
         "tum_fr2_xyz": ("datasets/TUM/rgbd_dataset_freiburg2_xyz", "freiburg2"),
         "tum_fr1_desk": ("datasets/TUM/rgbd_dataset_freiburg1_desk", "freiburg1"),
@@ -697,7 +745,7 @@ def load_phase10_sequence(
         "tum_fr3_sitting_static": ("datasets/TUM/rgbd_dataset_freiburg3_sitting_static", "freiburg3"),
     }
     if scene_name not in scene_map:
-        raise ValueError(f"Unknown scene '{scene_name}'. Available: {list(scene_map.keys())}")
+        raise ValueError(f"Unknown scene '{scene_name}'. Available: {list(scene_map.keys())} or replica_*")
     rel_path, cam = scene_map[scene_name]
     data_path = str(repo / rel_path)
 
