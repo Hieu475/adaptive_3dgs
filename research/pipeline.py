@@ -116,7 +116,7 @@ class OnlineReconstructionPipeline:
                 'depth_threshold_opaque': 0.5,
                 'attribution_top_k': 8,
             },
-            'losses': {'weight_color': 1.0, 'weight_depth': 0.5, 'weight_normal': 0.1, 'weight_regularization': 0.01},
+            'losses': {'weight_color': 0.8, 'weight_depth': 0.5, 'weight_ssim': 0.2, 'weight_normal': 0.1, 'weight_regularization': 0.01},
             'importance': {'depth_error': 1.0, 'color_error': 1.0, 'normal_error': 0.5, 'visibility': 0.1, 'temporal': 0.5, 'screen_space': 0.2},
             'scheduler': {
                 'gpu_budget_ms': 16.6,
@@ -138,7 +138,10 @@ class OnlineReconstructionPipeline:
                 'lambda_depth': 1.0,
                 'lambda_transmission': 0.5,
             },
-            'training': {'learning_rate': {'position': 1.6e-4, 'scale': 5e-3, 'rotation': 1e-3, 'opacity': 5e-2, 'sh': 2.5e-3}},
+            'training': {
+                'n_micro_steps': 5,
+                'learning_rate': {'position': 4.0e-4, 'scale': 5e-3, 'rotation': 1e-3, 'opacity': 5e-2, 'sh': 1.0e-2}
+            },
         }
     
     @classmethod
@@ -523,44 +526,49 @@ class OnlineReconstructionPipeline:
             else:
                 self.bg_cache.invalidate()
                 
-            # 2. Pure Selective Optimization Step (M only)
+            # 2. Pure Selective Optimization Step (M only) with Multi-Step Convergence
             opt_start = time.time()
-            self.optimizer.zero_grad()
-            active_subset = self.gaussian_model.get_optimization_subset(optimize_mask)
-            
-            composite_opt = self.bg_cache.composite_with_active(
-                active_subset=active_subset,
-                extrinsics=self.current_pose,
-                intrinsics=self.intrinsics,
-                image_width=W,
-                image_height=H,
-                tile_size=self.config['rendering']['tile_size'],
-            )
-            
-            rendered_opt_color = composite_opt['color']
-            rendered_opt_depth = composite_opt['depth']
-            depth_valid_mask = (rendered_opt_depth > 0) & (depth > 0)
-            
-            # 3. Compute loss
+            n_micro_steps = self.config.get('training', {}).get('n_micro_steps', 5)
             weights = {
-                'color': self.config['losses']['weight_color'],
-                'depth': self.config['losses']['weight_depth'],
+                'color': self.config.get('losses', {}).get('weight_color', 0.8),
+                'depth': self.config.get('losses', {}).get('weight_depth', 0.5),
+                'ssim': self.config.get('losses', {}).get('weight_ssim', 0.2),
             }
-            losses = total_loss(
-                rendered_opt_color, rgb,
-                rendered_opt_depth, depth,
-                weights,
-                depth_valid_mask=depth_valid_mask,
-            )
             
-            # 4. Backward: only computes gradients for the active subset M <= N
-            if losses['total'].requires_grad:
-                losses['total'].backward()
-                # 5. Selective Optimizer update (O(M) arithmetic & memory bandwidth)
-                self.optimizer.step(active_idx=active_subset['indices'])
-                n_optimized = optimize_mask.sum().item()
-            else:
-                n_optimized = 0
+            n_optimized = 0
+            for step_i in range(n_micro_steps):
+                self.optimizer.zero_grad()
+                active_subset = self.gaussian_model.get_optimization_subset(optimize_mask)
+                
+                composite_opt = self.bg_cache.composite_with_active(
+                    active_subset=active_subset,
+                    extrinsics=self.current_pose,
+                    intrinsics=self.intrinsics,
+                    image_width=W,
+                    image_height=H,
+                    tile_size=self.config['rendering']['tile_size'],
+                )
+                
+                rendered_opt_color = composite_opt['color']
+                rendered_opt_depth = composite_opt['depth']
+                depth_valid_mask = (rendered_opt_depth > 0) & (depth > 0)
+                
+                losses = total_loss(
+                    rendered_opt_color, rgb,
+                    rendered_opt_depth, depth,
+                    weights,
+                    depth_valid_mask=depth_valid_mask,
+                )
+                
+                # 4. Backward: only computes gradients for the active subset M <= N
+                if losses['total'].requires_grad:
+                    losses['total'].backward()
+                    # 5. Selective Optimizer update (O(M) arithmetic & memory bandwidth)
+                    self.optimizer.step(active_idx=active_subset['indices'])
+                    n_optimized = optimize_mask.sum().item()
+                else:
+                    break
+                    
             opt_loss_val = losses['total'].item()
             opt_time = time.time() - opt_start
         

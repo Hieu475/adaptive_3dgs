@@ -29,6 +29,60 @@ def color_loss(
     return diff.mean()
 
 
+def _gaussian(window_size: int, sigma: float) -> torch.Tensor:
+    gauss = torch.exp(torch.tensor([-(x - window_size // 2) ** 2 / float(2 * sigma ** 2) for x in range(window_size)]))
+    return gauss / gauss.sum()
+
+
+def create_window(window_size: int, channel: int, device: torch.device) -> torch.Tensor:
+    _1D_window = _gaussian(window_size, 1.5).unsqueeze(1)
+    _2D_window = _1D_window.mm(_1D_window.t()).float().unsqueeze(0).unsqueeze(0)
+    window = _2D_window.expand(channel, 1, window_size, window_size).contiguous().to(device)
+    return window
+
+
+def ssim_loss(
+    pred: torch.Tensor,
+    gt: torch.Tensor,
+    window_size: int = 11,
+) -> torch.Tensor:
+    """Differentiable structural similarity loss: L_ssim = 1 - SSIM(pred, gt).
+    
+    Args:
+        pred: (H, W, 3) predicted image
+        gt: (H, W, 3) ground truth image
+        window_size: Gaussian window kernel size
+    
+    Returns:
+        Scalar loss = 1 - mean(SSIM)
+    """
+    device = pred.device
+    channel = pred.shape[-1]
+    
+    # Permute to (1, C, H, W)
+    x = pred.permute(2, 0, 1).unsqueeze(0)
+    y = gt.permute(2, 0, 1).unsqueeze(0)
+    
+    window = create_window(window_size, channel, device)
+    
+    mu1 = F.conv2d(x, window, padding=window_size // 2, groups=channel)
+    mu2 = F.conv2d(y, window, padding=window_size // 2, groups=channel)
+    
+    mu1_sq = mu1.pow(2)
+    mu2_sq = mu2.pow(2)
+    mu1_mu2 = mu1 * mu2
+    
+    sigma1_sq = F.conv2d(x * x, window, padding=window_size // 2, groups=channel) - mu1_sq
+    sigma2_sq = F.conv2d(y * y, window, padding=window_size // 2, groups=channel) - mu2_sq
+    sigma12 = F.conv2d(x * y, window, padding=window_size // 2, groups=channel) - mu1_mu2
+    
+    c1 = 0.01 ** 2
+    c2 = 0.03 ** 2
+    
+    ssim_map = ((2 * mu1_mu2 + c1) * (2 * sigma12 + c2)) / ((mu1_sq + mu2_sq + c1) * (sigma1_sq + sigma2_sq + c2))
+    return 1.0 - ssim_map.mean()
+
+
 def depth_loss(
     pred: torch.Tensor,
     gt: torch.Tensor,
@@ -176,7 +230,15 @@ def total_loss(
     losses['color'] = l_color
     losses['depth'] = l_depth
     
-    total = weights.get('color', 1.0) * l_color + weights.get('depth', 0.5) * l_depth
+    w_color = weights.get('color', 0.8)
+    w_depth = weights.get('depth', 0.5)
+    w_ssim = weights.get('ssim', 0.2)
+    
+    total = w_color * l_color + w_depth * l_depth
+    if w_ssim > 0.0 and pred_color.shape[0] >= 11 and pred_color.shape[1] >= 11:
+        l_ssim = ssim_loss(pred_color, gt_color)
+        losses['ssim'] = l_ssim
+        total = total + w_ssim * l_ssim
     
     if pred_normals is not None and pseudo_normals is not None:
         l_normal = normal_consistency_loss(pred_normals, pseudo_normals)
