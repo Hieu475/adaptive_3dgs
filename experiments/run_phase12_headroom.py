@@ -47,6 +47,7 @@ from research.phase10_runtime import load_phase10_sequence
 from research.attribution import render_with_attribution
 from research.rasterizer import render as rasterize_scene
 from research.densification import compute_depth_adaptive_scale
+from research.reproducibility import create_provenance_manifest
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -692,18 +693,27 @@ def main():
     )
     print(f">> Loaded {len(frames)} frames successfully.")
 
-    # Save manifest
-    manifest = {
-        "timestamp": datetime.now().isoformat(),
-        "protocol_version": "2.0.0-headroom",
-        "experiment": "Phase 12-R Reconstruction Headroom Audit",
-        "scene": args.scene,
-        "seed": args.seed,
-        "device": args.device,
-        "stage": args.stage,
-        "n_frames_loaded": len(frames),
-        "resolution": f"{W}x{H}",
-    }
+    # Save comprehensive provenance manifest
+    manifest = create_provenance_manifest(
+        config=str(PROTOCOL_FILE) if PROTOCOL_FILE.exists() else None,
+        dataset_name=args.scene,
+        renderer_backend=os.environ.get("ADAPTIVE_3DGS_RENDERER", "gsplat" if args.device == "cuda" else "reference"),
+        init_stride=2,
+        scale_pixel_multiplier=1.5,
+        initial_opacity=0.8,
+        n_micro_steps=5,
+        psnr_mask="valid_depth",
+        extra_metadata={
+            "protocol_version": "2.0.0-headroom",
+            "experiment": "Phase 12-R Reconstruction Headroom Audit",
+            "scene": args.scene,
+            "seed": args.seed,
+            "device": args.device,
+            "stage": args.stage,
+            "n_frames_loaded": len(frames),
+            "resolution": f"{W}x{H}",
+        }
+    )
     with open(out_dir / "manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)
 

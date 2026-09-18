@@ -452,9 +452,12 @@ class OnlineReconstructionPipeline:
             ])
             tiers = self.importance_estimator.classify_tier(importance)
         
-        # Estimate per-Gaussian compute costs (A2: Controlled Cost Model)
+        # Estimate per-Gaussian compute costs (A2: Controlled Cost Model with K and backend awareness)
         use_cost_model = self.config.get('scheduler', {}).get('use_cost_model', True)
         use_attribution = self.config.get('importance', {}).get('use_attribution', True)
+        n_micro_steps = self.config.get('training', {}).get('n_micro_steps', 5)
+        renderer_backend = self.config.get('rendering', {}).get('backend', 'gsplat')
+
         if not use_cost_model:
             cost_estimates = torch.full((N_updated,), 0.5, device=self.device)
         else:
@@ -463,6 +466,8 @@ class OnlineReconstructionPipeline:
                 n_gaussians=N_updated,
                 base_cost_us=self.config['scheduler'].get('cost_per_gaussian_us', 0.5),
                 sh_degree=self.gaussian_model.sh_degree,
+                n_micro_steps=n_micro_steps,
+                backend=renderer_backend,
                 device=self.device,
             )
         
@@ -475,9 +480,11 @@ class OnlineReconstructionPipeline:
         
         error_scores = None
         error_influence_scores = None
+        error_influence_temporal_scores = None
         if self.importance_estimator._running_depth_error is not None and self.importance_estimator._running_color_error is not None:
             error_scores = self.importance_estimator._running_depth_error + self.importance_estimator._running_color_error
-            error_influence_scores = self.importance_estimator.compute_error_influence_score()
+            error_influence_scores = self.importance_estimator.compute_error_influence_score(use_temporal=False)
+            error_influence_temporal_scores = self.importance_estimator.compute_error_influence_score(use_temporal=True)
         
         top_k = self.config['scheduler'].get('top_k', None)
         binary_threshold = self.config['scheduler'].get('binary_threshold', 0.5)
@@ -493,6 +500,7 @@ class OnlineReconstructionPipeline:
                 cost_estimates=cost_estimates,
                 error_scores=error_scores,
                 error_influence_scores=error_influence_scores,
+                error_influence_temporal_scores=error_influence_temporal_scores,
                 ratio=ratio,
                 top_k=top_k,
                 frame_idx=self.frame_count,

@@ -26,16 +26,17 @@ import time
 
 class OptimizationPolicy(str, Enum):
     """Optimization selection policies for research benchmarking."""
-    FULL = "full"                         # Policy 0: Optimize 100% of Gaussians (unconstrained upper bound)
-    RANDOM = "random"                     # Policy 1: Random selection budget-scaled
-    ERROR_ONLY = "error_only"             # Policy: Optimize top-K ranked strictly by raw photometric/depth error
-    ERROR_INFLUENCE = "error_influence"   # Policy: Strong non-learning baseline (Error × Contribution Mass)
-    BINARY = "binary"                     # Policy 2: Binary stable/unstable (RTG-SLAM threshold)
-    TOP_K = "top_k"                       # Policy 3: Continuous importance rank top-K / ratio r
-    BUDGET_AWARE = "budget_aware"         # Policy 4: Importance/Cost knapsack optimization
-    OURS = "ours"                         # Alias for BUDGET_AWARE
-    LEARNED_UTILITY = "learned_utility"   # Policy 5: Two-Head Learned Marginal Utility Knapsack
-    ORACLE = "oracle"                     # Policy 6: Ground truth marginal utility upper bound
+    FULL = "full"                                           # Policy 0: Optimize 100% of Gaussians (unconstrained upper bound)
+    RANDOM = "random"                                       # Policy 1: Random selection budget-scaled
+    ERROR_ONLY = "error_only"                               # Policy: Optimize top-K ranked strictly by raw photometric/depth error
+    ERROR_INFLUENCE = "error_influence"                     # Policy: Instantaneous Error × Contribution Mass baseline
+    ERROR_INFLUENCE_TEMPORAL = "error_influence_temporal"   # Policy: Temporal filtered Error × Contribution Mass baseline
+    BINARY = "binary"                                       # Policy 2: Binary stable/unstable (RTG-SLAM threshold)
+    TOP_K = "top_k"                                         # Policy 3: Continuous importance rank top-K / ratio r
+    BUDGET_AWARE = "budget_aware"                           # Policy 4: Importance/Cost knapsack optimization
+    OURS = "ours"                                           # Alias for BUDGET_AWARE
+    LEARNED_UTILITY = "learned_utility"                     # Policy 5: Two-Head Learned Marginal Utility Knapsack
+    ORACLE = "oracle"                                       # Policy 6: Ground truth marginal utility upper bound
 
 
 def estimate_gaussian_costs(
@@ -46,9 +47,16 @@ def estimate_gaussian_costs(
     area_cost_factor: float = 0.002,
     sh_degree: int = 0,
     cost_coeffs: Optional[Tuple[float, float, float, float]] = None,
+    n_micro_steps: Optional[int] = None,
+    backend: str = "gsplat",
+    cost_backward_per_step_us: float = 0.35,
+    cost_optimizer_per_step_us: float = 0.15,
     device: Optional[torch.device] = None,
 ) -> torch.Tensor:
-    """Cost model: C_i = β₀ + β₁·Area_i + β₂·Influence_i + β₃·SH_degree.
+    """Cost model: C_i = f(N_i, A_i, K, SH, backend).
+    
+    Decomposes compute cost into:
+      C_i = C_render(backend, A_i) + K · (C_backward + C_optimizer) + C_overhead
     
     Calibrated against measured isolated optimization trials from oracle dataset.
     
@@ -60,11 +68,27 @@ def estimate_gaussian_costs(
         area_cost_factor: footprint scaling factor (β₁)
         sh_degree: spherical harmonics degree
         cost_coeffs: optional calibrated (beta_0, beta_1, beta_2, beta_3) tuple
+        n_micro_steps: optional number of optimization micro-steps K
+        backend: active renderer backend ('gsplat', 'reference', 'custom_cuda')
+        cost_backward_per_step_us: microsecond cost per active Gaussian per backward pass
+        cost_optimizer_per_step_us: microsecond cost per active Gaussian per Adam step
         device: torch device
         
     Returns:
         costs: (N,) estimated microsecond compute costs
     """
+    backend_mult = 1.0
+    if backend == "reference":
+        backend_mult = 5.0
+    elif backend == "custom_cuda":
+        backend_mult = 1.0
+
+    step_cost_us = (
+        float(n_micro_steps) * (cost_backward_per_step_us + cost_optimizer_per_step_us)
+        if n_micro_steps is not None
+        else 0.0
+    )
+
     if cost_coeffs is not None and (projected_areas is not None or screen_areas is not None):
         b0, b1, b2, b3 = cost_coeffs
         ref = projected_areas if projected_areas is not None else screen_areas
@@ -73,17 +97,18 @@ def estimate_gaussian_costs(
         area = projected_areas if projected_areas is not None else torch.zeros(N, device=dev)
         inf = screen_areas if screen_areas is not None else torch.zeros(N, device=dev)
         sh_val = float(sh_degree)
-        costs = b0 + b1 * area + b2 * inf + b3 * sh_val
+        costs = (b0 * backend_mult + b1 * area + b2 * inf + b3 * sh_val) + step_cost_us
         return torch.clamp(costs, min=0.1)
         
     if screen_areas is not None:
         device = screen_areas.device
         sh_multiplier = 1.0 + 0.1 * sh_degree
-        return (base_cost_us + area_cost_factor * screen_areas) * sh_multiplier
+        render_cost = (base_cost_us * backend_mult + area_cost_factor * screen_areas) * sh_multiplier
+        return render_cost + step_cost_us
     
     if n_gaussians is None:
         raise ValueError("Either screen_areas or n_gaussians must be provided")
-    return torch.full((n_gaussians,), base_cost_us, device=device or torch.device('cpu'))
+    return torch.full((n_gaussians,), (base_cost_us * backend_mult) + step_cost_us, device=device or torch.device('cpu'))
 
 
 class BudgetScheduler:
@@ -228,6 +253,7 @@ class BudgetScheduler:
         cost_estimates: Optional[torch.Tensor] = None,
         error_scores: Optional[torch.Tensor] = None,
         error_influence_scores: Optional[torch.Tensor] = None,
+        error_influence_temporal_scores: Optional[torch.Tensor] = None,
         ratio: Optional[float] = None,
         top_k: Optional[int] = None,
         frame_idx: int = 0,
@@ -246,7 +272,8 @@ class BudgetScheduler:
               sum_{i in S_B} C_i <= B
           Random: random ordering -> budget packing
           Error: error ordering -> budget packing
-          Error x Influence: (error * influence) ordering -> budget packing
+          Error x Influence: instantaneous (error * influence) ordering -> budget packing
+          Error x Influence Temporal: temporal (error * influence) ordering -> budget packing
           Heuristic: value density (importance / cost) -> budget packing
           Learned Utility: predicted U_hat ordering -> reject U_hat <= 0 -> safety-aware budget packing
           Oracle: oracle U* ordering -> reject U* <= 0 -> budget packing
@@ -339,6 +366,14 @@ class BudgetScheduler:
             )
             return _pack_by_scores(score_tensor, cost_estimates, budget_us, max_k=top_k)
 
+        elif policy_str in ("error_influence_temporal", OptimizationPolicy.ERROR_INFLUENCE_TEMPORAL.value):
+            score_tensor = error_influence_temporal_scores if error_influence_temporal_scores is not None else (
+                error_influence_scores if error_influence_scores is not None else (
+                    (error_scores if error_scores is not None else importance_scores) * importance_scores
+                )
+            )
+            return _pack_by_scores(score_tensor, cost_estimates, budget_us, max_k=top_k)
+
         elif policy_str in ("binary", OptimizationPolicy.BINARY.value):
             mask = torch.zeros(N, dtype=torch.bool, device=device)
             if confidence is not None:
@@ -373,8 +408,10 @@ class BudgetScheduler:
             return _pack_by_scores(importance_scores, cost_estimates, budget_us, max_k=top_k)
 
         elif policy_str in ("budget_aware", "ours", "heuristic", OptimizationPolicy.BUDGET_AWARE.value, OptimizationPolicy.OURS.value):
-            # Knapsack heuristic value density: (Error × Influence Mass) / cost
-            base_score = error_influence_scores if error_influence_scores is not None else importance_scores
+            # Knapsack heuristic value density: (Temporal Error × Influence Mass) / cost
+            base_score = error_influence_temporal_scores if error_influence_temporal_scores is not None else (
+                error_influence_scores if error_influence_scores is not None else importance_scores
+            )
             density = base_score / (cost_estimates + 1e-6)
             return _pack_by_scores(density, cost_estimates, budget_us, max_k=top_k)
 

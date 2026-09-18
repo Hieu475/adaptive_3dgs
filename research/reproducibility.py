@@ -194,3 +194,73 @@ class DatasetManifest:
         os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)
         with open(filepath, "w") as f:
             json.dump(self.to_dict(), f, indent=2)
+
+
+def compute_config_hash(config: Union[Dict[str, Any], str]) -> str:
+    """Compute SHA-256 hash of configuration dict or YAML file."""
+    import hashlib
+    if isinstance(config, str):
+        if os.path.exists(config):
+            with open(config, "rb") as f:
+                return hashlib.sha256(f.read()).hexdigest()
+        return hashlib.sha256(config.encode("utf-8")).hexdigest()
+    serialized = json.dumps(config, sort_keys=True, default=str)
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def create_provenance_manifest(
+    config: Optional[Dict[str, Any]] = None,
+    dataset_name: str = "tum_fr2_xyz",
+    dataset_path: Optional[str] = None,
+    renderer_backend: Optional[str] = None,
+    init_stride: Optional[int] = None,
+    scale_pixel_multiplier: Optional[float] = None,
+    initial_opacity: Optional[float] = None,
+    n_micro_steps: Optional[int] = None,
+    psnr_mask: str = "valid_depth",
+    extra_metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Create comprehensive provenance manifest for scientific reproducibility.
+    
+    Contains exact execution environment, commit hash, configuration SHA-256,
+    backend provenance, and reconstruction hyperparameters.
+    """
+    hw = get_hardware_info()
+    git_sha = get_git_commit()
+    
+    cuda_ext_status = "unavailable"
+    try:
+        import adaptive_3dgs._C
+        cuda_ext_status = "available (prototype)"
+    except Exception as e:
+        cuda_ext_status = f"unavailable: {e}"
+
+    if renderer_backend is None:
+        from research.rasterizer import get_renderer_backend
+        renderer_backend = get_renderer_backend(device_type="cuda" if hw["cuda_available"] else "cpu")
+
+    config_hash = compute_config_hash(config) if config is not None else "none"
+
+    manifest = {
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "git_sha": git_sha,
+        "git_branch": get_git_branch(),
+        "config_sha256": config_hash,
+        "dataset_name": dataset_name,
+        "dataset_path": str(dataset_path) if dataset_path else None,
+        "renderer_backend": renderer_backend,
+        "cuda_extension": cuda_ext_status,
+        "torch_version": hw["pytorch"],
+        "cuda_version": hw["cuda_version"],
+        "gpu": hw["device_name"],
+        "vram_gb": hw["vram_gb"],
+        "init_stride": init_stride,
+        "scale_pixel_multiplier": scale_pixel_multiplier,
+        "initial_opacity": initial_opacity,
+        "n_micro_steps": n_micro_steps,
+        "psnr_mask": psnr_mask,
+    }
+    if extra_metadata:
+        manifest.update(extra_metadata)
+    return manifest
+

@@ -4,7 +4,9 @@ __pycache__/
 build/
 dist/
 data/
-datasets/
+datasets/TUM/
+datasets/Replica/
+datasets/demo/
 *.egg-info/
 .pytest_cache/
 scratch/

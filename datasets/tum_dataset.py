@@ -51,6 +51,7 @@ class TUMDataset(BaseDataset):
         
         self.associations: List[Tuple[str, str]] = []
         self.timestamps: List[float] = []
+        self.association_diffs: List[float] = []
         self.poses: List[torch.Tensor] = []
         
         self._load_dataset()
@@ -76,23 +77,29 @@ class TUMDataset(BaseDataset):
         """Load pre-computed associations."""
         raw_assoc = []
         raw_times = []
+        raw_diffs = []
         with open(assoc_file) as f:
             for line in f:
                 if line.startswith('#'):
                     continue
                 parts = line.strip().split()
                 if len(parts) >= 4:
-                    raw_times.append(float(parts[0]))
+                    t_rgb = float(parts[0])
+                    t_d = float(parts[2])
+                    raw_times.append(t_rgb)
                     raw_assoc.append((parts[1], parts[3]))
+                    raw_diffs.append(abs(t_rgb - t_d))
         
         self.associations = raw_assoc[::self.stride]
         self.timestamps = raw_times[::self.stride]
+        self.association_diffs = raw_diffs[::self.stride]
         if self.max_frames:
             self.associations = self.associations[:self.max_frames]
             self.timestamps = self.timestamps[:self.max_frames]
+            self.association_diffs = self.association_diffs[:self.max_frames]
     
-    def _auto_associate(self):
-        """Auto-associate RGB and depth by timestamp proximity."""
+    def _auto_associate(self, max_tolerance_sec: float = 0.05):
+        """Auto-associate RGB and depth by timestamp proximity: t_rgb -> argmin |t_rgb - t_d|."""
         rgb_dir = self.data_path / 'rgb'
         depth_dir = self.data_path / 'depth'
         
@@ -102,22 +109,58 @@ class TUMDataset(BaseDataset):
         rgb_files = sorted(rgb_dir.glob('*.png'))
         depth_files = sorted(depth_dir.glob('*.png'))
         
-        raw_assoc = []
-        raw_times = []
-        for i, (rf, df) in enumerate(zip(rgb_files, depth_files)):
+        # Try parsing float timestamps from filenames (standard TUM format: <timestamp>.png)
+        rgb_items = []
+        for rf in rgb_files:
             try:
-                t = float(rf.stem)
+                rgb_items.append((float(rf.stem), rf))
             except ValueError:
-                t = float(i)
-            raw_times.append(t)
-            raw_assoc.append((str(rf.relative_to(self.data_path)), 
-                              str(df.relative_to(self.data_path))))
-        
-        self.associations = raw_assoc[::self.stride]
-        self.timestamps = raw_times[::self.stride]
+                pass
+
+        depth_items = []
+        for df in depth_files:
+            try:
+                depth_items.append((float(df.stem), df))
+            except ValueError:
+                pass
+
+        if rgb_items and depth_items:
+            depth_times = np.array([t for t, _ in depth_items])
+            raw_assoc = []
+            raw_times = []
+            raw_diffs = []
+            for t_rgb, rf in rgb_items:
+                closest_d_idx = int(np.argmin(np.abs(depth_times - t_rgb)))
+                diff = float(abs(depth_times[closest_d_idx] - t_rgb))
+                if diff <= max_tolerance_sec:
+                    df = depth_items[closest_d_idx][1]
+                    raw_times.append(t_rgb)
+                    raw_assoc.append((str(rf.relative_to(self.data_path)), 
+                                      str(df.relative_to(self.data_path))))
+                    raw_diffs.append(diff)
+            
+            self.associations = raw_assoc[::self.stride]
+            self.timestamps = raw_times[::self.stride]
+            self.association_diffs = raw_diffs[::self.stride]
+        else:
+            # Fallback for synthetic or non-timestamp named sequences: pair by index
+            raw_assoc = []
+            raw_times = []
+            raw_diffs = []
+            for i, (rf, df) in enumerate(zip(rgb_files, depth_files)):
+                raw_times.append(float(i))
+                raw_assoc.append((str(rf.relative_to(self.data_path)), 
+                                  str(df.relative_to(self.data_path))))
+                raw_diffs.append(0.0)
+            
+            self.associations = raw_assoc[::self.stride]
+            self.timestamps = raw_times[::self.stride]
+            self.association_diffs = raw_diffs[::self.stride]
+
         if self.max_frames:
             self.associations = self.associations[:self.max_frames]
             self.timestamps = self.timestamps[:self.max_frames]
+            self.association_diffs = self.association_diffs[:self.max_frames]
     
     def _load_groundtruth(self, gt_file: Path):
         """Load ground truth poses synchronized by nearest timestamp."""

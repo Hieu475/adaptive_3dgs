@@ -290,7 +290,22 @@ $$T_{\text{frame}} \approx 7005\text{ ms}$$
 
 ---
 
-## 11. Citation
+---
+
+## 12. Phase 13 — Systems Acceleration (Under Active Research)
+
+> [!NOTE]
+> **Phase 13 Status: EXPERIMENTAL / NOT FROZEN**
+> - **Production CUDA Backend**: [`gsplat`](https://github.com/nerfstudio-project/gsplat) (v1.5.3) for high-performance differentiable rasterization.
+> - **Custom CUDA Kernels (`cuda/`)**: Prototype stage. Native tile rasterizer (`rasterize.cu`), radix sort (`radix_sort.cu`), and preprocessing (`preprocess.cu`) are prototype implementations under active development; all production pipeline paths route strictly through `gsplat`.
+> - **Strict Fail-Fast Architecture (No Silent Fallback)**: Silent fallbacks from CUDA to Python reference rasterization have been eliminated. Backend selection is governed explicitly via `ADAPTIVE_3DGS_RENDERER` (`gsplat` | `reference` | `custom_cuda`), raising immediate exceptions upon failure to preserve scientific reproducibility.
+> - **Multi-Step Micro-Convergence ($K$)**: Evaluated empirical trade-offs $Q(K)$ vs $T(K)$ for $K \in \{1, 2, 3, 5\}$ to quantify marginal efficiency $\frac{\Delta Q(K)}{T(K)}$ and prevent scheduler cost underestimation.
+> - **Primary Systems Bottleneck**: Profiled and identified the per-Gaussian error attribution step (`render_with_attribution` in `research/attribution.py`) as the dominant bottleneck ($\approx 500\text{ ms/frame}$ in Python tile loops). Native CUDA kernel acceleration for attribution is required for real-time $<30\text{ ms}$ processing.
+> - **Rigorous Scientific Provenance**: All experiment manifests now record comprehensive metadata: Git SHA, config SHA-256, dataset hash, renderer backend, CUDA extension status, PyTorch/CUDA versions, GPU model, and hyperparameter states.
+
+---
+
+## 13. Citation
 
 ```bibtex
 @article{adaptive3dgs2026,
@@ -300,3 +315,4 @@ $$T_{\text{frame}} \approx 7005\text{ ms}$$
   year={2026}
 }
 ```
+

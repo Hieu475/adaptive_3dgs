@@ -138,3 +138,47 @@ class TestOptimizationPolicies:
         budget_us = scheduler.gpu_budget_ms * 1000.0 * scheduler.budget_allocation['optimize']
         selected_cost = costs[mask].sum().item()
         assert selected_cost <= budget_us, f"Selected cost {selected_cost} exceeds budget {budget_us}"
+
+    def test_cost_scaling_with_k_micro_steps(self):
+        """Test cost model strictly increases with number of micro-steps K."""
+        screen_areas = torch.tensor([50.0, 100.0, 200.0])
+        cost_k1 = estimate_gaussian_costs(screen_areas=screen_areas, n_micro_steps=1)
+        cost_k2 = estimate_gaussian_costs(screen_areas=screen_areas, n_micro_steps=2)
+        cost_k5 = estimate_gaussian_costs(screen_areas=screen_areas, n_micro_steps=5)
+        
+        assert (cost_k1 < cost_k2).all()
+        assert (cost_k2 < cost_k5).all()
+        # Difference between K=2 and K=1 should equal backward + optimizer cost per step
+        expected_diff = 0.35 + 0.15
+        assert (cost_k2 - cost_k1)[0].item() == pytest.approx(expected_diff, abs=1e-5)
+
+    def test_policy_error_influence_instantaneous_vs_temporal(self, scheduler_setup):
+        """Test distinct selection between instantaneous and temporal Error x Influence."""
+        scheduler, importance, tiers, confidence, costs, N = scheduler_setup
+        err_inst = torch.rand(N)
+        err_temp = torch.rand(N)
+        
+        mask_inst = scheduler.select_by_policy(
+            OptimizationPolicy.ERROR_INFLUENCE,
+            importance,
+            cost_estimates=costs,
+            error_influence_scores=err_inst,
+            error_influence_temporal_scores=err_temp,
+        )
+        mask_temp = scheduler.select_by_policy(
+            OptimizationPolicy.ERROR_INFLUENCE_TEMPORAL,
+            importance,
+            cost_estimates=costs,
+            error_influence_scores=err_inst,
+            error_influence_temporal_scores=err_temp,
+        )
+        
+        assert mask_inst.shape == (N,)
+        assert mask_temp.shape == (N,)
+        # Top ranked items of err_inst vs err_temp should differ if tensors are different
+        top_inst = torch.argmax(err_inst).item()
+        top_temp = torch.argmax(err_temp).item()
+        if top_inst != top_temp:
+            assert mask_inst[top_inst].item() is True
+            assert mask_temp[top_temp].item() is True
+

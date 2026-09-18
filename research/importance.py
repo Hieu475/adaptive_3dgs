@@ -351,11 +351,16 @@ class GaussianImportanceEstimator:
         
         return score
     
-    def compute_error_influence_score(self) -> torch.Tensor:
+    def compute_error_influence_score(self, use_temporal: bool = True) -> torch.Tensor:
         """Compute strong non-learning baseline score: S_i = Error_i × Influence_i.
         
         Combines total photometric and depth error with contribution mass:
             S_i = (E_{depth,i} + E_{color,i}) · Influence_i
+            
+        Args:
+            use_temporal: If True, filters error with slow running EMA:
+                          E_temp = 0.6 * E_curr + 0.4 * E_slow.
+                          If False, uses pure instantaneous error E_curr.
         
         Returns:
             score: (N,) normalized [0, 1] baseline importance scores
@@ -364,7 +369,7 @@ class GaussianImportanceEstimator:
             raise RuntimeError("Must call update_statistics before compute_error_influence_score")
         
         base_error = self._running_depth_error + self._running_color_error
-        if self._running_error_slow is not None and self._running_error_slow.shape[0] == base_error.shape[0]:
+        if use_temporal and self._running_error_slow is not None and self._running_error_slow.shape[0] == base_error.shape[0]:
             error = 0.6 * base_error + 0.4 * self._running_error_slow
         else:
             error = base_error

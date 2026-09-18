@@ -8,9 +8,10 @@ Rendering equation (front-to-back alpha compositing):
 where:
     fᵢ(u) = αᵢ · exp(-0.5 · (u-μᵢ)ᵀ · Σ₂D,ᵢ⁻¹ · (u-μᵢ))
 """
-import torch
-from typing import Dict, Tuple, Optional
+import os
 import math
+from typing import Dict, Tuple, Optional
+import torch
 
 
 def compute_gaussian_weight(
@@ -189,6 +190,34 @@ def rasterize_pixels(
     return rendered_color, rendered_depth, final_T
 
 
+VALID_BACKENDS = ("gsplat", "reference", "custom_cuda")
+
+
+def get_renderer_backend(
+    explicit_backend: Optional[str] = None,
+    device_type: str = "cpu",
+) -> str:
+    """Resolve active renderer backend without silent fallbacks.
+    
+    Order of precedence:
+      1. Explicit argument `explicit_backend`
+      2. Environment variable `ADAPTIVE_3DGS_RENDERER`
+      3. Automatic default: 'gsplat' if device_type == 'cuda', else 'reference'
+    """
+    if explicit_backend is not None:
+        backend = explicit_backend.lower()
+    elif "ADAPTIVE_3DGS_RENDERER" in os.environ:
+        backend = os.environ["ADAPTIVE_3DGS_RENDERER"].strip().lower()
+    else:
+        backend = "gsplat" if device_type == "cuda" else "reference"
+
+    if backend not in VALID_BACKENDS:
+        raise ValueError(
+            f"Invalid renderer backend '{backend}'. Supported backends: {list(VALID_BACKENDS)}"
+        )
+    return backend
+
+
 def render(
     means3D: torch.Tensor,
     cov3D: torch.Tensor,
@@ -200,6 +229,7 @@ def render(
     image_height: int,
     bg_color: Optional[torch.Tensor] = None,
     tile_size: int = 16,
+    backend: Optional[str] = None,
 ) -> Dict[str, torch.Tensor]:
     """Full rendering pipeline: project → tile → sort → rasterize.
     
@@ -213,6 +243,7 @@ def render(
         image_width, image_height: output dimensions
         bg_color: (3,) background color, default black
         tile_size: tile size for binning
+        backend: optional backend override ('gsplat', 'reference', 'custom_cuda')
     
     Returns:
         Dict with 'color' (H,W,3), 'depth' (H,W), 'transmission' (H,W)
@@ -235,14 +266,26 @@ def render(
             'transmission': torch.ones(image_height, image_width, device=device),
         }
 
-    # Fast CUDA path via gsplat (approx 1,000x faster than python tile loop)
-    if device.type == 'cuda':
+    active_backend = get_renderer_backend(backend, device_type=device.type)
+
+    # 1. Fast production CUDA path via gsplat
+    if active_backend == "gsplat":
+        if device.type != "cuda":
+            raise RuntimeError(
+                f"Renderer backend 'gsplat' requires CUDA device, but got device: '{device.type}'"
+            )
         try:
             import gsplat
-            opacities_1d = opacities.squeeze(-1) if opacities.ndim > 1 else opacities
-            viewmat = extrinsics.unsqueeze(0) if extrinsics.ndim == 2 else extrinsics
-            K = intrinsics.unsqueeze(0) if intrinsics.ndim == 2 else intrinsics
-            
+        except ImportError as e:
+            raise RuntimeError(
+                f"Renderer backend 'gsplat' requested, but gsplat is not installed: {e}"
+            ) from e
+
+        opacities_1d = opacities.squeeze(-1) if opacities.ndim > 1 else opacities
+        viewmat = extrinsics.unsqueeze(0) if extrinsics.ndim == 2 else extrinsics
+        K = intrinsics.unsqueeze(0) if intrinsics.ndim == 2 else intrinsics
+        
+        try:
             renders, alphas, meta = gsplat.rasterization(
                 means=means3D,
                 quats=None,
@@ -257,23 +300,40 @@ def render(
                 backgrounds=None,
                 render_mode='RGB+D',
             )
-            raw_color = renders[0, :, :, :3]
-            raw_depth = renders[0, :, :, 3]
-            transmission = (1.0 - alphas[0, :, :, 0]).clamp(min=0.0, max=1.0)
-            
-            if bg_color.any():
-                final_color = raw_color + transmission.unsqueeze(-1) * bg_color.unsqueeze(0).unsqueeze(0)
-            else:
-                final_color = raw_color
-                
-            return {
-                'color': final_color,
-                'depth': raw_depth,
-                'transmission': transmission,
-            }
-        except Exception:
-            pass  # Fallback to python reference implementation below
+        except Exception as e:
+            raise RuntimeError(f"gsplat.rasterization execution failed: {e}") from e
 
+        raw_color = renders[0, :, :, :3]
+        raw_depth = renders[0, :, :, 3]
+        transmission = (1.0 - alphas[0, :, :, 0]).clamp(min=0.0, max=1.0)
+        
+        if bg_color.any():
+            final_color = raw_color + transmission.unsqueeze(-1) * bg_color.unsqueeze(0).unsqueeze(0)
+        else:
+            final_color = raw_color
+            
+        return {
+            'color': final_color,
+            'depth': raw_depth,
+            'transmission': transmission,
+        }
+
+    # 2. Custom CUDA kernel path (explicit prototype identification)
+    elif active_backend == "custom_cuda":
+        if device.type != "cuda":
+            raise RuntimeError(
+                f"Renderer backend 'custom_cuda' requires CUDA device, but got device: '{device.type}'"
+            )
+        try:
+            import adaptive_3dgs._C as _C
+        except ImportError as e:
+            raise RuntimeError(f"CUDA extension adaptive_3dgs._C not available: {e}") from e
+        raise NotImplementedError(
+            "Custom CUDA renderer ('custom_cuda') is currently a prototype under development. "
+            "Please use 'gsplat' as the production CUDA backend."
+        )
+
+    # 3. Python reference rasterizer (active_backend == "reference")
     from .projection import (
         world_to_camera, project_to_screen,
         compute_2d_covariance, cov2d_to_conic, compute_radii
@@ -369,6 +429,7 @@ def render_full(
     image_height: int,
     tile_size: int = 16,
     bg_color: Optional[torch.Tensor] = None,
+    backend: Optional[str] = None,
 ) -> Dict[str, torch.Tensor]:
     """Render full scene representation (for tracking, error attribution, and importance)."""
     return render(
@@ -382,6 +443,7 @@ def render_full(
         image_height=image_height,
         bg_color=bg_color,
         tile_size=tile_size,
+        backend=backend,
     )
 
 
@@ -418,6 +480,7 @@ def render_active(
     image_height: int,
     tile_size: int = 16,
     bg_color: Optional[torch.Tensor] = None,
+    backend: Optional[str] = None,
 ) -> Dict[str, torch.Tensor]:
     """Render active subset (M Gaussians) with active gradient hooks."""
     return render(
@@ -431,5 +494,6 @@ def render_active(
         image_height=image_height,
         bg_color=bg_color,
         tile_size=tile_size,
+        backend=backend,
     )
 
