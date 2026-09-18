@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-17T19:55:21.000188",
+  "timestamp": "2026-09-18T00:34:28.712468",
   "stage": "R3_trajectory_75f",
   "summaries": [
     {
@@ -30,18 +30,18 @@
       "densification_enabled": true,
       "n_frames": 75,
       "N_init": 14073,
-      "N_final": 109525,
-      "N_new_total": 95452,
-      "mean_new_per_frame": 1272.6933333333334,
-      "max_new_per_frame": 1310,
+      "N_final": 110345,
+      "N_new_total": 96272,
+      "mean_new_per_frame": 1283.6266666666668,
+      "max_new_per_frame": 1328,
       "init_PSNR": 11.641901731491089,
-      "final_PSNR": 9.11270797252655,
-      "mean_PSNR": 11.347037617365519,
-      "mean_SSIM": 0.4325112839539846,
-      "mean_depth_L1": 1.3936433013280232,
-      "mean_coverage": 0.8602196383476257,
-      "final_coverage": 0.8805989623069763,
-      "mean_opt_ms": 1904.8354403177898,
+      "final_PSNR": 10.063447952270508,
+      "mean_PSNR": 11.950419267018637,
+      "mean_SSIM": 0.4921578049659729,
+      "mean_depth_L1": 1.3302775955200195,
+      "mean_coverage": 0.8821621735890707,
+      "final_coverage": 0.9149479269981384,
+      "mean_opt_ms": 1979.7250080108643,
       "catastrophic_failures": 0
     }
   ]

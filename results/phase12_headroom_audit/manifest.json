@@ -1,11 +1,11 @@
 {
-  "timestamp": "2026-09-17T22:38:22.749666",
+  "timestamp": "2026-09-18T01:35:12.135083",
   "protocol_version": "2.0.0-headroom",
   "experiment": "Phase 12-R Reconstruction Headroom Audit",
   "scene": "tum_fr2_xyz",
   "seed": 42,
   "device": "cuda",
-  "stage": "R2_decomp",
-  "n_frames_loaded": 31,
+  "stage": "R3",
+  "n_frames_loaded": 151,
   "resolution": "320x240"
 }

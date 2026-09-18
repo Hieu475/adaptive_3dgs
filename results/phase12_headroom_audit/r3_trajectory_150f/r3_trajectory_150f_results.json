@@ -1,0 +1,48 @@
+{
+  "timestamp": "2026-09-18T11:14:55.848329",
+  "stage": "R3_trajectory_150f",
+  "summaries": [
+    {
+      "config": "new_init_new_dense",
+      "policy": "no_op",
+      "seed": 42,
+      "densification_enabled": true,
+      "n_frames": 150,
+      "N_init": 14073,
+      "N_final": 150000,
+      "N_new_total": 179016,
+      "mean_new_per_frame": 1193.44,
+      "max_new_per_frame": 1350,
+      "init_PSNR": 11.641901731491089,
+      "final_PSNR": 9.397467970848083,
+      "mean_PSNR": 10.591731830437977,
+      "mean_SSIM": 0.43907519658406574,
+      "mean_depth_L1": 1.3495896848042805,
+      "mean_coverage": 0.8827414286136627,
+      "final_coverage": 0.9175130724906921,
+      "mean_opt_ms": 0.0,
+      "catastrophic_failures": 0
+    },
+    {
+      "config": "new_init_new_dense",
+      "policy": "full",
+      "seed": 42,
+      "densification_enabled": true,
+      "n_frames": 150,
+      "N_init": 14073,
+      "N_final": 150000,
+      "N_new_total": 180929,
+      "mean_new_per_frame": 1206.1933333333334,
+      "max_new_per_frame": 1375,
+      "init_PSNR": 11.641901731491089,
+      "final_PSNR": 10.9187650680542,
+      "mean_PSNR": 11.747206624348959,
+      "mean_SSIM": 0.5387285010019938,
+      "mean_depth_L1": 1.283917751312256,
+      "mean_coverage": 0.9116106986999511,
+      "final_coverage": 0.9569661617279053,
+      "mean_opt_ms": 2809.1082445780435,
+      "catastrophic_failures": 0
+    }
+  ]
+}
