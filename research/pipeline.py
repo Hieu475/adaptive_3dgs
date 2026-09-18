@@ -569,7 +569,7 @@ class OnlineReconstructionPipeline:
         if n_optimized > 0:
             with torch.no_grad():
                 cov3D_post = self.gaussian_model.build_covariance()
-                post_render = render_with_attribution(
+                post_render = rasterize_scene(
                     means3D=self.gaussian_model.positions,
                     cov3D=cov3D_post,
                     colors=self.gaussian_model.get_colors(),
@@ -579,7 +579,6 @@ class OnlineReconstructionPipeline:
                     image_width=W,
                     image_height=H,
                     tile_size=self.config['rendering']['tile_size'],
-                    top_k=self.config['rendering'].get('attribution_top_k', 8),
                 )
                 rendered_color_post = post_render['color']
         else:

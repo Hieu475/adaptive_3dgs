@@ -45,6 +45,7 @@ if str(REPO_ROOT) not in sys.path:
 from research.pipeline import OnlineReconstructionPipeline
 from research.phase10_runtime import load_phase10_sequence
 from research.attribution import render_with_attribution
+from research.rasterizer import render as rasterize_scene
 from research.densification import compute_depth_adaptive_scale
 
 # ---------------------------------------------------------------------------
@@ -121,7 +122,7 @@ def compute_coverage(
     """Compute pixel coverage: fraction of pixels with any Gaussian contribution > ε."""
     with torch.no_grad():
         cov3D = pipeline.gaussian_model.build_covariance()
-        rend = render_with_attribution(
+        rend = rasterize_scene(
             means3D=pipeline.gaussian_model.positions,
             cov3D=cov3D,
             colors=pipeline.gaussian_model.get_colors(),
@@ -131,7 +132,6 @@ def compute_coverage(
             image_width=W,
             image_height=H,
             tile_size=16,
-            top_k=4,
         )
         # Pixel is "covered" if transmittance < 1 - ε  (i.e., at least one
         # Gaussian contributed meaningfully)
@@ -152,7 +152,7 @@ def compute_quality_metrics(
     """Render and compute PSNR/SSIM/DepthL1 for a given frame."""
     with torch.no_grad():
         cov3D = pipeline.gaussian_model.build_covariance()
-        rend = render_with_attribution(
+        rend = rasterize_scene(
             means3D=pipeline.gaussian_model.positions,
             cov3D=cov3D,
             colors=pipeline.gaussian_model.get_colors(),
@@ -162,7 +162,6 @@ def compute_quality_metrics(
             image_width=W,
             image_height=H,
             tile_size=16,
-            top_k=4,
         )
         rendered_color = rend["color"]
         rendered_depth = rend["depth"]
