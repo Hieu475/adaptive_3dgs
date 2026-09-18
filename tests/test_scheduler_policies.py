@@ -183,12 +183,15 @@ class TestOptimizationPolicies:
             assert mask_temp[top_temp].item() is True
 
     def test_allocate_adaptive_micro_steps(self, scheduler_setup):
-        """Test Multi-choice Knapsack allocate_adaptive_micro_steps."""
+        """Test Multi-choice Knapsack allocate_adaptive_micro_steps with decoupled costs."""
+        from research.scheduler import estimate_gaussian_cost_components
         scheduler, importance, tiers, confidence, costs, N = scheduler_setup
         max_k = 3
+        base_costs, step_costs = estimate_gaussian_cost_components(n_gaussians=N)
         k_steps = scheduler.allocate_adaptive_micro_steps(
             importance_scores=importance,
-            cost_estimates=costs,
+            base_costs=base_costs,
+            step_costs=step_costs,
             max_k=max_k,
         )
         assert k_steps.shape == (N,)
@@ -197,9 +200,9 @@ class TestOptimizationPolicies:
         # Top ranked items should receive higher steps than low ranked
         top_idx = torch.argmax(importance).item()
         assert k_steps[top_idx].item() == max_k
-        # Ensure budget constraint is respected
-        step_cost_us = 0.50
-        total_spent = (costs[k_steps > 0] + (k_steps[k_steps > 0] - 1).float() * step_cost_us).sum().item()
+        # Ensure exact linear budget constraint is respected: sum_{k>0} (base + k * step) <= Budget
+        active_mask = k_steps > 0
+        total_spent = (base_costs[active_mask] + k_steps[active_mask].float() * step_costs[active_mask]).sum().item()
         budget_us = scheduler.gpu_budget_ms * 1000.0 * scheduler.budget_allocation['optimize']
         assert total_spent <= budget_us + 1e-4
 

@@ -61,5 +61,8 @@ phase6_context_utility/ablation/*.pt
 !phase12_paper_evidence/*.csv
 !phase12_paper_evidence/*.md
 !phase12_headroom_audit/**
+!attribution_fidelity/**
+!phase13_frozen_benchmark/**
+!phase13_multiscene_benchmark/**
 
 

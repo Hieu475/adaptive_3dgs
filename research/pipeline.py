@@ -22,7 +22,12 @@ from .attribution import (
     compute_gaussian_statistics,
     compute_fast_gaussian_statistics,
 )
-from .scheduler import BudgetScheduler, OptimizationPolicy, estimate_gaussian_costs
+from .scheduler import (
+    BudgetScheduler,
+    OptimizationPolicy,
+    estimate_gaussian_costs,
+    estimate_gaussian_cost_components,
+)
 from .densification import (
     compute_error_masks, sample_candidates,
     create_gaussians_from_candidates, prune_low_value,
@@ -511,17 +516,19 @@ class OnlineReconstructionPipeline:
         renderer_backend = self.config.get('rendering', {}).get('backend', 'gsplat')
 
         if not use_cost_model:
-            cost_estimates = torch.full((N_updated,), 0.5, device=self.device)
+            base_costs = torch.full((N_updated,), 0.5, device=self.device)
+            step_costs = torch.full((N_updated,), 0.5, device=self.device)
+            cost_estimates = base_costs + float(n_micro_steps) * step_costs
         else:
-            cost_estimates = estimate_gaussian_costs(
+            base_costs, step_costs = estimate_gaussian_cost_components(
                 screen_areas=getattr(self.importance_estimator, '_screen_areas', None) if use_attribution else None,
                 n_gaussians=N_updated,
                 base_cost_us=self.config['scheduler'].get('cost_per_gaussian_us', 0.5),
                 sh_degree=self.gaussian_model.sh_degree,
-                n_micro_steps=n_micro_steps,
                 backend=renderer_backend,
                 device=self.device,
             )
+            cost_estimates = base_costs + float(n_micro_steps) * step_costs
         
         policy = self.config['scheduler'].get('policy', 'budget_aware')
         use_knapsack = self.config.get('scheduler', {}).get('use_knapsack', True)
@@ -562,23 +569,39 @@ class OnlineReconstructionPipeline:
             )
         use_adaptive_k = self.config.get('training', {}).get('use_adaptive_k', False)
         k_alloc = None
-        if use_adaptive_k and self.optimizer is not None:
+        if policy in ("no_op", OptimizationPolicy.NO_OP.value):
+            optimize_mask = torch.zeros(N_updated, dtype=torch.bool, device=self.device)
+            k_alloc = None
+        elif policy in ("full", OptimizationPolicy.FULL.value):
+            optimize_mask = torch.ones(N_updated, dtype=torch.bool, device=self.device)
+            k_alloc = None
+        elif use_adaptive_k and self.optimizer is not None and policy in ("ours", "budget_aware", OptimizationPolicy.OURS.value, OptimizationPolicy.BUDGET_AWARE.value):
             k_alloc = self.scheduler.allocate_adaptive_micro_steps(
                 importance_scores=error_influence_temporal_scores if error_influence_temporal_scores is not None else (
                     error_influence_scores if error_influence_scores is not None else importance
                 ),
-                cost_estimates=cost_estimates,
-                max_k=self.config.get('training', {}).get('n_micro_steps', 3),
+                base_costs=base_costs,
+                step_costs=step_costs,
+                max_k=self.config.get('training', {}).get('n_micro_steps', 5),
             )
             optimize_mask = (k_alloc > 0)
+        else:
+            k_alloc = None
 
         self._last_optimize_mask = optimize_mask
         
         # === 7. True Selective Optimization with Frozen Background Cache (R21/R29) ===
-        n_optimized = 0
+        n_optimized = int(optimize_mask.sum().item()) if optimize_mask is not None else 0
         opt_loss_val = 0.0
         cache_time = 0.0
         opt_time = 0.0
+        
+        if k_alloc is not None and (k_alloc > 0).any():
+            mean_k = float(k_alloc[k_alloc > 0].float().mean().item())
+        elif n_optimized > 0:
+            mean_k = float(self.config.get('training', {}).get('n_micro_steps', 5))
+        else:
+            mean_k = 0.0
         
         if optimize_mask.any() and self.optimizer is not None:
             # 1. Build / refresh background cache for frozen Gaussians once per frame
@@ -743,6 +766,8 @@ class OnlineReconstructionPipeline:
             'color_loss': per_gaussian_color_err.mean().item(),
             'n_gaussians': self.gaussian_model.num_gaussians,
             'n_optimized': n_optimized,
+            'mean_k': mean_k,
+            'peak_vram_mb': float(torch.cuda.max_memory_allocated(self.device) / (1024.0 * 1024.0)) if str(self.device).startswith('cuda') and torch.cuda.is_available() else 0.0,
             'n_tier_a': (tiers == Tier.A).sum().item(),
             'n_tier_b': (tiers == Tier.B).sum().item(),
             'n_tier_c': (tiers == Tier.C).sum().item(),

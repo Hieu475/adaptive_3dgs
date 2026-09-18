@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-09-19T03:04:16",
+  "git_sha": "63146dc37564dd5d23d2f8fc751f6a6a6db2d883-dirty",
+  "git_branch": "phase13-cuda-acceleration",
+  "config_sha256": "none",
+  "dataset_name": "tum_fr2_xyz",
+  "dataset_path": null,
+  "renderer_backend": "gsplat",
+  "cuda_extension": "available (prototype)",
+  "torch_version": "2.11.0+cu128",
+  "cuda_version": "12.8",
+  "gpu": "NVIDIA GeForce RTX 4050 Laptop GPU",
+  "vram_gb": 5.64,
+  "init_stride": 2,
+  "scale_pixel_multiplier": 1.5,
+  "initial_opacity": 0.8,
+  "n_micro_steps": 5,
+  "psnr_mask": "valid_depth",
+  "protocol_version": "phase13-authoritative-v1",
+  "experiment": "Phase 13 Frozen Benchmark Across 6 Policies x 5 Seeds",
+  "scene": "tum_fr2_xyz",
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "policies": [
+    "no_op",
+    "error_only",
+    "error_influence",
+    "error_influence_temporal",
+    "ours",
+    "full"
+  ],
+  "budget_ms": 15.0,
+  "n_frames_evaluated": 150,
+  "resolution": "320x240"
+}

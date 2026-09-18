@@ -90,8 +90,8 @@ class TUMDataset(BaseDataset):
                     raw_assoc.append((parts[1], parts[3]))
                     raw_diffs.append(abs(t_rgb - t_d))
         
-        # Validate temporal alignment: if average diff > 50ms, the pre-computed file is desynchronized
-        if raw_diffs and (sum(raw_diffs) / len(raw_diffs) > 0.05):
+        # Strict per-pair validation: every pair must satisfy |t_rgb - t_d| <= 50ms (0.05s)
+        if raw_diffs and (max(raw_diffs) > 0.05):
             self._auto_associate(max_tolerance_sec=0.05)
             return
 
@@ -102,6 +102,22 @@ class TUMDataset(BaseDataset):
             self.associations = self.associations[:self.max_frames]
             self.timestamps = self.timestamps[:self.max_frames]
             self.association_diffs = self.association_diffs[:self.max_frames]
+
+    def get_association_statistics(self) -> Dict[str, float]:
+        """Return comprehensive synchronization quality metrics across pairs."""
+        if not self.association_diffs:
+            return {
+                'mean_ms': 0.0, 'median_ms': 0.0, 'p95_ms': 0.0,
+                'max_ms': 0.0, 'fraction_above_50ms': 0.0
+            }
+        diffs_ms = np.array(self.association_diffs) * 1000.0
+        return {
+            'mean_ms': round(float(np.mean(diffs_ms)), 2),
+            'median_ms': round(float(np.median(diffs_ms)), 2),
+            'p95_ms': round(float(np.percentile(diffs_ms, 95)), 2),
+            'max_ms': round(float(np.max(diffs_ms)), 2),
+            'fraction_above_50ms': round(float((diffs_ms > 50.0).mean()), 4),
+        }
     
     def _auto_associate(self, max_tolerance_sec: float = 0.05):
         """Auto-associate RGB and depth by timestamp proximity: t_rgb -> argmin |t_rgb - t_d|."""

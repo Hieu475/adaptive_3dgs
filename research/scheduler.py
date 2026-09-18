@@ -26,6 +26,7 @@ import time
 
 class OptimizationPolicy(str, Enum):
     """Optimization selection policies for research benchmarking."""
+    NO_OP = "no_op"                                         # Policy: 0% optimized (tracking/rendering baseline)
     FULL = "full"                                           # Policy 0: Optimize 100% of Gaussians (unconstrained upper bound)
     RANDOM = "random"                                       # Policy 1: Random selection budget-scaled
     ERROR_ONLY = "error_only"                               # Policy: Optimize top-K ranked strictly by raw photometric/depth error
@@ -37,6 +38,68 @@ class OptimizationPolicy(str, Enum):
     OURS = "ours"                                           # Alias for BUDGET_AWARE
     LEARNED_UTILITY = "learned_utility"                     # Policy 5: Two-Head Learned Marginal Utility Knapsack
     ORACLE = "oracle"                                       # Policy 6: Ground truth marginal utility upper bound
+
+
+def estimate_gaussian_cost_components(
+    screen_areas: Optional[torch.Tensor] = None,
+    projected_areas: Optional[torch.Tensor] = None,
+    n_gaussians: Optional[int] = None,
+    base_cost_us: float = 0.5,
+    area_cost_factor: float = 0.002,
+    sh_degree: int = 0,
+    cost_coeffs: Optional[Tuple[float, float, float, float]] = None,
+    backend: str = "gsplat",
+    cost_backward_per_step_us: float = 0.35,
+    cost_optimizer_per_step_us: float = 0.15,
+    device: Optional[torch.device] = None,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Decompose compute cost into decoupled base and incremental step components.
+
+    Exact Formulation:
+        C_i(K) = 0                                if K == 0
+        C_i(K) = C_i_base + K * C_i_step          if K >= 1
+
+    where:
+        C_i_base = C_overhead + C_render(backend, A_i, SH)
+        C_i_step = C_backward + C_optimizer
+
+    Returns:
+        (base_costs, step_costs): tuple of (N,) tensors in microseconds
+    """
+    backend_mult = 1.0
+    if backend == "reference":
+        backend_mult = 5.0
+    elif backend == "custom_cuda":
+        backend_mult = 1.0
+
+    step_unit = cost_backward_per_step_us + cost_optimizer_per_step_us
+
+    if cost_coeffs is not None and (projected_areas is not None or screen_areas is not None):
+        b0, b1, b2, b3 = cost_coeffs
+        ref = projected_areas if projected_areas is not None else screen_areas
+        dev = ref.device
+        N = ref.shape[0]
+        area = projected_areas if projected_areas is not None else torch.zeros(N, device=dev)
+        inf = screen_areas if screen_areas is not None else torch.zeros(N, device=dev)
+        sh_val = float(sh_degree)
+        base = torch.clamp((b0 * backend_mult + b1 * area + b2 * inf + b3 * sh_val), min=0.1)
+        step = torch.full((N,), step_unit, device=dev)
+        return base, step
+
+    if screen_areas is not None:
+        dev = screen_areas.device
+        N = screen_areas.shape[0]
+        sh_multiplier = 1.0 + 0.1 * sh_degree
+        base = (base_cost_us * backend_mult + area_cost_factor * screen_areas) * sh_multiplier
+        step = torch.full((N,), step_unit, device=dev)
+        return base, step
+
+    if n_gaussians is None:
+        raise ValueError("Either screen_areas or n_gaussians must be provided")
+    dev = device or torch.device('cpu')
+    base = torch.full((n_gaussians,), base_cost_us * backend_mult, device=dev)
+    step = torch.full((n_gaussians,), step_unit, device=dev)
+    return base, step
 
 
 def estimate_gaussian_costs(
@@ -53,62 +116,23 @@ def estimate_gaussian_costs(
     cost_optimizer_per_step_us: float = 0.15,
     device: Optional[torch.device] = None,
 ) -> torch.Tensor:
-    """Cost model: C_i = f(N_i, A_i, K, SH, backend).
-    
-    Decomposes compute cost into:
-      C_i = C_render(backend, A_i) + K · (C_backward + C_optimizer) + C_overhead
-    
-    Calibrated against measured isolated optimization trials from oracle dataset.
-    
-    Args:
-        screen_areas: (N,) contribution mass or screen areas
-        projected_areas: (N,) true geometric projected screen area in px²
-        n_gaussians: fallback number of Gaussians
-        base_cost_us: base gradient cost per Gaussian in microseconds (β₀)
-        area_cost_factor: footprint scaling factor (β₁)
-        sh_degree: spherical harmonics degree
-        cost_coeffs: optional calibrated (beta_0, beta_1, beta_2, beta_3) tuple
-        n_micro_steps: optional number of optimization micro-steps K
-        backend: active renderer backend ('gsplat', 'reference', 'custom_cuda')
-        cost_backward_per_step_us: microsecond cost per active Gaussian per backward pass
-        cost_optimizer_per_step_us: microsecond cost per active Gaussian per Adam step
-        device: torch device
-        
-    Returns:
-        costs: (N,) estimated microsecond compute costs
-    """
-    backend_mult = 1.0
-    if backend == "reference":
-        backend_mult = 5.0
-    elif backend == "custom_cuda":
-        backend_mult = 1.0
-
-    step_cost_us = (
-        float(n_micro_steps) * (cost_backward_per_step_us + cost_optimizer_per_step_us)
-        if n_micro_steps is not None
-        else 0.0
+    """Cost model: C_i = C_base_i + K * C_step_i."""
+    base_costs, step_costs = estimate_gaussian_cost_components(
+        screen_areas=screen_areas,
+        projected_areas=projected_areas,
+        n_gaussians=n_gaussians,
+        base_cost_us=base_cost_us,
+        area_cost_factor=area_cost_factor,
+        sh_degree=sh_degree,
+        cost_coeffs=cost_coeffs,
+        backend=backend,
+        cost_backward_per_step_us=cost_backward_per_step_us,
+        cost_optimizer_per_step_us=cost_optimizer_per_step_us,
+        device=device,
     )
-
-    if cost_coeffs is not None and (projected_areas is not None or screen_areas is not None):
-        b0, b1, b2, b3 = cost_coeffs
-        ref = projected_areas if projected_areas is not None else screen_areas
-        dev = ref.device
-        N = ref.shape[0]
-        area = projected_areas if projected_areas is not None else torch.zeros(N, device=dev)
-        inf = screen_areas if screen_areas is not None else torch.zeros(N, device=dev)
-        sh_val = float(sh_degree)
-        costs = (b0 * backend_mult + b1 * area + b2 * inf + b3 * sh_val) + step_cost_us
-        return torch.clamp(costs, min=0.1)
-        
-    if screen_areas is not None:
-        device = screen_areas.device
-        sh_multiplier = 1.0 + 0.1 * sh_degree
-        render_cost = (base_cost_us * backend_mult + area_cost_factor * screen_areas) * sh_multiplier
-        return render_cost + step_cost_us
-    
-    if n_gaussians is None:
-        raise ValueError("Either screen_areas or n_gaussians must be provided")
-    return torch.full((n_gaussians,), (base_cost_us * backend_mult) + step_cost_us, device=device or torch.device('cpu'))
+    if n_micro_steps is not None:
+        return base_costs + float(n_micro_steps) * step_costs
+    return base_costs
 
 
 class BudgetScheduler:
@@ -297,6 +321,9 @@ class BudgetScheduler:
         if cost_estimates is None:
             cost_estimates = torch.full((N,), self.cost_per_gaussian_us, device=device)
 
+        if policy_str in ("no_op", OptimizationPolicy.NO_OP.value):
+            return torch.zeros(N, dtype=torch.bool, device=device)
+
         if policy_str in ("full", OptimizationPolicy.FULL.value):
             return torch.ones(N, dtype=torch.bool, device=device)
 
@@ -451,22 +478,26 @@ class BudgetScheduler:
     def allocate_adaptive_micro_steps(
         self,
         importance_scores: torch.Tensor,
-        cost_estimates: torch.Tensor,
+        base_costs: torch.Tensor,
+        step_costs: Optional[Union[torch.Tensor, float]] = None,
         budget_override_us: Optional[float] = None,
         max_k: int = 3,
-        step_cost_us: float = 0.50,
     ) -> torch.Tensor:
         """Solve Generalized Multi-Choice Knapsack for adaptive micro-steps K_i.
         
-        Assigns K_i in {0, 1, 2, ..., max_k} per Gaussian subject to:
-            sum_i C_i(K_i) <= Budget
+        Exact Linear Formulation:
+            C_i(K) = 0                                if K == 0
+            C_i(K) = base_costs[i] + K * step_costs[i] if K >= 1
+            
+        Subject to:
+            sum_i (base_costs[i] + K_i * step_costs[i]) * 1[K_i > 0] <= Budget
         
         Args:
             importance_scores: (N,) ranking score (e.g. value density or utility)
-            cost_estimates: (N,) base cost at K=1
+            base_costs: (N,) base overhead and rendering cost per Gaussian (K=0 -> 0 cost)
+            step_costs: (N,) or float incremental cost per micro-step
             budget_override_us: optional budget override in microseconds
             max_k: maximum micro-steps for top candidates (e.g. 3 or 5)
-            step_cost_us: additional compute cost per incremental micro-step
             
         Returns:
             k_steps: (N,) int64 tensor containing micro-step count for each Gaussian
@@ -481,9 +512,7 @@ class BudgetScheduler:
         else:
             budget_us = float(self.gpu_budget_ms * 1000.0 * self.budget_allocation['optimize'] * self.budget_scale_factor)
 
-        # Rank candidates by score descending
         order = torch.argsort(importance_scores, descending=True)
-        
         k_steps = torch.zeros(N, dtype=torch.long, device=device)
         total_cost = 0.0
         
@@ -491,12 +520,12 @@ class BudgetScheduler:
         if n_eligible == 0:
             return k_steps
 
-        # Multi-tier allocation
         cutoff_high = max(1, int(0.15 * n_eligible))
         cutoff_med = max(1, int(0.40 * n_eligible))
         
         for rank, idx in enumerate(order[:n_eligible]):
-            base_c = cost_estimates[idx].item()
+            base_c = float(base_costs[idx].item())
+            step_c = float(step_costs[idx].item()) if isinstance(step_costs, torch.Tensor) else float(step_costs if step_costs is not None else 0.50)
             
             if rank < cutoff_high:
                 target_k = max_k
@@ -505,14 +534,16 @@ class BudgetScheduler:
             else:
                 target_k = 1
                 
-            c_candidate = base_c + float(target_k - 1) * step_cost_us
-            if total_cost + c_candidate <= budget_us + 1e-7:
-                k_steps[idx] = target_k
-                total_cost += c_candidate
-            elif target_k > 1 and (total_cost + base_c <= budget_us + 1e-7):
-                k_steps[idx] = 1
-                total_cost += base_c
-            else:
+            assigned_k = 0
+            for k in range(target_k, 0, -1):
+                c_candidate = base_c + float(k) * step_c
+                if total_cost + c_candidate <= budget_us + 1e-7:
+                    assigned_k = k
+                    total_cost += c_candidate
+                    break
+                    
+            k_steps[idx] = assigned_k
+            if total_cost >= budget_us:
                 break
                 
         return k_steps

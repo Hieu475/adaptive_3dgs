@@ -1,0 +1,97 @@
+{
+  "mean_spearman_rho": 0.9079,
+  "mean_pearson_r": 0.9028,
+  "mean_latency_exact_ms": 523.9,
+  "mean_latency_fast_ms": 0.85,
+  "speedup": 614.5,
+  "per_frame": [
+    {
+      "frame": 1,
+      "n_gaussians": 16008,
+      "n_visible": 15805,
+      "spearman_rho": 0.9084,
+      "pearson_r": 0.9169,
+      "t_exact_ms": 585.11,
+      "t_fast_ms": 0.98,
+      "speedup_factor": 596.6,
+      "topk_overlaps_pct": {
+        "top_50": 28.0,
+        "top_100": 37.0,
+        "top_200": 51.5,
+        "top_500": 60.2
+      }
+    },
+    {
+      "frame": 2,
+      "n_gaussians": 16008,
+      "n_visible": 15638,
+      "spearman_rho": 0.9152,
+      "pearson_r": 0.917,
+      "t_exact_ms": 522.96,
+      "t_fast_ms": 0.79,
+      "speedup_factor": 662.5,
+      "topk_overlaps_pct": {
+        "top_50": 28.0,
+        "top_100": 37.0,
+        "top_200": 49.5,
+        "top_500": 65.2
+      }
+    },
+    {
+      "frame": 3,
+      "n_gaussians": 16008,
+      "n_visible": 15219,
+      "spearman_rho": 0.9085,
+      "pearson_r": 0.896,
+      "t_exact_ms": 492.15,
+      "t_fast_ms": 0.87,
+      "speedup_factor": 563.9,
+      "topk_overlaps_pct": {
+        "top_50": 26.0,
+        "top_100": 39.0,
+        "top_200": 37.5,
+        "top_500": 53.0
+      }
+    },
+    {
+      "frame": 4,
+      "n_gaussians": 16008,
+      "n_visible": 14923,
+      "spearman_rho": 0.8993,
+      "pearson_r": 0.8813,
+      "t_exact_ms": 495.37,
+      "t_fast_ms": 0.77,
+      "speedup_factor": 639.7,
+      "topk_overlaps_pct": {
+        "top_50": 20.0,
+        "top_100": 35.0,
+        "top_200": 36.5,
+        "top_500": 44.8
+      }
+    }
+  ],
+  "manifest": {
+    "timestamp": "2026-09-19T02:55:40",
+    "git_sha": "63146dc37564dd5d23d2f8fc751f6a6a6db2d883-dirty",
+    "git_branch": "phase13-cuda-acceleration",
+    "config_sha256": "none",
+    "dataset_name": "rgbd_dataset_freiburg1_desk",
+    "dataset_path": null,
+    "renderer_backend": "gsplat",
+    "cuda_extension": "available (prototype)",
+    "torch_version": "2.11.0+cu128",
+    "cuda_version": "12.8",
+    "gpu": "NVIDIA GeForce RTX 4050 Laptop GPU",
+    "vram_gb": 5.64,
+    "init_stride": 2,
+    "scale_pixel_multiplier": 1.5,
+    "initial_opacity": 0.5,
+    "n_micro_steps": 1,
+    "psnr_mask": "valid_depth",
+    "experiment": "Exact vs Fast Approximate Attribution Validation",
+    "mean_spearman_rho": 0.9079,
+    "mean_pearson_r": 0.9028,
+    "mean_speedup": 614.5,
+    "device": "cuda"
+  }
+}
