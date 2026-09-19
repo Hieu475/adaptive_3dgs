@@ -30,6 +30,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description="Step 1 Validation")
     parser.add_argument("--scene", type=str, default="tum_fr2_xyz")
+    parser.add_argument("--policy", type=str, default="ours")
     parser.add_argument("--n_frames", type=int, default=150)
     parser.add_argument("--budget_ms", type=float, default=15.0)
     parser.add_argument("--seed", type=int, default=42)
@@ -38,6 +39,7 @@ def main():
     args = parser.parse_args()
 
     device = args.device
+    policy = args.policy
     n_frames = args.n_frames
     seed = args.seed
     budget_ms = args.budget_ms
@@ -70,10 +72,10 @@ def main():
     )
     print(f">> Loaded {len(frames)} frames in {time.time() - t0:.2f}s.")
 
-    # 2. Run OURS policy trajectory
-    print(f"\n>> Executing OURS policy trajectory (seed={seed}, {n_frames} frames)...")
+    # 2. Run policy trajectory
+    print(f"\n>> Executing {policy.upper()} policy trajectory (seed={seed}, {n_frames} frames)...")
     summary, frame_logs = run_policy_trajectory(
-        policy="ours",
+        policy=policy,
         seed=seed,
         frames=frames,
         intrinsics=intrinsics,
@@ -85,11 +87,11 @@ def main():
 
     # 3. Save trajectory CSV and summary JSON
     df = pd.DataFrame(frame_logs)
-    csv_path = output_dir / "ours_trajectory.csv"
+    csv_path = output_dir / f"{policy}_trajectory.csv"
     df.to_csv(csv_path, index=False)
     print(f"\n>> Trajectory CSV saved to {csv_path}")
 
-    summary_path = output_dir / "ours_summary.json"
+    summary_path = output_dir / f"{policy}_summary.json"
     with open(summary_path, "w") as f:
         json.dump(summary, f, indent=2)
     print(f">> Summary JSON saved to {summary_path}")
