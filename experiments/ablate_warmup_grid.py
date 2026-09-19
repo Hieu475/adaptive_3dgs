@@ -83,6 +83,7 @@ def run_warmup_ablation(n_frames: int = 40, scene_name: str = "tum_fr2_xyz", see
             summary, _ = run_policy_trajectory(
                 policy="ours", seed=seed, frames=frames, intrinsics=intrinsics,
                 budget_ms=budget_ms, device=device, W=W, H=H,
+                custom_config=cfg,
             )
             res = {
                 "policy": "ours",

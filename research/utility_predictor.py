@@ -93,6 +93,27 @@ class FrozenUtilityPredictor:
         for param in self.model.parameters():
             param.requires_grad = False
 
+    def predict_tensor(
+        self,
+        features: torch.Tensor,
+    ) -> Dict[str, torch.Tensor]:
+        """Predicts Delta Q, Delta T, and Utility for GPU tensor [N, 11] without CPU-GPU sync."""
+        if features.numel() == 0:
+            dev = features.device
+            return {
+                "predicted_delta_q": torch.empty(0, device=dev),
+                "predicted_delta_t": torch.empty(0, device=dev),
+                "predicted_utility": torch.empty(0, device=dev),
+            }
+        norm_feat = self.normalizer.transform(features)
+        with torch.no_grad():
+            delta_q, delta_t, utility = self.model(norm_feat)
+        return {
+            "predicted_delta_q": delta_q.squeeze(-1) if delta_q.ndim > 1 else delta_q,
+            "predicted_delta_t": delta_t.squeeze(-1) if delta_t.ndim > 1 else delta_t,
+            "predicted_utility": utility.squeeze(-1) if utility.ndim > 1 else utility,
+        }
+
     def predict_features(
         self,
         features: Union[np.ndarray, torch.Tensor],

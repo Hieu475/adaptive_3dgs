@@ -177,6 +177,7 @@ class BudgetScheduler:
         }
         self.cost_per_gaussian_us = cost_per_gaussian_us
         self.cost_densify_us = cost_densify_us
+        self.cache_refresh_cost_us = 800.0  # Estimated cost (us) to refresh frozen background cache
         
         # Adaptive threshold state
         self._depth_error_stats = RunningStats()
@@ -439,11 +440,22 @@ class BudgetScheduler:
             return _pack_by_scores(importance_scores, cost_estimates, budget_us, max_k=top_k)
 
         elif policy_str in ("budget_aware", "ours", "heuristic", OptimizationPolicy.BUDGET_AWARE.value, OptimizationPolicy.OURS.value):
-            # Knapsack heuristic value density: (Temporal Error × Influence Mass) / cost
-            base_score = error_influence_temporal_scores if error_influence_temporal_scores is not None else (
-                error_influence_scores if error_influence_scores is not None else importance_scores
-            )
-            density = base_score / (cost_estimates + 1e-6)
+            if utility_scores is not None and policy_str in ("ours", OptimizationPolicy.OURS.value):
+                # Learned utility density: predicted utility \hat{U} = \hat{\Delta Q} / \hat{C}
+                if utility_scores.shape[0] < N:
+                    u = torch.cat([utility_scores, torch.zeros(N - utility_scores.shape[0], device=device)])
+                else:
+                    u = utility_scores[:N]
+                if (u <= 0).all():
+                    density = u - u.min() + 1e-4
+                else:
+                    density = torch.clamp(u, min=0.0) if reject_negative else u
+            else:
+                # Knapsack heuristic value density: (Temporal Error × Influence Mass) / cost
+                base_score = error_influence_temporal_scores if error_influence_temporal_scores is not None else (
+                    error_influence_scores if error_influence_scores is not None else importance_scores
+                )
+                density = base_score / (cost_estimates + 1e-6)
 
             use_warmup = (
                 update_counts is not None and
@@ -494,7 +506,7 @@ class BudgetScheduler:
 
             return mask
 
-        elif policy_str in ("learned_utility", OptimizationPolicy.LEARNED_UTILITY.value) or (policy_str in ("budget_aware", "ours") and utility_scores is not None):
+        elif policy_str in ("learned_utility", OptimizationPolicy.LEARNED_UTILITY.value):
             if utility_scores is not None:
                 if utility_scores.shape[0] < N:
                     eff = torch.cat([utility_scores, torch.zeros(N - utility_scores.shape[0], device=device)])
@@ -539,6 +551,7 @@ class BudgetScheduler:
         warmup_steps: int = 3,
         warmup_budget_ratio: float = 0.20,
         warmup_k: int = 2,
+        cache_refresh_cost_us: Optional[float] = None,
     ) -> torch.Tensor:
         """Solve Generalized Multi-Choice Knapsack for adaptive micro-steps K_i.
         
@@ -625,7 +638,9 @@ class BudgetScheduler:
             return k_steps
 
         # Candidates not yet allocated
-        unallocated_mask = (k_steps == 0) & (importance_scores > 0)
+        has_pos = (importance_scores > 0).any()
+        score_filter = (importance_scores > 0) if has_pos else torch.ones(N, dtype=torch.bool, device=device)
+        unallocated_mask = (k_steps == 0) & score_filter
         if visibility_mask is not None:
             unallocated_mask = unallocated_mask & visibility_mask[:N]
             
@@ -639,23 +654,47 @@ class BudgetScheduler:
         order_local = torch.argsort(sub_imp, descending=True)
         ordered_indices = unallocated_indices[order_local]
 
-        cutoff_k5 = max(1, int(0.10 * n_eligible))
-        cutoff_k3 = max(1, int(0.25 * n_eligible))
-        cutoff_k2 = max(1, int(0.55 * n_eligible))
-
-        target_k = torch.ones(n_eligible, dtype=torch.long, device=device)
-        target_k[:cutoff_k2] = min(2, max_k)
-        target_k[:cutoff_k3] = min(3, max_k)
-        target_k[:cutoff_k5] = max_k
+        # Account for progressive background cache refresh overhead across micro-step levels
+        if cache_refresh_cost_us is not None and cache_refresh_cost_us > 0.0:
+            cr_cost = float(cache_refresh_cost_us)
+            n_transitions = min(3, max(0, max_k - 1))
+            cache_overhead_us = min(0.25 * rem_budget, float(n_transitions) * cr_cost)
+            budget_for_candidates = max(0.0, rem_budget - cache_overhead_us)
+        else:
+            budget_for_candidates = rem_budget
 
         item_base = base_costs[ordered_indices]
         item_step = step_c[ordered_indices] if isinstance(step_c, torch.Tensor) else step_c
-        item_costs = item_base + target_k.float() * item_step
 
-        cum_costs = torch.cumsum(item_costs, dim=0)
-        within_budget = cum_costs <= rem_budget + 1e-7
+        # Capacity-Aware Pyramid Allocation:
+        # Binary search for maximal M candidates that fit under budget with exact pyramid distribution:
+        # Top 10% -> K=5, Next 15% -> K=3, Next 30% -> K=2, Remaining 45% -> K=1 (Mean K = 2.00)
+        low = 1
+        high = n_eligible
+        best_M = 0
+        best_target_k = None
 
-        k_steps[ordered_indices[within_budget]] = target_k[within_budget]
+        while low <= high:
+            mid = (low + high) // 2
+            t_k = torch.ones(mid, dtype=torch.long, device=device)
+            c2 = max(1, int(0.55 * mid))
+            c3 = max(1, int(0.25 * mid))
+            c5 = max(1, int(0.10 * mid))
+            t_k[:c2] = min(2, max_k)
+            t_k[:c3] = min(3, max_k)
+            t_k[:c5] = max_k
+
+            mid_step = item_step[:mid] if isinstance(item_step, torch.Tensor) else item_step
+            mid_costs = float((item_base[:mid] + t_k.float() * mid_step).sum().item())
+            if mid_costs <= budget_for_candidates + 1e-7:
+                best_M = mid
+                best_target_k = t_k
+                low = mid + 1
+            else:
+                high = mid - 1
+
+        if best_M > 0 and best_target_k is not None:
+            k_steps[ordered_indices[:best_M]] = best_target_k
         return k_steps
     
     def compute_max_new_gaussians(
@@ -778,17 +817,22 @@ class BudgetScheduler:
         actual_frame_ms: float,
         actual_opt_ms: Optional[float] = None,
         n_optimized: Optional[int] = None,
+        actual_cache_ms: Optional[float] = None,
+        n_cache_rebuilds: Optional[int] = None,
     ):
         """Closed-loop feedback controller: adapt cost model and budget allocations.
         
         Controls budget compliance by dynamically tuning:
         1. Effective cost per Gaussian (α · Cost_est)
         2. Task budget shares (optimize vs densify vs memory)
+        3. Background cache refresh cost per transition
         
         Args:
             actual_frame_ms: total measured frame time in ms
             actual_opt_ms: measured optimization time in ms
             n_optimized: number of Gaussians optimized this frame
+            actual_cache_ms: measured background cache rebuild time in ms
+            n_cache_rebuilds: number of background cache rebuilds this frame
         """
         self._actual_times.append(actual_frame_ms)
         if len(self._actual_times) > 50:
@@ -803,6 +847,12 @@ class BudgetScheduler:
             if len(self._violation_history) > 50:
                 self._violation_history = self._violation_history[-50:]
         
+        # Update empirical cache refresh cost if cache timing provided
+        if actual_cache_ms is not None and n_cache_rebuilds is not None and n_cache_rebuilds > 0:
+            empirical_cache_us = (actual_cache_ms * 1000.0) / n_cache_rebuilds
+            self.cache_refresh_cost_us = 0.8 * self.cache_refresh_cost_us + 0.2 * empirical_cache_us
+            self.cache_refresh_cost_us = max(10.0, min(self.cache_refresh_cost_us, 5000.0))
+
         # Update empirical per-Gaussian optimization cost if opt timing provided
         if actual_opt_ms is not None and n_optimized is not None and n_optimized > 0:
             empirical_cost_us = (actual_opt_ms * 1000.0) / n_optimized

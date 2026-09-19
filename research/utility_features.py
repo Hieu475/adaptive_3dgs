@@ -21,6 +21,8 @@ Schema:
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple, Any
 import numpy as np
+import torch
+
 
 
 @dataclass(frozen=True)
@@ -267,3 +269,68 @@ def generate_feature_schema_table() -> str:
             f"[{spec.min_val}, {spec.max_val}] | `{spec.normalization}` | {spec.leakage_status} | {spec.description} |"
         )
     return "\n".join(lines)
+
+
+def extract_online_feature_tensor(
+    pipeline,
+    N: int,
+) -> torch.Tensor:
+    """Extract canonical 11-dimensional feature tensor on GPU from online pipeline state."""
+    model = pipeline.gaussian_model
+    store = getattr(model, 'state_store', None)
+    est = pipeline.importance_estimator
+    device = pipeline.device
+
+    # Helper to safely pad or slice a 1D tensor to length N
+    def _safe_tensor(t, fill_val=0.0):
+        if t is None:
+            return torch.full((N,), fill_val, device=device)
+        if t.shape[0] < N:
+            pad = torch.full((N - t.shape[0],), fill_val, device=device, dtype=t.dtype)
+            return torch.cat([t, pad])
+        return t[:N]
+
+    color_err = _safe_tensor(est._running_color_error, 0.0)
+    depth_err = _safe_tensor(est._running_depth_error, 0.0)
+    vis_count = _safe_tensor(est._visibility_count, 0.0)
+    
+    screen_areas = getattr(est, '_screen_areas', None)
+    proj_area = _safe_tensor(screen_areas, 1.0)
+        
+    inf_mass = getattr(est, '_influence_weights', None)
+    inf_mass_t = _safe_tensor(inf_mass, 1.0) if inf_mass is not None else proj_area
+        
+    grad_norm = inf_mass_t * (color_err + depth_err)
+
+    if store is not None and store.num_gaussians >= N:
+        pos_drift = store.position_drift[:N]
+        res_drift = store.residual_drift_ema[:N]
+        ages = store.ages[:N].float()
+        update_freq = store.get_update_frequency(pipeline.frame_count)[:N]
+    else:
+        pos_drift = torch.zeros(N, device=device)
+        res_drift = torch.zeros(N, device=device)
+        ages = torch.ones(N, device=device)
+        update_freq = torch.full((N,), 0.5, device=device)
+
+    if hasattr(model, '_confidence') and model._confidence is not None and model._confidence.shape[0] >= N:
+        conf = model._confidence[:N].squeeze(-1)
+        unc_var = (1.0 - conf).clamp(0.0, 1.0)
+    else:
+        unc_var = torch.full((N,), 0.5, device=device)
+
+
+    return torch.stack([
+        color_err,
+        depth_err,
+        grad_norm,
+        vis_count.float(),
+        inf_mass_t,
+        pos_drift,
+        res_drift,
+        unc_var,
+        proj_area,
+        update_freq,
+        ages,
+    ], dim=-1)
+

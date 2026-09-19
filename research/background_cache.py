@@ -4,8 +4,8 @@ Architecture:
     1. Render Frozen Gaussians (N - M elements) once per keyframe / schedule update:
        Frozen Set → C_f (color), D_f (depth), T_f (transmittance), A_f (accumulated opacity).
     2. Render Active Gaussians (M elements, M << N) with autograd gradient tracking.
-    3. Exact Depth-Aware Alpha Compositing:
-       Merges active and frozen contributions in strict front-to-back depth order:
+    3. Grouped Active/Frozen Compositing Approximation:
+       Approximates joint volumetric radiance via grouped two-layer alpha blending:
            C(u) = C_active(u) + T_active(u) · C_frozen(u)
            D(u) = D_active(u) + T_active(u) · D_frozen(u)
        where frozen Gaussians are completely detached (zero autograd graph tape)

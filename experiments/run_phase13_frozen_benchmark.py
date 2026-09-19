@@ -140,6 +140,8 @@ def run_policy_trajectory(
     device: str = "cuda",
     W: int = 320,
     H: int = 240,
+    config_override: Optional[Dict[str, Any]] = None,
+    custom_config: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """Execute a single policy trajectory across preloaded frames."""
     set_seed(seed)
@@ -148,14 +150,19 @@ def run_policy_trajectory(
         torch.cuda.reset_peak_memory_stats(device)
         torch.cuda.empty_cache()
 
-    cfg = build_pipeline_config(
-        policy=policy,
-        seed=seed,
-        budget_ms=budget_ms,
-        W=W,
-        H=H,
-        device=device,
-    )
+    if custom_config is not None:
+        cfg = custom_config
+    else:
+        cfg = build_pipeline_config(
+            policy=policy,
+            seed=seed,
+            budget_ms=budget_ms,
+            W=W,
+            H=H,
+            device=device,
+        )
+        if config_override is not None:
+            cfg = OnlineReconstructionPipeline._merge_config(cfg, config_override)
 
     pipeline = OnlineReconstructionPipeline(config=cfg, device=device)
     

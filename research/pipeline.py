@@ -36,7 +36,10 @@ from .densification import (
 from .tracker import ICPTracker
 from .background_cache import FrozenBackgroundCache
 from .selective_optimizer import SelectiveAdam
+from .utility_features import extract_online_feature_tensor
+from .utility_predictor import FrozenUtilityPredictor
 from enum import Enum
+
 
 
 class ExecutionMode(str, Enum):
@@ -105,8 +108,25 @@ class OnlineReconstructionPipeline:
         
         # Frozen Background Cache for True Selective Optimization
         self.bg_cache = FrozenBackgroundCache(device=device)
+
+        # Learned Utility Predictor (Phase 4 / Phase 13)
+        self.utility_predictor: Optional[FrozenUtilityPredictor] = None
+        self._learned_utility_scores: Optional[torch.Tensor] = None
+        self._predicted_delta_q: Optional[torch.Tensor] = None
+        self._predicted_delta_t: Optional[torch.Tensor] = None
+        policy_cfg = self.config.get('scheduler', {}).get('policy', 'budget_aware')
+        use_learned = self.config.get('scheduler', {}).get('use_learned_utility', False) or (policy_cfg in ('ours', OptimizationPolicy.OURS.value))
+        if use_learned:
+            try:
+                seed = self.config.get('seed', 42)
+                self.utility_predictor = FrozenUtilityPredictor(seed=seed, device=device)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Could not load FrozenUtilityPredictor for seed: {e}")
+                self.utility_predictor = None
         
         # State
+
         self.frame_count = 0
         self.current_pose = torch.eye(4, device=device)
         self.intrinsics: Optional[torch.Tensor] = None
@@ -646,6 +666,18 @@ class OnlineReconstructionPipeline:
             ])
         update_counts = self.gaussian_model.update_counts
 
+        # Compute learned utility predictions for current frame Gaussians if predictor is active
+        if self.utility_predictor is not None:
+            feat_tensor = extract_online_feature_tensor(self, N_updated)
+            pred_out = self.utility_predictor.predict_tensor(feat_tensor)
+            raw_u = pred_out['predicted_utility']
+            if raw_u.numel() > 0 and (raw_u <= 0).all():
+                self._learned_utility_scores = raw_u - raw_u.min() + 1e-4
+            else:
+                self._learned_utility_scores = raw_u
+            self._predicted_delta_q = pred_out['predicted_delta_q']
+            self._predicted_delta_t = pred_out['predicted_delta_t']
+
         if getattr(self, '_custom_selector_fn', None) is not None:
             optimize_mask = self._custom_selector_fn(self, N_updated)
         else:
@@ -678,10 +710,17 @@ class OnlineReconstructionPipeline:
             optimize_mask = torch.ones(N_updated, dtype=torch.bool, device=self.device)
             k_alloc = None
         elif use_adaptive_k and self.optimizer is not None and policy in ("ours", "budget_aware", OptimizationPolicy.OURS.value, OptimizationPolicy.BUDGET_AWARE.value):
+            if policy in ("ours", OptimizationPolicy.OURS.value) and self._learned_utility_scores is not None:
+                step_importance = self._learned_utility_scores
+            elif error_influence_temporal_scores is not None:
+                step_importance = error_influence_temporal_scores
+            elif error_influence_scores is not None:
+                step_importance = error_influence_scores
+            else:
+                step_importance = importance
+
             k_alloc = self.scheduler.allocate_adaptive_micro_steps(
-                importance_scores=error_influence_temporal_scores if error_influence_temporal_scores is not None else (
-                    error_influence_scores if error_influence_scores is not None else importance
-                ),
+                importance_scores=step_importance,
                 base_costs=base_costs,
                 step_costs=step_costs,
                 max_k=self.config.get('training', {}).get('n_micro_steps', 5),
@@ -701,6 +740,7 @@ class OnlineReconstructionPipeline:
         n_optimized = int(optimize_mask.sum().item()) if optimize_mask is not None else 0
         opt_loss_val = 0.0
         cache_time = 0.0
+        n_cache_rebuilds = 0
         opt_time = 0.0
         
         if k_alloc is not None and (k_alloc > 0).any():
@@ -725,6 +765,7 @@ class OnlineReconstructionPipeline:
                     tile_size=self.config['rendering']['tile_size'],
                 )
                 cache_time = time.time() - c_start
+                n_cache_rebuilds = 1
             else:
                 self.bg_cache.invalidate()
                 
@@ -750,6 +791,7 @@ class OnlineReconstructionPipeline:
                 # active_subset then strictly extracts M_k <= M elements for forward & backward.
                 if use_adaptive_k and k_alloc is not None and step_i > 0 and (k_alloc[:n_gaussians] == step_i).any():
                     frozen_mask = (k_alloc[:n_gaussians] <= step_i)
+                    rb_start = time.time()
                     self.bg_cache.build_cache(
                         model=self.gaussian_model,
                         frozen_mask=frozen_mask,
@@ -759,6 +801,8 @@ class OnlineReconstructionPipeline:
                         image_height=H,
                         tile_size=self.config['rendering']['tile_size'],
                     )
+                    cache_time += (time.time() - rb_start)
+                    n_cache_rebuilds += 1
 
                 self.optimizer.zero_grad()
                 # Active subset contains strictly {i | K_i > step_i} (O(M_k) backward compute)
@@ -873,6 +917,8 @@ class OnlineReconstructionPipeline:
             actual_frame_ms=frame_time * 1000.0,
             actual_opt_ms=opt_time * 1000.0,
             n_optimized=n_optimized,
+            actual_cache_ms=cache_time * 1000.0,
+            n_cache_rebuilds=n_cache_rebuilds,
         )
         
         # Compute quality metrics (pre and post optimization)

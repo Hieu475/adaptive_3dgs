@@ -33,6 +33,7 @@ def run_single_k_benchmark(
     intrinsics: torch.Tensor,
     k_micro_steps: int,
     use_adaptive_k: bool = False,
+    policy: str = "ours",
     budget_ms: float = 15.0,
     device: str = "cuda",
     seed: int = 42,
@@ -77,10 +78,15 @@ def run_single_k_benchmark(
         },
         "scheduler": {
             "gpu_budget_ms": budget_ms,
-            "policy": "budget_aware",
+            "policy": policy,
+            "use_learned_utility": True,
             "use_knapsack": True,
             "cost_per_gaussian_us": 0.10 if device == "cuda" else 0.5,
             "optimize_ratio": 0.50,
+            "enable_warmup": True,
+            "warmup_steps": 3,
+            "warmup_budget_ratio": 0.20,
+            "warmup_k": 2,
         },
         "training": {
             "n_micro_steps": k_micro_steps,
@@ -90,6 +96,7 @@ def run_single_k_benchmark(
             "max_new_per_frame": 4000,
             "strategy": "importance",
             "use_adaptive_thresholds": True,
+            "enable_coverage_throttling": True,
         },
     }
 
@@ -109,19 +116,27 @@ def run_single_k_benchmark(
     mean_ks: List[float] = []
 
     for f in frames[1:]:
-        if torch.cuda.is_available():
+        if str(device).startswith("cuda") and torch.cuda.is_available():
+            start_event = torch.cuda.Event(enable_timing=True)
+            end_event = torch.cuda.Event(enable_timing=True)
+            start_event.record()
+            res = pipeline.process_frame(
+                rgb=f["rgb"],
+                depth=f["depth"],
+                gt_pose=f["pose"],
+            )
+            end_event.record()
             torch.cuda.synchronize()
-        t0 = time.perf_counter()
+            t_frame_ms = float(start_event.elapsed_time(end_event))
+        else:
+            t0 = time.perf_counter()
+            res = pipeline.process_frame(
+                rgb=f["rgb"],
+                depth=f["depth"],
+                gt_pose=f["pose"],
+            )
+            t_frame_ms = (time.perf_counter() - t0) * 1000.0
 
-        res = pipeline.process_frame(
-            rgb=f["rgb"],
-            depth=f["depth"],
-            gt_pose=f["pose"],
-        )
-
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-        t_frame_ms = (time.perf_counter() - t0) * 1000.0
 
         opt_t_ms = res.get("opt_time_ms", 0.0)
         psnr_pre = res.get("psnr_pre", 0.0)
@@ -181,6 +196,8 @@ def main():
     parser.add_argument("--scene", type=str, default="tum_fr2_xyz")
     parser.add_argument("--n_frames", type=int, default=15)
     parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument("--policy", type=str, default="ours")
+    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--budget_ms", type=float, default=15.0)
     parser.add_argument("--out_dir", type=str, default="results/k_microsteps_benchmark")
     args = parser.parse_args()
@@ -196,7 +213,7 @@ def main():
     out_path.mkdir(parents=True, exist_ok=True)
 
     print(f"=== Multi-step Micro-convergence Benchmark: K in [1, 2, 3, 5] & Adaptive K ===")
-    print(f"Scene: {args.scene} | Frames: {args.n_frames} | Device: {args.device} | Budget: {args.budget_ms} ms")
+    print(f"Scene: {args.scene} | Frames: {args.n_frames} | Policy: {args.policy} | Device: {args.device} | Budget: {args.budget_ms} ms")
 
     frames, intrinsics = load_phase10_sequence(
         scene_name=args.scene,
@@ -223,8 +240,10 @@ def main():
             intrinsics=intrinsics,
             k_micro_steps=k_val,
             use_adaptive_k=adaptive,
+            policy=args.policy,
             budget_ms=args.budget_ms,
             device=args.device,
+            seed=args.seed,
         )
         records.append(rec)
         print(f"   {rec['k']} -> Mean K: {rec['mean_k']:.2f} | PSNR: {rec['mean_post_psnr_db']:.2f} dB | SSIM: {rec['mean_ssim']:.4f} | p50 opt: {rec['p50_opt_ms']:.2f} ms | FPS: {rec['fps']:.1f} | ΔQ/opt_ms: {rec['delta_q_per_opt_ms']:.4f}")
