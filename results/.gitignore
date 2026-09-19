@@ -64,5 +64,8 @@ phase6_context_utility/ablation/*.pt
 !attribution_fidelity/**
 !phase13_frozen_benchmark/**
 !phase13_multiscene_benchmark/**
+!step1_ablation_5seeds/**
+!throttle_no_warmup/**
+!final_confirmation/**
 
 
