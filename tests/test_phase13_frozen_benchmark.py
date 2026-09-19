@@ -20,13 +20,18 @@ from experiments.run_phase13_frozen_benchmark import (
 def test_build_pipeline_config():
     """Verify configuration generator sets appropriate policy flags."""
     cfg_ours = build_pipeline_config("ours", seed=42, budget_ms=15.0, device="cpu")
-    assert cfg_ours["training"]["use_adaptive_k"] is True
+    # OURS = pure throttling (no warmup, no adaptive-K, coverage+backlog throttling)
+    assert cfg_ours["training"]["use_adaptive_k"] is False  # Ablation: adaptive-K hurts
     assert cfg_ours["scheduler"]["policy"] == "ours"
     assert cfg_ours["scheduler"]["gpu_budget_ms"] == 15.0
+    assert cfg_ours["scheduler"]["enable_warmup"] is False  # Ablation: warmup hurts
+    assert cfg_ours["densification"]["enable_coverage_throttling"] is True
+    assert cfg_ours["scheduler"]["max_warmup_queue"] == 500  # backlog throttle
 
     cfg_err = build_pipeline_config("error_only", seed=42, budget_ms=15.0, device="cpu")
     assert cfg_err["training"]["use_adaptive_k"] is False
     assert cfg_err["scheduler"]["policy"] == "error_only"
+    assert cfg_err["densification"]["enable_coverage_throttling"] is False  # not OURS
 
     cfg_noop = build_pipeline_config("no_op", seed=42, budget_ms=15.0, device="cpu")
     assert cfg_noop["training"]["use_adaptive_k"] is False

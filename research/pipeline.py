@@ -115,7 +115,7 @@ class OnlineReconstructionPipeline:
         self._predicted_delta_q: Optional[torch.Tensor] = None
         self._predicted_delta_t: Optional[torch.Tensor] = None
         policy_cfg = self.config.get('scheduler', {}).get('policy', 'budget_aware')
-        use_learned = self.config.get('scheduler', {}).get('use_learned_utility', False) or (policy_cfg in ('ours', OptimizationPolicy.OURS.value))
+        use_learned = self.config.get('scheduler', {}).get('use_learned_utility', False)
         if use_learned:
             try:
                 seed = self.config.get('seed', 42)
@@ -174,7 +174,7 @@ class OnlineReconstructionPipeline:
                 'policy': 'budget_aware',
                 'optimize_ratio': 0.5,
                 'cost_per_gaussian_us': 0.5,
-                'enable_warmup': True,
+                'enable_warmup': False,  # Ablation: warmup is harmful (-0.75 dB)
                 'warmup_steps': 3,
                 'warmup_budget_ratio': 0.20,
                 'warmup_k': 2,
