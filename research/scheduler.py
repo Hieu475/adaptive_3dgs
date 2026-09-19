@@ -472,10 +472,8 @@ class BudgetScheduler:
             w_cum_cost = torch.cumsum(cost_estimates[w_order], dim=0)
             w_selected_local = w_cum_cost <= warmup_budget + 1e-7
             selected_warmup = w_order[w_selected_local]
-            spent_warmup = w_cum_cost[w_selected_local][-1].item() if w_selected_local.any() else 0.0
-
-            # Mature candidates packing with remaining budget
-            rem_budget = budget_us - spent_warmup
+            # Mature candidates packing with decoupled remaining budget without CPU sync
+            rem_budget = budget_us * (1.0 - warmup_budget_ratio)
             mask = torch.zeros(N, dtype=torch.bool, device=device)
             mask[selected_warmup] = True
 
@@ -488,7 +486,7 @@ class BudgetScheduler:
                 m_cum_cost = torch.cumsum(m_costs[m_order], dim=0)
                 m_selected = m_order[m_cum_cost <= rem_budget + 1e-7]
                 if top_k is not None:
-                    rem_k = max(0, top_k - int(mask.sum().item()))
+                    rem_k = max(0, top_k - len(selected_warmup))
                     m_selected = m_selected[:rem_k]
                 mask[mature_idx[m_selected]] = True
 
@@ -615,10 +613,12 @@ class BudgetScheduler:
                 selected_w = w_order[within_w_budget]
                 
                 k_steps[selected_w] = target_w_k
-                spent_budget = cum_w_costs[within_w_budget][-1].item() if within_w_budget.any() else 0.0
+                rem_budget = budget_us * (1.0 - warmup_budget_ratio)
+            else:
+                rem_budget = budget_us
+        else:
+            rem_budget = budget_us
 
-        # Remaining budget for mature / open-market candidates
-        rem_budget = budget_us - spent_budget
         if rem_budget <= 0:
             return k_steps
 
@@ -652,20 +652,6 @@ class BudgetScheduler:
         within_budget = cum_costs <= rem_budget + 1e-7
 
         k_steps[ordered_indices[within_budget]] = target_k[within_budget]
-
-        n_fitted = int(within_budget.sum().item())
-        if n_fitted < n_eligible:
-            boundary_idx = ordered_indices[n_fitted]
-            spent = cum_costs[n_fitted - 1].item() if n_fitted > 0 else 0.0
-            rem = rem_budget - spent
-            b_base = float(base_costs[boundary_idx].item())
-            b_step = float(step_c[boundary_idx].item()) if isinstance(step_c, torch.Tensor) else float(step_c)
-            boundary_target = int(target_k[n_fitted].item())
-            for k in range(boundary_target - 1, 0, -1):
-                if b_base + float(k) * b_step <= rem + 1e-7:
-                    k_steps[boundary_idx] = k
-                    break
-
         return k_steps
     
     def compute_max_new_gaussians(
