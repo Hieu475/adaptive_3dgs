@@ -195,6 +195,9 @@ def run_policy_trajectory(
             "opt_time_ms": float(m["opt_time_ms"]),
             "frame_time_ms": t_frame_ms,
             "peak_vram_mb": float(m.get("peak_vram_mb", 0.0)),
+            "coverage": float(m.get("coverage", 0.0)),
+            "n_warmup": int(m.get("n_warmup", 0)),
+            "n_warmup_optimized": int(m.get("n_warmup_optimized", 0)),
         }
         frame_logs.append(record)
 

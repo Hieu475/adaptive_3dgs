@@ -107,6 +107,20 @@ class GaussianModel(nn.Module):
         return self.state_store.persistent_ids
 
     @property
+    def update_counts(self) -> torch.Tensor:
+        """Number of times each Gaussian has been updated/optimized."""
+        if hasattr(self, 'state_store') and self.state_store is not None:
+            uc = self.state_store.update_counts
+            if uc.shape[0] == self.num_gaussians:
+                return uc
+            elif uc.shape[0] < self.num_gaussians:
+                pad = torch.zeros(self.num_gaussians - uc.shape[0], dtype=torch.long, device=self.device)
+                return torch.cat([uc, pad], dim=0)
+            else:
+                return uc[:self.num_gaussians]
+        return torch.zeros(self.num_gaussians, dtype=torch.long, device=self.device)
+
+    @property
     def num_gaussians(self) -> int:
         return self._xyz.shape[0]
     

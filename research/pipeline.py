@@ -148,6 +148,10 @@ class OnlineReconstructionPipeline:
                 'policy': 'budget_aware',
                 'optimize_ratio': 0.5,
                 'cost_per_gaussian_us': 0.5,
+                'enable_warmup': True,
+                'warmup_steps': 3,
+                'warmup_budget_ratio': 0.20,
+                'warmup_k': 2,
             },
             'densification': {
                 'max_new_per_frame': 500,
@@ -160,6 +164,10 @@ class OnlineReconstructionPipeline:
                 'lambda_color': 1.0,
                 'lambda_depth': 1.0,
                 'lambda_transmission': 0.5,
+                'enable_coverage_throttling': True,
+                'throttle_coverage_threshold': 0.90,
+                'throttle_factor': 0.20,
+                'throttle_error_threshold_mult': 1.5,
             },
             'training': {
                 'n_micro_steps': 5,
@@ -438,16 +446,33 @@ class OnlineReconstructionPipeline:
         # === 5. Densification ===
         dense_cfg = self.config['densification']
         
-        # Adaptive thresholds or fixed thresholds
+        # Compute scene coverage from transmission (< 0.5 indicates solid geometry coverage)
+        if depth_valid.any():
+            current_coverage = float((transmission[depth_valid] < 0.5).float().mean().item())
+        else:
+            current_coverage = float((transmission < 0.5).float().mean().item())
+
+        enable_throttling = dense_cfg.get('enable_coverage_throttling', True)
+        thresh_target = dense_cfg.get('throttle_coverage_threshold', 0.90)
+        max_multiplier = dense_cfg.get('throttle_error_threshold_mult', 1.5)
+        if enable_throttling and current_coverage >= thresh_target:
+            thresh_multiplier = max_multiplier
+        elif enable_throttling and current_coverage > 0.80:
+            scale_range = max(thresh_target - 0.80, 1e-4)
+            thresh_multiplier = 1.0 + (max_multiplier - 1.0) * ((current_coverage - 0.80) / scale_range)
+        else:
+            thresh_multiplier = 1.0
+
+        # Adaptive thresholds or fixed thresholds (scaled by coverage-aware multiplier)
         if dense_cfg.get('use_adaptive_thresholds', True):
             depth_thresh, color_thresh = self.scheduler.adaptive_threshold(
                 depth_errors=depth_err[depth_valid] if depth_valid.any() else torch.tensor([0.05], device=self.device),
                 color_errors=color_err,
-                k=dense_cfg.get('adaptive_k', 2.0),
+                k=dense_cfg.get('adaptive_k', 2.0) * thresh_multiplier,
             )
         else:
-            color_thresh = dense_cfg['error_threshold_color']
-            depth_thresh = dense_cfg['error_threshold_depth']
+            color_thresh = dense_cfg['error_threshold_color'] * thresh_multiplier
+            depth_thresh = dense_cfg['error_threshold_depth'] * thresh_multiplier
 
         error_masks = compute_error_masks(
             color_err, depth_err, transmission,
@@ -459,7 +484,8 @@ class OnlineReconstructionPipeline:
         max_new = min(
             dense_cfg['max_new_per_frame'],
             self.scheduler.compute_max_new_gaussians(
-                n_error_pixels=int(error_masks['combined_mask'].sum().item())
+                n_error_pixels=int(error_masks['combined_mask'].sum().item()),
+                current_coverage=current_coverage if enable_throttling else None,
             ),
             self.config['gaussian']['max_gaussians'] - self.gaussian_model.num_gaussians,
         )
@@ -548,6 +574,21 @@ class OnlineReconstructionPipeline:
         top_k = self.config['scheduler'].get('top_k', None)
         binary_threshold = self.config['scheduler'].get('binary_threshold', 0.5)
 
+        # Warm-up configuration (Age-Aware Guaranteed Warm-up)
+        sched_cfg = self.config.get('scheduler', {})
+        enable_warmup = sched_cfg.get('enable_warmup', True)
+        warmup_steps = sched_cfg.get('warmup_steps', 3)
+        warmup_budget_ratio = sched_cfg.get('warmup_budget_ratio', 0.20) if enable_warmup else 0.0
+        warmup_k = sched_cfg.get('warmup_k', 2)
+
+        # Ensure visibility mask matches N_updated
+        if visibility_mask.shape[0] < N_updated:
+            visibility_mask = torch.cat([
+                visibility_mask,
+                torch.ones(N_updated - visibility_mask.shape[0], dtype=torch.bool, device=self.device)
+            ])
+        update_counts = self.gaussian_model.update_counts
+
         if getattr(self, '_custom_selector_fn', None) is not None:
             optimize_mask = self._custom_selector_fn(self, N_updated)
         else:
@@ -566,6 +607,10 @@ class OnlineReconstructionPipeline:
                 binary_threshold=binary_threshold,
                 utility_scores=getattr(self, '_learned_utility_scores', None),
                 seed=self.config.get('seed', 42),
+                update_counts=update_counts if enable_warmup else None,
+                visibility_mask=visibility_mask if enable_warmup else None,
+                warmup_steps=warmup_steps,
+                warmup_budget_ratio=warmup_budget_ratio,
             )
         use_adaptive_k = self.config.get('training', {}).get('use_adaptive_k', False)
         k_alloc = None
@@ -583,6 +628,11 @@ class OnlineReconstructionPipeline:
                 base_costs=base_costs,
                 step_costs=step_costs,
                 max_k=self.config.get('training', {}).get('n_micro_steps', 5),
+                update_counts=update_counts if enable_warmup else None,
+                visibility_mask=visibility_mask if enable_warmup else None,
+                warmup_steps=warmup_steps,
+                warmup_budget_ratio=warmup_budget_ratio,
+                warmup_k=warmup_k,
             )
             optimize_mask = (k_alloc > 0)
         else:
@@ -691,6 +741,35 @@ class OnlineReconstructionPipeline:
         else:
             rendered_color_post = rendered_color
 
+        # Synchronize StateStore update counts and signals (Age-Aware Warmup lifecycle)
+        if hasattr(self.gaussian_model, 'state_store') and self.gaussian_model.state_store is not None:
+            padded_color_err = per_gaussian_color_err
+            padded_depth_err = per_gaussian_depth_err
+            padded_vis = visibility_mask
+            if padded_color_err.shape[0] < N_updated:
+                padded_color_err = torch.cat([
+                    padded_color_err,
+                    torch.zeros(N_updated - padded_color_err.shape[0], device=self.device)
+                ])
+            if padded_depth_err.shape[0] < N_updated:
+                padded_depth_err = torch.cat([
+                    padded_depth_err,
+                    torch.zeros(N_updated - padded_depth_err.shape[0], device=self.device)
+                ])
+            if padded_vis.shape[0] < N_updated:
+                padded_vis = torch.cat([
+                    padded_vis,
+                    torch.ones(N_updated - padded_vis.shape[0], dtype=torch.bool, device=self.device)
+                ])
+            self.gaussian_model.state_store.update_frame(
+                frame_idx=self.frame_count,
+                rgb_errors=padded_color_err,
+                depth_errors=padded_depth_err,
+                visibility_mask=padded_vis,
+                optimized_mask=optimize_mask,
+                positions=self.gaussian_model.positions.detach(),
+            )
+
         # === 8. Pruning ===
         prune_low_value(
             self.gaussian_model, importance[:self.gaussian_model.num_gaussians],
@@ -787,6 +866,10 @@ class OnlineReconstructionPipeline:
             'importance_min': importance.min().item() if importance.numel() > 0 else 0.0,
             'importance_max': importance.max().item() if importance.numel() > 0 else 0.0,
             'avg_screen_area': per_gaussian_screen_area.mean().item(),
+            # Coverage & Warmup metrics
+            'coverage': current_coverage,
+            'n_warmup': int(((update_counts < warmup_steps) & visibility_mask[:N_updated]).sum().item()) if enable_warmup else 0,
+            'n_warmup_optimized': int((optimize_mask[:N_updated] & (update_counts < warmup_steps) & visibility_mask[:N_updated]).sum().item()) if enable_warmup else 0,
         }
         self.metrics_history.append(metrics)
         self.frame_count += 1

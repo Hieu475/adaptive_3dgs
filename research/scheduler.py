@@ -288,6 +288,10 @@ class BudgetScheduler:
         budget_override_us: Optional[float] = None,
         reject_negative: bool = True,
         seed: int = 42,
+        update_counts: Optional[torch.Tensor] = None,
+        visibility_mask: Optional[torch.Tensor] = None,
+        warmup_steps: int = 3,
+        warmup_budget_ratio: float = 0.0,
     ) -> torch.Tensor:
         """Select Gaussians for optimization according to specified policy.
         
@@ -440,7 +444,55 @@ class BudgetScheduler:
                 error_influence_scores if error_influence_scores is not None else importance_scores
             )
             density = base_score / (cost_estimates + 1e-6)
-            return _pack_by_scores(density, cost_estimates, budget_us, max_k=top_k)
+
+            use_warmup = (
+                update_counts is not None and
+                warmup_budget_ratio > 0.0 and
+                warmup_steps > 0 and
+                (update_counts[:N] < warmup_steps).any()
+            )
+            if not use_warmup:
+                return _pack_by_scores(density, cost_estimates, budget_us, max_k=top_k)
+
+            # Two-tier warmup knapsack: guarantee newly spawned primitives get optimized
+            vis = visibility_mask[:N] if visibility_mask is not None else torch.ones(N, dtype=torch.bool, device=device)
+            uc = update_counts[:N]
+            warmup_mask = (uc < warmup_steps) & vis
+            warmup_idx = torch.where(warmup_mask)[0]
+
+            if len(warmup_idx) == 0:
+                return _pack_by_scores(density, cost_estimates, budget_us, max_k=top_k)
+
+            warmup_budget = budget_us * warmup_budget_ratio
+            w_uc = uc[warmup_idx]
+            w_density = density[warmup_idx]
+            # Prioritize: 0 updates first, then 1, 2, breaking ties with density
+            w_score = (warmup_steps - w_uc).float() * 1e4 + w_density
+            w_order = warmup_idx[torch.argsort(w_score, descending=True)]
+            w_cum_cost = torch.cumsum(cost_estimates[w_order], dim=0)
+            w_selected_local = w_cum_cost <= warmup_budget + 1e-7
+            selected_warmup = w_order[w_selected_local]
+            spent_warmup = w_cum_cost[w_selected_local][-1].item() if w_selected_local.any() else 0.0
+
+            # Mature candidates packing with remaining budget
+            rem_budget = budget_us - spent_warmup
+            mask = torch.zeros(N, dtype=torch.bool, device=device)
+            mask[selected_warmup] = True
+
+            # Open-market candidates (not yet selected)
+            mature_idx = torch.where(~mask & (density > 0))[0]
+            if len(mature_idx) > 0 and rem_budget > 0:
+                m_density = density[mature_idx]
+                m_costs = cost_estimates[mature_idx]
+                m_order = torch.argsort(m_density, descending=True)
+                m_cum_cost = torch.cumsum(m_costs[m_order], dim=0)
+                m_selected = m_order[m_cum_cost <= rem_budget + 1e-7]
+                if top_k is not None:
+                    rem_k = max(0, top_k - int(mask.sum().item()))
+                    m_selected = m_selected[:rem_k]
+                mask[mature_idx[m_selected]] = True
+
+            return mask
 
         elif policy_str in ("learned_utility", OptimizationPolicy.LEARNED_UTILITY.value) or (policy_str in ("budget_aware", "ours") and utility_scores is not None):
             if utility_scores is not None:
@@ -482,6 +534,11 @@ class BudgetScheduler:
         step_costs: Optional[Union[torch.Tensor, float]] = None,
         budget_override_us: Optional[float] = None,
         max_k: int = 3,
+        update_counts: Optional[torch.Tensor] = None,
+        visibility_mask: Optional[torch.Tensor] = None,
+        warmup_steps: int = 3,
+        warmup_budget_ratio: float = 0.20,
+        warmup_k: int = 2,
     ) -> torch.Tensor:
         """Solve Generalized Multi-Choice Knapsack for adaptive micro-steps K_i.
         
@@ -492,12 +549,22 @@ class BudgetScheduler:
         Subject to:
             sum_i (base_costs[i] + K_i * step_costs[i]) * 1[K_i > 0] <= Budget
         
+        When update_counts is provided (Age-Aware Guaranteed Warm-up):
+            Newly spawned Gaussians (update_count < warmup_steps) receive a dedicated
+            slice of compute (up to warmup_budget_ratio * Budget) with guaranteed
+            warmup_k micro-steps before mature primitives compete for remaining budget.
+        
         Args:
             importance_scores: (N,) ranking score (e.g. value density or utility)
             base_costs: (N,) base overhead and rendering cost per Gaussian (K=0 -> 0 cost)
             step_costs: (N,) or float incremental cost per micro-step
             budget_override_us: optional budget override in microseconds
             max_k: maximum micro-steps for top candidates (e.g. 3 or 5)
+            update_counts: optional (N,) tensor of prior update counts per Gaussian
+            visibility_mask: optional (N,) boolean tensor of visible Gaussians
+            warmup_steps: minimum updates before graduating to open knapsack market
+            warmup_budget_ratio: fraction of budget reserved for warm-up candidates
+            warmup_k: guaranteed micro-steps for warm-up candidates
             
         Returns:
             k_steps: (N,) int64 tensor containing micro-step count for each Gaussian
@@ -512,28 +579,77 @@ class BudgetScheduler:
         else:
             budget_us = float(self.gpu_budget_ms * 1000.0 * self.budget_allocation['optimize'] * self.budget_scale_factor)
 
-        order = torch.argsort(importance_scores, descending=True)
         k_steps = torch.zeros(N, dtype=torch.long, device=device)
-        total_cost = 0.0
-        
-        n_eligible = int((importance_scores > 0).sum().item())
+        step_c = step_costs if isinstance(step_costs, torch.Tensor) else float(step_costs if step_costs is not None else 0.50)
+
+        # Check for warm-up candidates
+        use_warmup = (
+            update_counts is not None and 
+            warmup_budget_ratio > 0.0 and 
+            warmup_steps > 0 and 
+            (update_counts[:N] < warmup_steps).any()
+        )
+
+        spent_budget = 0.0
+
+        if use_warmup:
+            uc = update_counts[:N]
+            vis = visibility_mask[:N] if visibility_mask is not None else torch.ones(N, dtype=torch.bool, device=device)
+            warmup_candidates = torch.where((uc < warmup_steps) & vis)[0]
+            
+            if len(warmup_candidates) > 0:
+                warmup_budget = budget_us * warmup_budget_ratio
+                w_uc = uc[warmup_candidates]
+                w_imp = importance_scores[warmup_candidates]
+                # Prioritize: fewest updates first (brand new = highest priority), breaking ties with importance
+                w_score = (warmup_steps - w_uc).float() * 1e4 + w_imp
+                w_order = warmup_candidates[torch.argsort(w_score, descending=True)]
+                
+                target_w_k = min(warmup_k, max_k)
+                w_base = base_costs[w_order]
+                w_step = step_c[w_order] if isinstance(step_c, torch.Tensor) else step_c
+                w_costs = w_base + float(target_w_k) * w_step
+                
+                cum_w_costs = torch.cumsum(w_costs, dim=0)
+                within_w_budget = cum_w_costs <= warmup_budget + 1e-7
+                selected_w = w_order[within_w_budget]
+                
+                k_steps[selected_w] = target_w_k
+                spent_budget = cum_w_costs[within_w_budget][-1].item() if within_w_budget.any() else 0.0
+
+        # Remaining budget for mature / open-market candidates
+        rem_budget = budget_us - spent_budget
+        if rem_budget <= 0:
+            return k_steps
+
+        # Candidates not yet allocated
+        unallocated_mask = (k_steps == 0) & (importance_scores > 0)
+        if visibility_mask is not None:
+            unallocated_mask = unallocated_mask & visibility_mask[:N]
+            
+        unallocated_indices = torch.where(unallocated_mask)[0]
+        n_eligible = len(unallocated_indices)
         if n_eligible == 0:
             return k_steps
+
+        # Sort remaining candidates by importance_scores
+        sub_imp = importance_scores[unallocated_indices]
+        order_local = torch.argsort(sub_imp, descending=True)
+        ordered_indices = unallocated_indices[order_local]
 
         cutoff_high = max(1, int(0.15 * n_eligible))
         cutoff_med = max(1, int(0.40 * n_eligible))
 
-        ordered_indices = order[:n_eligible]
         target_k = torch.ones(n_eligible, dtype=torch.long, device=device)
         target_k[:cutoff_high] = max_k
         target_k[cutoff_high:cutoff_med] = min(2, max_k)
 
         item_base = base_costs[ordered_indices]
-        item_step = step_costs[ordered_indices] if isinstance(step_costs, torch.Tensor) else float(step_costs if step_costs is not None else 0.50)
+        item_step = step_c[ordered_indices] if isinstance(step_c, torch.Tensor) else step_c
         item_costs = item_base + target_k.float() * item_step
 
         cum_costs = torch.cumsum(item_costs, dim=0)
-        within_budget = cum_costs <= budget_us + 1e-7
+        within_budget = cum_costs <= rem_budget + 1e-7
 
         k_steps[ordered_indices[within_budget]] = target_k[within_budget]
 
@@ -541,9 +657,9 @@ class BudgetScheduler:
         if n_fitted < n_eligible:
             boundary_idx = ordered_indices[n_fitted]
             spent = cum_costs[n_fitted - 1].item() if n_fitted > 0 else 0.0
-            rem = budget_us - spent
+            rem = rem_budget - spent
             b_base = float(base_costs[boundary_idx].item())
-            b_step = float(step_costs[boundary_idx].item()) if isinstance(step_costs, torch.Tensor) else float(step_costs if step_costs is not None else 0.50)
+            b_step = float(step_c[boundary_idx].item()) if isinstance(step_c, torch.Tensor) else float(step_c)
             boundary_target = int(target_k[n_fitted].item())
             for k in range(boundary_target - 1, 0, -1):
                 if b_base + float(k) * b_step <= rem + 1e-7:
@@ -552,39 +668,39 @@ class BudgetScheduler:
 
         return k_steps
     
-    def compute_max_new_gaussians(self, n_error_pixels: Optional[int] = None) -> int:
+    def compute_max_new_gaussians(
+        self,
+        n_error_pixels: Optional[int] = None,
+        current_coverage: Optional[float] = None,
+    ) -> int:
         """Compute maximum number of new Gaussians allowed this frame.
-
-        Previously this was the *only* signal used to cap densification, and
-        was further overridden by a small fixed constant
-        (`densification.max_new_per_frame`, e.g. 80) in the calling code —
-        meaning the map's growth was bottlenecked by an arbitrary constant
-        almost every frame, regardless of how much unmodeled geometry was
-        actually visible. That constant cap is the dominant reason the online
-        maps stayed at only ~4-5k Gaussians for an entire room (20-200x
-        sparser than published SLAM-3DGS systems), which in turn is why
-        Full-Optimization barely beat No-Op (near-zero headroom).
-
-        This now additionally accepts the actual current *demand* — the
-        number of pixels flagged as needing new geometry this frame
-        (`error_masks['combined_mask'].sum()`) — and returns
-        min(compute-budget-derived cap, demand). Early frames with lots of
-        unobserved geometry get to add many Gaussians in one shot (bounded
-        only by the compute-time budget for densification); once the map
-        has converged and few pixels are flagged, growth naturally tapers to
-        near zero without needing a hand-tuned constant.
 
         Args:
             n_error_pixels: number of pixels currently flagged for
                 densification this frame (e.g. `combined_mask.sum()`). If
                 None, falls back to the pure compute-budget-derived cap
                 (legacy behavior).
+            current_coverage: current frame's scene coverage fraction [0, 1].
+                If coverage >= 0.90: throttles densification by 80% (factor 0.20)
+                to transition from scene exploration to map refinement.
+                If coverage <= 0.80: maintains full exploration budget cap.
+                Between 0.80 and 0.90: linearly ramps down.
 
         Returns:
             max_new: maximum number of new Gaussians to create this frame
         """
         budget_us = self.gpu_budget_ms * 1000 * self.budget_allocation['densify']
         budget_cap = max(1, int(budget_us / self.cost_densify_us))
+
+        if current_coverage is not None:
+            if current_coverage >= 0.90:
+                throttle_factor = 0.20
+            elif current_coverage <= 0.80:
+                throttle_factor = 1.0
+            else:
+                throttle_factor = 1.0 - 0.80 * ((current_coverage - 0.80) / 0.10)
+            budget_cap = max(1, int(budget_cap * throttle_factor))
+
         if n_error_pixels is None:
             return budget_cap
         return max(1, min(budget_cap, int(n_error_pixels)))
