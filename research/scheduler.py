@@ -466,8 +466,8 @@ class BudgetScheduler:
             warmup_budget = budget_us * warmup_budget_ratio
             w_uc = uc[warmup_idx]
             w_density = density[warmup_idx]
-            # Prioritize: 0 updates first, then 1, 2, breaking ties with density
-            w_score = (warmup_steps - w_uc).float() * 1e4 + w_density
+            # Prioritize candidates closest to graduating (w_uc == 2 first, then 1, then 0) to prevent backlog, breaking ties with density
+            w_score = w_uc.float() * 1e4 + w_density
             w_order = warmup_idx[torch.argsort(w_score, descending=True)]
             w_cum_cost = torch.cumsum(cost_estimates[w_order], dim=0)
             w_selected_local = w_cum_cost <= warmup_budget + 1e-7
@@ -601,8 +601,8 @@ class BudgetScheduler:
                 warmup_budget = budget_us * warmup_budget_ratio
                 w_uc = uc[warmup_candidates]
                 w_imp = importance_scores[warmup_candidates]
-                # Prioritize: fewest updates first (brand new = highest priority), breaking ties with importance
-                w_score = (warmup_steps - w_uc).float() * 1e4 + w_imp
+                # Prioritize candidates closest to graduating (w_uc == 2 first, then 1, then 0) to prevent backlog, breaking ties with importance
+                w_score = w_uc.float() * 1e4 + w_imp
                 w_order = warmup_candidates[torch.argsort(w_score, descending=True)]
                 
                 target_w_k = min(warmup_k, max_k)
@@ -672,6 +672,8 @@ class BudgetScheduler:
         self,
         n_error_pixels: Optional[int] = None,
         current_coverage: Optional[float] = None,
+        n_warmup: Optional[int] = None,
+        max_warmup_queue: int = 500,
     ) -> int:
         """Compute maximum number of new Gaussians allowed this frame.
 
@@ -685,6 +687,9 @@ class BudgetScheduler:
                 to transition from scene exploration to map refinement.
                 If coverage <= 0.80: maintains full exploration budget cap.
                 Between 0.80 and 0.90: linearly ramps down.
+            n_warmup: current number of Gaussians in the warm-up backlog (update_count < warmup_steps).
+                If n_warmup > max_warmup_queue: throttles densification to prevent queue overflow.
+            max_warmup_queue: maximum allowable warm-up queue length before backpressure throttling.
 
         Returns:
             max_new: maximum number of new Gaussians to create this frame
@@ -700,6 +705,10 @@ class BudgetScheduler:
             else:
                 throttle_factor = 1.0 - 0.80 * ((current_coverage - 0.80) / 0.10)
             budget_cap = max(1, int(budget_cap * throttle_factor))
+
+        if n_warmup is not None and n_warmup > max_warmup_queue:
+            backlog_factor = max(0.10, float(max_warmup_queue) / float(n_warmup))
+            budget_cap = max(10, int(budget_cap * backlog_factor))
 
         if n_error_pixels is None:
             return budget_cap

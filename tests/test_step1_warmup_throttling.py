@@ -172,3 +172,55 @@ def test_pipeline_warmup_and_coverage_lifecycle():
     # Process frame 2
     metrics2 = pipeline.process_frame(rgb, depth)
     assert metrics2['frame'] == 2
+
+
+def test_frame0_refinement_burst_and_warmup_maturity():
+    """Verify that when init_refine_steps > 0, frame 0 optimizes map and sets update_counts to warmup_steps."""
+    config = {
+        'gaussian': {
+            'init_refine_steps': 2,
+        },
+        'rendering': {'image_width': 32, 'image_height': 32, 'tile_size': 16, 'backend': 'reference'},
+        'scheduler': {
+            'gpu_budget_ms': 30.0,
+            'policy': 'ours',
+            'enable_warmup': True,
+            'warmup_steps': 3,
+            'warmup_budget_ratio': 0.20,
+        },
+        'training': {
+            'n_micro_steps': 2,
+        }
+    }
+    pipeline = OnlineReconstructionPipeline(config=config, device='cpu')
+
+    H, W = 32, 32
+    rgb = torch.rand(H, W, 3)
+    depth = torch.ones(H, W) * 1.5
+    intrinsics = torch.tensor([[25.0, 0, 16.0], [0, 25.0, 16.0], [0, 0, 1.0]])
+
+    pipeline.initialize(rgb, depth, intrinsics)
+    assert pipeline.gaussian_model.num_gaussians > 0
+    # Because init_refine_steps=2 > 0, initial primitives must be graduated to mature (update_counts == 3)
+    assert (pipeline.gaussian_model.update_counts == 3).all()
+
+
+def test_backlog_aware_densification_throttling():
+    """Verify that compute_max_new_gaussians throttles densification when n_warmup exceeds max_warmup_queue."""
+    scheduler = BudgetScheduler(
+        gpu_budget_ms=15.0,
+        budget_allocation={'optimize': 0.50, 'densify': 0.20, 'render': 0.20, 'memory': 0.10},
+        cost_densify_us=2.0,
+    )
+    # Budget = 15.0 * 1000 * 0.20 = 3000 us -> Base cap = 1500
+    base_cap = scheduler.compute_max_new_gaussians(n_error_pixels=5000)
+    assert base_cap == 1500
+
+    # No backlog (n_warmup=200 <= 500): no backlog throttling
+    cap_ok = scheduler.compute_max_new_gaussians(n_error_pixels=5000, n_warmup=200, max_warmup_queue=500)
+    assert cap_ok == 1500
+
+    # Severe backlog (n_warmup=1500 > 500): backlog factor = 500 / 1500 = 1/3 -> 1500 * (1/3) = 500
+    cap_backlog = scheduler.compute_max_new_gaussians(n_error_pixels=5000, n_warmup=1500, max_warmup_queue=500)
+    assert cap_backlog == 500
+

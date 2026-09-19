@@ -91,6 +91,7 @@ def build_pipeline_config(
             "init_stride": 2,
             "scale_mode": "depth_adaptive",
             "scale_pixel_multiplier": 1.5,
+            "init_refine_steps": 10,
         },
         "rendering": {
             "tile_size": 16,

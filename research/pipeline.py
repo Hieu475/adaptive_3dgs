@@ -125,7 +125,13 @@ class OnlineReconstructionPipeline:
     @staticmethod
     def _default_config() -> Dict:
         return {
-            'gaussian': {'sh_degree': 0, 'initial_opacity': 0.5, 'max_gaussians': 500000},
+            'gaussian': {
+                'sh_degree': 0,
+                'initial_opacity': 0.5,
+                'max_gaussians': 500000,
+                'init_refine_steps': 0,
+                'init_warmup_mature': False,
+            },
             'system': {
                 'max_vram_fraction': 0.70,
                 'empty_cache_frequency': 0,
@@ -294,8 +300,48 @@ class OnlineReconstructionPipeline:
         self._setup_optimizer()
         self.initialized = True
         self.frame_count = 1
+
+        # Frame-0 Map Refinement Burst (fits initial unprojected primitives to frame 0)
+        init_refine_steps = self.config.get('gaussian', {}).get('init_refine_steps', 0)
+        if init_refine_steps > 0 and self.optimizer is not None:
+            weights = {
+                'color': self.config.get('losses', {}).get('weight_color', 0.8),
+                'depth': self.config.get('losses', {}).get('weight_depth', 0.5),
+                'ssim': self.config.get('losses', {}).get('weight_ssim', 0.2),
+            }
+            tile_size = self.config.get('rendering', {}).get('tile_size', 16)
+            for _ in range(init_refine_steps):
+                self.optimizer.zero_grad()
+                cov3D = self.gaussian_model.build_covariance()
+                rendered = rasterize_scene(
+                    means3D=self.gaussian_model.positions,
+                    cov3D=cov3D,
+                    colors=self.gaussian_model.get_colors(),
+                    opacities=self.gaussian_model.opacities.squeeze(-1),
+                    extrinsics=self.current_pose,
+                    intrinsics=self.intrinsics,
+                    image_width=W,
+                    image_height=H,
+                    tile_size=tile_size,
+                )
+                d_mask = (rendered['depth'] > 0) & (depth > 0)
+                losses = total_loss(
+                    rendered['color'], rgb,
+                    rendered['depth'], depth,
+                    weights,
+                    depth_valid_mask=d_mask,
+                )
+                if losses['total'].requires_grad:
+                    losses['total'].backward()
+                    self.optimizer.step()
+
+        # Set update_counts of initial primitives to warmup_steps so they enter stream mature
+        if hasattr(self.gaussian_model, 'state_store') and self.gaussian_model.state_store is not None:
+            if init_refine_steps > 0 or self.config.get('gaussian', {}).get('init_warmup_mature', False):
+                warmup_steps = self.config.get('scheduler', {}).get('warmup_steps', 3)
+                self.gaussian_model.state_store.update_counts.fill_(warmup_steps)
         
-        print(f"[Init] Created {self.gaussian_model.num_gaussians} Gaussians from first frame")
+        print(f"[Init] Created {self.gaussian_model.num_gaussians} Gaussians from first frame (refine_steps={init_refine_steps})")
     
     def process_frame(
         self,
@@ -481,11 +527,18 @@ class OnlineReconstructionPipeline:
             transmission_threshold=dense_cfg['transmission_threshold'],
         )
         
+        n_warmup_current = None
+        if hasattr(self.gaussian_model, 'update_counts'):
+            warmup_steps = self.config.get('scheduler', {}).get('warmup_steps', 3)
+            n_warmup_current = int((self.gaussian_model.update_counts < warmup_steps).sum().item())
+
         max_new = min(
             dense_cfg['max_new_per_frame'],
             self.scheduler.compute_max_new_gaussians(
                 n_error_pixels=int(error_masks['combined_mask'].sum().item()),
                 current_coverage=current_coverage if enable_throttling else None,
+                n_warmup=n_warmup_current if enable_throttling else None,
+                max_warmup_queue=self.config.get('scheduler', {}).get('max_warmup_queue', 500),
             ),
             self.config['gaussian']['max_gaussians'] - self.gaussian_model.num_gaussians,
         )
