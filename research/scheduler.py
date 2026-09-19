@@ -522,30 +522,34 @@ class BudgetScheduler:
 
         cutoff_high = max(1, int(0.15 * n_eligible))
         cutoff_med = max(1, int(0.40 * n_eligible))
-        
-        for rank, idx in enumerate(order[:n_eligible]):
-            base_c = float(base_costs[idx].item())
-            step_c = float(step_costs[idx].item()) if isinstance(step_costs, torch.Tensor) else float(step_costs if step_costs is not None else 0.50)
-            
-            if rank < cutoff_high:
-                target_k = max_k
-            elif rank < cutoff_med:
-                target_k = min(2, max_k)
-            else:
-                target_k = 1
-                
-            assigned_k = 0
-            for k in range(target_k, 0, -1):
-                c_candidate = base_c + float(k) * step_c
-                if total_cost + c_candidate <= budget_us + 1e-7:
-                    assigned_k = k
-                    total_cost += c_candidate
+
+        ordered_indices = order[:n_eligible]
+        target_k = torch.ones(n_eligible, dtype=torch.long, device=device)
+        target_k[:cutoff_high] = max_k
+        target_k[cutoff_high:cutoff_med] = min(2, max_k)
+
+        item_base = base_costs[ordered_indices]
+        item_step = step_costs[ordered_indices] if isinstance(step_costs, torch.Tensor) else float(step_costs if step_costs is not None else 0.50)
+        item_costs = item_base + target_k.float() * item_step
+
+        cum_costs = torch.cumsum(item_costs, dim=0)
+        within_budget = cum_costs <= budget_us + 1e-7
+
+        k_steps[ordered_indices[within_budget]] = target_k[within_budget]
+
+        n_fitted = int(within_budget.sum().item())
+        if n_fitted < n_eligible:
+            boundary_idx = ordered_indices[n_fitted]
+            spent = cum_costs[n_fitted - 1].item() if n_fitted > 0 else 0.0
+            rem = budget_us - spent
+            b_base = float(base_costs[boundary_idx].item())
+            b_step = float(step_costs[boundary_idx].item()) if isinstance(step_costs, torch.Tensor) else float(step_costs if step_costs is not None else 0.50)
+            boundary_target = int(target_k[n_fitted].item())
+            for k in range(boundary_target - 1, 0, -1):
+                if b_base + float(k) * b_step <= rem + 1e-7:
+                    k_steps[boundary_idx] = k
                     break
-                    
-            k_steps[idx] = assigned_k
-            if total_cost >= budget_us:
-                break
-                
+
         return k_steps
     
     def compute_max_new_gaussians(self, n_error_pixels: Optional[int] = None) -> int:
