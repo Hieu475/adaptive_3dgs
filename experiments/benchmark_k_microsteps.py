@@ -79,7 +79,8 @@ def run_single_k_benchmark(
             "gpu_budget_ms": budget_ms,
             "policy": "budget_aware",
             "use_knapsack": True,
-            "cost_per_gaussian_us": 0.5,
+            "cost_per_gaussian_us": 0.10 if device == "cuda" else 0.5,
+            "optimize_ratio": 0.50,
         },
         "training": {
             "n_micro_steps": k_micro_steps,
@@ -104,6 +105,8 @@ def run_single_k_benchmark(
     frame_times_ms: List[float] = []
     delta_qs: List[float] = []
     post_psnrs: List[float] = []
+    ssims: List[float] = []
+    mean_ks: List[float] = []
 
     for f in frames[1:]:
         if torch.cuda.is_available():
@@ -124,9 +127,13 @@ def run_single_k_benchmark(
         psnr_pre = res.get("psnr_pre", 0.0)
         psnr_post = res.get("psnr_post", res.get("psnr", 0.0))
         delta_q = psnr_post - psnr_pre
+        ssim_val = res.get("ssim", 0.0)
+        k_val = res.get("mean_k", float(k_micro_steps))
 
         frame_times_ms.append(t_frame_ms)
         post_psnrs.append(psnr_post)
+        ssims.append(ssim_val)
+        mean_ks.append(k_val)
         if opt_t_ms > 0:
             opt_times_ms.append(opt_t_ms)
             delta_qs.append(delta_q)
@@ -136,6 +143,10 @@ def run_single_k_benchmark(
     mean_frame_time = float(np.mean(frame_times_ms))
     mean_delta_q = float(np.mean(delta_qs)) if delta_qs else 0.0
     mean_post_psnr = float(np.mean(post_psnrs))
+    final_psnr = float(post_psnrs[-1]) if post_psnrs else 0.0
+    mean_ssim = float(np.mean(ssims)) if ssims else 0.0
+    fps = 1000.0 / mean_frame_time if mean_frame_time > 0 else 0.0
+    overall_mean_k = float(np.mean(mean_ks)) if mean_ks else float(k_micro_steps)
 
     efficiency_opt = mean_delta_q / (p50_opt + 1e-6)
     efficiency_frame = mean_delta_q / (mean_frame_time + 1e-6)
@@ -150,11 +161,15 @@ def run_single_k_benchmark(
 
     return {
         "k": label,
+        "mean_k": round(overall_mean_k, 2),
         "mean_delta_q_db": round(mean_delta_q, 4),
         "mean_post_psnr_db": round(mean_post_psnr, 2),
+        "final_psnr_db": round(final_psnr, 2),
+        "mean_ssim": round(mean_ssim, 4),
         "p50_opt_ms": round(p50_opt, 2),
         "p95_opt_ms": round(p95_opt, 2),
         "frame_time_ms": round(mean_frame_time, 2),
+        "fps": round(fps, 1),
         "delta_q_per_opt_ms": round(efficiency_opt, 4),
         "delta_q_per_frame_ms": round(efficiency_frame, 4),
         "n_gaussians": n_gauss,
@@ -196,7 +211,7 @@ def main():
         (2, False),
         (3, False),
         (5, False),
-        (3, True),  # Adaptive K in {1, 2, 3}
+        (5, True),  # Adaptive K in {1, 2, 3, 5} (Pyramid: K=1 nhiều, K=2 vừa, K=3 ít, K=5 rất ít)
     ]
     records = []
 
@@ -212,7 +227,7 @@ def main():
             device=args.device,
         )
         records.append(rec)
-        print(f"   {rec['k']} -> Mean ΔQ: {rec['mean_delta_q_db']:+.4f} dB | p50 opt: {rec['p50_opt_ms']:.2f} ms | Frame time: {rec['frame_time_ms']:.2f} ms | ΔQ/opt_ms: {rec['delta_q_per_opt_ms']:.4f}")
+        print(f"   {rec['k']} -> Mean K: {rec['mean_k']:.2f} | PSNR: {rec['mean_post_psnr_db']:.2f} dB | SSIM: {rec['mean_ssim']:.4f} | p50 opt: {rec['p50_opt_ms']:.2f} ms | FPS: {rec['fps']:.1f} | ΔQ/opt_ms: {rec['delta_q_per_opt_ms']:.4f}")
 
     # Manifest with strict provenance
     manifest = create_provenance_manifest(
@@ -239,14 +254,14 @@ def main():
         json.dump({"benchmark_results": records, "manifest": manifest}, f, indent=2)
 
     # Print summary table
-    print("\n" + "=" * 86)
-    print("AI Systems Micro-convergence Evaluation Table:")
-    print("=" * 86)
-    print(f"| {'Configuration':<18} | {'Mean ΔQ (dB)':<12} | {'p50 opt (ms)':<12} | {'p95 opt (ms)':<12} | {'frame time (ms)':<15} | {'ΔQ / opt_ms':<12} |")
-    print(f"|{'-'*20}|{'-'*14}|{'-'*14}|{'-'*14}|{'-'*17}|{'-'*14}|")
+    print("\n" + "=" * 110)
+    print("AI Systems Micro-convergence Evaluation Table: Q(K) vs T(K)")
+    print("=" * 110)
+    print(f"| {'Configuration':<18} | {'Mean K':<8} | {'PSNR (dB)':<10} | {'SSIM':<8} | {'p50 opt (ms)':<14} | {'FPS':<6} | {'ΔQ / opt_ms':<12} |")
+    print(f"|{'-'*20}|{'-'*10}|{'-'*12}|{'-'*10}|{'-'*16}|{'-'*8}|{'-'*14}|")
     for r in records:
-        print(f"| {str(r['k']):<18} | {r['mean_delta_q_db']:<+12.4f} | {r['p50_opt_ms']:<12.2f} | {r['p95_opt_ms']:<12.2f} | {r['frame_time_ms']:<15.2f} | {r['delta_q_per_opt_ms']:<12.4f} |")
-    print("=" * 86)
+        print(f"| {str(r['k']):<18} | {r['mean_k']:<8.2f} | {r['mean_post_psnr_db']:<10.2f} | {r['mean_ssim']:<8.4f} | {r['p50_opt_ms']:<14.2f} | {r['fps']:<6.1f} | {r['delta_q_per_opt_ms']:<12.4f} |")
+    print("=" * 110)
 
 
 if __name__ == "__main__":

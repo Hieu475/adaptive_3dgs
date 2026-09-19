@@ -639,12 +639,14 @@ class BudgetScheduler:
         order_local = torch.argsort(sub_imp, descending=True)
         ordered_indices = unallocated_indices[order_local]
 
-        cutoff_high = max(1, int(0.20 * n_eligible))
-        cutoff_med = max(1, int(0.50 * n_eligible))
+        cutoff_k5 = max(1, int(0.10 * n_eligible))
+        cutoff_k3 = max(1, int(0.25 * n_eligible))
+        cutoff_k2 = max(1, int(0.55 * n_eligible))
 
-        target_k = torch.full((n_eligible,), max(2, max_k - 2), dtype=torch.long, device=device)
-        target_k[:cutoff_high] = max_k
-        target_k[cutoff_high:cutoff_med] = max(2, max_k - 1)
+        target_k = torch.ones(n_eligible, dtype=torch.long, device=device)
+        target_k[:cutoff_k2] = min(2, max_k)
+        target_k[:cutoff_k3] = min(3, max_k)
+        target_k[:cutoff_k5] = max_k
 
         item_base = base_costs[ordered_indices]
         item_step = step_c[ordered_indices] if isinstance(step_c, torch.Tensor) else step_c

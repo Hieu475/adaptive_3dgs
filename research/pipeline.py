@@ -738,15 +738,31 @@ class OnlineReconstructionPipeline:
             }
             
             n_optimized = 0
-            opt_indices = torch.where(optimize_mask[:self.gaussian_model.num_gaussians])[0]
+            n_gaussians = self.gaussian_model.num_gaussians
             for step_i in range(n_micro_steps):
                 step_mask = (k_alloc > step_i) if (use_adaptive_k and k_alloc is not None) else optimize_mask
                 if not step_mask.any():
                     break
 
+                # Progressive Background Caching (True Adaptive-K Compute Scaling):
+                # When primitives graduate at step_i (k_alloc == step_i), absorb them into
+                # the frozen background cache with their latest updated parameters.
+                # active_subset then strictly extracts M_k <= M elements for forward & backward.
+                if use_adaptive_k and k_alloc is not None and step_i > 0 and (k_alloc[:n_gaussians] == step_i).any():
+                    frozen_mask = (k_alloc[:n_gaussians] <= step_i)
+                    self.bg_cache.build_cache(
+                        model=self.gaussian_model,
+                        frozen_mask=frozen_mask,
+                        extrinsics=self.current_pose,
+                        intrinsics=self.intrinsics,
+                        image_width=W,
+                        image_height=H,
+                        tile_size=self.config['rendering']['tile_size'],
+                    )
+
                 self.optimizer.zero_grad()
-                # Always render all optimize_mask Gaussians so no primitives vanish from composite_opt
-                active_subset = self.gaussian_model.get_optimization_subset(optimize_mask)
+                # Active subset contains strictly {i | K_i > step_i} (O(M_k) backward compute)
+                active_subset = self.gaussian_model.get_optimization_subset(step_mask)
                 
                 composite_opt = self.bg_cache.composite_with_active(
                     active_subset=active_subset,
@@ -768,12 +784,11 @@ class OnlineReconstructionPipeline:
                     depth_valid_mask=depth_valid_mask,
                 )
                 
-                # 4. Backward: computes gradients for active subset
+                # 4. Backward: computes gradients strictly for active_subset M_k
                 if losses['total'].requires_grad:
                     losses['total'].backward()
-                    # 5. Selective Optimizer update: only update Gaussians active in this microstep
-                    step_active_idx = torch.where(step_mask[:self.gaussian_model.num_gaussians])[0]
-                    self.optimizer.step(active_idx=step_active_idx)
+                    # 5. Selective Optimizer update: updates strictly M_k active parameters
+                    self.optimizer.step(active_idx=active_subset['indices'])
                     n_optimized = max(n_optimized, step_mask.sum().item())
                 else:
                     break
