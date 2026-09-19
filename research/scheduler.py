@@ -477,8 +477,10 @@ class BudgetScheduler:
             mask = torch.zeros(N, dtype=torch.bool, device=device)
             mask[selected_warmup] = True
 
-            # Open-market candidates (not yet selected)
-            mature_idx = torch.where(~mask & (density > 0))[0]
+            # Open-market candidates (not yet selected) - strictly visible
+            mature_idx = torch.where(~mask & vis & (density > 0))[0]
+            if len(mature_idx) == 0 and rem_budget > 0:
+                mature_idx = torch.where(~mask & vis)[0]
             if len(mature_idx) > 0 and rem_budget > 0:
                 m_density = density[mature_idx]
                 m_costs = cost_estimates[mature_idx]
@@ -637,12 +639,12 @@ class BudgetScheduler:
         order_local = torch.argsort(sub_imp, descending=True)
         ordered_indices = unallocated_indices[order_local]
 
-        cutoff_high = max(1, int(0.15 * n_eligible))
-        cutoff_med = max(1, int(0.40 * n_eligible))
+        cutoff_high = max(1, int(0.20 * n_eligible))
+        cutoff_med = max(1, int(0.50 * n_eligible))
 
-        target_k = torch.ones(n_eligible, dtype=torch.long, device=device)
+        target_k = torch.full((n_eligible,), max(2, max_k - 2), dtype=torch.long, device=device)
         target_k[:cutoff_high] = max_k
-        target_k[cutoff_high:cutoff_med] = min(2, max_k)
+        target_k[cutoff_high:cutoff_med] = max(2, max_k - 1)
 
         item_base = base_costs[ordered_indices]
         item_step = step_c[ordered_indices] if isinstance(step_c, torch.Tensor) else step_c

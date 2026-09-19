@@ -105,7 +105,8 @@ def build_pipeline_config(
         "scheduler": {
             "gpu_budget_ms": budget_ms,
             "policy": policy,
-            "cost_per_gaussian_us": 2.0,
+            "cost_per_gaussian_us": 0.10 if device.startswith("cuda") else 2.0,
+            "optimize_ratio": 0.50,
             "use_knapsack": True,
         },
         "training": {
