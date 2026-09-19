@@ -1,0 +1,121 @@
+{
+  "metadata": {
+    "scene": "datasets/TUM/rgbd_dataset_freiburg2_xyz",
+    "n_frames": 3669,
+    "seed": 42,
+    "device": "cuda",
+    "framing": "Mapping-Only with Oracle (Ground-Truth) Pose",
+    "git_commit": "f805afb88f7c0d716ceb60f7a9340ccd04d7e83a-dirty",
+    "hardware": {
+      "os": "Linux-6.8.0-94-generic-x86_64-with-glibc2.39",
+      "python": "3.12.13",
+      "pytorch": "2.11.0+cu128",
+      "cuda_available": true,
+      "cuda_version": "12.8",
+      "device_name": "NVIDIA GeForce RTX 4050 Laptop GPU",
+      "vram_gb": 5.64,
+      "cpu_count": 20
+    }
+  },
+  "policies": [
+    {
+      "policy": "ours",
+      "n_frames": 3669,
+      "seed": 42,
+      "mean_psnr": 18.601625772637917,
+      "final_psnr": 20.196828842163086,
+      "mean_ssim": 0.8795402681489547,
+      "final_ssim": 0.9523069262504578,
+      "mean_lpips": 0.5331828645638708,
+      "final_lpips": 0.35348817706108093,
+      "mean_depth_l1": 0.1740883348195843,
+      "final_depth_l1": 0.05571042373776436,
+      "N_final": 150000,
+      "fps": 7.245997864246214,
+      "mean_frame_time_ms": 138.00181619135182,
+      "mean_opt_time_ms": 103.00882971533773,
+      "peak_vram_mb": 210.46630859375,
+      "total_wall_sec": 506.21047214200007
+    },
+    {
+      "policy": "ours_hq",
+      "n_frames": 3669,
+      "seed": 42,
+      "mean_psnr": 18.310007431189913,
+      "final_psnr": 20.57711124420166,
+      "mean_ssim": 0.8706891666874371,
+      "final_ssim": 0.9571463465690613,
+      "mean_lpips": 0.5327287717126188,
+      "final_lpips": 0.29980799555778503,
+      "mean_depth_l1": 0.18576056677888725,
+      "final_depth_l1": 0.046807389706373215,
+      "N_final": 200000,
+      "fps": 5.92108439818147,
+      "mean_frame_time_ms": 168.88189474455513,
+      "mean_opt_time_ms": 128.1667303623004,
+      "peak_vram_mb": 267.18701171875,
+      "total_wall_sec": 619.481120911998
+    },
+    {
+      "policy": "error_influence",
+      "n_frames": 3669,
+      "seed": 42,
+      "mean_psnr": 17.440215050524166,
+      "final_psnr": 18.97961139678955,
+      "mean_ssim": 0.846013654084346,
+      "final_ssim": 0.9336369037628174,
+      "mean_lpips": 0.5637966624685566,
+      "final_lpips": 0.41211146116256714,
+      "mean_depth_l1": 0.19005562972496776,
+      "final_depth_l1": 0.07579264044761658,
+      "N_final": 150000,
+      "fps": 6.727896651479146,
+      "mean_frame_time_ms": 148.62906231027804,
+      "mean_opt_time_ms": 110.09361959725716,
+      "peak_vram_mb": 209.701171875,
+      "total_wall_sec": 545.1926790809994
+    }
+  ],
+  "literature_baselines": {
+    "Point-SLAM (ICCV'23)": {
+      "psnr": 17.62,
+      "ssim": 0.68,
+      "lpips": 0.42,
+      "fps": 0.2,
+      "n_gaussians": 120000,
+      "tracking": "Estimated (0.52cm)"
+    },
+    "MonoGS (CVPR'24)": {
+      "psnr": 16.17,
+      "ssim": 0.65,
+      "lpips": 0.46,
+      "fps": 1.6,
+      "n_gaussians": 180000,
+      "tracking": "Estimated (1.55cm)"
+    },
+    "Photo-SLAM (CVPR'24)": {
+      "psnr": 21.07,
+      "ssim": 0.78,
+      "lpips": 0.31,
+      "fps": 10.0,
+      "n_gaussians": 250000,
+      "tracking": "Estimated (0.38cm)"
+    },
+    "SplaTAM (CVPR'24)": {
+      "psnr": 25.06,
+      "ssim": 0.89,
+      "lpips": 0.18,
+      "fps": 0.6,
+      "n_gaussians": 410000,
+      "tracking": "Estimated (0.41cm)"
+    },
+    "RTG-SLAM (2024)": {
+      "psnr": 21.4,
+      "ssim": 0.785,
+      "lpips": 0.28,
+      "fps": 20.0,
+      "n_gaussians": 280000,
+      "tracking": "Estimated (0.45cm)"
+    }
+  }
+}

@@ -67,5 +67,6 @@ phase6_context_utility/ablation/*.pt
 !step1_ablation_5seeds/**
 !throttle_no_warmup/**
 !final_confirmation/**
+!full_sequence_benchmark/**
 
 

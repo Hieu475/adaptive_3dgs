@@ -125,6 +125,20 @@ class OnlineReconstructionPipeline:
                 logging.getLogger(__name__).warning(f"Could not load FrozenUtilityPredictor for seed: {e}")
                 self.utility_predictor = None
         
+        # Optional LPIPS Perceptual Metric
+        self._lpips_metric = None
+        if self.config.get('rendering', {}).get('compute_lpips', False):
+            try:
+                from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
+                self._lpips_metric = LearnedPerceptualImagePatchSimilarity(net_type='alex', normalize=True).to(device)
+                self._lpips_metric.eval()
+                for p in self._lpips_metric.parameters():
+                    p.requires_grad = False
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Could not load LPIPS metric: {e}")
+                self._lpips_metric = None
+
         # State
 
         self.frame_count = 0
@@ -951,6 +965,12 @@ class OnlineReconstructionPipeline:
                 return ssim_map.mean().item()
             
             ssim = _compute_ssim_simple(rendered_color_post, rgb)
+            
+            lpips_val = 0.0
+            if self._lpips_metric is not None:
+                img_pred = rendered_color_post.permute(2, 0, 1).unsqueeze(0).clamp(0.0, 1.0)
+                img_gt = rgb.permute(2, 0, 1).unsqueeze(0).clamp(0.0, 1.0)
+                lpips_val = float(self._lpips_metric(img_pred, img_gt).item())
         
         budget_ms = self.config['scheduler'].get('gpu_budget_ms', 16.6)
         budget_violated = (frame_time * 1000.0) > budget_ms if budget_ms > 0 else False
@@ -962,6 +982,7 @@ class OnlineReconstructionPipeline:
             'psnr_pre': psnr_pre,
             'psnr_post': psnr_post,
             'ssim': ssim,
+            'lpips': lpips_val,
             'depth_l1': depth_l1,
             'color_loss': per_gaussian_color_err.mean().item(),
             'n_gaussians': self.gaussian_model.num_gaussians,
