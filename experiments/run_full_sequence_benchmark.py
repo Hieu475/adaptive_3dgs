@@ -117,11 +117,13 @@ def build_experiment_configs(
     W: int = 320,
     H: int = 240,
     device: str = "cuda",
+    sh_degree: int = 1,
 ) -> Dict[str, Dict[str, Any]]:
     """Builds pipeline configurations for the Pareto evaluation."""
     # 1. OURS (Budget 15ms, Real-Time Operating Point)
     cfg_ours = build_pipeline_config("ours", seed=seed, budget_ms=15.0, W=W, H=H, device=device)
     cfg_ours["rendering"]["compute_lpips"] = True
+    cfg_ours["gaussian"]["sh_degree"] = sh_degree
 
     # 2. OURS-HQ (Budget 30ms, High-Quality Operating Point)
     cfg_ours_hq = json.loads(json.dumps(cfg_ours))
@@ -134,10 +136,12 @@ def build_experiment_configs(
     # 3. ERROR_INFLUENCE (Standard Selective Baseline, Budget 15ms)
     cfg_err = build_pipeline_config("error_influence", seed=seed, budget_ms=15.0, W=W, H=H, device=device)
     cfg_err["rendering"]["compute_lpips"] = True
+    cfg_err["gaussian"]["sh_degree"] = sh_degree
 
     # 4. FULL (Quality Ceiling, Unconstrained)
     cfg_full = build_pipeline_config("full", seed=seed, budget_ms=15.0, W=W, H=H, device=device)
     cfg_full["rendering"]["compute_lpips"] = True
+    cfg_full["gaussian"]["sh_degree"] = sh_degree
 
     return {
         "ours": cfg_ours,
@@ -270,6 +274,7 @@ def main():
     parser.add_argument("--max_frames", type=int, default=None, help="Default runs all 3669 frames")
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--sh_degree", type=int, default=1, help="Spherical Harmonics degree (0 for diffuse, 1 for view-dependent color)")
     parser.add_argument("--policies", type=str, nargs="+", default=["ours", "ours_hq", "error_influence", "full"])
     parser.add_argument("--out_dir", type=str, default="results/full_sequence_benchmark")
     parser.add_argument("--log_interval", type=int, default=200)
@@ -292,6 +297,7 @@ def main():
     print(f"  Camera:       {args.camera}")
     print(f"  Resolution:   {W}x{H}")
     print(f"  Max Frames:   {args.max_frames if args.max_frames else 'FULL SEQUENCE (~3669)'}")
+    print(f"  SH Degree:    {args.sh_degree} ({'diffuse' if args.sh_degree == 0 else 'view-dependent SH'})")
     print(f"  Policies:     {args.policies}")
     print(f"  Seed:         {args.seed}")
     print(f"  Device:       {args.device}")
@@ -310,7 +316,7 @@ def main():
     actual_frames = rgb_cpu.shape[0]
 
     # 2. Build configs
-    configs = build_experiment_configs(seed=args.seed, W=W, H=H, device=args.device)
+    configs = build_experiment_configs(seed=args.seed, W=W, H=H, device=args.device, sh_degree=args.sh_degree)
 
     all_summaries = []
     all_logs = {}
@@ -415,6 +421,7 @@ def main():
             "scene": args.scene_path,
             "n_frames": actual_frames,
             "seed": args.seed,
+            "sh_degree": args.sh_degree,
             "device": args.device,
             "framing": "Mapping-Only with Oracle (Ground-Truth) Pose",
             "git_commit": get_git_commit(),
