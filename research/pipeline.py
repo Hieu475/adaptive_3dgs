@@ -606,7 +606,7 @@ class OnlineReconstructionPipeline:
                     initial_opacity=self.config['gaussian'].get('initial_opacity', 0.5),
                 )
                 if new_gaussians['xyz'].shape[0] > 0:
-                    self.gaussian_model.add_gaussians(new_gaussians)
+                    self.gaussian_model.add_gaussians(new_gaussians, frame_idx=self.frame_count)
                     self.importance_estimator.expand_buffers(
                         new_gaussians['xyz'].shape[0], self.device
                     )
