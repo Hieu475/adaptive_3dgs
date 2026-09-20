@@ -76,7 +76,12 @@ class FrozenBackgroundCache:
         # Extract frozen parameters (detached)
         frozen_pos = model.positions[frozen_idx].detach()
         frozen_cov = model.build_covariance()[frozen_idx].detach()
-        frozen_col = model.get_colors()[frozen_idx].detach()
+        if model.sh_degree > 0:
+            from .rasterizer import _view_directions
+            frozen_dirs = _view_directions(model.positions, extrinsics)
+            frozen_col = model.get_colors(frozen_dirs)[frozen_idx].detach()
+        else:
+            frozen_col = model.get_colors()[frozen_idx].detach()
         frozen_op = model.opacities.squeeze(-1)[frozen_idx].detach()
         
         from .rasterizer import render as rasterize_scene

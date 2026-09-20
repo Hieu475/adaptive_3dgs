@@ -1,0 +1,33 @@
+{
+  "policy": "ours",
+  "scene": "tum_fr2_xyz",
+  "n_frames": 3669,
+  "overall": {
+    "n_gaussians": 150000,
+    "mean": 216.42310666666665,
+    "p10": 13.0,
+    "p25": 22.0,
+    "p50_median": 66.0,
+    "p75": 243.0,
+    "p90": 611.0,
+    "frac_zero_touches": 1.3333333333333333e-05,
+    "frac_under_5_touches": 0.0021333333333333334,
+    "frac_under_1_full_pass": 0.0021333333333333334,
+    "max": 3642
+  },
+  "by_creation_time": {
+    "early_third": {
+      "n_gaussians": 150000,
+      "mean": 216.42310666666665,
+      "p10": 13.0,
+      "p25": 22.0,
+      "p50_median": 66.0,
+      "p75": 243.0,
+      "p90": 611.0,
+      "frac_zero_touches": 1.3333333333333333e-05,
+      "frac_under_5_touches": 0.0021333333333333334,
+      "frac_under_1_full_pass": 0.0021333333333333334,
+      "max": 3642
+    }
+  }
+}

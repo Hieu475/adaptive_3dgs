@@ -432,10 +432,11 @@ def render_full(
     backend: Optional[str] = None,
 ) -> Dict[str, torch.Tensor]:
     """Render full scene representation (for tracking, error attribution, and importance)."""
+    colors = model.get_colors(_view_directions(model.positions, extrinsics)) if model.sh_degree > 0 else model.get_colors()
     return render(
         means3D=model.positions,
         cov3D=model.build_covariance(),
-        colors=model.get_colors(),
+        colors=colors,
         opacities=model.opacities.squeeze(-1),
         extrinsics=extrinsics,
         intrinsics=intrinsics,
@@ -445,6 +446,19 @@ def render_full(
         tile_size=tile_size,
         backend=backend,
     )
+
+
+def _view_directions(positions: torch.Tensor, extrinsics: torch.Tensor) -> torch.Tensor:
+    """Per-Gaussian normalized viewing direction (Gaussian -> camera center, world frame).
+
+    `extrinsics` is the world-to-camera 4x4 transform [R|t]. Camera center in
+    world coordinates is C = -R^T @ t (standard extrinsic-matrix convention).
+    """
+    R = extrinsics[:3, :3]
+    t = extrinsics[:3, 3]
+    cam_center = -(R.transpose(0, 1) @ t)  # (3,)
+    dirs = cam_center.unsqueeze(0) - positions  # (N, 3), points TOWARD the camera
+    return dirs / (dirs.norm(dim=-1, keepdim=True) + 1e-8)
 
 
 def render_frozen(

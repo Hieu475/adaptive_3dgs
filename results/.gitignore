@@ -68,5 +68,6 @@ phase6_context_utility/ablation/*.pt
 !throttle_no_warmup/**
 !final_confirmation/**
 !full_sequence_benchmark/**
+!diagnostics_lifetime_convergence_*.json
 
 

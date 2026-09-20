@@ -416,6 +416,13 @@ class OnlineReconstructionPipeline:
         )
         with torch.no_grad():
             cov3D = self.gaussian_model.build_covariance()
+            if self.gaussian_model.sh_degree > 0:
+                from .rasterizer import _view_directions
+                current_dirs = _view_directions(self.gaussian_model.positions, self.current_pose)
+            else:
+                current_dirs = None
+            current_colors = self.gaussian_model.get_colors(current_dirs)
+
             if use_fast_attribution:
                 renderer_backend = self.config.get('rendering', {}).get(
                     'backend', 'gsplat' if str(self.device).startswith('cuda') else 'reference'
@@ -423,7 +430,7 @@ class OnlineReconstructionPipeline:
                 render_result = rasterize_scene(
                     means3D=self.gaussian_model.positions,
                     cov3D=cov3D,
-                    colors=self.gaussian_model.get_colors(),
+                    colors=current_colors,
                     opacities=self.gaussian_model.opacities.squeeze(-1),
                     extrinsics=self.current_pose,
                     intrinsics=self.intrinsics,
@@ -436,7 +443,7 @@ class OnlineReconstructionPipeline:
                 render_result = render_with_attribution(
                     means3D=self.gaussian_model.positions,
                     cov3D=cov3D,
-                    colors=self.gaussian_model.get_colors(),
+                    colors=current_colors,
                     opacities=self.gaussian_model.opacities.squeeze(-1),
                     extrinsics=self.current_pose,
                     intrinsics=self.intrinsics,
@@ -820,7 +827,7 @@ class OnlineReconstructionPipeline:
 
                 self.optimizer.zero_grad()
                 # Active subset contains strictly {i | K_i > step_i} (O(M_k) backward compute)
-                active_subset = self.gaussian_model.get_optimization_subset(step_mask)
+                active_subset = self.gaussian_model.get_optimization_subset(step_mask, extrinsics=self.current_pose)
                 
                 composite_opt = self.bg_cache.composite_with_active(
                     active_subset=active_subset,
@@ -859,10 +866,15 @@ class OnlineReconstructionPipeline:
         if n_optimized > 0:
             with torch.no_grad():
                 cov3D_post = self.gaussian_model.build_covariance()
+                if self.gaussian_model.sh_degree > 0:
+                    from .rasterizer import _view_directions
+                    post_dirs = _view_directions(self.gaussian_model.positions, self.current_pose)
+                else:
+                    post_dirs = None
                 post_render = rasterize_scene(
                     means3D=self.gaussian_model.positions,
                     cov3D=cov3D_post,
-                    colors=self.gaussian_model.get_colors(),
+                    colors=self.gaussian_model.get_colors(post_dirs),
                     opacities=self.gaussian_model.opacities.squeeze(-1),
                     extrinsics=self.current_pose,
                     intrinsics=self.intrinsics,

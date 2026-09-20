@@ -143,19 +143,79 @@ class GaussianModel(nn.Module):
         """Normalized quaternions."""
         return self._rotation / (self._rotation.norm(dim=-1, keepdim=True) + 1e-8)
     
+    # Real Spherical Harmonics basis constants (standard closed-form real SH,
+    # same constants used throughout the 3DGS/NeRF literature — not
+    # implementation-specific, just the normalization coefficients of the
+    # real SH basis functions up to degree 3).
+    _SH_C0 = 0.28209479177387814
+    _SH_C1 = 0.4886025119029199
+    _SH_C2 = (
+        1.0925484305920792, -1.0925484305920792, 0.31539156525252005,
+        -1.0925484305920792, 0.5462742152960396,
+    )
+    _SH_C3 = (
+        -0.5900435899266435, 2.890611442640554, -0.4570457994644658,
+        0.3731763325901154, -0.4570457994644658, 1.445305721320277,
+        -0.5900435899266435,
+    )
+
+    @classmethod
+    def eval_sh(cls, dc: torch.Tensor, sh: torch.Tensor, directions: Optional[torch.Tensor], sh_degree: int) -> torch.Tensor:
+        """Evaluate real Spherical Harmonics color expansion up to degree 3."""
+        if directions is None or sh_degree == 0 or sh.numel() == 0:
+            return torch.sigmoid(dc)
+
+        result = cls._SH_C0 * dc
+
+        x, y, z = directions[:, 0:1], directions[:, 1:2], directions[:, 2:3]
+
+        if sh_degree >= 1:
+            result = (
+                result
+                - cls._SH_C1 * y * sh[:, 0, :]
+                + cls._SH_C1 * z * sh[:, 1, :]
+                - cls._SH_C1 * x * sh[:, 2, :]
+            )
+        if sh_degree >= 2:
+            xx, yy, zz = x * x, y * y, z * z
+            xy, yz, xz = x * y, y * z, x * z
+            c2 = cls._SH_C2
+            result = (
+                result
+                + c2[0] * xy * sh[:, 3, :]
+                + c2[1] * yz * sh[:, 4, :]
+                + c2[2] * (2.0 * zz - xx - yy) * sh[:, 5, :]
+                + c2[3] * xz * sh[:, 6, :]
+                + c2[4] * (xx - yy) * sh[:, 7, :]
+            )
+        if sh_degree >= 3:
+            xx, yy, zz = x * x, y * y, z * z
+            c3 = cls._SH_C3
+            result = (
+                result
+                + c3[0] * y * (3.0 * xx - yy) * sh[:, 8, :]
+                + c3[1] * xy * z * sh[:, 9, :]
+                + c3[2] * y * (4.0 * zz - xx - yy) * sh[:, 10, :]
+                + c3[3] * z * (2.0 * zz - 3.0 * xx - 3.0 * yy) * sh[:, 11, :]
+                + c3[4] * x * (4.0 * zz - xx - yy) * sh[:, 12, :]
+                + c3[5] * z * (xx - yy) * sh[:, 13, :]
+                + c3[6] * x * (xx - 3.0 * yy) * sh[:, 14, :]
+            )
+        return torch.sigmoid(result)
+
     def get_colors(self, directions: Optional[torch.Tensor] = None) -> torch.Tensor:
-        """Get colors. If directions provided, evaluate SH; otherwise return DC.
-        
+        """Get colors. If directions provided and sh_degree > 0, evaluate the
+        real Spherical Harmonics expansion (view-dependent color); otherwise
+        return the DC (diffuse) component only.
+
         Args:
-            directions: Optional viewing directions (..., 3)
+            directions: (N, 3) normalized viewing directions (camera -> point),
+                required to evaluate degree >= 1 terms.
         Returns:
-            Colors (..., 3) in [0, 1]
+            Colors (N, 3) in [0, 1]
         """
-        if directions is None or self.sh_degree == 0:
-            return torch.sigmoid(self._features_dc[:, 0, :])  # (N, 3)
-        # For higher SH degrees, a full SH evaluation would go here
-        # For now, return DC component
-        return torch.sigmoid(self._features_dc[:, 0, :])
+        dc = self._features_dc[:, 0, :]  # (N, 3)
+        return self.eval_sh(dc, self._features_rest, directions, self.sh_degree)
     
     def build_covariance(self) -> torch.Tensor:
         """Build 3D covariance matrices: Σ = R·S·S^T·R^T.
@@ -179,6 +239,8 @@ class GaussianModel(nn.Module):
     def get_optimization_subset(
         self,
         optimize_mask: torch.Tensor,
+        extrinsics: Optional[torch.Tensor] = None,
+        directions: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
         """Extract optimization subset containing only active Gaussians (M <= N).
         
@@ -186,6 +248,8 @@ class GaussianModel(nn.Module):
         
         Args:
             optimize_mask: (N,) boolean tensor of Gaussians selected for optimization.
+            extrinsics: (4, 4) optional camera extrinsics to evaluate view directions for SH.
+            directions: (M, 3) optional precomputed viewing directions.
             
         Returns:
             Dict containing active indices, active sliced parameters, and active 3D attributes.
@@ -225,7 +289,11 @@ class GaussianModel(nn.Module):
         M_act = torch.bmm(R_act, S_act)
         cov3D = torch.bmm(M_act, M_act.transpose(1, 2))
         
-        colors = torch.sigmoid(features_dc[:, 0, :])
+        if directions is None and extrinsics is not None and self.sh_degree > 0:
+            from .rasterizer import _view_directions
+            directions = _view_directions(xyz, extrinsics)
+
+        colors = self.eval_sh(features_dc[:, 0, :], features_rest, directions, self.sh_degree)
         opacities = torch.sigmoid(opacity).squeeze(-1)
         
         return {
