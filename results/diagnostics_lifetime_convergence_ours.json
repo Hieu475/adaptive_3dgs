@@ -4,30 +4,56 @@
   "n_frames": 3669,
   "overall": {
     "n_gaussians": 150000,
-    "mean": 216.42310666666665,
-    "p10": 13.0,
-    "p25": 22.0,
-    "p50_median": 66.0,
-    "p75": 243.0,
-    "p90": 611.0,
-    "frac_zero_touches": 1.3333333333333333e-05,
-    "frac_under_5_touches": 0.0021333333333333334,
-    "frac_under_1_full_pass": 0.0021333333333333334,
-    "max": 3642
+    "mean": 220.78762666666665,
+    "p10": 12.0,
+    "p25": 20.0,
+    "p50_median": 70.0,
+    "p75": 255.0,
+    "p90": 608.0,
+    "frac_zero_touches": 0.00019333333333333333,
+    "frac_under_5_touches": 0.00958,
+    "frac_under_1_full_pass": 0.00958,
+    "max": 3671
   },
   "by_creation_time": {
     "early_third": {
-      "n_gaussians": 150000,
-      "mean": 216.42310666666665,
-      "p10": 13.0,
-      "p25": 22.0,
-      "p50_median": 66.0,
-      "p75": 243.0,
-      "p90": 611.0,
-      "frac_zero_touches": 1.3333333333333333e-05,
-      "frac_under_5_touches": 0.0021333333333333334,
-      "frac_under_1_full_pass": 0.0021333333333333334,
-      "max": 3642
+      "n_gaussians": 59423,
+      "mean": 253.4154788549888,
+      "p10": 16.0,
+      "p25": 29.0,
+      "p50_median": 85.0,
+      "p75": 251.0,
+      "p90": 661.0,
+      "frac_zero_touches": 0.0,
+      "frac_under_5_touches": 0.0,
+      "frac_under_1_full_pass": 0.0,
+      "max": 3671
+    },
+    "middle_third": {
+      "n_gaussians": 29035,
+      "mean": 273.25303943516445,
+      "p10": 12.0,
+      "p25": 19.0,
+      "p50_median": 48.0,
+      "p75": 307.0,
+      "p90": 937.6000000000022,
+      "frac_zero_touches": 0.0,
+      "frac_under_5_touches": 0.00017220595832615808,
+      "frac_under_1_full_pass": 0.00017220595832615808,
+      "max": 2437
+    },
+    "late_third": {
+      "n_gaussians": 61542,
+      "mean": 164.5304669981476,
+      "p10": 9.0,
+      "p25": 14.0,
+      "p50_median": 60.0,
+      "p75": 253.0,
+      "p90": 499.0,
+      "frac_zero_touches": 0.00047122290468298075,
+      "frac_under_5_touches": 0.023268662051932013,
+      "frac_under_1_full_pass": 0.023268662051932013,
+      "max": 1191
     }
   }
 }
