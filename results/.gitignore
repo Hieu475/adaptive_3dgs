@@ -69,5 +69,7 @@ phase6_context_utility/ablation/*.pt
 !final_confirmation/**
 !full_sequence_benchmark/**
 !diagnostics_lifetime_convergence_*.json
+!multiscene_benchmark/**
+demo_output/
 
 

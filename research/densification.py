@@ -36,12 +36,14 @@ def compute_error_masks(
     Returns:
         Dict with 'color_mask', 'depth_mask', 'transmission_mask', 'combined_mask'
     """
-    color_mask = color_err > color_threshold
-    depth_mask = depth_err > depth_threshold
+    # Prevent stacking redundant Gaussians on surfaces that are already solidly covered (transmission < 0.20)
+    not_solid = transmission >= 0.20
+    color_mask = (color_err > color_threshold) & not_solid
+    depth_mask = (depth_err > depth_threshold) & not_solid
     transmission_mask = transmission > transmission_threshold
     
-    # Combined: any condition triggers densification
-    combined = color_mask | depth_mask | transmission_mask
+    # Combined: only densify where geometry is missing or not yet solidly covered
+    combined = transmission_mask | depth_mask | color_mask
     
     return {
         'color_mask': color_mask,

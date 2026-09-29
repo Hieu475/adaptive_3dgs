@@ -740,6 +740,7 @@ def load_phase10_sequence(
     scene_map = {
         "tum_fr2_xyz": ("datasets/TUM/rgbd_dataset_freiburg2_xyz", "freiburg2"),
         "tum_fr1_desk": ("datasets/TUM/rgbd_dataset_freiburg1_desk", "freiburg1"),
+        "tum_fr1_room": ("datasets/TUM/rgbd_dataset_freiburg1_room", "freiburg1"),
         "tum_fr1_rpy": ("datasets/TUM/rgbd_dataset_freiburg1_rpy", "freiburg1"),
         "tum_fr1_xyz": ("datasets/TUM/rgbd_dataset_freiburg1_xyz", "freiburg1"),
         "tum_fr3_sitting_static": ("datasets/TUM/rgbd_dataset_freiburg3_sitting_static", "freiburg3"),
@@ -766,7 +767,28 @@ def load_phase10_sequence(
     for i in range(min(n_frames, len(dataset))):
         item = dataset[i]
         rgb = item["rgb"].unsqueeze(0).permute(0, 3, 1, 2)
-        depth = item["depth"].unsqueeze(0).unsqueeze(0)
+        # Depth hygiene for real-world Kinect sensor
+        d_raw = item["depth"].squeeze().numpy()
+        import cv2
+        valid_raw = (d_raw >= 0.4) & (d_raw <= 4.0)
+        near_valid = cv2.dilate(valid_raw.astype(np.uint8), np.ones((7, 7), np.uint8)) > 0
+        small_holes = ((d_raw == 0) | (d_raw < 0.4)) & near_valid
+        if np.any(small_holes):
+            d_filled = cv2.inpaint(d_raw.astype(np.float32), small_holes.astype(np.uint8), inpaintRadius=4, flags=cv2.INPAINT_TELEA)
+        else:
+            d_filled = d_raw
+
+        valid_range = (d_filled >= 0.4) & (d_filled <= 4.0)
+        sobelx = cv2.Sobel(d_filled, cv2.CV_32F, 1, 0, ksize=3)
+        sobely = cv2.Sobel(d_filled, cv2.CV_32F, 0, 1, ksize=3)
+        grad = np.sqrt(sobelx**2 + sobely**2)
+        edge_mask = grad > 0.20
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        edge_dilated = cv2.dilate(edge_mask.astype(np.uint8), kernel) > 0
+        clean_mask = valid_range & (~edge_dilated)
+        d_clean = d_filled.copy()
+        d_clean[~clean_mask] = 0.0
+        depth = torch.from_numpy(d_clean).unsqueeze(0).unsqueeze(0)
 
         rgb_scaled = torch.nn.functional.interpolate(
             rgb, size=(H, W), mode="bilinear", align_corners=False
@@ -775,11 +797,15 @@ def load_phase10_sequence(
             depth, size=(H, W), mode="nearest"
         ).squeeze(0).squeeze(0)
 
+        # TUM ground truth trajectory records Camera-to-World (C2W: [R_c2w | C]).
+        # The 3DGS pipeline strictly requires World-to-Camera (W2C: [R_w2c | t_w2c]) extrinsics.
+        w2c_pose = torch.inverse(item["pose"])
+
         frames.append({
             "frame_id": i,
             "rgb": rgb_scaled.to(dev),
             "depth": depth_scaled.to(dev),
-            "pose": item["pose"].to(dev),
+            "pose": w2c_pose.to(dev),
         })
 
     return frames, intrinsics

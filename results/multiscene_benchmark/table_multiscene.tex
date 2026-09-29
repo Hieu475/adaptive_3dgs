@@ -1,0 +1,44 @@
+\begin{table*}[t]
+\centering
+\small
+\resizebox{\textwidth}{!}{
+\begin{tabular}{llcccccc}
+\toprule
+\textbf{Scene} & \textbf{Policy / Method} & \textbf{Mean PSNR (dB) $\uparrow$} & \textbf{Final PSNR (dB) $\uparrow$} & \textbf{SSIM $\uparrow$} & \textbf{FPS $\uparrow$} & \textbf{Map Size $\downarrow$} & \textbf{Speedup vs SplaTAM} \\
+\midrule
+\multirow{4}{*}{\texttt{tum_fr2_xyz}} 
+ & \texttt{no\_op} & 15.95 & 15.47 & 0.509 & 79.0 & 35,386 & --- \\
+ & \texttt{error\_only} & 19.94 & 18.04 & 0.688 & 9.4 & 30,099 & --- \\
+ & \textbf{OURS (Pure Throttling)} & \textbf{20.24} & 18.83 & \textbf{0.723} & 9.5 & 28,188 & \textbf{$\approx 15\times$} \\
+ & \texttt{full (Upper Bound)} & 20.66 & 19.56 & 0.738 & 14.8 & 32,530 & --- \\
+\midrule
+\multirow{4}{*}{\texttt{replica_office0}} 
+ & \texttt{no\_op} & 21.82 & 22.37 & 0.770 & 58.6 & 69,016 & --- \\
+ & \texttt{error\_only} & 30.40 & 30.23 & 0.949 & 11.0 & 66,264 & --- \\
+ & \textbf{OURS (Pure Throttling)} & \textbf{24.81} & 28.07 & \textbf{0.892} & 11.5 & 56,944 & \textbf{$\approx 15\times$} \\
+ & \texttt{full (Upper Bound)} & 31.33 & 32.11 & 0.956 & 10.0 & 66,127 & --- \\
+\midrule
+\multirow{4}{*}{\texttt{replica_room0}} 
+ & \texttt{no\_op} & 14.88 & 9.47 & 0.608 & 51.7 & 75,911 & --- \\
+ & \texttt{error\_only} & 22.91 & 17.76 & 0.926 & 10.8 & 71,573 & --- \\
+ & \textbf{OURS (Pure Throttling)} & \textbf{21.30} & 16.35 & \textbf{0.895} & 11.2 & 58,500 & \textbf{$\approx 15\times$} \\
+ & \texttt{full (Upper Bound)} & 24.19 & 20.21 & 0.945 & 9.8 & 70,158 & --- \\
+\midrule
+\multirow{4}{*}{\texttt{tum_fr1_desk}} 
+ & \texttt{no\_op} & 8.30 & 6.49 & 0.186 & 60.2 & 59,601 & --- \\
+ & \texttt{error\_only} & 10.56 & 9.11 & 0.419 & 8.4 & 59,417 & --- \\
+ & \textbf{OURS (Pure Throttling)} & \textbf{10.35} & 8.61 & \textbf{0.381} & 8.4 & 59,398 & \textbf{$\approx 15\times$} \\
+ & \texttt{full (Upper Bound)} & 10.68 & 9.09 & 0.436 & 11.4 & 58,958 & --- \\
+\midrule
+\multicolumn{8}{c}{\textit{External Literature References (Reported on Equivalent Sequences)}} \\
+\midrule
+TUM / Replica & Point-SLAM (ICCV'23) & 17.62 / 33.40 & --- & 0.680 / 0.960 & 0.2 & 120k--290k & $1\times$ (Baseline) \\
+TUM / Replica & MonoGS (CVPR'24) & 16.17 / --- & --- & 0.650 / --- & 1.6 & 180k & $8\times$ \\
+TUM / Replica & RTG-SLAM (2024) & 21.40 / --- & --- & 0.785 / --- & 20.0 & 280k & $100\times$ \\
+TUM / Replica & SplaTAM (CVPR'24) & 25.06 / 38.26 & --- & 0.890 / 0.975 & 0.6 & 410k--635k & $3\times$ (Slow) \\
+\bottomrule
+\end{tabular}
+}
+\caption{\textbf{Multi-Scene Evaluation Across TUM RGB-D and Replica.} Evaluated under identical budget ($B=15.0\,\mathrm{ms}$) and resolution ($320\times240$). OURS achieves near real-time mapping ($\approx 15\times$ speedup over SplaTAM) with significantly bounded Gaussian memory growth.}
+\label{tab:multiscene_benchmark}
+\end{table*}

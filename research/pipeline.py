@@ -568,18 +568,25 @@ class OnlineReconstructionPipeline:
             transmission_threshold=dense_cfg['transmission_threshold'],
         )
         
+        sched_cfg = self.config.get('scheduler', {})
+        enable_warmup = sched_cfg.get('enable_warmup', True) and sched_cfg.get('warmup_budget_ratio', 0.20) > 0
         n_warmup_current = None
-        if hasattr(self.gaussian_model, 'update_counts'):
-            warmup_steps = self.config.get('scheduler', {}).get('warmup_steps', 3)
+        if enable_warmup and hasattr(self.gaussian_model, 'update_counts'):
+            warmup_steps = sched_cfg.get('warmup_steps', 3)
             n_warmup_current = int((self.gaussian_model.update_counts < warmup_steps).sum().item())
+
+        n_err_pixels = int(error_masks['combined_mask'].sum().item())
+        error_ratio = n_err_pixels / float(H * W)
+        # Only throttle coverage when current view is settled (error_ratio < 0.15)
+        effective_coverage = current_coverage if (enable_throttling and error_ratio < 0.15) else None
 
         max_new = min(
             dense_cfg['max_new_per_frame'],
             self.scheduler.compute_max_new_gaussians(
-                n_error_pixels=int(error_masks['combined_mask'].sum().item()),
-                current_coverage=current_coverage if enable_throttling else None,
-                n_warmup=n_warmup_current if enable_throttling else None,
-                max_warmup_queue=self.config.get('scheduler', {}).get('max_warmup_queue', 500),
+                n_error_pixels=n_err_pixels,
+                current_coverage=effective_coverage,
+                n_warmup=n_warmup_current,
+                max_warmup_queue=sched_cfg.get('max_warmup_queue', 500),
             ),
             self.config['gaussian']['max_gaussians'] - self.gaussian_model.num_gaussians,
         )
@@ -916,10 +923,12 @@ class OnlineReconstructionPipeline:
             )
 
         # === 8. Pruning ===
+        enable_persistent_prune = self.config.get('densification', {}).get('enable_persistent_prune', True)
+        zero_frames = self.importance_estimator._zero_contrib_frames if enable_persistent_prune else None
         prune_low_value(
             self.gaussian_model, importance[:self.gaussian_model.num_gaussians],
             opacity_threshold=0.005,
-            zero_contrib_frames=self.importance_estimator._zero_contrib_frames,
+            zero_contrib_frames=zero_frames,
             prune_patience=self.importance_estimator.prune_patience,
         )
         

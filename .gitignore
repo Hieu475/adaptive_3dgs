@@ -17,5 +17,6 @@ scratch/
 *.swo
 *~
 .ipynb_checkpoints/
+*.patch
 
 
