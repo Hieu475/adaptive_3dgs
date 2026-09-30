@@ -194,7 +194,9 @@ def run_gate1_multi_seed():
             w_rgb=float(oracle_cfg["w_rgb"]),
             w_depth=float(oracle_cfg["w_depth"]),
             seed=seed,
-            min_influence_pixels=int(oracle_cfg["min_influence_pixels"])
+            min_influence_pixels=int(oracle_cfg["min_influence_pixels"]),
+            protocol=protocol,
+            use_exact_render=True,
         )
         last_oracle_engine = oracle_engine
         
@@ -307,10 +309,10 @@ def run_gate1_multi_seed():
     )
     
     w_stat, p_wilcoxon = wilcoxon(arr_q_ora, arr_q_rand, alternative='greater')
-    cohen_d_headroom = compute_cohens_d(arr_q_ora, arr_q_rand)
+    cohen_dz_headroom = compute_cohens_d(arr_q_ora, arr_q_rand)
     
     w_stat_heur, p_wilcoxon_heur = wilcoxon(arr_q_heur, arr_q_err, alternative='greater')
-    cohen_d_heur_vs_err = compute_cohens_d(arr_q_heur, arr_q_err)
+    cohen_dz_heur_vs_err = compute_cohens_d(arr_q_heur, arr_q_err)
     
     print("\n" + "=" * 80)
     print("   HEADROOM STATISTICAL RIGOR (N=5 SEEDS)")
@@ -320,8 +322,8 @@ def run_gate1_multi_seed():
     ci_strictly_positive = bool(ci_h_low > 0)
     print(f"CI Strictly Positive:   {'YES ✅' if ci_strictly_positive else 'NO (cuts 0)'}")
     print(f"Wilcoxon p-value:       p = {p_wilcoxon:.5f}")
-    print(f"Cohen's d Effect Size:  d = {cohen_d_headroom:+.3f}")
-    print(f"Heuristic vs Error-Only: d = {cohen_d_heur_vs_err:+.3f} | Wilcoxon p = {p_wilcoxon_heur:.5f}")
+    print(f"Paired Cohen's d_z:     d_z = {cohen_dz_headroom:+.3f}")
+    print(f"Heuristic vs Error-Only: d_z = {cohen_dz_heur_vs_err:+.3f} | Wilcoxon p = {p_wilcoxon_heur:.5f}")
     
     strata_data = {}
     for r in all_visible_interventions:
@@ -412,7 +414,7 @@ def run_gate1_multi_seed():
             'ci_95': [ci_h_low, ci_h_high],
             'ci_strictly_positive': ci_strictly_positive,
             'wilcoxon_p_value': float(p_wilcoxon),
-            'cohens_d': float(cohen_d_headroom),
+            'cohens_dz': float(cohen_dz_headroom),
             'mean_h_psnr_db': float(np.mean(arr_h_psnr)),
         },
         'policy_comparison': {
@@ -424,7 +426,7 @@ def run_gate1_multi_seed():
             'ose_error': float(np.mean(arr_q_err) / (np.mean(arr_q_ora) + 1e-8)),
             'ose_random': float(np.mean(arr_q_rand) / (np.mean(arr_q_ora) + 1e-8)),
             'heuristic_vs_error_wilcoxon_p': float(p_wilcoxon_heur),
-            'heuristic_vs_error_cohens_d': float(cohen_d_heur_vs_err),
+            'heuristic_vs_error_cohens_dz': float(cohen_dz_heur_vs_err),
         },
         'negative_utility_strata': strata_table_rows,
         'group_interaction_curve': group_curve_rows,
@@ -450,16 +452,16 @@ def run_gate1_multi_seed():
         "",
         "## 1. Optimization Headroom ($H$) with 95% Bootstrap CI",
         "",
-        f"- **Headroom Definition:** $H = \\Delta Q(S^\\star_K) - \\Delta Q(S_{{\\text{{random}}}})$ at $K = {K}$ (Top 20% budget).",
+        f"- **Headroom Definition:** $H = \\Delta Q(S^\\star_{{\\text{{pointwise}}}}) - \\Delta Q(S_{{\\text{{random}}}})$ at $K = {K}$ (Top 20% budget Pointwise Oracle Reference).",
         f"- **Mean Headroom:** **${mean_h:+.6f}$** ($\\sigma = {std_h:.6f}$)",
         f"- **95% Bootstrap CI:** **[${ci_h_low:+.6f}$, ${ci_h_high:+.6f}$]** ({'Strictly Positive $> 0$ ✅' if ci_strictly_positive else 'Cuts 0 ⚠️'})",
         f"- **Paired Wilcoxon Signed-Rank Test:** $p = {p_wilcoxon:.5f}$ ({'Statistically Significant ✅' if p_wilcoxon < 0.05 else 'Not Significant'})",
-        f"- **Cohen's $d$ Effect Size:** $d = {cohen_d_headroom:+.3f}$ (Large effect size)",
+        f"- **Paired Cohen's $d_z$ Effect Size:** $d_z = {cohen_dz_headroom:+.3f}$ (Large effect size)",
         "",
-        "| Policy | Realized $\\Delta Q$ (Mean $\\pm$ Std) | Oracle Selection Efficiency ($OSE$) | Cohen's $d$ vs Error-Only | Wilcoxon $p$ vs Error |",
+        "| Policy | Realized $\\Delta Q$ (Mean $\\pm$ Std) | Pointwise Selection Efficiency ($OSE$) | Paired Cohen's $d_z$ vs Error-Only | Wilcoxon $p$ vs Error |",
         "|:---|:---:|:---:|:---:|:---:|",
-        f"| **Oracle Reference ($S^\\star$)** | ${np.mean(arr_q_ora):+.6f} \\pm {np.std(arr_q_ora):.6f}$ | **1.000** | -- | -- |",
-        f"| **Heuristic Knapsack** | ${np.mean(arr_q_heur):+.6f} \\pm {np.std(arr_q_heur):.6f}$ | **{gate1_summary['policy_comparison']['ose_heuristic']:.3f}** | **{cohen_d_heur_vs_err:+.3f}** | **{p_wilcoxon_heur:.5f}** |",
+        f"| **Pointwise Oracle Reference ($S^\\star_{{\\text{{pointwise}}}})** | ${np.mean(arr_q_ora):+.6f} \\pm {np.std(arr_q_ora):.6f}$ | **1.000** | -- | -- |",
+        f"| **Heuristic Knapsack** | ${np.mean(arr_q_heur):+.6f} \\pm {np.std(arr_q_heur):.6f}$ | **{gate1_summary['policy_comparison']['ose_heuristic']:.3f}** | **{cohen_dz_heur_vs_err:+.3f}** | **{p_wilcoxon_heur:.5f}** |",
         f"| **Error-Only Top-$K$** | ${np.mean(arr_q_err):+.6f} \\pm {np.std(arr_q_err):.6f}$ | {gate1_summary['policy_comparison']['ose_error']:.3f} | 0.000 (Ref) | -- |",
         f"| **Random Baseline** | ${np.mean(arr_q_rand):+.6f} \\pm {np.std(arr_q_rand):.6f}$ | {gate1_summary['policy_comparison']['ose_random']:.3f} | -- | -- |",
         "",
@@ -505,7 +507,7 @@ def run_gate1_multi_seed():
         f"- **Marginal Gain in Small Context $\\mathbb{{E}}[\\Delta_i(A)]$:** **{dim_res['mean_marginal_gain_A']:+.6f}**",
         f"- **Marginal Gain in Large Context $\\mathbb{{E}}[\\Delta_i(B)]$:** **{dim_res['mean_marginal_gain_B']:+.6f}**",
         f"- **Empirical Diminishing Consistency:** **{dim_res['diminishing_rate']*100.0:.1f}%** of trials satisfied $\\Delta_i(A) \\ge \\Delta_i(B)$.",
-        "- **Scientific Finding:** Alpha-compositing induces an interaction structure consistent with diminishing-return behavior under the evaluated intervention protocol, mathematically motivating budget knapsack selection.",
+        "- **Scientific Finding:** Empirical evidence is consistent with diminishing-return behavior under the evaluated intervention protocol, motivating budgeted knapsack selection over unconstrained allocation.",
         ""
     ])
     

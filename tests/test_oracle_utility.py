@@ -314,8 +314,8 @@ def test_oracle_negative_utility_preservation():
     # Verify that delta metrics and utility are numeric and unclamped
     assert isinstance(res['oracle_utility_joint'], float)
     assert isinstance(res['delta_quality_local'], float)
-    # Ensure no clipping to 0 was performed: formula is (norm_psnr + norm_depth) / dt
-    expected_util = res['delta_quality_local'] / max(0.001, res['measured_trial_cost_ms'])
+    # Ensure no clipping to 0 was performed: formula is Delta Q / Delta C_action
+    expected_util = res['delta_quality_global'] / res['action_cost_ms']
     assert abs(res['oracle_utility_joint'] - expected_util) < 1e-4
 
 
@@ -438,6 +438,37 @@ def test_oracle_repeatability_cv_positive_negative():
     assert 'positive_utility_count' in res
     assert 'negative_utility_count' in res
     assert res['n_repeats'] == 3
+
+
+def test_greedy_contextual_oracle_and_exact_subset_search():
+    """Verify Greedy Contextual Oracle and Exact combinatorial subset selection."""
+    pipeline = OnlineReconstructionPipeline(device='cpu')
+    H, W = 32, 40
+    torch.manual_seed(42)
+    rgb = torch.rand(H, W, 3)
+    depth = torch.ones(H, W) * 2.0
+    fx, fy = 80.0, 80.0
+    intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
+    pipeline.initialize(rgb, depth, intrinsics)
+    
+    from research.oracle_utility import OracleUtilityExperiment
+    exp = OracleUtilityExperiment(pipeline=pipeline, n_samples=6, n_opt_steps=2, seed=42)
+    candidates = [0, 1, 2, 3]
+    
+    # 1. Greedy Contextual Oracle
+    subset_greedy, summary = exp.greedy_contextual_oracle_selection(
+        candidates, budget_ms=0.010, rgb=rgb, depth=depth, n_steps=2
+    )
+    assert isinstance(subset_greedy, list)
+    assert 'realized_delta_quality' in summary
+    assert 'total_cost_ms' in summary
+    
+    # 2. Exact Combinatorial Search
+    subset_exact, dq_exact = exp.exact_subset_search(
+        candidates[:3], budget_ms=0.010, rgb=rgb, depth=depth, n_steps=2
+    )
+    assert isinstance(subset_exact, list)
+    assert isinstance(dq_exact, float)
 
 
 if __name__ == '__main__':

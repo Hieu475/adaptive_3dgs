@@ -79,7 +79,8 @@ class OracleUtilityExperiment:
         group_size: int = 1,
         min_influence_pixels: int = 25,
         protocol: Optional[Dict[str, Any]] = None,
-        use_exact_render: bool = False,
+        use_exact_render: bool = True,
+        cost_mode: str = "calibrated_action",
     ):
         """
         Args:
@@ -93,6 +94,8 @@ class OracleUtilityExperiment:
             group_size: Gaussians per optimization group (1, 4, 16)
             min_influence_pixels: minimum pixel count for robust local utility estimation (default: 25)
             protocol: optional loaded protocol dictionary
+            use_exact_render: bool (default True). Authoritative oracle requires exact rendering to avoid the 31.44% depth interleaving gradient error.
+            cost_mode: 'calibrated_action' or 'measured_action'. Decoupled action cost oracle.
         """
         self.pipeline = pipeline
         self.protocol = protocol
@@ -100,14 +103,22 @@ class OracleUtilityExperiment:
         # Override defaults with protocol if provided
         if protocol is not None:
             try:
-                from research.protocol import get_oracle_config
+                from research.protocol import get_oracle_config, validate_oracle_protocol
                 ocfg = get_oracle_config(protocol)
                 n_opt_steps = int(ocfg.get('n_opt_steps', n_opt_steps))
                 w_rgb = float(ocfg.get('w_rgb', w_rgb))
                 w_depth = float(ocfg.get('w_depth', w_depth))
                 min_influence_pixels = int(ocfg.get('min_influence_pixels', min_influence_pixels))
-            except Exception:
-                pass
+                cost_mode = ocfg.get('cost_mode', cost_mode)
+                q_mode = str(ocfg.get('quality_mode', 'EXACT')).upper()
+                if q_mode != 'EXACT' or not use_exact_render:
+                    raise ValueError(
+                        f"Protocol Violation: Authoritative oracle quality must be EXACT, but got quality_mode='{q_mode}', "
+                        f"use_exact_render={use_exact_render}. Affine background compositing exhibits 31.44% gradient corruption."
+                    )
+            except Exception as e:
+                if not use_exact_render:
+                    raise
                 
         self.n_samples = n_samples
         self.n_opt_steps = n_opt_steps
@@ -118,6 +129,7 @@ class OracleUtilityExperiment:
         self.group_size = group_size
         self.min_influence_pixels = min_influence_pixels
         self.use_exact_render = use_exact_render
+        self.cost_mode = cost_mode
         torch.manual_seed(seed)
         np.random.seed(seed)
 
@@ -273,8 +285,15 @@ class OracleUtilityExperiment:
         rgb: torch.Tensor,
         depth: torch.Tensor,
         influence_mask: torch.Tensor,
+        action_cost_ms: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Optimize a group of Gaussians and measure raw RGB-D local quality improvements."""
+        """Optimize a group of Gaussians and measure raw RGB-D local and global quality improvements.
+
+        Strict Two-Oracle Formulation:
+          1. Quality Oracle: Exact full rendering ensures uncorrupted gradients and ground truth ΔQ_exact.
+          2. Cost Oracle: ΔC_action models/measures the true selective action cost (avoiding T_full-render pollution).
+          3. Joint Marginal Utility: U* = ΔQ_exact / ΔC_action.
+        """
         model = self.pipeline.gaussian_model
         H, W = rgb.shape[:2]
         device = rgb.device
@@ -308,19 +327,19 @@ class OracleUtilityExperiment:
             opt_mask[valid_indices] = True
         
         trial_opt = SelectiveAdam([{'params': list(model.parameters()), 'lr': 0.001}])
-        trial_cache = FrozenBackgroundCache(device=device)
-        frozen_mask = ~opt_mask
-        
-        # Pre-cache frozen background once for the trial
-        if frozen_mask.any():
-            trial_cache.build_cache(
-                model=model,
-                frozen_mask=frozen_mask,
-                extrinsics=self.pipeline.current_pose,
-                intrinsics=self.pipeline.intrinsics,
-                image_width=W,
-                image_height=H,
-            )
+        trial_cache = None
+        if not self.use_exact_render:
+            trial_cache = FrozenBackgroundCache(device=device)
+            frozen_mask = ~opt_mask
+            if frozen_mask.any():
+                trial_cache.build_cache(
+                    model=model,
+                    frozen_mask=frozen_mask,
+                    extrinsics=self.pipeline.current_pose,
+                    intrinsics=self.pipeline.intrinsics,
+                    image_width=W,
+                    image_height=H,
+                )
             
         if device.type == 'cuda':
             torch.cuda.synchronize()
@@ -399,20 +418,31 @@ class OracleUtilityExperiment:
         norm_delta_depth_global = delta_depth_gain_global / max(1e-3, depth_l1_global_before)
         delta_quality_global = self.w_rgb * norm_delta_psnr_global + self.w_depth * norm_delta_depth_global
         
-        # Actual trial cost strictly separating ΔQ and ΔT (Point 7)
-        actual_cost_ms = max(0.001, measured_trial_cost_ms)
+        # === 4. Decoupled Cost Oracle Calculation ===
+        # Do NOT conflate full-scene rendering wall-clock with selective action cost
+        if action_cost_ms is not None:
+            effective_action_cost_ms = max(1e-6, float(action_cost_ms))
+        else:
+            from .scheduler import estimate_gaussian_costs
+            action_cost_us = estimate_gaussian_costs(
+                screen_areas=torch.tensor([n_influence_pixels], dtype=torch.float32, device=device) if n_influence_pixels > 0 else None,
+                n_gaussians=max(1, len(valid_indices)),
+                n_micro_steps=n_steps,
+                device=device,
+            ).sum().item()
+            effective_action_cost_ms = max(1e-6, action_cost_us / 1000.0)
+            
+        # Marginal Utility Densities: strictly ΔQ_exact / ΔC_action
+        oracle_util_rgb_local = delta_psnr_local / effective_action_cost_ms
+        oracle_util_depth_local = delta_depth_gain_local / effective_action_cost_ms
+        oracle_util_loss_local = delta_loss_local / effective_action_cost_ms
+        oracle_util_joint_local = delta_quality_local / effective_action_cost_ms
         
-        # Local utilities (secondary diagnostic)
-        oracle_util_rgb_local = delta_psnr_local / actual_cost_ms
-        oracle_util_depth_local = delta_depth_gain_local / actual_cost_ms
-        oracle_util_loss_local = delta_loss_local / actual_cost_ms
-        oracle_util_joint_local = delta_quality_local / actual_cost_ms
-        
-        # Global utilities (PRIMARY SCIENTIFIC ESTIMAND: 3-FIX-1)
-        oracle_util_rgb_global = delta_psnr_global / actual_cost_ms
-        oracle_util_depth_global = delta_depth_gain_global / actual_cost_ms
-        oracle_util_loss_global = delta_loss_global / actual_cost_ms
-        oracle_util_joint_global = delta_quality_global / actual_cost_ms
+        # Global utilities (PRIMARY SCIENTIFIC ESTIMAND: ΔQ_exact / ΔC_action)
+        oracle_util_rgb_global = delta_psnr_global / effective_action_cost_ms
+        oracle_util_depth_global = delta_depth_gain_global / effective_action_cost_ms
+        oracle_util_loss_global = delta_loss_global / effective_action_cost_ms
+        oracle_util_joint_global = delta_quality_global / effective_action_cost_ms
         
         return {
             # Local metrics (secondary diagnostics)
@@ -465,7 +495,10 @@ class OracleUtilityExperiment:
             'oracle_utility_joint': oracle_util_joint_global,
             'oracle_utility': oracle_util_joint_global,
             
+            'action_cost_ms': effective_action_cost_ms,
+            'action_cost_us': effective_action_cost_ms * 1000.0,
             'measured_trial_cost_ms': measured_trial_cost_ms,
+            'trial_wallclock_ms': measured_trial_cost_ms,
             'n_influence_pixels': n_influence_pixels,
             'is_small_region': is_small_region,
         }
@@ -911,8 +944,10 @@ class OracleUtilityExperiment:
                         "oracle_utility_rgb_local": 0.0,
                         "oracle_utility_depth_local": 0.0,
                         "oracle_utility_loss_local": 0.0,
-                        "delta_time_ms": 0.0,
+                        "delta_time_ms": float(cost_estimates_us[idx] / 1000.0),
+                        "action_cost_ms": float(cost_estimates_us[idx] / 1000.0),
                         "measured_trial_cost_ms": 0.0,
+                        "trial_wallclock_ms": 0.0,
                         "modeled_marginal_cost_us": float(cost_estimates_us[idx]),
                         "n_influence_pixels": 0,
                         "filtered": True,
@@ -923,11 +958,18 @@ class OracleUtilityExperiment:
                 
             snapshot = self.snapshot_state()
             try:
-                metrics = self.optimize_gaussian_group(
-                    group, self.n_opt_steps, rgb, depth, influence_mask)
+                # Cost Oracle: calculate selective action cost for the active group
+                group_action_cost_us = float(cost_estimates_us[group].sum().item())
+                group_action_cost_ms = max(1e-6, group_action_cost_us / 1000.0)
                 
-                trial_cost = metrics['measured_trial_cost_ms']
-                per_gauss_cost = trial_cost / len(group)
+                metrics = self.optimize_gaussian_group(
+                    group, self.n_opt_steps, rgb, depth, influence_mask,
+                    action_cost_ms=group_action_cost_ms
+                )
+                
+                trial_wallclock = metrics['measured_trial_cost_ms']
+                per_gauss_wallclock = trial_wallclock / len(group)
+                per_gauss_action_cost = group_action_cost_ms / len(group)
                 delta_q_global = metrics['delta_quality_global']
                 delta_q_local = metrics['delta_quality_local']
                 
@@ -978,7 +1020,9 @@ class OracleUtilityExperiment:
                             "loss_before": float(metrics['loss_global_before']),
                             "loss_after": float(metrics['loss_global_after']),
                             "delta_loss": float(metrics['delta_loss_global']),
-                            "measured_trial_cost_ms": float(trial_cost),
+                            "measured_trial_cost_ms": float(trial_wallclock),
+                            "trial_wallclock_ms": float(trial_wallclock),
+                            "action_cost_ms": float(group_action_cost_ms),
                             "psnr_local_before": float(metrics['psnr_local_before']),
                             "psnr_local_after": float(metrics['psnr_local_after']),
                             "delta_psnr_local": float(metrics['delta_psnr_local']),
@@ -1002,8 +1046,10 @@ class OracleUtilityExperiment:
                         "delta_loss": float(metrics['delta_loss_global']),
                         "delta_quality": float(delta_q_global),
                         "delta_quality_global": float(delta_q_global),
-                        "delta_time_ms": float(per_gauss_cost),
-                        "measured_trial_cost_ms": float(per_gauss_cost),
+                        "delta_time_ms": float(per_gauss_action_cost),
+                        "action_cost_ms": float(per_gauss_action_cost),
+                        "measured_trial_cost_ms": float(per_gauss_wallclock),
+                        "trial_wallclock_ms": float(per_gauss_wallclock),
                         "modeled_marginal_cost_us": float(cost_estimates_us[idx]),
                         "oracle_utility": float(metrics['oracle_utility_joint_global']),
                         "oracle_utility_joint": float(metrics['oracle_utility_joint_global']),
@@ -1396,6 +1442,158 @@ class OracleUtilityExperiment:
                 'max': float(np.max(delta_q)),
             }
         }
+
+    def greedy_contextual_oracle_selection(
+        self,
+        candidate_indices: List[int],
+        budget_ms: float,
+        rgb: torch.Tensor,
+        depth: torch.Tensor,
+        n_steps: int = 5,
+    ) -> Tuple[List[int], Dict[str, Any]]:
+        """Greedy Contextual Oracle Reference for budgeted subset selection.
+
+        Because Gaussian marginal utility is non-additive (U(S) != \\sum U_i),
+        pointwise top-K ranking is NOT a combinatorial upper bound (as evidenced
+        by empirical OSE > 1.0 cases).
+        This greedy contextual oracle iteratively selects:
+            i_t = argmax_{i not in S_t, C(S_t U {i}) <= B} Delta Q(i | S_t) / Delta C(i | S_t)
+            S_{t+1} = S_t U {i_t}
+        providing an authoritative contextual reference subset S*_greedy.
+        """
+        model = self.pipeline.gaussian_model
+        device = rgb.device
+        selected_subset: List[int] = []
+        accumulated_cost_ms = 0.0
+        remaining_candidates = list(candidate_indices)
+        
+        base_snapshot = self.snapshot_state()
+        step_history = []
+        
+        while remaining_candidates and accumulated_cost_ms < budget_ms:
+            best_cand = None
+            best_density = -float('inf')
+            best_cand_cost_ms = 0.0
+            best_dq = 0.0
+            
+            self.restore_state(base_snapshot)
+            full_mask = torch.ones(rgb.shape[0], rgb.shape[1], dtype=torch.bool, device=device)
+            if selected_subset:
+                res_context = self.optimize_gaussian_group(
+                    selected_subset, n_steps=n_steps, rgb=rgb, depth=depth,
+                    influence_mask=full_mask
+                )
+                q_context = res_context['delta_quality_global']
+            else:
+                q_context = 0.0
+                
+            snapshot_context = self.snapshot_state()
+            
+            for cand in remaining_candidates:
+                test_group = selected_subset + [cand]
+                from .scheduler import estimate_gaussian_costs
+                c_us = estimate_gaussian_costs(
+                    n_gaussians=1, n_micro_steps=n_steps, device=device
+                ).sum().item()
+                c_ms = max(1e-6, c_us / 1000.0)
+                
+                if accumulated_cost_ms + c_ms > budget_ms:
+                    continue
+                    
+                self.restore_state(snapshot_context)
+                res_cand = self.optimize_gaussian_group(
+                    test_group, n_steps=n_steps, rgb=rgb, depth=depth,
+                    influence_mask=full_mask, action_cost_ms=c_ms
+                )
+                q_cand = res_cand['delta_quality_global']
+                dq_conditional = q_cand - q_context
+                density = dq_conditional / c_ms
+                
+                if density > best_density:
+                    best_density = density
+                    best_cand = cand
+                    best_cand_cost_ms = c_ms
+                    best_dq = dq_conditional
+                    
+            self.restore_state(base_snapshot)
+            
+            if best_cand is None or best_density <= -1e-6:
+                break
+                
+            selected_subset.append(best_cand)
+            remaining_candidates.remove(best_cand)
+            accumulated_cost_ms += best_cand_cost_ms
+            step_history.append({
+                'gaussian_id': best_cand,
+                'marginal_gain': best_dq,
+                'action_cost_ms': best_cand_cost_ms,
+                'utility_density': best_density,
+                'accumulated_cost_ms': accumulated_cost_ms,
+            })
+            
+        self.restore_state(base_snapshot)
+        if selected_subset:
+            final_res = self.optimize_gaussian_group(
+                selected_subset, n_steps=n_steps, rgb=rgb, depth=depth,
+                influence_mask=torch.ones(rgb.shape[0], rgb.shape[1], dtype=torch.bool, device=device),
+                action_cost_ms=accumulated_cost_ms
+            )
+            final_dq = final_res['delta_quality_global']
+            final_dpsnr = final_res['delta_psnr_global']
+        else:
+            final_dq = 0.0
+            final_dpsnr = 0.0
+            
+        self.restore_state(base_snapshot)
+        
+        summary = {
+            'selected_subset': selected_subset,
+            'total_cost_ms': accumulated_cost_ms,
+            'realized_delta_quality': final_dq,
+            'realized_delta_psnr': final_dpsnr,
+            'step_history': step_history,
+        }
+        return selected_subset, summary
+
+    def exact_subset_search(
+        self,
+        candidate_indices: List[int],
+        budget_ms: float,
+        rgb: torch.Tensor,
+        depth: torch.Tensor,
+        n_steps: int = 5,
+    ) -> Tuple[List[int], float]:
+        """Exact combinatorial search for optimal subset on small candidate pools (N <= 15)."""
+        import itertools
+        from .scheduler import estimate_gaussian_costs
+        device = rgb.device
+        base_snapshot = self.snapshot_state()
+        full_mask = torch.ones(rgb.shape[0], rgb.shape[1], dtype=torch.bool, device=device)
+        
+        best_subset = []
+        best_dq = -float('inf')
+        
+        c_us = estimate_gaussian_costs(
+            n_gaussians=1, n_micro_steps=n_steps, device=device
+        ).sum().item()
+        c_ms = max(1e-6, c_us / 1000.0)
+        max_k = min(len(candidate_indices), int(budget_ms / c_ms))
+        
+        for k in range(1, max_k + 1):
+            for subset in itertools.combinations(candidate_indices, k):
+                sub_list = list(subset)
+                self.restore_state(base_snapshot)
+                res = self.optimize_gaussian_group(
+                    sub_list, n_steps=n_steps, rgb=rgb, depth=depth,
+                    influence_mask=full_mask, action_cost_ms=c_ms * k
+                )
+                dq = res['delta_quality_global']
+                if dq > best_dq:
+                    best_dq = dq
+                    best_subset = sub_list
+                    
+        self.restore_state(base_snapshot)
+        return best_subset, best_dq
 
     def export_oracle_dataset(self, results: List[Dict], save_path: str):
         """Export tabular dataset rows X_i → Y_i for Offline Learned Utility modeling (Point 38, Step 2)."""

@@ -42,6 +42,8 @@ splits:
     - "tum_fr2_xyz"
 
 oracle_specification:
+  quality_mode: "EXACT"           # Authoritative oracle quality strictly requires exact full rendering (no affine compositing)
+  cost_mode: "calibrated_action"  # Decoupled selective action cost: U* = Delta_Q_exact / Delta_C_action
   n_opt_steps: 5
   optimizer: "SelectiveAdam"
   learning_rate: 0.001

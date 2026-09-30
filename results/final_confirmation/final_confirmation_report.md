@@ -13,17 +13,23 @@
 | `ours` | 19.24 ± 0.05 | 17.64 ± 0.50 | 0.8433 | 8.7 | 39,250 |
 | `full` | 21.03 ± 0.04 | 19.31 ± 0.68 | 0.8767 | 5.8 | 150,000 |
 
-## 2. Paired Significance Tests (OURS vs each baseline)
+## 2. Paired Significance Tests (Family of Comparisons against OURS, Holm-Corrected)
 
-| Comparison | Δ Mean PSNR | 95% CI | p-value | Cohen's d | Δ Final PSNR | p-value | Δ SSIM |
-|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| OURS vs `no_op` | +5.80 dB | [+5.76, +5.83] | 0.0078 ✅ | 111.39 | +5.89 dB | 0.0078 | +0.4055 |
-| OURS vs `error_only` | +3.70 dB | [+3.65, +3.74] | 0.0078 ✅ | 54.98 | +4.87 dB | 0.0078 | +0.2725 |
-| OURS vs `error_influence` | +2.87 dB | [+2.83, +2.92] | 0.0078 ✅ | 38.42 | +4.11 dB | 0.0078 | +0.1054 |
-| OURS vs `error_influence_temporal` | +2.97 dB | [+2.92, +3.01] | 0.0078 ✅ | 41.87 | +4.13 dB | 0.0078 | +0.1088 |
-| OURS vs `full` | -1.78 dB | [-1.83, -1.75] | 0.0078 ✅ | -29.00 | -1.67 dB | 0.0078 | -0.0334 |
+| Comparison | Δ Mean PSNR | 95% CI | Raw p | Holm p | Paired Cohen's $d_z$ | Δ Final PSNR | Final Holm p | Δ SSIM |
+|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| OURS vs `no_op` | +5.80 dB | [+5.76, +5.83] | 0.0078 | 0.0391 ✅ | 111.39 | +5.89 dB | 0.0391 ✅ | +0.4055 |
+| OURS vs `error_only` | +3.70 dB | [+3.65, +3.74] | 0.0078 | 0.0313 ✅ | 54.98 | +4.87 dB | 0.0313 ✅ | +0.2725 |
+| OURS vs `error_influence` | +2.87 dB | [+2.83, +2.92] | 0.0078 | 0.0234 ✅ | 38.42 | +4.11 dB | 0.0234 ✅ | +0.1054 |
+| OURS vs `error_influence_temporal` | +2.97 dB | [+2.92, +3.01] | 0.0078 | 0.0156 ✅ | 41.87 | +4.13 dB | 0.0156 ✅ | +0.1088 |
+| OURS vs `full` | -1.78 dB | [-1.83, -1.75] | 0.0078 | 0.0078 ✅ | -29.00 | -1.67 dB | 0.0078 ✅ | -0.0334 |
 
-## 3. OURS Definition
+## 3. Headroom Recovery & Substrate Metrics
+
+- **Gap to Unconstrained FULL:** **1.79 dB** ($21.03 - 19.24\,\mathrm{dB}$) while operating $50\%$ faster ($8.7$ vs $5.8\,\mathrm{FPS}$) with a **3.8× smaller map** ($39\mathrm{k}$ vs $150\mathrm{k}$ primitives).
+- **Headroom Recovery Ratio:** $\eta = \frac{Q_{\mathrm{OURS}} - Q_{\mathrm{no\_op}}}{Q_{\mathrm{full}} - Q_{\mathrm{no\_op}}} = \frac{19.24 - 13.45}{21.03 - 13.45} = \mathbf{76.4\%}$.
+  *(Note: PSNR is logarithmic dB; we report normalized headroom recovery rather than the unnormalized ratio).*
+
+## 4. OURS Definition
 
 ```
 OURS = Error-Influence-Temporal selection + Coverage Throttling + Backlog Throttling
