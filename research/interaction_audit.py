@@ -162,13 +162,14 @@ class InteractionAuditExperiment:
         import random
         random.seed(self.config.seed)
         
+        bins = list(self.config.overlap_bins.keys())
+        quota_per_bin = max(1, self.config.n_pairs // len(bins))
+        bin_counts = {b: 0 for b in bins}
         pairs = []
-        n_pool = len(candidate_pool)
+        sampled = set()
         
         attempts = 0
-        max_attempts = self.config.n_pairs * 10
-        
-        sampled = set()
+        max_attempts = self.config.n_pairs * 50
         
         while len(pairs) < self.config.n_pairs and attempts < max_attempts:
             attempts += 1
@@ -181,14 +182,20 @@ class InteractionAuditExperiment:
                 continue
                 
             iou = self.compute_pairwise_iou(i, j, contrib_indices, contrib_weights)
-            conflict_info = self.compute_depth_conflict(i, j, positions)
             
-            overlap_bin = 'low'
+            overlap_bin = None
             for bin_name, (low, high) in self.config.overlap_bins.items():
                 if low <= iou <= high:
                     overlap_bin = bin_name
                     break
-                    
+            if overlap_bin is None:
+                continue
+                
+            # Enforce quota per stratum to prevent imbalanced representation
+            if bin_counts[overlap_bin] >= quota_per_bin and len(pairs) < (len(bins) * quota_per_bin):
+                continue
+                
+            conflict_info = self.compute_depth_conflict(i, j, positions)
             pairs.append({
                 'idx_i': i,
                 'idx_j': j,
@@ -198,6 +205,7 @@ class InteractionAuditExperiment:
                 'depth_diff': conflict_info['depth_diff']
             })
             sampled.add(pair_key)
+            bin_counts[overlap_bin] += 1
             
         return pairs
     
@@ -218,18 +226,13 @@ class InteractionAuditExperiment:
             if low <= iou <= high:
                 valid_context.append(c_idx)
                 
+        # Strict Stratum Preservation: Never backfill with out-of-stratum random candidates.
+        # Contaminating a requested high-overlap context with random unrelated candidates creates stratum mislabeling.
         if len(valid_context) < context_size:
-            available = [c for c in candidate_pool if c != candidate_idx and c not in valid_context]
-            needed = context_size - len(valid_context)
-            if len(available) >= needed:
-                valid_context.extend(random.sample(available, needed))
-            else:
-                valid_context.extend(available)
-                
-        if not valid_context:
+            # If not enough candidates exist within the requested stratum, return empty list or fail cleanly
             return []
             
-        return random.sample(valid_context, min(context_size, len(valid_context)))
+        return random.sample(valid_context, context_size)
     
     def run_pair_interaction_audit(
         self, rgb_gt: torch.Tensor, depth_gt: torch.Tensor, contrib_indices: torch.Tensor, contrib_weights: torch.Tensor,

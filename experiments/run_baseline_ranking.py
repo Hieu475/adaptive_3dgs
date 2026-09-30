@@ -84,7 +84,7 @@ def evaluate_ranking_policy(
     gain_pol_20 = delta_qs[list(top_pol_20)].sum()
     gain_ora_20 = delta_qs[list(top_ora_20)].sum()
     
-    ose_20 = float(gain_pol_20 / (gain_ora_20 + 1e-8)) if gain_ora_20 > 0 else 1.0
+    ose_20 = float(gain_pol_20 / (gain_ora_20 + 1e-8)) if gain_ora_20 > 0 else float('nan')
     regret_20_abs = float(gain_ora_20 - gain_pol_20)
     
     ndcg_10 = compute_ndcg(scores, oracle_joint, k10)

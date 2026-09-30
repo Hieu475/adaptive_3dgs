@@ -74,9 +74,15 @@ def build_pipeline_config(
     W: int = 320,
     H: int = 240,
     device: str = "cuda",
+    throttling: Optional[bool] = None,
+    use_learned_utility: Optional[bool] = None,
 ) -> Dict[str, Any]:
-    """Build standardized pipeline config for Phase 13 benchmark."""
+    """Build standardized pipeline config for Phase 13 benchmark and factorial ablations."""
     is_ours = policy in ["ours", "budget_aware", OptimizationPolicy.OURS.value, OptimizationPolicy.BUDGET_AWARE.value]
+    apply_throttling = throttling if throttling is not None else is_ours
+    use_learned = use_learned_utility if use_learned_utility is not None else (
+        policy in ["learned_utility", OptimizationPolicy.LEARNED_UTILITY.value]
+    )
     return {
         "seed": seed,
         "system": {
@@ -108,10 +114,11 @@ def build_pipeline_config(
             "cost_per_gaussian_us": 0.10 if device.startswith("cuda") else 2.0,
             "optimize_ratio": 0.50,
             "use_knapsack": True,
+            "use_learned_utility": use_learned,
             # OURS: no warmup (ablation: warmup hurts -0.75 dB)
             "enable_warmup": False,
             "warmup_budget_ratio": 0.0,
-            "max_warmup_queue": 500 if is_ours else 999999,  # backlog throttle for OURS
+            "max_warmup_queue": 500 if apply_throttling else 999999,  # backlog throttle
         },
         "training": {
             "n_micro_steps": 5,
@@ -131,8 +138,8 @@ def build_pipeline_config(
             "max_new_per_frame": 4000,
             "strategy": "importance",
             "use_adaptive_thresholds": True,
-            # OURS: coverage throttling (ablation: +1.04 dB)
-            "enable_coverage_throttling": is_ours,
+            # Coverage throttling: halving/capping expansion in mature regions
+            "enable_coverage_throttling": apply_throttling,
             "throttle_coverage_threshold": 0.90,
             "throttle_factor": 0.20,
         },

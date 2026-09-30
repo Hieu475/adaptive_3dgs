@@ -79,6 +79,7 @@ class OracleUtilityExperiment:
         group_size: int = 1,
         min_influence_pixels: int = 25,
         protocol: Optional[Dict[str, Any]] = None,
+        use_exact_render: bool = False,
     ):
         """
         Args:
@@ -116,6 +117,7 @@ class OracleUtilityExperiment:
         self.contribution_threshold = contribution_threshold
         self.group_size = group_size
         self.min_influence_pixels = min_influence_pixels
+        self.use_exact_render = use_exact_render
         torch.manual_seed(seed)
         np.random.seed(seed)
 
@@ -328,13 +330,16 @@ class OracleUtilityExperiment:
             trial_opt.zero_grad()
             active_subset = model.get_optimization_subset(opt_mask)
             
-            comp_out = trial_cache.composite_with_active(
-                active_subset=active_subset,
-                extrinsics=self.pipeline.current_pose,
-                intrinsics=self.pipeline.intrinsics,
-                image_width=W,
-                image_height=H,
-            )
+            if self.use_exact_render:
+                comp_out = self._render(H, W)
+            else:
+                comp_out = trial_cache.composite_with_active(
+                    active_subset=active_subset,
+                    extrinsics=self.pipeline.current_pose,
+                    intrinsics=self.pipeline.intrinsics,
+                    image_width=W,
+                    image_height=H,
+                )
             
             # Loss formulation
             if n_influence_pixels > 0 and n_influence_pixels < H * W * 0.8:

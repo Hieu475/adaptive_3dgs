@@ -36,13 +36,17 @@ def compute_error_masks(
     Returns:
         Dict with 'color_mask', 'depth_mask', 'transmission_mask', 'combined_mask'
     """
-    # Prevent stacking redundant Gaussians on surfaces that are already solidly covered (transmission < 0.20)
+    # Missing/inaccurate geometry:
+    # 1. High transmission (see-through rays where geometry has not yet formed)
+    # 2. Depth discrepancy (foreground objects like chair legs, table drawer fronts, occlusions
+    #    where sensor depth is closer or significantly different from rendered depth, regardless of background solidity)
+    # 3. Color error on surfaces not yet solidly covered (avoids stacking duplicate points on already well-converged geometry)
     not_solid = transmission >= 0.20
     color_mask = (color_err > color_threshold) & not_solid
-    depth_mask = (depth_err > depth_threshold) & not_solid
+    depth_mask = depth_err > depth_threshold
     transmission_mask = transmission > transmission_threshold
     
-    # Combined: only densify where geometry is missing or not yet solidly covered
+    # Combined: densify missing surfaces, thin structures, and geometric discrepancies
     combined = transmission_mask | depth_mask | color_mask
     
     return {

@@ -132,7 +132,7 @@ def evaluate_frame_selection(
     realized_dq = float(np.sum(delta_q[policy_selected])) if policy_selected else 0.0
     actual_t = float(np.sum(costs_ms[policy_selected])) if policy_selected else 0.0
 
-    ose = float(realized_dq / oracle_dq) if oracle_dq > 1e-7 else 1.0
+    ose = float(realized_dq / oracle_dq) if oracle_dq > 1e-7 else float('nan')
     dq_per_ms = float(realized_dq / actual_t) if actual_t > 0.0 else 0.0
     ndcg = compute_ndcg_at_k(scores, oracle_u, k=min(k, N))
 

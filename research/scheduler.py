@@ -507,13 +507,15 @@ class BudgetScheduler:
             return mask
 
         elif policy_str in ("learned_utility", OptimizationPolicy.LEARNED_UTILITY.value):
-            if utility_scores is not None:
-                if utility_scores.shape[0] < N:
-                    eff = torch.cat([utility_scores, torch.zeros(N - utility_scores.shape[0], device=device)])
-                else:
-                    eff = utility_scores[:N]
+            if utility_scores is None:
+                raise ValueError(
+                    "Optimization policy 'learned_utility' strictly requires valid 'utility_scores' "
+                    "from a trained predictor, but utility_scores was None. Silent fallback is prohibited."
+                )
+            if utility_scores.shape[0] < N:
+                eff = torch.cat([utility_scores, torch.zeros(N - utility_scores.shape[0], device=device)])
             else:
-                eff = (importance_scores / (cost_estimates + 1e-6))
+                eff = utility_scores[:N]
             return _pack_by_scores(
                 scores=eff,
                 costs=cost_estimates,

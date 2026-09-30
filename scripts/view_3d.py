@@ -30,11 +30,11 @@ import trimesh
 import logging
 import websockets.asyncio.server
 
-# 1. Increase Viser WebSocket max_size from 50MB to 250MB to handle large 3DGS point sets (> 1.4M splats)
+# 1. Increase Viser WebSocket max_size from 50MB to 500MB to handle large 3DGS point sets (> 2.5M splats)
 _orig_serve = websockets.asyncio.server.serve
 def _patched_serve(*args, **kwargs):
     if 'max_size' in kwargs:
-        kwargs['max_size'] = 250 * 1024 * 1024
+        kwargs['max_size'] = 500 * 1024 * 1024
     return _orig_serve(*args, **kwargs)
 websockets.asyncio.server.serve = _patched_serve
 
@@ -269,7 +269,7 @@ def main():
                         help="Path to .ply file or demo_output scene directory")
     parser.add_argument("--port", type=int, default=8080, help="Web viewer port (default: 8080)")
     parser.add_argument("--point_size", type=float, default=0.015, help="Initial point cloud size (default: 0.015)")
-    parser.add_argument("--splat_scale", type=float, default=1.0, help="Initial Gaussian splat scale factor (default: 1.0)")
+    parser.add_argument("--splat_scale", type=float, default=0.8, help="Initial Gaussian splat scale factor (default: 0.8 for crisp rendering)")
     parser.add_argument("--no_browser", action="store_true", help="Don't auto-open web browser")
     args = parser.parse_args()
 
@@ -337,7 +337,7 @@ def main():
             "Splat Scale", min=0.1, max=3.0, step=0.05, initial_value=args.splat_scale
         )
         opacity_slider = server.gui.add_slider(
-            "Min Opacity Filter", min=0.0, max=0.95, step=0.01, initial_value=0.0
+            "Min Opacity Filter", min=0.0, max=0.95, step=0.01, initial_value=0.10
         )
         point_size_slider = server.gui.add_slider(
             "Point Size", min=0.001, max=0.05, step=0.001, initial_value=args.point_size

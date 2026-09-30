@@ -297,12 +297,16 @@ class ConditionalOracleExperiment:
         # Cost validity protocol:
         # ΔT = T(S ∪ {i}) - T(S) must physically be > 0.
         # If ΔT <= 0 due to GPU timing noise/jitter, mark invalid and use regularized baseline cost
-        delta_t_valid = bool(delta_t_conditional_ms > 0.0)
+        delta_t_valid = bool(delta_t_conditional_ms > 1e-4)
         if delta_t_valid:
             effective_delta_t_ms = delta_t_conditional_ms
         else:
-            # Standalone single cost fallback if S was non-empty, else eps floor
-            effective_delta_t_ms = max(eps, 1.0)
+            # Deterministic compute accounting fallback: cost of 1 Gaussian update (n_opt_steps * step_cost)
+            # Avoids unphysical 1.0ms discontinuity when timing jitter occurs.
+            calibrated_step_us = 100.0
+            if hasattr(self.pipeline, 'scheduler') and hasattr(self.pipeline.scheduler, 'cost_per_gaussian_us'):
+                calibrated_step_us = float(self.pipeline.scheduler.cost_per_gaussian_us)
+            effective_delta_t_ms = max(eps, (calibrated_step_us * self.config.n_opt_steps) / 1000.0)
 
         utility_conditional = delta_q_conditional / effective_delta_t_ms
 

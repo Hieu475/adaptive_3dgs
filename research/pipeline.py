@@ -116,13 +116,28 @@ class OnlineReconstructionPipeline:
         self._predicted_delta_t: Optional[torch.Tensor] = None
         policy_cfg = self.config.get('scheduler', {}).get('policy', 'budget_aware')
         use_learned = self.config.get('scheduler', {}).get('use_learned_utility', False)
+        if policy_cfg in ("learned_utility", OptimizationPolicy.LEARNED_UTILITY.value):
+            use_learned = True
+
         if use_learned:
+            seed = self.config.get('seed', 42)
             try:
-                seed = self.config.get('seed', 42)
                 self.utility_predictor = FrozenUtilityPredictor(seed=seed, device=device)
-            except Exception as e:
                 import logging
-                logging.getLogger(__name__).warning(f"Could not load FrozenUtilityPredictor for seed: {e}")
+                logging.getLogger(__name__).info(
+                    f"[Pipeline] Successfully loaded FrozenUtilityPredictor for seed {seed} (in_features={self.utility_predictor.in_features})."
+                )
+            except Exception as e:
+                if policy_cfg in ("learned_utility", OptimizationPolicy.LEARNED_UTILITY.value):
+                    raise RuntimeError(
+                        f"Policy '{policy_cfg}' strictly requires FrozenUtilityPredictor for seed {seed}, "
+                        f"but loading failed: {e}. Aborting to avoid invalid fallback."
+                    )
+                import logging
+                logging.getLogger(__name__).warning(
+                    f"[Pipeline] Could not load FrozenUtilityPredictor for seed {seed}: {e}. "
+                    f"Policy '{policy_cfg}' will operate in HEURISTIC mode, NOT learned utility."
+                )
                 self.utility_predictor = None
         
         # Optional LPIPS Perceptual Metric
@@ -737,8 +752,8 @@ class OnlineReconstructionPipeline:
         elif policy in ("full", OptimizationPolicy.FULL.value):
             optimize_mask = torch.ones(N_updated, dtype=torch.bool, device=self.device)
             k_alloc = None
-        elif use_adaptive_k and self.optimizer is not None and policy in ("ours", "budget_aware", OptimizationPolicy.OURS.value, OptimizationPolicy.BUDGET_AWARE.value):
-            if policy in ("ours", OptimizationPolicy.OURS.value) and self._learned_utility_scores is not None:
+        elif use_adaptive_k and self.optimizer is not None and policy in ("ours", "budget_aware", "learned_utility", OptimizationPolicy.OURS.value, OptimizationPolicy.BUDGET_AWARE.value, OptimizationPolicy.LEARNED_UTILITY.value):
+            if policy in ("ours", "learned_utility", OptimizationPolicy.OURS.value, OptimizationPolicy.LEARNED_UTILITY.value) and self._learned_utility_scores is not None:
                 step_importance = self._learned_utility_scores
             elif error_influence_temporal_scores is not None:
                 step_importance = error_influence_temporal_scores

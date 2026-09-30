@@ -127,7 +127,8 @@ class ConditionalDatasetGenerator:
         mean_iou = np.mean(ious) if ious else 0.0
         max_iou = np.max(ious) if ious else 0.0
         mean_depth_conflict = np.mean(depth_conflicts) if depth_conflicts else 0.0
-        alpha_competition = mean_iou  # As specified
+        # Multiplicity of overlapping primitives: sum of IoU across S (independent from mean_iou)
+        alpha_competition = float(np.sum(ious)) if ious else 0.0
         
         redundant_pixels = (cand_mask & S_union_mask).sum().item()
         attribution_redundancy = redundant_pixels / max(cand_pixels, 1)
@@ -140,9 +141,10 @@ class ConditionalDatasetGenerator:
             attribution_redundancy
         ], dtype=np.float32)
         
-        # 3. Set metadata (2 dims)
+        # 3. Set metadata (2 dims): size of set |S| and capacity fraction
         set_size = len(context_indices)
-        budget_fraction = set_size / 200.0  # arbitrary normalization, assuming max budget 200
+        max_pool_capacity = float(self.config.n_candidates) if hasattr(self.config, 'n_candidates') and self.config.n_candidates > 0 else 50.0
+        budget_fraction = float(np.clip(set_size / max_pool_capacity, 0.0, 1.0))
         meta = np.array([set_size, budget_fraction], dtype=np.float32)
         
         h_S = np.concatenate([agg_stats, inter_desc, meta])

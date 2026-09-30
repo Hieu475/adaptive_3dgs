@@ -75,7 +75,7 @@ def evaluate_method_budgets(
         overlap = len(top_pred & top_ora) / k
         gain_pred = float(delta_q[list(top_pred)].sum())
         gain_ora = float(delta_q[list(top_ora)].sum())
-        ose = float(gain_pred / (gain_ora + 1e-8)) if gain_ora > 0 else 1.0
+        ose = float(gain_pred / (gain_ora + 1e-8)) if gain_ora > 0 else float('nan')
         regret = float(gain_ora - gain_pred)
         ndcg = compute_ndcg_at_k(pred_u, oracle_u, k)
 
@@ -85,7 +85,7 @@ def evaluate_method_budgets(
         sel_ora, c_ora = select_candidates(oracle_u, costs, budget_val)
         gain_bg_pred = float(delta_q[sel_pred].sum()) if len(sel_pred) > 0 else 0.0
         gain_bg_ora = float(delta_q[sel_ora].sum()) if len(sel_ora) > 0 else 0.0
-        ose_bg = float(gain_bg_pred / (gain_bg_ora + 1e-8)) if gain_bg_ora > 0 else 1.0
+        ose_bg = float(gain_bg_pred / (gain_bg_ora + 1e-8)) if gain_bg_ora > 0 else float('nan')
         regret_bg = float(gain_bg_ora - gain_bg_pred)
 
         budget_results[pct_label] = {

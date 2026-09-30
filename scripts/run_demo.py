@@ -264,11 +264,11 @@ def main():
     else:
         n_frames = args.n_frames
 
-    # Stride calculation: use stride 2 for full_room/native so frame 0 doesn't hoard all Gaussians
+    # Stride calculation: use stride 3 for full_room Replica, 2 for TUM so initial frame doesn't hoard budget
     if args.stride is not None:
         stride = args.stride
     elif args.full_room:
-        stride = 2
+        stride = 2  # Dense 2px grid for thin structures, chair legs, and sharp edges
     elif args.native:
         stride = 2
     elif args.high_res or args.dense:
@@ -280,7 +280,7 @@ def main():
     if args.max_gaussians is not None:
         max_gaussians = args.max_gaussians
     elif args.full_room:
-        max_gaussians = 1500000
+        max_gaussians = 2500000
     elif args.native:
         max_gaussians = 1200000 if args.scene.startswith("replica_") else 500000
     elif args.high_res or args.dense:
@@ -347,13 +347,13 @@ def main():
     cfg["training"]["n_micro_steps"] = args.steps
     cfg["gaussian"]["init_stride"] = stride
     cfg["gaussian"]["max_gaussians"] = max_gaussians
-    if args.high_res or args.native or args.full_room:
-        cfg["gaussian"]["scale_pixel_multiplier"] = 2.0  # Solid footprint ensuring seamless overlap between splats
+    cfg["gaussian"]["scale_pixel_multiplier"] = 1.05  # Sharp, crisp splats avoiding blurry/fuzzy blobs
+    cfg["gaussian"]["initial_opacity"] = 0.85        # Solid, opaque primitives from creation
 
     if args.dense or args.full_room:
         cfg["densification"]["enable_coverage_throttling"] = False
         cfg["densification"]["enable_persistent_prune"] = False  # Keep full scene map intact throughout video
-        cfg["densification"]["max_new_per_frame"] = int(max_gaussians / max(n_frames, 1) * 1.35) if args.full_room else 25000
+        cfg["densification"]["max_new_per_frame"] = int(max_gaussians / max(n_frames, 1)) if args.full_room else 25000
         cfg["scheduler"]["max_warmup_queue"] = 999999
         cfg["scheduler"]["enable_warmup"] = False
 
@@ -413,6 +413,14 @@ def main():
             n_opt = 0
             wall_ms = init_time
         else:
+            # Dynamically balance densification budget across remaining frames
+            if args.dense or args.full_room:
+                remaining_frames = max(len(frames) - t, 1)
+                remaining_budget = max(0, max_gaussians - pipeline.gaussian_model.num_gaussians)
+                even_share = int(remaining_budget / remaining_frames)
+                dynamic_limit = max(3000, int(even_share * 1.15))
+                pipeline.config["densification"]["max_new_per_frame"] = min(dynamic_limit, remaining_budget)
+
             # Process incoming streaming frame
             metrics = pipeline.process_frame(
                 rgb=frames[t]["rgb"],
