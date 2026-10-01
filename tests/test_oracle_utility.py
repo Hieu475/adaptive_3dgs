@@ -409,11 +409,14 @@ def test_oracle_diminishing_marginal_returns():
     candidates = list(range(min(10, pipeline.gaussian_model.num_gaussians)))
     
     res = exp.evaluate_diminishing_returns(rgb, depth, candidate_indices=candidates, n_trials=3, size_a=2, size_b=4)
-    assert 'diminishing_rate' in res
+    assert 'within_tolerance_nonviolation_rate' in res
+    assert 'exact_inequality_rate' in res
+    assert 'exact_inequality_count' in res
     assert 'mean_marginal_gain_A' in res
     assert 'mean_marginal_gain_B' in res
-    assert 'is_diminishing_consistent' in res
-    assert 0.0 <= res['diminishing_rate'] <= 1.0
+    assert 'mean_supports_diminishing' in res
+    assert 0.0 <= res['within_tolerance_nonviolation_rate'] <= 1.0
+    assert 0.0 <= res['exact_inequality_rate'] <= 1.0
 
 
 def test_oracle_repeatability_cv_positive_negative():

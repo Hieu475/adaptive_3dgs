@@ -1,5 +1,12 @@
 {
- "adaptive": 29.445501903090815,
- "ours": 26.745929441066703,
- "error_only": 30.299698945247766
+ "adaptive": 29.427190609652587,
+ "ours": 26.757981319620153,
+ "error_only": 30.322859949535793,
+ "route_first_half": {
+  "error_only": 49
+ },
+ "route_second_half": {
+  "error_influence_temporal": 50
+ },
+ "n_frames": 99
 }

@@ -548,8 +548,9 @@ Evaluated empirical additivity ratio $R_{{\\text{{add}}}}(S) = \\frac{{\\Delta Q
 Tested whether $\\Delta_i(A) \\ge \\Delta_i(B)$ for nested subsets $A \\subset B$ ($|A| = {diminishing_returns_stats['size_A']}, |B| = {diminishing_returns_stats['size_B']}$):
 - **Mean Marginal Gain $\\Delta_i(A)$**: `{diminishing_returns_stats['mean_marginal_gain_A']:.6f}`
 - **Mean Marginal Gain $\\Delta_i(B)$**: `{diminishing_returns_stats['mean_marginal_gain_B']:.6f}`
-- **Empirical Diminishing Returns Rate**: `{diminishing_returns_stats['diminishing_rate']*100:.1f}%`
-- **Finding**: The experiments reveal substantial non-additivity and limited/mixed empirical evidence for diminishing marginal returns under the tested intervention protocol.
+- **Within-tolerance non-violation**: `{diminishing_returns_stats['within_tolerance_nonviolation_rate']*100:.1f}%`
+- **Exact inequality**: `{diminishing_returns_stats['exact_inequality_count']}`
+- **Finding**: The experiments reveal protocol-dependent interaction and no positive evidence for diminishing marginal returns under the tested intervention protocol (see results/gate1_headroom/).
 
 ---
 
