@@ -1,12 +1,22 @@
 {
  "experiment": "phase14_corrected",
- "status": "frozen-candidate",
+ "status": "frozen",
+ "freeze_tag": "phase14-corrected-frozen",
  "git": {
-  "sha": "6b089c29fe44edef1fce22b7ef8212767ed709ac",
+  "sha": "13d3c5000f9e0fc93dbb676ef3e407f955ef49f2",
   "branch": "phase13-cuda-acceleration",
-  "status_short": "M scripts/download_replica_scene.py\n M scripts/view_3d.py\n?? scripts/download_all_remaining_replica.py\n?? scripts/run_all_replica_suite.py\n?? scripts/upscale_all_replica_scenes.py"
+  "status_short": "M results/phase14_corrected/manifest.json\n M scripts/download_replica_scene.py\n M scripts/view_3d.py\n?? scripts/download_all_remaining_replica.py\n?? scripts/run_all_replica_suite.py\n?? scripts/upscale_all_replica_scenes.py",
+  "experiment_relevant_tree_clean": true,
+  "unrelated_worktree_changes": [
+   "M results/phase14_corrected/manifest.json",
+   " M scripts/download_replica_scene.py",
+   " M scripts/view_3d.py",
+   "?? scripts/download_all_remaining_replica.py",
+   "?? scripts/run_all_replica_suite.py",
+   "?? scripts/upscale_all_replica_scenes.py"
+  ]
  },
- "timestamp_utc": "2026-10-01T12:00:26.397490+00:00",
+ "timestamp_utc": "2026-10-01T14:18:43.741823+00:00",
  "dataset": {
   "tum_fr2_xyz": "datasets/TUM/rgbd_dataset_freiburg2_xyz",
   "replica_office0": "datasets/Replica/office0",
