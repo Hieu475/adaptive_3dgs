@@ -1,0 +1,308 @@
+note: exact dicts passed as custom_config (seed varies per run)
+policies:
+  error_influence:
+    densification:
+      enable_coverage_throttling: false
+      max_new_per_frame: 4000
+      strategy: importance
+      throttle_coverage_threshold: 0.9
+      throttle_factor: 0.2
+      use_adaptive_thresholds: true
+    gaussian:
+      init_refine_steps: 10
+      init_stride: 2
+      initial_opacity: 0.8
+      initial_scale: 0.02
+      max_gaussians: 150000
+      scale_mode: depth_adaptive
+      scale_pixel_multiplier: 1.5
+      sh_degree: 0
+    losses:
+      weight_color: 0.8
+      weight_depth: 0.5
+      weight_ssim: 0.2
+    rendering:
+      attribution_top_k: 4
+      backend: gsplat
+      image_height: 240
+      image_width: 320
+      tile_size: 16
+      use_fast_attribution: true
+      use_surface_aware_depth: false
+    scheduler:
+      cost_per_gaussian_us: 0.1
+      enable_warmup: false
+      gpu_budget_ms: 15.0
+      max_warmup_queue: 999999
+      optimize_ratio: 0.5
+      policy: error_influence
+      use_knapsack: true
+      use_learned_utility: false
+      warmup_budget_ratio: 0.0
+    seed: 42
+    system:
+      empty_cache_frequency: 10
+      max_vram_fraction: 0.7
+    training:
+      lr_color: 0.0025
+      lr_opacity: 0.05
+      lr_position: 0.00016
+      lr_rotation: 0.001
+      lr_scale: 0.005
+      n_micro_steps: 5
+      use_adaptive_k: false
+  error_only:
+    densification:
+      enable_coverage_throttling: false
+      max_new_per_frame: 4000
+      strategy: importance
+      throttle_coverage_threshold: 0.9
+      throttle_factor: 0.2
+      use_adaptive_thresholds: true
+    gaussian:
+      init_refine_steps: 10
+      init_stride: 2
+      initial_opacity: 0.8
+      initial_scale: 0.02
+      max_gaussians: 150000
+      scale_mode: depth_adaptive
+      scale_pixel_multiplier: 1.5
+      sh_degree: 0
+    losses:
+      weight_color: 0.8
+      weight_depth: 0.5
+      weight_ssim: 0.2
+    rendering:
+      attribution_top_k: 4
+      backend: gsplat
+      image_height: 240
+      image_width: 320
+      tile_size: 16
+      use_fast_attribution: true
+      use_surface_aware_depth: false
+    scheduler:
+      cost_per_gaussian_us: 0.1
+      enable_warmup: false
+      gpu_budget_ms: 15.0
+      max_warmup_queue: 999999
+      optimize_ratio: 0.5
+      policy: error_only
+      use_knapsack: true
+      use_learned_utility: false
+      warmup_budget_ratio: 0.0
+    seed: 42
+    system:
+      empty_cache_frequency: 10
+      max_vram_fraction: 0.7
+    training:
+      lr_color: 0.0025
+      lr_opacity: 0.05
+      lr_position: 0.00016
+      lr_rotation: 0.001
+      lr_scale: 0.005
+      n_micro_steps: 5
+      use_adaptive_k: false
+  full:
+    densification:
+      enable_coverage_throttling: false
+      max_new_per_frame: 4000
+      strategy: importance
+      throttle_coverage_threshold: 0.9
+      throttle_factor: 0.2
+      use_adaptive_thresholds: true
+    gaussian:
+      init_refine_steps: 10
+      init_stride: 2
+      initial_opacity: 0.8
+      initial_scale: 0.02
+      max_gaussians: 150000
+      scale_mode: depth_adaptive
+      scale_pixel_multiplier: 1.5
+      sh_degree: 0
+    losses:
+      weight_color: 0.8
+      weight_depth: 0.5
+      weight_ssim: 0.2
+    rendering:
+      attribution_top_k: 4
+      backend: gsplat
+      image_height: 240
+      image_width: 320
+      tile_size: 16
+      use_fast_attribution: true
+      use_surface_aware_depth: false
+    scheduler:
+      cost_per_gaussian_us: 0.1
+      enable_warmup: false
+      gpu_budget_ms: 15.0
+      max_warmup_queue: 999999
+      optimize_ratio: 0.5
+      policy: full
+      use_knapsack: true
+      use_learned_utility: false
+      warmup_budget_ratio: 0.0
+    seed: 42
+    system:
+      empty_cache_frequency: 10
+      max_vram_fraction: 0.7
+    training:
+      lr_color: 0.0025
+      lr_opacity: 0.05
+      lr_position: 0.00016
+      lr_rotation: 0.001
+      lr_scale: 0.005
+      n_micro_steps: 5
+      use_adaptive_k: false
+  no_op:
+    densification:
+      enable_coverage_throttling: false
+      max_new_per_frame: 4000
+      strategy: importance
+      throttle_coverage_threshold: 0.9
+      throttle_factor: 0.2
+      use_adaptive_thresholds: true
+    gaussian:
+      init_refine_steps: 10
+      init_stride: 2
+      initial_opacity: 0.8
+      initial_scale: 0.02
+      max_gaussians: 150000
+      scale_mode: depth_adaptive
+      scale_pixel_multiplier: 1.5
+      sh_degree: 0
+    losses:
+      weight_color: 0.8
+      weight_depth: 0.5
+      weight_ssim: 0.2
+    rendering:
+      attribution_top_k: 4
+      backend: gsplat
+      image_height: 240
+      image_width: 320
+      tile_size: 16
+      use_fast_attribution: true
+      use_surface_aware_depth: false
+    scheduler:
+      cost_per_gaussian_us: 0.1
+      enable_warmup: false
+      gpu_budget_ms: 15.0
+      max_warmup_queue: 999999
+      optimize_ratio: 0.5
+      policy: no_op
+      use_knapsack: true
+      use_learned_utility: false
+      warmup_budget_ratio: 0.0
+    seed: 42
+    system:
+      empty_cache_frequency: 10
+      max_vram_fraction: 0.7
+    training:
+      lr_color: 0.0025
+      lr_opacity: 0.05
+      lr_position: 0.00016
+      lr_rotation: 0.001
+      lr_scale: 0.005
+      n_micro_steps: 5
+      use_adaptive_k: false
+  ours:
+    densification:
+      enable_coverage_throttling: true
+      max_new_per_frame: 4000
+      strategy: importance
+      throttle_coverage_threshold: 0.9
+      throttle_factor: 0.2
+      use_adaptive_thresholds: true
+    gaussian:
+      init_refine_steps: 10
+      init_stride: 2
+      initial_opacity: 0.8
+      initial_scale: 0.02
+      max_gaussians: 150000
+      scale_mode: depth_adaptive
+      scale_pixel_multiplier: 1.5
+      sh_degree: 0
+    losses:
+      weight_color: 0.8
+      weight_depth: 0.5
+      weight_ssim: 0.2
+    rendering:
+      attribution_top_k: 4
+      backend: gsplat
+      image_height: 240
+      image_width: 320
+      tile_size: 16
+      use_fast_attribution: true
+      use_surface_aware_depth: false
+    scheduler:
+      cost_per_gaussian_us: 0.1
+      enable_warmup: false
+      gpu_budget_ms: 15.0
+      max_warmup_queue: 500
+      optimize_ratio: 0.5
+      policy: ours
+      use_knapsack: true
+      use_learned_utility: false
+      warmup_budget_ratio: 0.0
+    seed: 42
+    system:
+      empty_cache_frequency: 10
+      max_vram_fraction: 0.7
+    training:
+      lr_color: 0.0025
+      lr_opacity: 0.05
+      lr_position: 0.00016
+      lr_rotation: 0.001
+      lr_scale: 0.005
+      n_micro_steps: 5
+      use_adaptive_k: false
+  rtg_slam_reimpl:
+    densification:
+      enable_coverage_throttling: false
+      max_new_per_frame: 4000
+      strategy: importance
+      throttle_coverage_threshold: 0.9
+      throttle_factor: 0.2
+      use_adaptive_thresholds: true
+    gaussian:
+      init_refine_steps: 10
+      init_stride: 2
+      initial_opacity: 0.8
+      initial_scale: 0.02
+      max_gaussians: 150000
+      scale_mode: depth_adaptive
+      scale_pixel_multiplier: 1.5
+      sh_degree: 0
+    losses:
+      weight_color: 0.8
+      weight_depth: 0.5
+      weight_ssim: 0.2
+    rendering:
+      attribution_top_k: 4
+      backend: gsplat
+      image_height: 240
+      image_width: 320
+      tile_size: 16
+      use_fast_attribution: true
+      use_surface_aware_depth: false
+    scheduler:
+      cost_per_gaussian_us: 0.1
+      enable_warmup: false
+      gpu_budget_ms: 15.0
+      max_warmup_queue: 999999
+      optimize_ratio: 0.5
+      policy: rtg_slam_reimpl
+      use_knapsack: true
+      use_learned_utility: false
+      warmup_budget_ratio: 0.0
+    seed: 42
+    system:
+      empty_cache_frequency: 10
+      max_vram_fraction: 0.7
+    training:
+      lr_color: 0.0025
+      lr_opacity: 0.05
+      lr_position: 0.00016
+      lr_rotation: 0.001
+      lr_scale: 0.005
+      n_micro_steps: 5
+      use_adaptive_k: false

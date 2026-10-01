@@ -52,7 +52,7 @@ We introduce \textbf{dual map-growth throttling} --- coverage-saturation throttl
 On TUM \texttt{fr2\_xyz} (150 frames $\times$ 8 seeds) this reaches $27.67\,\mathrm{dB}$ mean PSNR: \textbf{+2.63 dB} over the strongest selective baseline and \textbf{+4.62 dB} over an RTG-SLAM-policy baseline ($p_{\mathrm{Holm}} = 0.0391$), recovering \textbf{98.0\%} of headroom to the unconstrained ceiling (0.18 dB gap).
 We further show every \textit{fixed} rule overfits its sensor regime: the same pipeline loses $-3.32\,\mathrm{dB}$ ($p = 0.0078$) on clean synthetic Replica, where raw-error selection wins instead.
 A \textbf{sensor-adaptive router} driven by raw depth hole-rate (TUM $\sim 0.25$ vs Replica $\sim 0.000$, 300--500$\times$ separation, 5/5 scenes) selects the winning rule per substrate and wins on both.
-All benchmarks use matched budgets, paired Holm-corrected tests, and frozen reproduction artifacts.
+All selective policies share the same modeled $15\,\mathrm{ms}$ optimization budget with paired Holm-corrected tests and frozen artifacts; FULL is reported separately as an unconstrained ceiling, not a budget-matched competitor. Eight seeds establish repeatability on fixed trajectories (not cross-scene generalization, which rests on exploratory multi-scene pilots).
 \end{abstract}
 
 \section{Introduction}
@@ -119,15 +119,16 @@ Coverage $\kappa_t$ = fraction of valid pixels with transmission $< 0.5$.
 The per-frame spawn cap ramps $1.0 \to 0.20$ over $\kappa_t \in [0.80, 0.90]$ (configurable knee, no longer hardcoded), and backlog backpressure multiplies the cap by $500/N_{\mathrm{warmup}}$ beyond 500 unrefined primitives.
 Warmup pre-allocation is disabled (ablation $-0.75\,\mathrm{dB}$); microsteps fixed at $K = 5$.
 \textbf{Sensor-adaptive routing.}
-Raw depth hole-rate (missing measurements) is sensor physics, not content: TUM $0.18$--$0.31$ vs Replica $\approx 0.000$ (300--500$\times$).
+Raw depth hole-rate is strongly associated with sensor domain: TUM $0.18$--$0.31$ vs Replica $\approx 0.000$ (300--500$\times$); we claim domain association within evaluated datasets, not content-independence in general.
 The score $n = \mathrm{clip}(2.5 \cdot \mathrm{holes} + 1.0 \cdot \mathrm{edge})$ routes $n \le 0.10 \to$ raw-error selection ($\kappa = 0.98$) and $n \ge 0.30 \to$ temporal$\times$influence + throttling ($\kappa = 0.90$), computed pre-hygiene in milliseconds on CPU.
 Two earlier features failed held-out separation and are reported as such: post-hygiene invalid ratio (conflates far-but-valid geometry --- 18\% of Replica room0 exceeds $4\,\mathrm{m}$ --- with holes) and Laplacian texture energy (measures sharpness, inverted: crisp synthetic scores \textit{higher}).
 Operating on pre-hygiene raw depth was the fix (Fig.~\ref{fig:separation}).
+Thresholds were frozen after 5 development scenes; on 7 unseen scenes classification is 7/7 without retuning, but PSNR routing is so far validated on two substrates at 8 seeds each --- wider confirmation and per-frame routing remain future work.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figs/fig1_noise_separation.pdf}
-\caption{\textbf{Sensor separation.} v3 hole-rate score across 5 scenes: Replica $\le 0.022$ vs TUM $\ge 0.49$ (thresholds $0.10$/$0.30$, 5/5 correct). Invalid-range and texture features failed; missing-measurement rate is sensor physics, not content.}
+\caption{\textbf{Sensor separation.} v3 hole-rate score, development scenes: Replica $\le 0.022$ vs TUM $\ge 0.49$ (thresholds $0.10$/$0.30$, 5/5); 7 unseen scenes classify 7/7 frozen. Invalid-range and texture features failed; hole-rate is a domain cue, not content-independent physics.}
 \label{fig:separation}
 \end{figure}
 
@@ -138,7 +139,7 @@ Operating on pre-hygiene raw depth was the fix (Fig.~\ref{fig:separation}).
 
 \section{Experiments}
 \label{sec:experiments}
-\textbf{Protocol.} $320 \times 240$, $B_t = 15\,\mathrm{ms}$, seeds $[42..49]$, two-sided Wilcoxon paired + Holm-Bonferroni + bootstrap CIs; production \texttt{gsplat} backend; GT poses with tracking decoupled (mapping benchmark, not SLAM ATE); every 8th frame held out render-only (train--holdout gap $\approx +0.25\,\mathrm{dB}$, no overfitting).
+\textbf{Protocol.} $320 \times 240$, $B_t = 15\,\mathrm{ms}$, seeds $[42..49]$, two-sided Wilcoxon paired + Holm-Bonferroni + bootstrap CIs; production \texttt{gsplat} backend; GT poses with tracking decoupled (mapping benchmark, not SLAM ATE); every 8th frame held out render-only (train--holdout gap $+0.47\,\mathrm{dB}$ mean over 30f$\times$3 seeds for both OURS and \texttt{error\_only}, \texttt{results/phase14\_holdout/}; small positive gap, no overfitting).
 Artifacts: \texttt{results/phase14\_corrected/}.
 
 \begin{table*}[t]
@@ -218,6 +219,7 @@ A $\kappa$-sweep (Fig.~\ref{fig:kappa}) attributes only $\sim 0.8\,\mathrm{dB}$ 
 \section{Limitations}
 \label{sec:limitations}
 Ground-truth poses throughout (tracking decoupled; no ATE claim --- our ICP tracker is a stub); $150$-frame horizons rather than full SLAM sessions; $\kappa$/backlog thresholds calibrated on one real--synthetic pair; no learned components by design after documented failure; optimization-budgeted execution, not $15\,\mathrm{ms}$ end-to-end; prior $19.24\,\mathrm{dB}$/76.4\% numbers from a pose-bugged substrate are deprecated, not compared.
+Statistically, $n=8$ seeds establish \textit{repeatability} under stochastic variation on fixed trajectories; they do not establish cross-scene generalization, whose unit is scenes, not seeds --- additional scenes are exploratory ($n=3$) until confirmed.
 
 \section{Conclusion}
 Compute dilution --- not ranking error --- binds budgeted online 3DGS.

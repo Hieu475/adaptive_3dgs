@@ -1460,24 +1460,33 @@ class OracleUtilityExperiment:
             i_t = argmax_{i not in S_t, C(S_t U {i}) <= B} Delta Q(i | S_t) / Delta C(i | S_t)
             S_{t+1} = S_t U {i_t}
         providing an authoritative contextual reference subset S*_greedy.
+
+        Fork semantics (fixed 2026-10): both branches of each conditional
+        measurement start from the SAME base state G:
+            G |-- optimize(S)      -> Q(S)
+              |-- optimize(S U i)  -> Q(S U i)
+        with Delta Q(i|S) = Q(S U i) - Q(S). A prior version incrementally
+        extended the S-optimized state (optimizing S twice), confounding
+        extra S training with i's contribution; that protocol is deprecated.
         """
         model = self.pipeline.gaussian_model
         device = rgb.device
         selected_subset: List[int] = []
         accumulated_cost_ms = 0.0
         remaining_candidates = list(candidate_indices)
-        
+
         base_snapshot = self.snapshot_state()
         step_history = []
-        
+
         while remaining_candidates and accumulated_cost_ms < budget_ms:
             best_cand = None
             best_density = -float('inf')
             best_cand_cost_ms = 0.0
             best_dq = 0.0
-            
-            self.restore_state(base_snapshot)
+
             full_mask = torch.ones(rgb.shape[0], rgb.shape[1], dtype=torch.bool, device=device)
+            # Branch A (from base): optimize S alone -> Q(S).
+            self.restore_state(base_snapshot)
             if selected_subset:
                 res_context = self.optimize_gaussian_group(
                     selected_subset, n_steps=n_steps, rgb=rgb, depth=depth,
@@ -1486,9 +1495,7 @@ class OracleUtilityExperiment:
                 q_context = res_context['delta_quality_global']
             else:
                 q_context = 0.0
-                
-            snapshot_context = self.snapshot_state()
-            
+
             for cand in remaining_candidates:
                 test_group = selected_subset + [cand]
                 from .scheduler import estimate_gaussian_costs
@@ -1496,11 +1503,12 @@ class OracleUtilityExperiment:
                     n_gaussians=1, n_micro_steps=n_steps, device=device
                 ).sum().item()
                 c_ms = max(1e-6, c_us / 1000.0)
-                
+
                 if accumulated_cost_ms + c_ms > budget_ms:
                     continue
-                    
-                self.restore_state(snapshot_context)
+
+                # Branch B (from the SAME base): optimize S U {i} -> Q(S U i).
+                self.restore_state(base_snapshot)
                 res_cand = self.optimize_gaussian_group(
                     test_group, n_steps=n_steps, rgb=rgb, depth=depth,
                     influence_mask=full_mask, action_cost_ms=c_ms
@@ -1508,7 +1516,7 @@ class OracleUtilityExperiment:
                 q_cand = res_cand['delta_quality_global']
                 dq_conditional = q_cand - q_context
                 density = dq_conditional / c_ms
-                
+
                 if density > best_density:
                     best_density = density
                     best_cand = cand

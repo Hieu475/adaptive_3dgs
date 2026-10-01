@@ -1,0 +1,103 @@
+{
+  "metadata": {
+    "scene": "tum_fr2_xyz",
+    "n_frames": 30,
+    "seeds": [
+      42,
+      43,
+      44
+    ],
+    "policies": [
+      "ours",
+      "error_only"
+    ],
+    "holdout_every": 8,
+    "note": "online-holdout proxy (unseen-for-optimization views on same trajectory), NOT independent novel trajectory; ATE GT-anchored (tracking decoupled)"
+  },
+  "rows": [
+    {
+      "train_psnr": 28.456922990304452,
+      "holdout_psnr": 27.978889147440594,
+      "gen_gap_db": 0.47803384286385864,
+      "n_train": 27,
+      "n_holdout": 3,
+      "holdout_ssim": 0.7589476307233175,
+      "ate_rmse_m": 0.0028529208453862026,
+      "ate_max_m": 0.015382679179310799,
+      "n_poses": 31,
+      "policy": "ours",
+      "seed": 42,
+      "N_final": 13310
+    },
+    {
+      "train_psnr": 28.449256949954563,
+      "holdout_psnr": 27.96647310256958,
+      "gen_gap_db": 0.48278384738498303,
+      "n_train": 27,
+      "n_holdout": 3,
+      "holdout_ssim": 0.7582582831382751,
+      "ate_rmse_m": 0.0028529208453862026,
+      "ate_max_m": 0.015382679179310799,
+      "n_poses": 31,
+      "policy": "ours",
+      "seed": 43,
+      "N_final": 13308
+    },
+    {
+      "train_psnr": 28.459245363871258,
+      "holdout_psnr": 28.0093248685201,
+      "gen_gap_db": 0.44992049535115797,
+      "n_train": 27,
+      "n_holdout": 3,
+      "holdout_ssim": 0.7585707902908325,
+      "ate_rmse_m": 0.0028529208453862026,
+      "ate_max_m": 0.015382679179310799,
+      "n_poses": 31,
+      "policy": "ours",
+      "seed": 44,
+      "N_final": 13278
+    },
+    {
+      "train_psnr": 28.46471115394875,
+      "holdout_psnr": 28.005976676940918,
+      "gen_gap_db": 0.4587344770078303,
+      "n_train": 27,
+      "n_holdout": 3,
+      "holdout_ssim": 0.7592759132385254,
+      "ate_rmse_m": 0.0028529208453862026,
+      "ate_max_m": 0.015382679179310799,
+      "n_poses": 31,
+      "policy": "error_only",
+      "seed": 42,
+      "N_final": 13523
+    },
+    {
+      "train_psnr": 28.526731243839972,
+      "holdout_psnr": 28.056047757466633,
+      "gen_gap_db": 0.4706834863733391,
+      "n_train": 27,
+      "n_holdout": 3,
+      "holdout_ssim": 0.7588504354159037,
+      "ate_rmse_m": 0.0028529208453862026,
+      "ate_max_m": 0.015382679179310799,
+      "n_poses": 31,
+      "policy": "error_only",
+      "seed": 43,
+      "N_final": 13531
+    },
+    {
+      "train_psnr": 28.4690938172517,
+      "holdout_psnr": 27.9771089553833,
+      "gen_gap_db": 0.4919848618683993,
+      "n_train": 27,
+      "n_holdout": 3,
+      "holdout_ssim": 0.7588030099868774,
+      "ate_rmse_m": 0.0028529208453862026,
+      "ate_max_m": 0.015382679179310799,
+      "n_poses": 31,
+      "policy": "error_only",
+      "seed": 44,
+      "N_final": 13549
+    }
+  ]
+}

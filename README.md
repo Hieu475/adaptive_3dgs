@@ -45,59 +45,49 @@ We establish the following scientific hierarchy:
 
 ## 3. Method
 
-The online reconstruction pipeline executes a strictly causal, closed-loop cycle on each streaming RGB-D frame:
+> [!CAUTION]
+> **Two tracks — do not conflate.** **(A) Final method** = heuristic selector (error×influence, temporal EMA) + dual throttling + knapsack. This is OURS and everything significant in Sec.12/Phase-14.
+> **(B) Diagnostic branch** = TwoHeadMLP learned utility (steps marked ⑴ below). It has offline rank signal but **degrades closed-loop PSNR (-2.51 dB)** and is NOT part of OURS. The diagram keeps it only to show exactly what was tested and rejected.
 
-$$\boxed{ S_t \longrightarrow X_t \longrightarrow \hat{X}_t \longrightarrow \hat{U}_t \longrightarrow A_t \longrightarrow S_{t+1} }$$
+### A. Final method (OURS): heuristic selection + dual throttling
 
 ```
 Streaming RGB-D Frame (I_t, D_t)
-          │
-          ▼
-Gaussian Map State S_t (positions, scales, rotations, opacities, SH colors, StateStore)
-          │
-          ▼
-Observable Feature Extraction (X_t ∈ R^{N × 11})  [Strictly causal, pre-intervention]
-          │
-          ▼
-A1 Geometry-Relative Transform (Scale & coordinate invariant)
-          │
-          ▼
-B2 Online EMA Normalization (Online moment adaptation with β = 0.90)
-          │
-          ▼
-TwoHeadMLP Forward Pass (Frozen checkpoint, requires_grad=False)
-          │
-          ├─────────────────────────┐
-          ▼                         ▼
-   Predicted ΔQ_hat          Predicted Cost C_hat (> 0)
-          │                         │
-          └────────────┬────────────┘
-                       ▼
-            Predicted Utility U_hat_i = ΔQ_hat_i / C_hat_i
-                       │
-                       ▼
-       Knapsack Budget Selection (α · Σ C_hat_i ≤ B)  [Safety factor α = 1.10]
-                       │
-                       ▼
-             Selected Subset A_t
-                       │
-                       ▼
-       Selective Gaussian Optimization (Only i ∈ A_t receive gradient descent)
-                       │
-                       ▼
-       StateStore Synchronization (Ages, update counts, error EMA, persistent IDs)
-                       │
-                       ▼
-           Updated Gaussian Map S_{t+1} (Continuous evolution, no reset)
+           │
+           ▼
+Gaussian Map State S_t → Observable State X_t ∈ R^{N×11} (causal, pre-intervention)
+           │
+           ▼
+Heuristic score: error × influence mass × temporal EMA drift
+           │
+           ▼
+Knapsack Budget Selection (value density s_i / C_i, B = 15 ms)
+           │
+           ▼
+Selective Gaussian Optimization (fixed K = 5 microsteps)
+           │
+           ├─ Coverage throttling (κ ≥ 0.90 → spawn cap ×0.20)
+           └─ Backlog throttling (unrefined queue > 500 → backpressure)
+                        │
+                        ▼
+            Updated Gaussian Map S_{t+1}
 ```
 
-### Core Method Components:
+### B. Diagnostic branch (rejected): learned marginal utility ⑴
+
+```
+X_t → A1 geometry-relative → B2 online EMA (β = 0.90) → ⑴ TwoHeadMLP (11→64→32,
+frozen, requires_grad=False) → U_hat = ΔQ_hat / C_hat → knapsack
+Finding: ρ = 0.2035 offline but -2.51 dB closed-loop (distribution shift +
+gradient coupling). Retained for analysis only; excluded from OURS.
+```
+
+### Core Components:
 1. **11-D Observable State ($X_t$)**: Photometric residual, depth residual, gradient norm, screen visibility, attribution mass, positional drift, residual EMA drift, temporal drift, uncertainty, projected area, update age.
-2. **A1 Representation (`geometry_relative`)**: Normalizes spatial coordinates and bounding box metrics relative to Gaussian covariance scale $\sigma_i$ and screen projection.
-3. **B2 Online Normalization (`OnlineEMANormalizer`, $\beta = 0.90$)**: Tracks streaming feature distributions online to prevent distribution shift when transitioning zero-shot between indoor rooms.
-4. **TwoHeadMLP**: Compact network ($11 \to 64 \to 32$) with decoupled quality and softplus-constrained cost heads (4,386 parameters).
-5. **Budget Knapsack Scheduler**: Greedy fractional knapsack ordering by $\hat{U}_i$, strictly enforcing $\sum_{i \in A_t} 1.10 \hat{C}_i \le B$.
-6. **Closed-Loop StateStore**: Synchronizes primitive-level metadata across frames, maintaining 100% persistent ID uniqueness without per-frame state reset.
+2. **Budget Knapsack Scheduler**: Greedy fractional knapsack ordering by value density, strictly enforcing budget $B$.
+3. **Dual Throttling**: Coverage saturation + backlog backpressure (the decisive mechanism, +2.63 dB).
+4. **Closed-Loop StateStore**: Synchronizes primitive-level metadata across frames, maintaining 100% persistent ID uniqueness without per-frame state reset.
+5. ⑴ **TwoHeadMLP (diagnostic only)**: A1 + B2 + frozen $11 \to 64 \to 32$ network (4,386 params). See caution above.
 
 ---
 
@@ -344,7 +334,9 @@ $$T_{\text{frame}} \approx 7005\text{ ms}$$
 > `results/final_confirmation/DEPRECATED.md`. Authoritative is Phase-14 below
 > (`results/phase14_corrected/phase14_results.json`, corrected W2C pose + depth hygiene).
 
-Evaluated across **6 Policies** and **8 Seeds** (`[42, 43, 44, 45, 46, 47, 48, 49]`) for 150 frames at $320 \times 240$ resolution (48 continuous trajectories, 7,200 total processed frames, zero NaN/Inf crashes):
+Evaluated across **6 Policies** and **8 Seeds** (`[42, 43, 44, 45, 46, 47, 48, 49]`) for 150 frames at $320 \times 240$ resolution (48 continuous trajectories, 7,200 total processed frames, zero NaN/Inf crashes).
+All selective policies share the same modeled $15\,\mathrm{ms}$ optimization budget; **FULL is an unconstrained ceiling, not a budget-matched competitor**.
+$n=8$ seeds establish repeatability on this fixed trajectory --- generalization across scenes rests on the exploratory pilots below, not on seeds:
 
 | Policy | Mean PSNR (dB) | Final PSNR (dB) | Mean SSIM | FPS | Map Size ($N_{\text{final}}$) |
 |:---|:---:|:---:|:---:|:---:|:---:|
@@ -372,11 +364,13 @@ With $n=8$ independent seeds, the exact minimum two-sided Wilcoxon signed-rank $
 
 ---
 
-### Cross-Scene Generalization Benchmark (Phase-14 corrected substrate, 30f × 3 seeds [42-44], B=15ms)
+### Cross-Scene Generalization Pilots — EXPLORATORY, not confirmatory (Phase-14 corrected substrate, 30f × 3 seeds [42-44], B=15ms)
 
 > [!CAUTION]
-> Table below replaces the pose-bugged cross-scene numbers. `n=3` → underpowered (min p=0.25);
-> treat deltas as pilot estimates. Full results: `results/phase14_multiscene/*/final_confirmation_results.json`.
+> Table below replaces the pose-bugged cross-scene numbers. `n=3` → underpowered (min Wilcoxon p=0.25);
+> treat deltas as exploratory generalization trends only. Confirmatory evidence is the 8-seed main benchmark above
+> (repeatability on one trajectory); cross-scene external validity requires more scenes, not more seeds.
+> Full results: `results/phase14_multiscene/*/final_confirmation_results.json`.
 
 | Scene | Frames | Policy | Mean PSNR (dB) | Final PSNR | Mean SSIM | N_final | FPS | Δ vs OURS |
 | :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: |

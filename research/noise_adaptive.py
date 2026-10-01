@@ -34,12 +34,17 @@ def frame_noise_score_v2(raw_invalid: float, raw_edge: float) -> Dict[str, float
 
 
 def frame_noise_score_v3(raw_holes: float, raw_edge: float) -> Dict[str, float]:
-    """Sensor-noise score v3 from RAW missing-measurement rate.
+    """Sensor-domain cue v3 from RAW missing-measurement rate.
 
-    Missing depth (== 0 / NaN) is sensor physics, not scene content:
-    TUM Kinect holes ~0.18-0.31 vs Replica ~0.000 (300-500x gap), while
-    out-of-range far geometry is content and excluded. Edge density is a
-    secondary cue (TUM ~0.06 vs Replica ~0.01-0.02).
+    Raw missing-depth rate is strongly associated with the evaluated
+    real-vs-synthetic datasets (TUM Kinect holes ~0.18-0.31 vs Replica
+    ~0.000, 300-500x gap); out-of-range far geometry is content and
+    excluded. NOT claimed independent of scene content in general: hole
+    rate also varies with reflective/transparent surfaces, incidence
+    angle, range, occlusion, and preprocessing. Validated scope: 5/5
+    development scenes + 7/7 held-out scenes (thresholds frozen;
+    see results/phase14_corrected/router_heldout.json).
+    Edge density is secondary (TUM ~0.06 vs Replica ~0.01-0.02).
     score = clip(2.5 * holes + 1.0 * edge, 0, 1):
       Replica -> ~0.02, TUM -> ~0.55-0.85.
     """

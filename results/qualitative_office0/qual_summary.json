@@ -1,0 +1,23 @@
+{
+  "scene": "replica_office0",
+  "views": [
+    {
+      "view": 20,
+      "ours": 28.22,
+      "error_only": 30.32,
+      "full": 30.68
+    },
+    {
+      "view": 60,
+      "ours": 25.68,
+      "error_only": 27.31,
+      "full": 27.96
+    },
+    {
+      "view": 98,
+      "ours": 25.93,
+      "error_only": 28.37,
+      "full": 31.67
+    }
+  ]
+}

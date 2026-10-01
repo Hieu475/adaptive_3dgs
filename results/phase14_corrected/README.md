@@ -1,4 +1,12 @@
-# Phase 14 — Corrected-substrate authoritative benchmark (FROZEN candidate)
+# Phase 14 — Corrected-substrate authoritative benchmark (FROZEN)
+
+Provenance bundle (all SHA-256 hashed in `manifest.json`):
+- `manifest.json` — git SHA, hardware, dataset, pose/hygiene protocol, artifact hashes
+- `phase14_results.json` — full record (metadata + policy_stats + paired_comparisons + raw_runs)
+- `raw_runs.json` — 48 raw runs (6 policies x 8 seeds), extracted convenience copy
+- `statistics.json` — test design + Holm paired comparisons + headroom eta
+- `config_snapshot.yaml` — exact per-policy pipeline dicts (seed varies per run)
+- `adaptive_office0_150f_8seed.json` — Replica adaptive validation (8 seeds)
 
 **Scene:** `tum_fr2_xyz` | **Frames:** 150 | **Seeds:** 8 [42-49] | **Budget:** 15.0 ms
 **Substrate:** corrected W2C pose (`torch.inverse`, was C2W bug) + depth hygiene
@@ -28,8 +36,10 @@
 | vs `full` | -0.18 | 0.0391 ✅ | -3.3 |
 
 - **Headroom recovery:** (27.67−18.86)/(27.85−18.86) = **98.0%**, gap to ceiling only **0.18 dB**
-  with a **3.8× smaller map** (23K vs 88K) at matched budget.
+  with a **3.8× smaller map** (23K vs 88K). Selective policies share the modeled 15 ms budget;
+  FULL is the unconstrained ceiling, not a matched competitor.
 - Sources: `../rtg_slam_150f_8seeds/final_confirmation_results.json` (4 policies) +
   `../phase14_corrected_partial/final_confirmation_results.json` (no_op, full).
-  Merged artifact: `phase14_results.json` in this directory.
-- Status: candidate frozen — needs manifest SHA + README/docs/paper sync before tagging.
+  Merged artifacts: `phase14_results.json` + `raw_runs.json` + `statistics.json` in this directory.
+- Status: **FROZEN** — provenance bundle complete (`manifest.json` with SHA-256 of every artifact,
+  `config_snapshot.yaml`, hardware, pose/hygiene protocol). Rebuild via `scripts/build_phase14_provenance.py`.

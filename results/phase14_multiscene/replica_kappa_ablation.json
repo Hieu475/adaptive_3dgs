@@ -1,0 +1,32 @@
+{
+  "off": {
+    "mean_psnr": 24.794305059644913,
+    "std": 0.004355099497674047,
+    "N": 57229.333333333336
+  },
+  "k0.80": {
+    "mean_psnr": 24.00041162967682,
+    "std": 0.028521045481667607,
+    "N": 51832.333333333336
+  },
+  "k0.90": {
+    "mean_psnr": 23.976786692937214,
+    "std": 0.017298295208595046,
+    "N": 51887.0
+  },
+  "k0.95": {
+    "mean_psnr": 24.19405433866713,
+    "std": 0.03397940364285458,
+    "N": 51559.666666666664
+  },
+  "no_throttle_cov_and_backlog": {
+    "mean_psnr": 24.78,
+    "std": 0.02,
+    "N": 57256
+  },
+  "error_only_ref": {
+    "mean_psnr": 29.48,
+    "note": "from phase14_multiscene/replica_office0 30f x3seeds"
+  },
+  "diagnosis": "coverage-throttling costs ~0.8dB (24.79->23.98); backlog ~0.0; remaining ~4.7dB gap is SELECTION (temporal x influence vs raw error). Throttling is secondary on synthetic; selection heuristic is primary overfit."
+}

@@ -1,4 +1,12 @@
-"""RTG-SLAM (Peng et al., SIGGRAPH 2024) faithful re-implementation as budget-matched baseline.
+"""RTG-SLAM-inspired stable/unstable policy baseline (Peng et al., SIGGRAPH 2024).
+
+NOT a faithful system reproduction: the original couples opaque/nearly-
+transparent representation, separate depth rendering, newly-observed-region
+insertion, unstable-only pixel rendering, ICP tracking and compact-map
+machinery. This re-implements ONLY the selection rule (high error + temporal
+drift + opacity stability, budgeted) under this repo's shared rendering
+substrate. Label as "RTG-SLAM-policy (reimpl., matched budget)", never as
+"RTG-SLAM" alone.
 
 Reference: RTG-SLAM compacts Gaussians into opaque / nearly-transparent roles,
 adds Gaussians at newly-observed / high color-error / high depth-error pixels,

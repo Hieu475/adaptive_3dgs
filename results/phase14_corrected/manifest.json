@@ -1,0 +1,67 @@
+{
+ "experiment": "phase14_corrected",
+ "status": "frozen-candidate",
+ "git": {
+  "sha": "66e65f2e608f8f78111c96a1ff21a4fad32351c2",
+  "branch": "phase13-cuda-acceleration",
+  "status_short": "M README.md\n M docs/paper/adaptive_3dgs_iccv.pdf\n M docs/paper/adaptive_3dgs_iccv.tex\n M research/baselines/rtg_slam_policy.py\n M research/noise_adaptive.py\n M research/oracle_utility.py\n M results/.gitignore\n M results/phase14_corrected/README.md\n M scripts/download_replica_scene.py\n M scripts/view_3d.py\n?? results/phase14_adaptive_office0_150f/final_confirmation_results.json\n?? results/phase14_adaptive_office0_150f_b/final_confirmation_results.json\n?? results/phase14_corrected/adaptive_office0_150f_8seed.json\n?? results/phase14_corrected/config_snapshot.yaml\n?? results/phase14_corrected/manifest.json\n?? results/phase14_corrected/phase14_results.json\n?? results/phase14_corrected/raw_runs.json\n?? results/phase14_corrected/router_heldout.json\n?? results/phase14_corrected/statistics.json\n?? results/phase14_corrected_partial/final_confirmation_results.json\n?? results/phase14_holdout/\n?? results/phase14_multiscene/replica_kappa_ablation.json\n?? results/phase14_multiscene/replica_office0/final_confirmation_results.json\n?? results/phase14_multiscene/tum_fr1_xyz/final_confirmation_results.json\n?? results/phase14_multiscene/tum_fr2_xyz/final_confirmation_results.json\n?? results/qualitative_fr2/\n?? results/qualitative_office0/\n?? results/rtg_slam_150f_3seeds/final_confirmation_results.json\n?? results/rtg_slam_150f_8seeds/final_confirmation_results.json\n?? results/rtg_slam_smoke/final_confirmation_results.json\n?? scripts/build_phase14_provenance.py\n?? scripts/download_all_remaining_replica.py\n?? scripts/run_all_replica_suite.py\n?? scripts/upscale_all_replica_scenes.py"
+ },
+ "timestamp_utc": "2026-10-01T10:56:46.539737+00:00",
+ "dataset": {
+  "tum_fr2_xyz": "datasets/TUM/rgbd_dataset_freiburg2_xyz",
+  "replica_office0": "datasets/Replica/office0",
+  "association": "nearest-timestamp, max |dt| <= 50 ms"
+ },
+ "protocol": {
+  "scene": "tum_fr2_xyz",
+  "n_frames": 150,
+  "resolution": [
+   320,
+   240
+  ],
+  "seeds": [
+   42,
+   43,
+   44,
+   45,
+   46,
+   47,
+   48,
+   49
+  ],
+  "budget_ms": 15.0,
+  "policies": [
+   "no_op",
+   "error_only",
+   "error_influence",
+   "rtg_slam_reimpl",
+   "ours",
+   "full"
+  ],
+  "pose_convention": "W2C via torch.inverse(TUM C2W groundtruth)",
+  "depth_hygiene": "inpaint small holes (Telea r=4), drop out-of-range [0.4,4]m, dilate Sobel>0.20 edges (3x3) and zero them",
+  "backend": "gsplat (cuda) / reference (cpu)",
+  "tracker": "decoupled (GT poses); no ATE claim"
+ },
+ "hardware": {
+  "platform": "Linux-6.8.0-94-generic-x86_64-with-glibc2.39",
+  "cpu": "x86_64",
+  "gpu": "NVIDIA GeForce RTX 4050 Laptop GPU, 595.84, 6141 MiB",
+  "torch": "2.11.0+cu128",
+  "cuda_available": true
+ },
+ "artifacts": {
+  "phase14_results.json": "85ce673e4e08236b2e41695ffd5ef57360dded699cedf18cb09270180e63ec06",
+  "raw_runs.json": "54234674d1a758b1744fabe9f4c0e1b3f959c56f383fd61435324f3f3689bdfe",
+  "statistics.json": "df1da117792febf8e7b36a3a904f18814c6f970f7dde2e94b4c729fd7faa191c",
+  "config_snapshot.yaml": "301f593f3f336cbec98b3102f03e855b22726bcc5732bd2b02cc3ecca1dca4fa",
+  "README.md": "b85bce40680e9ea3c40d3de77494cb40115ec89564ee01e150786dbbe5dbcdcd",
+  "adaptive_office0_150f_8seed.json": "49f6c742d21339915f77179895682020f76da3396ebcd2d55509a046710c0dfd",
+  "router_heldout.json": "c86a817917237aba2fe2eec325acba1e5272ff9cca1f72e702a0ae6df578c365"
+ },
+ "sources": {
+  "rtg_slam_150f_8seeds/final_confirmation_results.json": "4 policies x 8 seeds (ours, rtg_slam_reimpl, error_only, error_influence)",
+  "phase14_corrected_partial/final_confirmation_results.json": "2 policies x 8 seeds (no_op, full)"
+ },
+ "supersedes": "results/final_confirmation (pose-bugged C2W substrate, see DEPRECATED.md)"
+}

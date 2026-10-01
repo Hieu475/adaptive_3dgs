@@ -1,0 +1,104 @@
+{
+ "design": {
+  "n_seeds": 8,
+  "min_wilcoxon_p_two_sided": 0.0078125,
+  "correction": "Holm-Bonferroni step-down",
+  "ci": "bootstrap 95% (2000 resamples)"
+ },
+ "paired_comparisons": [
+  {
+   "baseline": "no_op",
+   "delta_mean_psnr": 8.80247508486112,
+   "ci_mean_psnr": [
+    8.770209927161535,
+    8.835486759195726
+   ],
+   "p_mean_psnr": 0.0078125,
+   "cohens_dz_mean_psnr": 168.75555847250095,
+   "delta_final_psnr": 14.005260914564133,
+   "ci_final_psnr": [
+    13.935617730021477,
+    14.075677301734686
+   ],
+   "p_final_psnr": 0.0078125,
+   "delta_mean_ssim": 0.2349576474229495,
+   "p_holm_mean_psnr": 0.0390625
+  },
+  {
+   "baseline": "error_only",
+   "delta_mean_psnr": 3.592073453466097,
+   "ci_mean_psnr": [
+    3.4816924144824344,
+    3.704629981567463
+   ],
+   "p_mean_psnr": 0.0078125,
+   "cohens_dz_mean_psnr": 21.18734510572235,
+   "delta_final_psnr": 8.876160681247711,
+   "ci_final_psnr": [
+    8.559014350175858,
+    9.179097644984722
+   ],
+   "p_final_psnr": 0.0078125,
+   "delta_mean_ssim": 0.03813667441407839,
+   "p_holm_mean_psnr": 0.0390625
+  },
+  {
+   "baseline": "error_influence",
+   "delta_mean_psnr": 2.6268154482046766,
+   "ci_mean_psnr": [
+    2.563991970320543,
+    2.675728951195876
+   ],
+   "p_mean_psnr": 0.0078125,
+   "cohens_dz_mean_psnr": 29.788380265148863,
+   "delta_final_psnr": 6.993899643421173,
+   "ci_final_psnr": [
+    6.8927377462387085,
+    7.083646968007088
+   ],
+   "p_final_psnr": 0.0078125,
+   "delta_mean_ssim": 0.014765230317910522,
+   "p_holm_mean_psnr": 0.0390625
+  },
+  {
+   "baseline": "rtg_slam_reimpl",
+   "delta_mean_psnr": 4.615748709440231,
+   "ci_mean_psnr": [
+    4.441699252724646,
+    4.8228827947874855
+   ],
+   "p_mean_psnr": 0.0078125,
+   "cohens_dz_mean_psnr": 15.4466845507413,
+   "delta_final_psnr": 8.847182393074036,
+   "ci_final_psnr": [
+    8.26449515298009,
+    9.448578517884016
+   ],
+   "p_final_psnr": 0.0078125,
+   "delta_mean_ssim": 0.05684922680258753,
+   "p_holm_mean_psnr": 0.0390625
+  },
+  {
+   "baseline": "full",
+   "delta_mean_psnr": -0.18269489606221478,
+   "ci_mean_psnr": [
+    -0.2173121035099026,
+    -0.14548257668812975
+   ],
+   "p_mean_psnr": 0.0078125,
+   "cohens_dz_mean_psnr": -3.2730024274628113,
+   "delta_final_psnr": -0.5197429656982422,
+   "ci_final_psnr": [
+    -0.6088906526565552,
+    -0.4236409142613412
+   ],
+   "p_final_psnr": 0.0078125,
+   "delta_mean_ssim": -0.0011580044527848554,
+   "p_holm_mean_psnr": 0.0390625
+  }
+ ],
+ "headroom": {
+  "formula": "(Q_ours - Q_noop)/(Q_full - Q_noop)",
+  "eta": 0.9796670628991883
+ }
+}

@@ -1,0 +1,51 @@
+[
+ {
+  "scene": "tum_fr1_room",
+  "v3": 0.5224407552083333,
+  "pred": "noisy",
+  "expect": "noisy",
+  "ok": true
+ },
+ {
+  "scene": "tum_fr1_rpy",
+  "v3": 0.7203559570312501,
+  "pred": "noisy",
+  "expect": "noisy",
+  "ok": true
+ },
+ {
+  "scene": "tum_fr3_sitting_static",
+  "v3": 0.8288393554687499,
+  "pred": "noisy",
+  "expect": "noisy",
+  "ok": true
+ },
+ {
+  "scene": "replica_office1",
+  "v3": 0.009585110294117646,
+  "pred": "clean",
+  "expect": "clean",
+  "ok": true
+ },
+ {
+  "scene": "replica_office2",
+  "v3": 0.1244905637254902,
+  "pred": "clean",
+  "expect": "clean",
+  "ok": true
+ },
+ {
+  "scene": "replica_room1",
+  "v3": 0.006411274509803921,
+  "pred": "clean",
+  "expect": "clean",
+  "ok": true
+ },
+ {
+  "scene": "replica_room2",
+  "v3": 0.012482107843137257,
+  "pred": "clean",
+  "expect": "clean",
+  "ok": true
+ }
+]

@@ -1,0 +1,23 @@
+{
+  "scene": "tum_fr2_xyz",
+  "views": [
+    {
+      "view": 30,
+      "ours": 14.01,
+      "error_only": 15.08,
+      "full": 13.97
+    },
+    {
+      "view": 90,
+      "ours": 22.71,
+      "error_only": 20.14,
+      "full": 22.59
+    },
+    {
+      "view": 149,
+      "ours": 27.4,
+      "error_only": 18.93,
+      "full": 28.63
+    }
+  ]
+}
