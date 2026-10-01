@@ -1,0 +1,95 @@
+{
+ "metadata": {
+  "scene": "tum_fr2_xyz",
+  "n_frames": 30,
+  "seeds": [
+   42,
+   43,
+   44
+  ],
+  "budgets": [
+   5.0,
+   10.0,
+   15.0,
+   20.0,
+   30.0
+  ],
+  "policies": [
+   "ours",
+   "error_only"
+  ],
+  "note": "matched modeled budgets; exploratory n=3"
+ },
+ "rows": [
+  {
+   "budget_ms": 5.0,
+   "policy": "ours",
+   "mean_psnr": 27.318378845850628,
+   "std_psnr": 0.00485866123185703,
+   "mean_N": 12905.666666666666
+  },
+  {
+   "budget_ms": 5.0,
+   "policy": "error_only",
+   "mean_psnr": 27.48282474941678,
+   "std_psnr": 0.005193365447011029,
+   "mean_N": 13009.666666666666
+  },
+  {
+   "budget_ms": 10.0,
+   "policy": "ours",
+   "mean_psnr": 28.442733605702717,
+   "std_psnr": 0.009981636405900484,
+   "mean_N": 13148.333333333334
+  },
+  {
+   "budget_ms": 10.0,
+   "policy": "error_only",
+   "mean_psnr": 28.557010226779514,
+   "std_psnr": 0.018053832577784697,
+   "mean_N": 13262.333333333334
+  },
+  {
+   "budget_ms": 15.0,
+   "policy": "ours",
+   "mean_psnr": 28.661078717973496,
+   "std_psnr": 0.007604046743128474,
+   "mean_N": 13342.666666666666
+  },
+  {
+   "budget_ms": 15.0,
+   "policy": "error_only",
+   "mean_psnr": 28.677180608113606,
+   "std_psnr": 0.01573325218020573,
+   "mean_N": 13557.666666666666
+  },
+  {
+   "budget_ms": 20.0,
+   "policy": "ours",
+   "mean_psnr": 28.71182770199246,
+   "std_psnr": 0.008213035593849451,
+   "mean_N": 13558.666666666666
+  },
+  {
+   "budget_ms": 20.0,
+   "policy": "error_only",
+   "mean_psnr": 28.725525670581394,
+   "std_psnr": 0.01198692624923311,
+   "mean_N": 13828.333333333334
+  },
+  {
+   "budget_ms": 30.0,
+   "policy": "ours",
+   "mean_psnr": 28.760060866673786,
+   "std_psnr": 0.005688634484829634,
+   "mean_N": 13942.666666666666
+  },
+  {
+   "budget_ms": 30.0,
+   "policy": "error_only",
+   "mean_psnr": 28.767075644599064,
+   "std_psnr": 0.013777823126603854,
+   "mean_N": 14323.0
+  }
+ ]
+}

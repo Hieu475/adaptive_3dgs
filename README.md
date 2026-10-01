@@ -391,7 +391,11 @@ With $n=8$ independent seeds, the exact minimum two-sided Wilcoxon signed-rank $
 > [!NOTE]
 > **Scene-Dependent Empirical Findings (corrected substrate — including a clean negative result)**:
 > - **Throttling advantage compounds over time**: on `tum_fr2_xyz` at 30f OURS ties `error_only` (-0.01dB), but at 150f leads `+2.63~+3.59dB`. Map bloat takes dozens of frames to bite; short-horizon evals hide the effect. Always benchmark ≥100 frames.
-> - **Rapid motion (`tum_fr1_xyz`)**: OURS ties `error_only` (+0.03dB) while beating `rtg_slam_reimpl` (+1.61dB) with the smallest map (16.5K) — throttling is safe but not decisive here.
+> - **Rapid motion (`tum_fr1_xyz`)**: at 30f OURS ties `error_only` (+0.03dB), but at **150f OURS leads +2.41dB** (23.48 vs 21.07, n=3 exploratory; map 39K vs 81K) — the 30f tie was a horizon artifact, not a scene property.
+> - **Desk (`tum_fr1_desk`) 150f**: OURS +0.22 mean but **+2.7 final** (error_only collapses late, map 27K vs 56K).
+> - **Replica `room0` 99f**: error_only wins mean (-1.93) yet **hits the 150K cap and collapses at the end** (final +3.7 OURS) — late-stage dilution evidence for the thesis.
+> - **Per-frame adaptive (no scene labels)**: 27.69 on fr2_xyz (≈ fixed OURS) and 30.36 on office0 (≈ routed error_only) — recovers scene-level picks automatically (`results/phase14_adaptive_perframe/`).
+> - **Baseline VO tracking**: dense GN odometer ATE 0.8cm (fr2) / 1.1cm (fr1_xyz), 30f×3 (`results/phase14_tracking/`); mapping under tracked poses holds 31.0/25.8 dB.
 > - **NEGATIVE RESULT on synthetic Replica + adaptive fix (8 seeds)**: OURS loses to `error_only` on `replica_office0` by **-5.5dB at 30f, +3.32dB at 150f inverted** (`results/phase14_corrected/adaptive_office0_150f_8seed.json`: error_only 30.17±0.02 vs ours 26.85±0.03, n=8, p=0.0078 ✅, d_z=71.9). κ-ablation (30f): `off` 24.79 / `κ0.90` 23.98 vs `error_only` 29.48 — throttling costs only **~0.8dB**; the rest is **selection** overfit. Scene-level noise-adaptive routing (v3 holes score: Replica ~0.02 → `error_only`, TUM ~0.5+ → temporal+throttling, 5/5 scenes) picks the winner on **both** substrates: +3.59dB on `fr2_xyz` (via OURS, n=8) and +3.32dB on `office0` (via error_only, n=8) over the respective fixed loser. Fixed policies lose one scene badly either way — adaptivity is necessary, not optional.
 
 ---

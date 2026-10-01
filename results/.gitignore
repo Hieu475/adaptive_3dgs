@@ -90,6 +90,15 @@ phase6_context_utility/ablation/*.pt
 !qualitative_office0/*.png
 !qualitative_office0/*.json
 !qualitative_office0/*.md
+!gate1_headroom/*.json
+!phase14_budget_curve/*.json
+!phase14_budget_curve/*.md
+!phase14_adaptive_perframe/*.json
+!phase14_adaptive_perframe/*.md
+!phase14_tracking/*.json
+!phase14_tracking/*.md
+!phase14_multiscene150/**/*.json
+!phase14_multiscene150/**/*.md
 !full_sequence_benchmark/**
 !diagnostics_lifetime_convergence_*.json
 !multiscene_benchmark/**

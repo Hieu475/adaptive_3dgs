@@ -251,14 +251,28 @@ class TUMDataset(BaseDataset):
         else:
             depth = torch.zeros(rgb.shape[0], rgb.shape[1])
         
+        # Stored convention: Camera-to-World (TUM groundtruth.txt records the
+        # camera frame in world coordinates). Renderers in this repo require
+        # World-to-Camera; use w2c_pose() — NEVER feed item['pose'] directly
+        # to the pipeline (pre-2026-10 loaders did; their numbers are deprecated).
         pose = self.poses[idx] if idx < len(self.poses) else torch.eye(4)
-        
+
         return {
             'rgb': rgb,
             'depth': depth,
             'pose': pose,
             'intrinsics': self.intrinsics,
         }
+
+    def w2c_pose(self, idx: int) -> torch.Tensor:
+        """World-to-Camera extrinsics for frame ``idx`` (renderer-ready).
+
+        Returns ``torch.inverse(C2W)``. All NEW loaders must use this;
+        legacy loaders that passed ``item['pose']`` straight through carry
+        the transposed-viewpoint bug (see results/final_confirmation/DEPRECATED.md).
+        """
+        c2w = self.poses[idx] if idx < len(self.poses) else torch.eye(4)
+        return torch.inverse(c2w)
     
     @property
     def intrinsics(self) -> torch.Tensor:

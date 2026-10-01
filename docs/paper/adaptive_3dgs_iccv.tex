@@ -187,6 +187,9 @@ A $\kappa$-sweep (Fig.~\ref{fig:kappa}) attributes only $\sim 0.8\,\mathrm{dB}$ 
 \textbf{Horizon effect:} at 30 frames OURS ties \texttt{error\_only} ($-0.01\,\mathrm{dB}$ on \texttt{fr2\_xyz}); the lead needs $\ge 100$ frames for bloat to bite --- short-horizon evals hide dilution, so we benchmark 150.
 \textbf{Ablation (deltas transfer across substrates):} warmup $-0.75$, coverage $+1.04$, backlog $+1.08$, learned utility $+$ adaptive-$K$ $-1.54\,\mathrm{dB}$.
 \textbf{Systems:} scheduler overhead $2.54\,\mathrm{ms}$; optimization-budgeted execution at $\sim 10\,\mathrm{FPS}$ measured --- \textit{not} end-to-end $15\,\mathrm{ms}$ real-time, reported as such.
+\textbf{Baseline tracking:} a dense frame-to-frame photometric+depth Gauss-Newton odometer (no keyframes/loop closure) reaches ATE $0.8\,\mathrm{cm}$ (fr2\_xyz) and $1.1\,\mathrm{cm}$ (fr1\_xyz) over 30 frames at 3 seeds (\texttt{results/phase14\_tracking/}); mapping under tracked poses holds $31.0$/$25.8\,\mathrm{dB}$.
+\textbf{Long horizons:} at 150f the lead widens beyond fr2\_xyz --- fr1\_xyz $+2.41\,\mathrm{dB}$ mean ($23.48$ vs $21.07$, map $39\mathrm{k}$ vs $81\mathrm{k}$), fr1\_desk $+0.22$ mean but $+2.7$ final (error-only collapses late); room0 error-only wins mean ($-1.93$) yet also collapses at the $150\mathrm{k}$ cap while OURS stays flat --- more dilution evidence.
+Supplementary video (\texttt{supp\_video.mp4}) shows both A/B directions.
 
 \begin{figure}[t]
 \centering

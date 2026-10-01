@@ -300,7 +300,15 @@ class OnlineReconstructionPipeline:
         """
         self.intrinsics = intrinsics.to(self.device)
         self.current_pose = (pose if pose is not None else torch.eye(4)).to(self.device)
-        
+        # Anchor the visual tracker on the init frame (GT pose if given).
+        try:
+            if hasattr(self.tracker, "reset"):
+                self.tracker.reset(rgb.to(self.device), depth.to(self.device),
+                                   self.current_pose.clone())
+            self.tracker._K = self.intrinsics.detach().float()
+        except Exception:
+            pass
+
         H, W = depth.shape
         rgb = rgb.to(self.device)
         depth = depth.to(self.device)
@@ -403,32 +411,53 @@ class OnlineReconstructionPipeline:
         rgb: torch.Tensor,
         depth: torch.Tensor,
         gt_pose: Optional[torch.Tensor] = None,
+        frame_noise: Optional[float] = None,
     ) -> Dict[str, Any]:
         """Process a single RGB-D frame through the full pipeline.
-        
-        Pipeline: track → render → compute errors → densify → schedule → optimize → prune
-        
+
+        Pipeline: track → route → render → compute errors → densify → schedule → optimize → prune
+
         Args:
             rgb: (H, W, 3) RGB image in [0, 1]
             depth: (H, W) depth map
             gt_pose: (4, 4) optional ground truth pose (skip tracking)
-        
+            frame_noise: optional v3 sensor-noise score for this frame (see
+                research/noise_adaptive.py). When ``adaptive_routing.enabled``
+                is set, routes this frame's selection policy + kappa from the
+                score; otherwise the configured policy/kappa apply. The routed
+                values are recorded in metrics (routed_policy, frame_noise).
+
         Returns:
             Dict with per-frame metrics
         """
         if not self.initialized:
             raise RuntimeError("Pipeline not initialized. Call initialize() first.")
-        
+
         frame_start = time.time()
         rgb = rgb.to(self.device)
         depth = depth.to(self.device)
         H, W = depth.shape
-        
+
         # === 1. Camera Tracking ===
         if gt_pose is not None:
             self.current_pose = gt_pose.to(self.device)
         else:
-            self.current_pose = self.tracker.track_frame(rgb, depth, self.gaussian_model).to(self.device)
+            self.current_pose = self.tracker.track_frame(
+                rgb, depth, self.gaussian_model,
+                intrinsics=self.intrinsics).to(self.device)
+
+        # === 1b. Per-frame adaptive routing (no-op unless enabled) ===
+        adapt_cfg = self.config.get('adaptive_routing', {})
+        routed_policy: Optional[str] = None
+        routed_kappa: Optional[float] = None
+        if adapt_cfg.get('enabled', False) and frame_noise is not None:
+            from .noise_adaptive import NoiseAdaptiveController, NoiseAdaptiveConfig
+            _ctrl = NoiseAdaptiveController(NoiseAdaptiveConfig(
+                kappa_noisy=adapt_cfg.get('kappa_noisy', 0.90),
+                kappa_clean=adapt_cfg.get('kappa_clean', 0.98),
+                blend_lo=adapt_cfg.get('blend_lo', 0.10),
+                blend_hi=adapt_cfg.get('blend_hi', 0.30)))
+            routed_policy, routed_kappa = _ctrl.route(float(frame_noise))
         
         # === 2. Render Current Map (with per-Gaussian attribution) ===
         use_fast_attribution = self.config['rendering'].get(
@@ -561,7 +590,7 @@ class OnlineReconstructionPipeline:
             current_coverage = float((transmission < 0.5).float().mean().item())
 
         enable_throttling = dense_cfg.get('enable_coverage_throttling', True)
-        thresh_target = dense_cfg.get('throttle_coverage_threshold', 0.90)
+        thresh_target = routed_kappa if routed_kappa is not None else dense_cfg.get('throttle_coverage_threshold', 0.90)
         max_multiplier = dense_cfg.get('throttle_error_threshold_mult', 1.5)
         if enable_throttling and current_coverage >= thresh_target:
             thresh_multiplier = max_multiplier
@@ -608,7 +637,7 @@ class OnlineReconstructionPipeline:
                 current_coverage=effective_coverage,
                 n_warmup=n_warmup_current,
                 max_warmup_queue=sched_cfg.get('max_warmup_queue', 500),
-                coverage_hi=dense_cfg.get('throttle_coverage_threshold', 0.90),
+                coverage_hi=routed_kappa if routed_kappa is not None else dense_cfg.get('throttle_coverage_threshold', 0.90),
                 coverage_lo=dense_cfg.get('throttle_coverage_lo', 0.80),
                 throttle_factor_hi=dense_cfg.get('throttle_factor', 0.20),
             ),
@@ -689,6 +718,8 @@ class OnlineReconstructionPipeline:
         use_knapsack = self.config.get('scheduler', {}).get('use_knapsack', True)
         if not use_knapsack and policy in ['budget_aware', 'ours']:
             policy = 'top_k'  # Greedy top-k utility ranking
+        if routed_policy is not None:
+            policy = routed_policy
             
         ratio = self.config['scheduler'].get('optimize_ratio', 0.5)
         
@@ -1055,6 +1086,9 @@ class OnlineReconstructionPipeline:
             'avg_screen_area': per_gaussian_screen_area.mean().item(),
             # Coverage & Warmup metrics
             'coverage': current_coverage,
+            'routed_policy': routed_policy if routed_policy is not None else policy,
+            'frame_noise': float(frame_noise) if frame_noise is not None else -1.0,
+            'routed_kappa': float(routed_kappa) if routed_kappa is not None else -1.0,
             'n_warmup': int(((update_counts < warmup_steps) & visibility_mask[:N_updated]).sum().item()) if enable_warmup else 0,
             'n_warmup_optimized': int((optimize_mask[:N_updated] & (update_counts < warmup_steps) & visibility_mask[:N_updated]).sum().item()) if enable_warmup else 0,
         }

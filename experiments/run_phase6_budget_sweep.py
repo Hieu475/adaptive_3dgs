@@ -80,10 +80,11 @@ def load_tum_sequence(data_path: str, n_frames: int, H: int, W: int, device: str
             depth, size=(H, W), mode='nearest'
         ).squeeze(0).squeeze(0)
         
+        # W2C via dataset helper (C2W stored; renderer needs inverse).
         frames.append({
             'rgb': rgb_scaled.to(device),
             'depth': depth_scaled.to(device),
-            'pose': item['pose'].to(device)
+            'pose': dataset.w2c_pose(i).to(device)
         })
         
     return frames, intrinsics

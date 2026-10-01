@@ -1,0 +1,65 @@
+{
+ "metadata": {
+  "scenes": [
+   "tum_fr2_xyz",
+   "replica_office0"
+  ],
+  "n_frames": 150,
+  "seeds": [
+   42,
+   43,
+   44
+  ],
+  "note": "per-frame routing, no scene labels; exploratory n=3"
+ },
+ "rows": [
+  {
+   "scene": "tum_fr2_xyz",
+   "seed": 42,
+   "mean_psnr": 27.761618900299073,
+   "route_frac": {
+    "error_influence_temporal": 1.0
+   }
+  },
+  {
+   "scene": "tum_fr2_xyz",
+   "seed": 43,
+   "mean_psnr": 27.641657416025797,
+   "route_frac": {
+    "error_influence_temporal": 1.0
+   }
+  },
+  {
+   "scene": "tum_fr2_xyz",
+   "seed": 44,
+   "mean_psnr": 27.675578610102335,
+   "route_frac": {
+    "error_influence_temporal": 1.0
+   }
+  },
+  {
+   "scene": "replica_office0",
+   "seed": 42,
+   "mean_psnr": 30.351941717995537,
+   "route_frac": {
+    "error_only": 1.0
+   }
+  },
+  {
+   "scene": "replica_office0",
+   "seed": 43,
+   "mean_psnr": 30.36272017642705,
+   "route_frac": {
+    "error_only": 1.0
+   }
+  },
+  {
+   "scene": "replica_office0",
+   "seed": 44,
+   "mean_psnr": 30.374632953393338,
+   "route_frac": {
+    "error_only": 1.0
+   }
+  }
+ ]
+}

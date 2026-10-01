@@ -63,10 +63,14 @@ def load_tum_sequence(data_path: str, n_frames: int = 25, H: Optional[int] = Non
             depth, size=(H, W), mode='nearest'
         ).squeeze(0).squeeze(0)
         
+        # TUM groundtruth.txt stores C2W; renderer requires W2C (same fix as
+        # research/phase10_runtime.py::load_phase10_sequence — old Gate 1
+        # numbers were rendered from the transposed viewpoint.
+        w2c = torch.inverse(item['pose'])
         frames.append({
             'rgb': rgb_scaled.to(device),
             'depth': depth_scaled.to(device),
-            'pose': item['pose'].to(device)
+            'pose': w2c.to(device)
         })
     return frames, intrinsics
 
