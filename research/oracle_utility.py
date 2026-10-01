@@ -1309,28 +1309,39 @@ class OracleUtilityExperiment:
             q_b_plus_i = _get_joint_gain(idx_b + [i_elem])
             delta_i_b = q_b_plus_i - q_b
             
-            is_diminishing = bool(delta_i_a >= delta_i_b - 1e-7)
-            if is_diminishing:
+            # Tolerance-based non-violation (eps absorbs floating noise only).
+            # NOTE: this is NOT evidence for diminishing returns when the two
+            # sides are merely equal within eps. See exact_inequality_rate and
+            # the mean comparison below for the honest reading.
+            tol = 1e-7
+            within_tol = bool(delta_i_a >= delta_i_b - tol)
+            exact = bool(delta_i_a >= delta_i_b)
+            if within_tol:
                 diminishing_count += 1
-                
+
             trials.append({
                 'delta_i_A': float(delta_i_a),
                 'delta_i_B': float(delta_i_b),
-                'diminishing': is_diminishing,
+                'within_tolerance': within_tol,
+                'exact_inequality': exact,
             })
-            
+
         mean_delta_a = float(np.mean([t['delta_i_A'] for t in trials]))
         mean_delta_b = float(np.mean([t['delta_i_B'] for t in trials]))
         consistency_rate = float(diminishing_count / len(trials)) if trials else 0.0
-        
+        exact_count = sum(1 for t in trials if t['exact_inequality'])
+
         return {
             'n_trials': len(trials),
             'size_A': size_a,
             'size_B': size_b,
+            'tolerance_eps': 1e-7,
             'mean_marginal_gain_A': mean_delta_a,
             'mean_marginal_gain_B': mean_delta_b,
-            'diminishing_rate': consistency_rate,
-            'is_diminishing_consistent': bool(mean_delta_a >= mean_delta_b),
+            'mean_supports_diminishing': bool(mean_delta_a >= mean_delta_b),
+            'within_tolerance_nonviolation_rate': consistency_rate,
+            'exact_inequality_rate': float(exact_count / len(trials)) if trials else 0.0,
+            'exact_inequality_count': f"{exact_count}/{len(trials)}",
             'trials': trials,
         }
 

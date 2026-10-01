@@ -87,11 +87,30 @@ def main():
     files = ["phase14_results.json", "raw_runs.json", "statistics.json",
              "config_snapshot.yaml", "README.md",
              "adaptive_office0_150f_8seed.json", "router_heldout.json"]
+    raw_status = git("status --short")
+    # Files participating in the experiment (code + data + provenance docs).
+    # Unrelated worktree changes (e.g. viewer/paper drafts) do not invalidate
+    # the frozen experiment, but are listed explicitly instead of claiming a
+    # literally clean tree.
+    relevant_prefixes = ("research/", "experiments/", "datasets/", "configs/",
+                         "tests/", "README.md", "docs/",
+                         "results/phase14", "results/rtg_slam", "results/final_confirmation",
+                         "results/gate1_headroom", "results/seeds/", "scripts/build_phase14")
+    # manifest.json itself is excluded: it records build-time state and can
+    # never be clean at its own build moment; its content hashes of the other
+    # artifacts are what freeze verification checks.
+    relevant_dirty = [ln for ln in raw_status.splitlines()
+                      if (ln.strip().split(None, 1)[-1].startswith(relevant_prefixes)
+                          and not ln.strip().endswith("results/phase14_corrected/manifest.json"))]
     manifest = {
         "experiment": "phase14_corrected",
-        "status": "frozen-candidate",
+        "status": "frozen",
+        "freeze_tag": "phase14-corrected-frozen",
         "git": {"sha": git("rev-parse HEAD"), "branch": git("rev-parse --abbrev-ref HEAD"),
-                "status_short": git("status --short")},
+                "status_short": raw_status,
+                "experiment_relevant_tree_clean": len(relevant_dirty) == 0,
+                "unrelated_worktree_changes": [ln for ln in raw_status.splitlines()
+                                               if ln not in relevant_dirty]},
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "dataset": {"tum_fr2_xyz": "datasets/TUM/rgbd_dataset_freiburg2_xyz",
                     "replica_office0": "datasets/Replica/office0",

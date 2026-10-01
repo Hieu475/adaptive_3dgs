@@ -238,7 +238,7 @@ def main():
                             size_a=2,
                             size_b=6
                         )
-                        print(f"   [Diminishing Returns] Consistency rate: {diminishing_returns_stats['diminishing_rate']*100:.1f}%")
+                        print(f"   [Diminishing Returns] within-tol: {diminishing_returns_stats['within_tolerance_nonviolation_rate']*100:.1f}%, exact: {diminishing_returns_stats['exact_inequality_count']}")
                 
                 # Single-Gaussian intervention sampling for current seed
                 frame_results = oracle_fr1.run_oracle_experiment(
@@ -474,7 +474,7 @@ def main():
 | **Multi-Seed Provenance** | Seeds evaluated across protocol | **seeds=[42, 43, 44, 45, 46] with per-row seed tag** | **PASS** |
 | **Repeatability** | Multi-trial stability on candidates | **Mean CV = {repeatability_stats['mean_cv']:.4f}** (Pos CV = {repeatability_stats['positive_utility_cv']:.4f}) | **PASS** |
 | **Group Interaction Isolation** | Separate artifact for interaction $\Delta Q(S)$ | **Exported to `group_interaction_analysis.json`** | **PASS** |
-| **Non-Additivity & Interaction** | Empirical evaluation of interaction $\Delta Q(S)$ | **Substantial non-additivity; mixed diminishing evidence ({diminishing_returns_stats['diminishing_rate']*100:.1f}%)** | **PASS** |
+| **Non-Additivity & Interaction** | Empirical evaluation of interaction $\Delta Q(S)$ | **Protocol-dependent interaction; no diminishing-returns evidence ({diminishing_returns_stats['exact_inequality_count']} exact)** | **PASS** |
 
 ---
 

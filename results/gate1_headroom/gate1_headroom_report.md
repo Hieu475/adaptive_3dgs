@@ -43,5 +43,7 @@ Interaction error $I(S) = \frac{|\Delta Q(S) - \sum_{i \in S} \Delta Q_i|}{|\Del
 - **Condition:** $\Delta_i(A) \ge \Delta_i(B)$ for $A \subset B$ ($|A|=2, |B|=6$).
 - **Marginal Gain in Small Context $\mathbb{E}[\Delta_i(A)]$:** **+0.000005**
 - **Marginal Gain in Large Context $\mathbb{E}[\Delta_i(B)]$:** **+0.000005**
-- **Non-Violation Rate:** **100.0%** of trials satisfied $\Delta_i(A) \ge \Delta_i(B)$ (equality counts; flat equal marginals also satisfy).
-- **Scientific Finding:** No violation was observed in 10 spot checks; however, mean marginal gains were approximately equal across contexts, providing NO positive evidence of diminishing returns. Do not cite this as submodular-like behavior.
+- **Within-tolerance non-violation:** **100.0%** of trials within $\epsilon=10^{-7}$ of $\Delta_i(A) \ge \Delta_i(B)$.
+- **Exact inequality:** **2/10** trials (20.0%) satisfied the exact inequality.
+- **Mean comparison:** $\bar\Delta_A=+4.848e-06$ vs $\bar\Delta_B=+4.855e-06$.
+- **Scientific Finding:** All 10 trials were within numerical tolerance, but only 2/10 satisfied the exact inequality and the mean marginal gain was slightly LARGER in the larger context. The experiment provides NO evidence for diminishing returns. Do not cite this as submodular-like behavior.

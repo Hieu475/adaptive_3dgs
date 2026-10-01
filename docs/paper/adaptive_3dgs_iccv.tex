@@ -77,7 +77,7 @@ Our response has two parts.
 \textbf{Dual map-growth throttling} regulates spawning with (i) a coverage-saturation knee ($\kappa_t \ge 0.90$ measured by transmission) that ramps new-primitive allowance $1.0 \to 0.20$, and (ii) backlog backpressure that penalizes densification while more than 500 primitives await their first refinements.
 \textbf{Sensor-adaptive routing} addresses the second discovery of this work: fixed rules overfit their sensor-noise regime.
 The identical throttled pipeline that gains $+3.59\,\mathrm{dB}$ on noisy Kinect data loses $-3.32\,\mathrm{dB}$ on clean synthetic data, where plain raw-error selection dominates.
-A training-free router keyed on raw depth hole-rate --- missing measurements, i.e.\ sensor physics rather than scene content (TUM $0.18$--$0.31$ vs Replica $\approx 0.000$) --- picks the winning rule per substrate and wins on both, while every fixed policy fails one substrate badly.
+A training-free router keyed on raw missing-depth rate --- an observable sensor-domain cue in the evaluated datasets (TUM $0.18$--$0.31$ vs Replica $\approx 0.000$) --- picks the winning rule per substrate and wins on both, while every fixed policy fails one substrate badly.
 
 \textbf{Contributions.}
 (1) A budgeted subset-selection formulation with an exact counterfactual oracle, exposing negative utility and non-additivity.
@@ -94,7 +94,7 @@ Error-only, error$\times$influence, gradient-norm, and temporal-filtered heurist
 We benchmark them under identical modeled budgets with paired Holm-corrected tests rather than reporting best-of-sweep numbers, and we show their ordering flips across sensor regimes --- the motivation for adaptivity.
 \textbf{Submodular maximization and knapsack allocation.}
 $\max_S \Delta Q(S)$ s.t.\ $C(S) \le B$ is a knapsack instance related to submodular maximization with greedy $(1-1/e)$ guarantees~\cite{nemhauser1978analysis}.
-Our measured $R_{\mathrm{add}} \ll 1$ shows the objective is far from additive in practice, which is precisely why we regulate the ground set (map growth) instead of refining the greedy order.
+Interaction strength is protocol-dependent: corrected joint-group interventions remain relatively close to additive ($R_{\mathrm{add}}(4) = 0.95$, $R_{\mathrm{add}}(16) = 0.82$), whereas a separate pairwise interaction protocol exhibits substantially stronger coupling. Our diminishing-returns spot test further provides no positive evidence (2/10 exact, inverted means). We therefore regulate the ground set (map growth) on the strength of the dilution evidence, not on any universality claim about sub-additivity.
 
 \section{Problem Formulation}
 Let $G_t = \{g_1, \dots, g_N\}$ be the active map, $g_i = (\mu_i, \Sigma_i, \alpha_i, c_i)$, with streaming observation $(I_t, D_t)$ and pose $T_t$.
