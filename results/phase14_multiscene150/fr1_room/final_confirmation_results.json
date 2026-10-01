@@ -1,0 +1,184 @@
+{
+  "metadata": {
+    "experiment": "final_confirmation",
+    "scene": "tum_fr1_room",
+    "n_frames": 100,
+    "seeds": [
+      42,
+      43,
+      44
+    ],
+    "n_seeds": 3,
+    "policies": [
+      "ours",
+      "error_only"
+    ],
+    "budget_ms": 15.0,
+    "total_wall_sec": 77.19287423800051,
+    "ours_definition": "pure_throttling_no_warmup_no_adaptivek",
+    "min_wilcoxon_p": 0.25
+  },
+  "policy_stats": {
+    "ours": {
+      "mean_psnr": {
+        "mean": 15.528520981470743,
+        "std": 0.033233914833420704
+      },
+      "final_psnr": {
+        "mean": 12.163018782933554,
+        "std": 0.006693826069931806
+      },
+      "mean_ssim": {
+        "mean": 0.6263929331985613,
+        "std": 0.0009016421556934031
+      },
+      "final_ssim": {
+        "mean": 0.4040413498878479,
+        "std": 0.0022361020451134314
+      },
+      "N_final": {
+        "mean": 91791.33333333333,
+        "std": 361.31273003990447
+      },
+      "fps": {
+        "mean": 7.98344393817159,
+        "std": 0.02854494369437931
+      }
+    },
+    "error_only": {
+      "mean_psnr": {
+        "mean": 16.538240718841553,
+        "std": 0.021401250930210145
+      },
+      "final_psnr": {
+        "mean": 12.3849618434906,
+        "std": 0.06997361679852837
+      },
+      "mean_ssim": {
+        "mean": 0.6537677957396953,
+        "std": 0.0007803026215005691
+      },
+      "final_ssim": {
+        "mean": 0.40827620029449463,
+        "std": 0.009070184026037235
+      },
+      "N_final": {
+        "mean": 96550.0,
+        "std": 250.6511520021402
+      },
+      "fps": {
+        "mean": 7.900493517886953,
+        "std": 0.013935953262876933
+      }
+    }
+  },
+  "paired_comparisons": [
+    {
+      "baseline": "error_only",
+      "delta_mean_psnr": -1.0097197373708084,
+      "ci_mean_psnr": [
+        -1.0260213136672967,
+        -0.9892428517341614
+      ],
+      "p_mean_psnr": 0.25,
+      "cohens_dz_mean_psnr": -53.876534367821414,
+      "delta_final_psnr": -0.22194306055704752,
+      "ci_final_psnr": [
+        -0.2764272689819336,
+        -0.11400341987609863
+      ],
+      "p_final_psnr": 0.25,
+      "cohens_dz_final_psnr": -2.3742333207364776,
+      "delta_mean_ssim": -0.027374862541134155,
+      "p_mean_ssim": 0.25,
+      "p_holm_mean_psnr": 0.25,
+      "p_holm_final_psnr": 0.25
+    }
+  ],
+  "raw_runs": [
+    {
+      "policy": "ours",
+      "seed": 42,
+      "mean_psnr": 15.513333487510682,
+      "final_psnr": 12.172027826309204,
+      "mean_ssim": 0.6262569032609463,
+      "final_ssim": 0.4009653925895691,
+      "mean_depth_l1": 0.3526173784583807,
+      "N_final": 91985,
+      "fps": 7.966158769108681,
+      "mean_k": 5.0,
+      "mean_opt_time_ms": 103.32046508789062,
+      "mean_frame_time_ms": 125.52272019991506
+    },
+    {
+      "policy": "ours",
+      "seed": 43,
+      "mean_psnr": 15.49759532213211,
+      "final_psnr": 12.16103196144104,
+      "mean_ssim": 0.625362968314439,
+      "final_ssim": 0.40494364500045776,
+      "mean_depth_l1": 0.3517831664532423,
+      "N_final": 92104,
+      "fps": 8.023679843415229,
+      "mean_k": 5.0,
+      "mean_opt_time_ms": 102.62807607650757,
+      "mean_frame_time_ms": 124.62268822986516
+    },
+    {
+      "policy": "ours",
+      "seed": 44,
+      "mean_psnr": 15.57463413476944,
+      "final_psnr": 12.155996561050415,
+      "mean_ssim": 0.6275589280202984,
+      "final_ssim": 0.40621501207351685,
+      "mean_depth_l1": 0.35403700947761535,
+      "N_final": 91285,
+      "fps": 7.960493201990861,
+      "mean_k": 5.0,
+      "mean_opt_time_ms": 103.49622249603271,
+      "mean_frame_time_ms": 125.61181764998764
+    },
+    {
+      "policy": "error_only",
+      "seed": 42,
+      "mean_psnr": 16.53935480117798,
+      "final_psnr": 12.286031246185303,
+      "mean_ssim": 0.6548712741583586,
+      "final_ssim": 0.39830493927001953,
+      "mean_depth_l1": 0.3252587880939245,
+      "N_final": 96652,
+      "fps": 7.90019971024644,
+      "mean_k": 5.0,
+      "mean_opt_time_ms": 104.31370258331299,
+      "mean_frame_time_ms": 126.57049062989245
+    },
+    {
+      "policy": "error_only",
+      "seed": 43,
+      "mean_psnr": 16.511490368843077,
+      "final_psnr": 12.43643045425415,
+      "mean_ssim": 0.653223789986223,
+      "final_ssim": 0.4062737822532654,
+      "mean_depth_l1": 0.32593064539134503,
+      "N_final": 96793,
+      "fps": 7.883574331123234,
+      "mean_k": 5.0,
+      "mean_opt_time_ms": 104.31191205978394,
+      "mean_frame_time_ms": 126.83790889986994
+    },
+    {
+      "policy": "error_only",
+      "seed": 44,
+      "mean_psnr": 16.5638769865036,
+      "final_psnr": 12.432423830032349,
+      "mean_ssim": 0.6532083230745047,
+      "final_ssim": 0.420249879360199,
+      "mean_depth_l1": 0.3254461833834648,
+      "N_final": 96205,
+      "fps": 7.917706512291183,
+      "mean_k": 5.0,
+      "mean_opt_time_ms": 104.13038969039917,
+      "mean_frame_time_ms": 126.2911696800802
+    }
+  ]
+}

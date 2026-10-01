@@ -77,7 +77,7 @@ Our response has two parts.
 \textbf{Dual map-growth throttling} regulates spawning with (i) a coverage-saturation knee ($\kappa_t \ge 0.90$ measured by transmission) that ramps new-primitive allowance $1.0 \to 0.20$, and (ii) backlog backpressure that penalizes densification while more than 500 primitives await their first refinements.
 \textbf{Sensor-adaptive routing} addresses the second discovery of this work: fixed rules overfit their sensor-noise regime.
 The identical throttled pipeline that gains $+3.59\,\mathrm{dB}$ on noisy Kinect data loses $-3.32\,\mathrm{dB}$ on clean synthetic data, where plain raw-error selection dominates.
-A training-free router keyed on raw missing-depth rate --- an observable sensor-domain cue in the evaluated datasets (TUM $0.18$--$0.31$ vs Replica $\approx 0.000$) --- picks the winning rule per substrate and wins on both, while every fixed policy fails one substrate badly.
+A training-free router keyed on raw missing-depth rate --- an observable sensor-domain cue in the evaluated datasets (TUM $0.18$--$0.31$ vs Replica $\approx 0.000$) --- picks the winning rule per substrate and wins on both confirmatory substrates (exploratory 7-scene routing matches best-fixed on five, trails on two rapid/exploratory TUM sequences --- reported in full).
 
 \textbf{Contributions.}
 (1) A budgeted subset-selection formulation with an exact counterfactual oracle, exposing negative utility and non-additivity.
@@ -183,9 +183,31 @@ $\Delta$ (adaptive $-$ fixed) & +3.32 $\checkmark$ & +1.95 $\checkmark$ & +0.034
 \label{tab:adaptive}
 \end{table}
 
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Scene} & \textbf{Adaptive} & \textbf{Best fixed} & \textbf{$\Delta$} & \textbf{Route} \\
+\midrule
+fr2\_xyz 150f & 27.66 & 27.67 (ours) & $-0.01$ & temporal \\
+office0 150f & 30.36 & 30.17 (err) & $+0.19$ & error\_only \\
+office1 100f & 33.11 & 33.48 (err) & $-0.37$ & error\_only \\
+room1 100f & 24.17 & 24.29 (err) & $-0.12$ & error\_only \\
+fr3\_static 100f & 25.95 & 25.96 (ours) & $-0.01$ & temporal \\
+fr1\_room 100f & 15.50 & 16.54 (err) & $-1.04$ & temporal \\
+fr1\_rpy 100f & 19.93 & 21.06 (err) & $-1.13$ & temporal \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Per-frame routing, 7 scenes, exploratory $n=3$.} Adaptive matches best-fixed on five scenes; trails on exploration-heavy room and rapid-rotation rpy where the TUM$\to$temporal rule misfires. \texttt{results/phase14\_adaptive\_perframe/}.}
+\label{tab:routing7}
+\end{table}
+
 \textbf{Adaptivity is necessary (Tab.~\ref{tab:adaptive}).}
 On synthetic Replica the fixed throttled pipeline loses $-3.32\,\mathrm{dB}$; routing to raw-error selection recovers $+3.32$ [$+3.29$, $+3.35$], $p = 0.0078$.
 A $\kappa$-sweep (Fig.~\ref{fig:kappa}) attributes only $\sim 0.8\,\mathrm{dB}$ of the gap to throttling; the rest is selection overfit.
+\textbf{Seven-scene routing (Tab.~\ref{tab:routing7}, exploratory $n=3$, no scene labels):} the router matches or nearly matches the best fixed policy on five scenes (fr2\_xyz, office0/office1, room1, fr3\_static; worst gap $-0.37\,\mathrm{dB}$ from the $\kappa=0.98$ safety margin), but trails raw-error by $\approx -1.1\,\mathrm{dB}$ on exploration-heavy \texttt{fr1\_room} and rapid-rotation \texttt{fr1\_rpy}, where temporal smoothing reacts slower than instantaneous error.
+Domain dependence is thus finer than real-vs-synthetic: motion and exploration regime matter within a sensor, and the current router does not capture them --- reported as-is.
 \textbf{Horizon effect:} at 30 frames OURS ties \texttt{error\_only} ($-0.01\,\mathrm{dB}$ on \texttt{fr2\_xyz}); the lead needs $\ge 100$ frames for bloat to bite --- short-horizon evals hide dilution, so we benchmark 150.
 \textbf{Ablation (deltas transfer across substrates):} warmup $-0.75$, coverage $+1.04$, backlog $+1.08$, learned utility $+$ adaptive-$K$ $-1.54\,\mathrm{dB}$.
 \textbf{Systems:} scheduler overhead $2.54\,\mathrm{ms}$; optimization-budgeted execution at $\sim 10\,\mathrm{FPS}$ measured --- \textit{not} end-to-end $15\,\mathrm{ms}$ real-time, reported as such.

@@ -78,9 +78,19 @@ def main():
             rows.append(row)
             print(f"{sc} seed={seed}: adaptive PSNR={s['mean_psnr']:.2f} routes={s['route_frac']}",
                   flush=True)
-    json.dump({"metadata": {"scenes": a.scenes, "n_frames": a.n_frames, "seeds": a.seeds,
+    fp = out / "adaptive_perframe.json"
+    prev = []
+    if fp.exists():
+        try:
+            old = json.load(open(fp))
+            prev = [r for r in old.get("rows", [])
+                    if not (r["scene"] in a.scenes)]
+        except Exception:
+            prev = []
+    json.dump({"metadata": {"scenes": sorted({r["scene"] for r in prev + rows}),
+                            "n_frames": a.n_frames, "seeds": a.seeds,
                             "note": "per-frame routing, no scene labels; exploratory n=3"},
-               "rows": rows}, open(out / "adaptive_perframe.json", "w"), indent=1)
+               "rows": prev + rows}, open(fp, "w"), indent=1)
     print("wrote", out / "adaptive_perframe.json")
 
 

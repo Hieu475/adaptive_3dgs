@@ -1,8 +1,13 @@
 {
  "metadata": {
   "scenes": [
+   "replica_office0",
+   "replica_office1",
+   "replica_room1",
+   "tum_fr1_room",
+   "tum_fr1_rpy",
    "tum_fr2_xyz",
-   "replica_office0"
+   "tum_fr3_sitting_static"
   ],
   "n_frames": 150,
   "seeds": [
@@ -14,9 +19,129 @@
  },
  "rows": [
   {
+   "scene": "tum_fr1_room",
+   "seed": 42,
+   "mean_psnr": 15.517334914207458,
+   "route_frac": {
+    "error_influence_temporal": 1.0
+   }
+  },
+  {
+   "scene": "tum_fr1_room",
+   "seed": 43,
+   "mean_psnr": 15.481386756896972,
+   "route_frac": {
+    "error_influence_temporal": 1.0
+   }
+  },
+  {
+   "scene": "tum_fr1_room",
+   "seed": 44,
+   "mean_psnr": 15.487784707546234,
+   "route_frac": {
+    "error_influence_temporal": 1.0
+   }
+  },
+  {
+   "scene": "tum_fr1_rpy",
+   "seed": 42,
+   "mean_psnr": 19.960665023326875,
+   "route_frac": {
+    "error_influence_temporal": 1.0
+   }
+  },
+  {
+   "scene": "tum_fr1_rpy",
+   "seed": 43,
+   "mean_psnr": 19.932644927501677,
+   "route_frac": {
+    "error_influence_temporal": 1.0
+   }
+  },
+  {
+   "scene": "tum_fr1_rpy",
+   "seed": 44,
+   "mean_psnr": 19.886371445655822,
+   "route_frac": {
+    "error_influence_temporal": 1.0
+   }
+  },
+  {
+   "scene": "tum_fr3_sitting_static",
+   "seed": 42,
+   "mean_psnr": 25.95690129995346,
+   "route_frac": {
+    "error_influence_temporal": 1.0
+   }
+  },
+  {
+   "scene": "tum_fr3_sitting_static",
+   "seed": 43,
+   "mean_psnr": 25.983619618415833,
+   "route_frac": {
+    "error_influence_temporal": 1.0
+   }
+  },
+  {
+   "scene": "tum_fr3_sitting_static",
+   "seed": 44,
+   "mean_psnr": 25.89931309223175,
+   "route_frac": {
+    "error_influence_temporal": 1.0
+   }
+  },
+  {
+   "scene": "replica_office1",
+   "seed": 42,
+   "mean_psnr": 33.12319820577448,
+   "route_frac": {
+    "error_only": 1.0
+   }
+  },
+  {
+   "scene": "replica_office1",
+   "seed": 43,
+   "mean_psnr": 33.09879941169662,
+   "route_frac": {
+    "error_only": 1.0
+   }
+  },
+  {
+   "scene": "replica_office1",
+   "seed": 44,
+   "mean_psnr": 33.116748646052194,
+   "route_frac": {
+    "error_only": 1.0
+   }
+  },
+  {
+   "scene": "replica_room1",
+   "seed": 42,
+   "mean_psnr": 24.175605135734635,
+   "route_frac": {
+    "error_only": 1.0
+   }
+  },
+  {
+   "scene": "replica_room1",
+   "seed": 43,
+   "mean_psnr": 24.175984558432994,
+   "route_frac": {
+    "error_only": 1.0
+   }
+  },
+  {
+   "scene": "replica_room1",
+   "seed": 44,
+   "mean_psnr": 24.148969337193652,
+   "route_frac": {
+    "error_only": 1.0
+   }
+  },
+  {
    "scene": "tum_fr2_xyz",
    "seed": 42,
-   "mean_psnr": 27.761618900299073,
+   "mean_psnr": 27.670982583363852,
    "route_frac": {
     "error_influence_temporal": 1.0
    }
@@ -24,7 +149,7 @@
   {
    "scene": "tum_fr2_xyz",
    "seed": 43,
-   "mean_psnr": 27.641657416025797,
+   "mean_psnr": 27.622032642364502,
    "route_frac": {
     "error_influence_temporal": 1.0
    }
@@ -32,7 +157,7 @@
   {
    "scene": "tum_fr2_xyz",
    "seed": 44,
-   "mean_psnr": 27.675578610102335,
+   "mean_psnr": 27.689601548512776,
    "route_frac": {
     "error_influence_temporal": 1.0
    }
@@ -40,7 +165,7 @@
   {
    "scene": "replica_office0",
    "seed": 42,
-   "mean_psnr": 30.351941717995537,
+   "mean_psnr": 30.360214698194252,
    "route_frac": {
     "error_only": 1.0
    }
@@ -48,7 +173,7 @@
   {
    "scene": "replica_office0",
    "seed": 43,
-   "mean_psnr": 30.36272017642705,
+   "mean_psnr": 30.38716454698582,
    "route_frac": {
     "error_only": 1.0
    }
@@ -56,7 +181,7 @@
   {
    "scene": "replica_office0",
    "seed": 44,
-   "mean_psnr": 30.374632953393338,
+   "mean_psnr": 30.3462642250639,
    "route_frac": {
     "error_only": 1.0
    }
