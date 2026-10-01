@@ -1,0 +1,16 @@
+{
+ "scenes": [
+  "replica_office0",
+  "replica_room0",
+  "tum_fr1_xyz",
+  "tum_fr1_desk",
+  "tum_fr2_xyz"
+ ],
+ "v3": [
+  0.017,
+  0.022,
+  0.706,
+  0.493,
+  0.714
+ ]
+}

@@ -722,6 +722,15 @@ def load_phase10_sequence(
             ).squeeze(0).permute(1, 2, 0).to(dev)
 
             d_np = depths_mmap[i]
+            d_raw = np.asarray(d_np, dtype=np.float32)
+            raw_invalid = float(1.0 - ((d_raw >= 0.4) & (d_raw <= 4.0)).mean())
+            raw_holes = float(((d_raw == 0) | ~np.isfinite(d_raw)).mean())
+            try:
+                _gx = cv2.Sobel(d_raw, cv2.CV_32F, 1, 0, ksize=3)
+                _gy = cv2.Sobel(d_raw, cv2.CV_32F, 0, 1, ksize=3)
+                raw_edge = float((np.sqrt(_gx * _gx + _gy * _gy) > 0.20).mean())
+            except Exception:
+                raw_edge = 0.0
             d_t = torch.from_numpy(d_np.copy()).float()
             d_scaled = torch.nn.functional.interpolate(
                 d_t.unsqueeze(0).unsqueeze(0), size=(H, W), mode="nearest"
@@ -734,6 +743,9 @@ def load_phase10_sequence(
                 "rgb": rgb_scaled,
                 "depth": d_scaled,
                 "pose": pose_t,
+                "raw_invalid": raw_invalid,
+                "raw_holes": raw_holes,
+                "raw_edge": raw_edge,
             })
         return frames, intrinsics
 
@@ -770,6 +782,17 @@ def load_phase10_sequence(
         # Depth hygiene for real-world Kinect sensor
         d_raw = item["depth"].squeeze().numpy()
         import cv2
+        # Raw (pre-hygiene) sensor-noise stats for the noise-adaptive
+        # controller: post-hygiene depth has the noise signal scrubbed, so
+        # stash raw invalid ratio + raw edge density per frame. Cheap (~ms).
+        try:
+            _rgx = cv2.Sobel(d_raw.astype(np.float32), cv2.CV_32F, 1, 0, ksize=3)
+            _rgy = cv2.Sobel(d_raw.astype(np.float32), cv2.CV_32F, 0, 1, ksize=3)
+            raw_invalid = float(1.0 - (((d_raw >= 0.4) & (d_raw <= 4.0))).mean())
+            raw_holes = float(((d_raw == 0) | ~np.isfinite(d_raw)).mean())
+            raw_edge = float((np.sqrt(_rgx * _rgx + _rgy * _rgy) > 0.20).mean())
+        except Exception:
+            raw_invalid, raw_holes, raw_edge = 0.3, 0.25, 0.05
         valid_raw = (d_raw >= 0.4) & (d_raw <= 4.0)
         near_valid = cv2.dilate(valid_raw.astype(np.uint8), np.ones((7, 7), np.uint8)) > 0
         small_holes = ((d_raw == 0) | (d_raw < 0.4)) & near_valid
@@ -806,6 +829,9 @@ def load_phase10_sequence(
             "rgb": rgb_scaled.to(dev),
             "depth": depth_scaled.to(dev),
             "pose": w2c_pose.to(dev),
+            "raw_invalid": raw_invalid,
+            "raw_holes": raw_holes,
+            "raw_edge": raw_edge,
         })
 
     return frames, intrinsics

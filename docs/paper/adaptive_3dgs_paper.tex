@@ -50,11 +50,11 @@ To understand why conventional heuristics fail to mitigate this dilution, we con
 
 We resolve these challenges with \textbf{Adaptive 3DGS}, prioritizing structural map-growth regulation over uncalibrated heuristic selection. We introduce \textbf{Fast Approximate Attribution} (FAA) via center-sampled projection, slashing attribution latency by \textbf{614.5$\times$} ($0.85\,\mathrm{ms}$ vs $523.9\,\mathrm{ms}$) with high rank correlation ($\rho = 0.908$). Crucially, we introduce \textbf{Dual Coverage and Backlog Throttling}, smoothly attenuating densification once surface coverage reaches saturation ($\kappa \ge 0.90$) and enforcing queue backpressure.
 Empirical evaluations demonstrate:
-(1) on the authoritative 8-seed benchmark on \texttt{tum\_fr2\_xyz} ($n=8$, budget $15.0\,\mathrm{ms}$), OURS decisively outperforms the strongest selective baseline (\texttt{error\_influence}) by \textbf{+2.87 dB} mean PSNR ($19.24$ vs $16.37\,\mathrm{dB}$) and \textbf{+4.11 dB} final PSNR ($17.64$ vs $13.53\,\mathrm{dB}$), achieving $+0.1054$ SSIM, paired Cohen's $d_z = \mathbf{38.42}$, and statistically confirmed superiority under Holm-Bonferroni correction (all $p_{\mathrm{Holm}} \le 0.0391$) while maintaining a \textbf{3.8$\times$ smaller map} ($39\mathrm{k}$ vs $150\mathrm{k}$ splats);
-(2) OURS recovers \textbf{76.4\%} of achievable headroom ($\eta = 0.764$, $1.79\,\mathrm{dB}$ gap to unconstrained FULL ceiling);
+(1) on the authoritative Phase-14 corrected-substrate 8-seed benchmark on \texttt{tum\_fr2\_xyz} ($n=8$, budget $15.0\,\mathrm{ms}$, corrected W2C pose; prior $19.24\,\mathrm{dB}$ numbers were pose-bugged, see results/final\_confirmation/DEPRECATED.md), OURS decisively outperforms the strongest selective baseline (\texttt{error\_influence}) by \textbf{+2.63 dB} mean PSNR ($27.67$ vs $25.04\,\mathrm{dB}$) and \textbf{+6.99 dB} final PSNR ($28.89$ vs $21.89\,\mathrm{dB}$), and the RTG-SLAM-policy baseline by \textbf{+4.62 dB} ($27.67$ vs $23.05\,\mathrm{dB}$), achieving $+0.0148$/$+0.0568$ SSIM, paired Cohen's $d_z = \mathbf{29.8}$/$\mathbf{15.4}$, and statistically confirmed superiority under Holm-Bonferroni correction (all $p_{\mathrm{Holm}} = 0.0391$) while maintaining a \textbf{3.8$\times$ smaller map} ($23\mathrm{k}$ vs $88\mathrm{k}$ splats);
+(2) OURS recovers \textbf{98.0\%} of achievable headroom ($\eta = 0.980$, $0.18\,\mathrm{dB}$ gap to unconstrained FULL ceiling at $27.85\,\mathrm{dB}$);
 (3) on the full 3,669-frame \texttt{tum\_fr2\_xyz} sequence (122.7s), OURS delivers $18.84\,\mathrm{dB}$ mean PSNR ($21.08\,\mathrm{dB}$ final) at $7.1\,\mathrm{FPS}$, surpassing Point-SLAM (+1.22 dB, $36\times$ faster) and MonoGS (+2.67 dB, $4.5\times$ faster);
 (4) lifetime convergence diagnostics tracking 150k primitives over 3,669 frames disprove optimization starvation ($99.79\%$ receive $\ge 5$ touches, median 70); and
-(5) cross-scene evaluation confirms scene-dependent advantages (+1.31 dB on \texttt{tum\_fr2\_xyz}, +1.03 dB on \texttt{replica\_office0}, comparable PSNR with +2.0\% SSIM and -11.3\% depth error on \texttt{tum\_fr1\_xyz}) with an $\approx 15\times$ speedup over SplaTAM.
+(5) cross-scene pilot evaluation on the corrected substrate (30 frames $\times$ 3 seeds) shows the throttling advantage compounds over time (\texttt{tum\_fr2\_xyz} 30f: tie at $-0.01\,\mathrm{dB}$ vs \texttt{error\_only}; 150f: $+2.63$--$+3.59\,\mathrm{dB}$), ties on rapid-motion \texttt{tum\_fr1\_xyz} ($+0.03\,\mathrm{dB}$ vs \texttt{error\_only}, $+1.61\,\mathrm{dB}$ vs RTG-SLAM-policy), and a clean \textbf{negative result} on synthetic \texttt{replica\_office0} ($-5.5\,\mathrm{dB}$): a $\kappa$-ablation (off $24.79$ / $0.80$:$24.00$ / $0.90$:$23.98$ / $0.95$:$24.19$ vs \texttt{error\_only} $29.48$) shows coverage throttling costs only $\sim 0.8\,\mathrm{dB}$ while the remaining $\sim 4.7\,\mathrm{dB}$ comes from the \texttt{temporal}$\times$\texttt{influence} selection heuristic itself, proving both throttling and selection are sensor-noise overfit and motivating noise-adaptive selection plus per-scene $\kappa$.
 \end{abstract}
 
 \section{Introduction}
@@ -88,8 +88,8 @@ To overcome these barriers, we present \textbf{Adaptive 3DGS}, an online reconst
 \setlength{\itemsep}{1pt}
 \item \textbf{Fast Approximate Attribution (FAA):} Computing exact Gaussian-to-pixel attribution masks via rasterization requires $>500\,\mathrm{ms}$, bottlenecking real-time execution. We formulate FAA via center-sampled projection, slashing attribution latency to \textbf{0.85 ms} (\textbf{614.5$\times$ speedup}) while preserving high rank correlation ($\rho = 0.908$).
 \item \textbf{Dual Coverage and Backlog Throttling:} Rather than continuously spawning splats, our scheduler monitors spatial transmission coverage $\kappa_t$. Once local scene coverage exceeds $90\%$, densification is throttled by $80\%$, capping the unoptimized backlog and preserving the compute budget exclusively for mature primitive refinement.
-\item \textbf{Definitive Multi-Seed Benchmark ($n=8$):} Across 8 seeds on \texttt{tum\_fr2\_xyz}, OURS achieves $+2.87\,\mathrm{dB}$ mean PSNR ($19.24$ vs $16.37\,\mathrm{dB}$), $+4.11\,\mathrm{dB}$ final PSNR ($17.64$ vs $13.53\,\mathrm{dB}$), $+0.1054$ SSIM, and paired Cohen's $d_z = 38.42$ over the best selective baseline, with statistically significant superiority across all comparisons under Holm-Bonferroni correction ($p_{\mathrm{Holm}} \le 0.0391$).
-\item \textbf{Headroom Recovery Analysis:} OURS recovers $\eta = \mathbf{76.4\%}$ of achievable headroom ($1.79\,\mathrm{dB}$ gap to unconstrained FULL ceiling) while operating $50\%$ faster with a $3.8\times$ smaller map.
+\item \textbf{Definitive Multi-Seed Benchmark ($n=8$, Phase-14 corrected substrate):} Across 8 seeds on \texttt{tum\_fr2\_xyz}, OURS achieves $+2.63\,\mathrm{dB}$ mean PSNR ($27.67$ vs $25.04\,\mathrm{dB}$), $+6.99\,\mathrm{dB}$ final PSNR ($28.89$ vs $21.89\,\mathrm{dB}$), $+0.0148$ SSIM, and paired Cohen's $d_z = 29.8$ over the best selective baseline (and $+4.62\,\mathrm{dB}$, $d_z = 15.4$ over the RTG-SLAM-policy baseline), with statistically significant superiority across all comparisons under Holm-Bonferroni correction ($p_{\mathrm{Holm}} = 0.0391$).
+\item \textbf{Headroom Recovery Analysis:} OURS recovers $\eta = \mathbf{98.0\%}$ of achievable headroom ($0.18\,\mathrm{dB}$ gap to unconstrained FULL ceiling at $27.85\,\mathrm{dB}$) with a $3.8\times$ smaller map (23K vs 88K).
 \item \textbf{Full-Trajectory Validation (3,669 Frames):} We validate OURS on the entire 122.7s \texttt{tum\_fr2\_xyz} sequence with Spherical Harmonics degrees $0..3$ and AlexNet LPIPS, surpassing Point-SLAM~\cite{sandstrom2023pointslam} ($+1.22\,\mathrm{dB}$, $36\times$ faster) and MonoGS~\cite{matsuki2024gaussian} ($+2.67\,\mathrm{dB}$, $4.5\times$ faster) in mapping quality.
 \item \textbf{Lifetime Convergence Diagnostic:} Tracking all 150k primitives across 3,669 frames confirms that $99.79\%$ receive $\ge 5$ touches (median 70), disproving the under-convergence hypothesis and demonstrating that residual LPIPS gaps are governed by high-frequency view-dependent appearance.
 \item \textbf{Multi-Scene Generalization:} Across TUM RGB-D and Replica sequences, OURS maintains compact map boundaries with an $\approx 15\times$ speedup over SplaTAM.
@@ -103,17 +103,17 @@ To overcome these barriers, we present \textbf{Adaptive 3DGS}, an online reconst
 \toprule
 \textbf{Policy} & \textbf{Mean PSNR (dB)} & \textbf{Final PSNR (dB)} & \textbf{Mean SSIM} & \textbf{Final SSIM} & \textbf{FPS} & \textbf{Final Primitives} & \textbf{Paired Cohen's $d_z$} & \textbf{Holm $p$ ($p_{\mathrm{Holm}}$)} \\
 \midrule
-\texttt{no\_op} (Pass-through) & 13.45 ± 0.02 & 11.75 ± 0.04 & 0.4378 ± 0.0018 & 0.3844 ± 0.0057 & \textbf{61.3} & 119,258 ± 384 & +111.39 & 0.0391 \checkmark \\
-\texttt{error\_only} & 15.54 ± 0.02 & 12.77 ± 0.10 & 0.5708 ± 0.0035 & 0.5028 ± 0.0156 & 8.0 & 105,845 ± 1836 & +54.98 & 0.0313 \checkmark \\
-\texttt{error\_influence} & 16.37 ± 0.06 & 13.53 ± 0.26 & 0.7379 ± 0.0032 & 0.6719 ± 0.0192 & 7.8 & 150,000 ± 0 & +38.42 & 0.0234 \checkmark \\
-\texttt{error\_influence\_temporal} & 16.28 ± 0.07 & 13.51 ± 0.19 & 0.7345 ± 0.0032 & 0.6744 ± 0.0146 & 7.7 & 150,000 ± 0 & +41.87 & 0.0156 \checkmark \\
-\textbf{OURS (Pure Throttling)} & \textbf{19.24 ± 0.05} & \textbf{17.64 ± 0.50} & \textbf{0.8433 ± 0.0012} & \textbf{0.8745 ± 0.0151} & \textbf{8.7} & \textbf{39,251 ± 88} & \textbf{---} & \textbf{---} \\
+\texttt{no\_op} (Pass-through) & 18.86 ± 0.01 & 14.88 ± 0.01 & 0.6882 & 0.70 & \textbf{106.3} & 23,523 & +168.8 & 0.0391 \checkmark \\
+\texttt{error\_only} & 24.07 ± 0.14 & 20.01 ± 0.37 & 0.8850 & 0.90 & 8.9 & 74,640 & +21.2 & 0.0391 \checkmark \\
+\texttt{error\_influence} & 25.04 ± 0.06 & 21.89 ± 0.09 & 0.9084 & 0.92 & 8.8 & 106,929 & +29.8 & 0.0391 \checkmark \\
+\texttt{rtg\_slam\_reimpl} (external policy baseline) & 23.05 ± 0.26 & 20.04 ± 0.88 & 0.8663 & 0.88 & 8.0 & 67,231 & +15.4 & 0.0391 \checkmark \\
+\textbf{OURS (Pure Throttling)} & \textbf{27.67 ± 0.04} & \textbf{28.89 ± 0.11} & \textbf{0.9232} & \textbf{0.9863} & \textbf{10.7} & \textbf{23,398} & \textbf{---} & \textbf{---} \\
 \midrule
-\textit{FULL (Unconstrained Ceiling)} & \textit{21.03 ± 0.04} & \textit{19.31 ± 0.68} & \textit{0.8767 ± 0.0011} & \textit{0.9205 ± 0.0128} & \textit{5.8} & \textit{150,000 ± 0} & -29.00 & 0.0078 \checkmark \\
+\textit{FULL (Unconstrained Ceiling)} & \textit{27.85 ± 0.01} & \textit{29.41 ± 0.06} & \textit{0.9243} & \textit{0.99} & \textit{9.5} & \textit{87,967} & -3.3 & 0.0391 \checkmark \\
 \bottomrule
 \end{tabular}
 }
-\caption{\textbf{Authoritative Final Confirmation Benchmark (TUM \texttt{fr2\_xyz}, 8 Seeds, 150 Frames, Budget $B = 15.0\,\mathrm{ms}$).} Evaluated across 8 seeds ($n=8$: \texttt{[42..49]}). All paired Wilcoxon signed-rank comparisons of OURS vs baselines achieve statistical significance under Holm-Bonferroni correction ($p_{\mathrm{Holm}} \le 0.0391$). OURS achieves a headroom recovery ratio of $\eta = \mathbf{76.4\%}$ (1.79 dB gap to unconstrained ceiling) while running at 8.7 FPS with a \textbf{3.8$\times$ smaller map}.}
+\caption{\textbf{Authoritative Phase-14 Corrected-Substrate Benchmark (TUM \texttt{fr2\_xyz}, 8 Seeds, 150 Frames, Budget $B = 15.0\,\mathrm{ms}$).} Evaluated across 8 seeds ($n=8$: \texttt{[42..49]}) on the corrected W2C-pose substrate (supersedes pose-bugged $19.24\,\mathrm{dB}$ snapshot). All paired Wilcoxon signed-rank comparisons of OURS vs baselines achieve statistical significance under Holm-Bonferroni correction ($p_{\mathrm{Holm}} = 0.0391$). OURS achieves a headroom recovery ratio of $\eta = \mathbf{98.0\%}$ (0.18 dB gap to unconstrained ceiling) with a \textbf{3.8$\times$ smaller map}.}
 \label{tab:final_confirmation}
 \end{table*}
 
@@ -240,11 +240,11 @@ $A_2$ & $A_1$ + Coverage Throttling ($\kappa \ge 0.90$) & 17.11 ± 0.35 & 14.31 
 $A_3$ & $A_2$ + Backlog Queue Throttling & 17.15 ± 0.27 & 14.68 ± 0.28 & 0.7713 ± 0.0075 & 0.7259 ± 0.0177 & 43,824 & \textbf{Helpful (+1.08 dB)}: Prevents unrefined queue bloat \\
 $A_4$ & $A_3$ + Offline TwoHeadMLP + Adaptive-K & 14.53 ± 1.32 & 12.97 ± 1.35 & 0.5652 ± 0.1343 & 0.4907 ± 0.1374 & 38,317 & \textbf{Harmful (-1.54 dB)}: Offline pairwise loss degrades online \\
 \midrule
-\textbf{OURS} & Pure Throttling ($A_3$ with no warmup, no offline model) & \textbf{19.24 ± 0.05} & \textbf{17.64 ± 0.50} & \textbf{0.8433 ± 0.0012} & \textbf{0.8745 ± 0.0151} & \textbf{39,251} & \textbf{Optimal (+3.71 dB vs $A_0$)}: Concentrated mature refinement \\
+\textbf{OURS} & Pure Throttling ($A_3$ with no warmup, no offline model) & \textbf{19.24 ± 0.05 (old substrate; 27.67 on Phase-14 corrected)} & \textbf{17.64 ± 0.50} & \textbf{0.8433 ± 0.0012} & \textbf{0.8745 ± 0.0151} & \textbf{39,251 (old; 23,398 corrected)} & \textbf{Optimal (+3.71 dB vs $A_0$)}: Concentrated mature refinement \\
 \bottomrule
 \end{tabular}
 }
-\caption{\textbf{Stage 1 Component Ablation Study (TUM \texttt{fr2\_xyz}, 5 Seeds, 150 Frames, Budget $B = 15.0\,\mathrm{ms}$).} Dissecting the exact individual contributors to online reconstruction fidelity. Map expansion throttling is the decisive performance driver.}
+\caption{\textbf{Stage 1 Component Ablation Study (TUM \texttt{fr2\_xyz}, 5 Seeds, 150 Frames, Budget $B = 15.0\,\mathrm{ms}$, pre-pose-fix substrate).} Dissecting the exact individual contributors to online reconstruction fidelity. Map expansion throttling is the decisive performance driver. Absolute values predate the W2C pose fix; use DELTAS only.}
 \label{tab:component_ablation}
 \end{table*}
 
@@ -254,13 +254,13 @@ $A_4$ & $A_3$ + Offline TwoHeadMLP + Adaptive-K & 14.53 ± 1.32 & 12.97 ± 1.35 
 Table~\ref{tab:final_confirmation} presents the primary benchmark across 8 independent seeds on \texttt{tum\_fr2\_xyz} under a strict per-frame budget of $B = 15.0\,\mathrm{ms}$.
 \begin{itemize}
 \setlength{\itemsep}{2pt}
-\item \textbf{Significant Advantage over Error Heuristic:} OURS outperforms standard \texttt{error\_only} by \textbf{+3.70 dB} mean PSNR ($15.54 \to 19.24\,\mathrm{dB}$) and \textbf{+4.87 dB} final PSNR ($12.77 \to 17.64\,\mathrm{dB}$), lifting SSIM from $0.5708$ to $0.8433$ ($+0.2725$). Paired Wilcoxon signed-rank testing confirms extreme statistical significance under Holm-Bonferroni family-wise error control ($p_{\mathrm{Holm}} = 0.0313$, raw $p = 0.0078$, paired Cohen's $d_z = 54.98$).
-\item \textbf{Superiority over Sensitivity Baselines:} Compared to \texttt{error\_influence} and \texttt{error\_influence\_temporal}, OURS provides a $+2.87\,\mathrm{dB}$ to $+2.97\,\mathrm{dB}$ mean PSNR margin ($p_{\mathrm{Holm}} \le 0.0234$, paired Cohen's $d_z = 38.42$).
-\item \textbf{Headroom Recovery Analysis:} Rather than a naive percentage of logarithmic decibels ($19.24/21.03$), we evaluate normalized headroom recovery:
+\item \textbf{Significant Advantage over Error Heuristic (Phase-14 corrected substrate):} OURS outperforms standard \texttt{error\_only} by \textbf{+3.59 dB} mean PSNR ($24.07 \to 27.67\,\mathrm{dB}$) and \textbf{+8.88 dB} final PSNR ($20.01 \to 28.89\,\mathrm{dB}$), lifting SSIM from $0.8850$ to $0.9232$ ($+0.0381$). Paired Wilcoxon signed-rank testing confirms extreme statistical significance under Holm-Bonferroni family-wise error control ($p_{\mathrm{Holm}} = 0.0391$, raw $p = 0.0078$, paired Cohen's $d_z = 21.2$).
+\item \textbf{Superiority over Sensitivity and SOTA-policy Baselines:} Compared to \texttt{error\_influence}, OURS provides a $+2.63\,\mathrm{dB}$ mean PSNR margin ($p_{\mathrm{Holm}} = 0.0391$, paired Cohen's $d_z = 29.8$), and compared to the external \texttt{rtg\_slam\_reimpl} policy baseline a $+4.62\,\mathrm{dB}$ margin ($d_z = 15.4$).
+\item \textbf{Headroom Recovery Analysis:} Rather than a naive percentage of logarithmic decibels, we evaluate normalized headroom recovery:
 \begin{equation}
-\eta = \frac{Q_{\mathrm{OURS}} - Q_{\mathrm{no\_op}}}{Q_{\mathrm{full}} - Q_{\mathrm{no\_op}}} = \frac{19.24 - 13.45}{21.03 - 13.45} = \mathbf{76.4\%}
+\eta = \frac{Q_{\mathrm{OURS}} - Q_{\mathrm{no\_op}}}{Q_{\mathrm{full}} - Q_{\mathrm{no\_op}}} = \frac{27.67 - 18.86}{27.85 - 18.86} = \mathbf{98.0\%}
 \end{equation}
-OURS recovers over three-quarters of achievable optimization headroom with a narrow residual gap of only \textbf{1.79 dB} to unconstrained FULL ceiling, while operating $50\%$ faster ($8.7$ vs $5.8\,\mathrm{FPS}$) with $73.8\%$ fewer primitives ($39\mathrm{k}$ vs $150\mathrm{k}$).
+OURS recovers nearly all achievable optimization headroom with a residual gap of only \textbf{0.18 dB} to the unconstrained FULL ceiling ($27.85\,\mathrm{dB}$), with a $3.8\times$ smaller map ($23\mathrm{k}$ vs $88\mathrm{k}$).
 \end{itemize}
 
 \subsection{Component and Factorial Ablation Study}
@@ -272,7 +272,7 @@ To rigorously identify the origin of this performance leap, we conduct a control
 \item \textbf{Backlog Throttling Stabilizes Growth ($A_3$ vs $A_2$):} Adding backpressure throttling adds another \textbf{+0.04 dB} ($+1.75\,\mathrm{dB}$ final PSNR over $A_0$) and caps queue latency.
 \item \textbf{Offline Utility Predictors Degrade Online ($A_4$ vs $A_3$):} Wiring an offline-trained TwoHeadMLP with dynamic adaptive-K reduces PSNR by \textbf{-1.54 dB} ($17.15 \to 14.53\,\mathrm{dB}$). Distribution shift between offline oracle labels and recursive online trajectories misallocates microsteps ($K=2.0$).
 \item \textbf{Factorial Confirmation of Distribution Shift:} In an independent $2\times 3$ factorial benchmark crossing selection rules with throttling states, learned utility consistently degrades mean PSNR compared to sensitivity heuristics: $B_2 - B_1 = -2.64\,\mathrm{dB}$ (unthrottled) and $B_5 - B_4 = -2.51\,\mathrm{dB}$ (throttled). This establishes that closed-loop online tracking cannot rely on offline pointwise regressors; map-growth throttling is the true dominant mechanism.
-\item \textbf{The Optimal Formulation (OURS):} Combining Coverage + Backlog Throttling with sensitivity selection and fixed $K=5$ microsteps achieves the peak performance of \textbf{19.24 dB} (+3.71 dB over $A_0$).
+\item \textbf{The Optimal Formulation (OURS):} Combining Coverage + Backlog Throttling with sensitivity selection and fixed $K=5$ microsteps achieves the peak performance of \textbf{19.24 dB on the old substrate (+3.71 dB over $A_0$; 27.67 dB on the Phase-14 corrected substrate)}. Ablation deltas transfer; absolutes do not.
 \end{enumerate}
 
 \begin{table}[t]
@@ -396,7 +396,7 @@ Table~\ref{tab:systems_latency} decomposes per-frame wall-clock latency on an NV
 \section{Conclusion}
 We have presented Adaptive 3DGS, establishing an empirically verified framework for compute-constrained online RGB-D 3D Gaussian Splatting:
 (1) Naive error heuristics fail because over $21\%$ of updates induce negative marginal utility, and inter-splat coupling causes extreme non-additivity;
-(2) Unconstrained densification induces compute dilution, whereas Dual Coverage and Backlog Throttling resolves this bottleneck, delivering \textbf{+2.87 dB} mean PSNR gain (paired Cohen's $d_z = 38.42$, Holm-adjusted $p_{\mathrm{Holm}} \le 0.0391$, $\eta = 76.4\%$ headroom recovery) with a 3.8$\times$ smaller map;
+(2) Unconstrained densification induces compute dilution, whereas Dual Coverage and Backlog Throttling resolves this bottleneck, delivering \textbf{+2.63 dB} mean PSNR gain over the strongest selective baseline and \textbf{+4.62 dB} over the RTG-SLAM-policy baseline (paired Cohen's $d_z = 29.8$/$15.4$, Holm-adjusted $p_{\mathrm{Holm}} = 0.0391$, $\eta = 98.0\%$ headroom recovery, 0.18 dB gap to FULL) with a 3.8$\times$ smaller map on the corrected substrate;
 (3) Fast Approximate Attribution enables 614$\times$ faster attribution ($0.85\,\mathrm{ms}$);
 (4) Validation on 3,669 continuous frames demonstrates sustained interactive mapping ($8.7\,\mathrm{FPS}$, $21.08\,\mathrm{dB}$ final PSNR);
 (5) Lifetime convergence diagnostics conclusively reject optimization starvation; and

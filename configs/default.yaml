@@ -1,10 +1,16 @@
 # Default configuration for Adaptive 3D Gaussian Splatting
+# CANONICAL SOURCE: research/pipeline.py::OnlineReconstructionPipeline._default_config()
+# configs/default.yaml must mirror it. Canonical benchmark overrides:
+# sh_degree=0/1 (see run_final_confirmation.py), gpu_budget_ms=15.0, max_gaussians=500000.
+# Do NOT set sh_degree=3 / max_gaussians=5M here — those are legacy values kept only for offline rendering.
 gaussian:
-  initial_opacity: 0.1
+  initial_opacity: 0.5
   opacity_threshold: 0.01
-  max_gaussians: 5000000
-  sh_degree: 3
+  max_gaussians: 500000
+  sh_degree: 0
   confidence_init: 0.5
+  init_refine_steps: 0
+  init_warmup_mature: false
 rendering:
   tile_size: 16
   image_width: 640
@@ -23,14 +29,24 @@ importance:
   temporal: 0.5
   screen_space: 0.2
 scheduler:
-  gpu_budget_ms: 16.6
+  gpu_budget_ms: 15.0
   tier_thresholds: [0.8, 0.5, 0.2]
   optimize_every_n_frames: 5
+  policy: budget_aware
+  optimize_ratio: 0.5
+  cost_per_gaussian_us: 0.5
+  enable_warmup: false # Ablation A1: warmup harmful (-0.75 dB), keep OFF
 densification:
-  max_new_per_frame: 1000
+  max_new_per_frame: 500
+  strategy: importance
+  use_adaptive_thresholds: true
+  adaptive_k: 2.0
   error_threshold_color: 0.1
   error_threshold_depth: 0.05
   transmission_threshold: 0.5
+  enable_coverage_throttling: true # Core contribution: OURS pure throttling
+  throttle_coverage_threshold: 0.90
+  throttle_factor: 0.20
 tracking:
   icp_iterations: 30
   convergence_threshold: 1e-4

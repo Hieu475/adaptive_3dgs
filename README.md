@@ -15,7 +15,7 @@
 Dense online 3D reconstruction from streaming RGB-D sensors requires maintaining photometric and geometric fidelity under rigid per-frame execution deadlines ($15\text{–}30\text{ ms}$). In compute-constrained online 3D Gaussian Splatting (3DGS), we identify a fundamental structural bottleneck: **uncontrolled densification causes exponential Gaussian map bloat ($\sim 150\text{k}$ splats)**, which dilutes per-frame compute and starves existing mature surface geometry of gradient descent updates.
 
 We establish the following scientific hierarchy:
-1. **Primary Contribution (Dual Map-Growth Throttling)**: By coupling surface coverage saturation ($\kappa \ge 0.90$) with backlog queue backpressure, our dual throttling mechanism halts compute dilution, keeping the map compact ($39\text{k}$ vs $150\text{k}$ primitives) and directing compute exclusively to mature Gaussian refinement. This delivers **+2.87 dB** mean PSNR over standard selective baselines ($p = 0.0078$).
+1. **Primary Contribution (Dual Map-Growth Throttling)**: By coupling surface coverage saturation ($\kappa \ge 0.90$) with backlog queue backpressure, our dual throttling mechanism halts compute dilution, keeping the map compact ($23\text{k}$ vs $88\text{k}$ primitives) and directing compute exclusively to mature Gaussian refinement. This delivers **+2.63 dB** mean PSNR over the strongest selective baseline and **+4.62 dB** over the RTG-SLAM-policy baseline ($p_{\text{Holm}} = 0.0391$, $n=8$), recovering **98.0%** of headroom to the unconstrained ceiling (gap only 0.18 dB).
 2. **Secondary Analytical Framework (Gaussian Marginal Utility)**: We prove that residual error does not imply positive optimization return: on occluding silhouettes, planar surfaces, and saturated regions, naive gradient updates frequently degrade local geometry ($U_i^\star < 0$ in $20\text{–}24\%$ of interventions). Furthermore, Gaussian utility is strongly non-additive ($R_{\text{add}}(4) \approx -0.36, R_{\text{add}}(16) \approx 0.005$), explaining why pointwise heuristics cannot achieve true combinatorial optimality.
 3. **Failure Analysis (Offline Learned Utility $\to$ Closed-Loop Transfer)**: While offline utility prediction exhibits moderate rank correlation ($\rho = 0.2035$), closed-loop factorial experiments reveal that pointwise learned models degrade online PSNR ($-2.51\text{ dB}$) due to offline-to-online distribution shift and inter-Gaussian gradient coupling. We report this transparently as a scientific negative finding.
 
@@ -37,9 +37,9 @@ We establish the following scientific hierarchy:
 | Research Question | Core Hypothesis | Empirical Finding & Authoritative Status |
 | :--- | :--- | :--- |
 | **RQ1: State Predictability** | Can observable Gaussian state variables $X_t$ predict marginal utility $U_i^\star$? | **Affirmative (Moderate Predictive Signal)**: Observable Gaussian state contains predictive information about marginal utility ($\rho = 0.2035 \pm 0.172$, $\text{NDCG@20} = 0.4566$). Interventions exhibit negative marginal utility ($U_i^\star < 0$): $20.5\%$ in visible-only pilot evaluations (`fr1_desk`), $21.37\%$ in geometry-stratified interventions (`fr2_xyz`, rising to $23.86\%$ in top-error decile), and $13.33\%$ in unstratified observations. |
-| **RQ2: Budgeted Selection vs Map Throttling** | Does learned utility selection drive closed-loop online reconstruction gains? | **Negative Result for Learned Selection / Dominant Role of Throttling**: In offline Gate 2 ranking, learned utility achieves $\text{OSE} = 0.3535 \pm 0.079$ vs Error $\text{OSE} = 0.3454$ ($p = 0.40625$, not statistically distinguishable). In online factorial ablations, learned utility degrades PSNR ($B_5 - B_4 = -2.51\text{ dB}$) due to offline-to-online distribution shift. Map-growth throttling is the decisive empirical driver ($+2.87\text{ dB}$). |
+| **RQ2: Budgeted Selection vs Map Throttling** | Does learned utility selection drive closed-loop online reconstruction gains? | **Negative Result for Learned Selection / Dominant Role of Throttling**: In offline Gate 2 ranking, learned utility achieves $\text{OSE} = 0.3535 \pm 0.079$ vs Error $\text{OSE} = 0.3454$ ($p = 0.40625$, not statistically distinguishable). In online factorial ablations, learned utility degrades PSNR ($B_5 - B_4 = -2.51\text{ dB}$) due to offline-to-online distribution shift. Map-growth throttling is the decisive empirical driver ($+2.63\text{ dB}$ vs strongest selective, $+4.62\text{ dB}$ vs RTG-SLAM-policy, Phase-14 corrected substrate). |
 | **RQ3: Non-Additivity & Oracle Formulation** | Can pointwise top-$K$ oracle ranking serve as a true combinatorial upper bound? | **Resolved as Non-Additive Contextual Reference**: Group interventions show severe non-additivity ($R_{\text{add}}(4) \approx -0.358$, $R_{\text{add}}(16) \approx 0.0053$). Pointwise top-$K$ ranking is a Pointwise Oracle Reference rather than a combinatorial subset upper bound (explaining empirical $\text{OSE} > 1.0$ observations). True subset selection requires greedy contextual oracles. |
-| **RQ4: Closed-Loop Integration** | Does the integrated throttling pipeline deliver robust reconstruction under rigid budgets? | **Affirmative (Definitive Multi-Seed Confirmation)**: On \texttt{tum\_fr2\_xyz} across 8 seeds ($n=8$), OURS outperforms the strongest baseline by $+2.87\text{ dB}$ ($p = 0.0078$, paired Cohen's $d_z = 38.42$) with a $3.8\times$ smaller map while recovering $76.4\%$ of available headroom over NO_OP. |
+| **RQ4: Closed-Loop Integration** | Does the integrated throttling pipeline deliver robust reconstruction under rigid budgets? | **Affirmative (Phase-14 Corrected Substrate)**: On \texttt{tum\_fr2\_xyz} across 8 seeds ($n=8$), OURS outperforms the strongest selective baseline by $+2.63\text{ dB}$ ($p_{\text{Holm}} = 0.0391$, $d_z = 29.8$) and the RTG-SLAM-policy baseline by $+4.62\text{ dB}$ ($d_z = 15.4$) with a $3.8\times$ smaller map (23K vs 88K) while recovering $98.0\%$ of headroom to FULL (gap 0.18 dB). Prior $19.24\text{ dB}$ / $76.4\%$ numbers were pose-bugged — see `results/final_confirmation/DEPRECATED.md`. |
 
 ---
 
@@ -133,15 +133,27 @@ flowchart TD
 
 ## 5. Authoritative Results
 
+> [!CAUTION]
+> **Phase 10 numbers below (12.34 dB, 30 frames, Python rasterizer) are HISTORICAL and SUPERSEDED.**
+> They are kept only for provenance of Gates 10A–10E. The authoritative benchmark is **Phase 13 / Final Confirmation
+> in Sec.12 / `results/phase14_corrected/`: `tum_fr2_xyz` 150 frames x 8 seeds, OURS (Pure Throttling) 27.67 dB, +2.63 dB vs strongest selective / +4.62 dB vs RTG-SLAM-policy, 98.0% headroom**.
+> `OURS` is redefined as **Pure Throttling (Coverage κ≥0.90 + Backlog, No Warmup, Fixed K=5, No learned utility)**
+> per `results/final_confirmation/final_confirmation_report.md`. The learned TwoHeadMLP pipeline described in Sec.3
+> is retained as a documented negative result (offline ρ=0.20 but closed-loop -2.51 dB).
+
+<details>
+<summary>Phase 10 historical snapshot (30 frames, 5 seeds [42-46], B=15ms, superseded — click to expand)</summary>
+
 Evaluated on the zero-shot unseen test scene `tum_fr2_xyz` across **5 seeds** (`[42, 43, 44, 45, 46]`) under a per-frame budget deadline $B = 15.0\text{ ms}$ (30 continuous trajectory frames, 464 evaluated steps, zero crashes):
 
-### Primary Benchmark Comparison
+### Primary Benchmark Comparison (HISTORICAL — see Sec.12 for authoritative)
 | Policy | Mean PSNR | Final PSNR | Mean Opt | Mean Frame |
 | :--- | :---: | :---: | :---: | :---: |
 | **NO_OP** | 12.34 dB | 12.15 dB | 0 ms | 6505.6 ms |
 | **ERROR_ONLY** | 12.34 dB | 12.14 dB | 10.36 ms | 6805.5 ms |
-| **OURS** | **12.34 dB** | **12.15 dB** | **9.25 ms** | **7005.3 ms** |
+| **OURS (old def.)** | **12.34 dB** | **12.15 dB** | **9.25 ms** | **7005.3 ms** |
 | **FULL** | 12.36 dB | 12.18 dB | 467.6 ms | 7057.8 ms |
+</details>
 
 ### Paired Statistical Evidence: OURS vs ERROR_ONLY ($N = 145$ Paired Frames)
 
@@ -281,8 +293,11 @@ $$T_{\text{opt}} \approx 9.25\text{ ms}$$
 $$T_{\text{frame}} \approx 7005\text{ ms}$$
 
 > [!WARNING]
-> **Essential AI Systems Finding**:
-> **The scheduler satisfies the modeled 15 ms budget, but the current Python/PyTorch implementation is not a real-time 15 ms end-to-end system.**
+> **Essential AI Systems Finding — compute-constrained, NOT real-time end-to-end**:
+> **The scheduler satisfies the modeled 15 ms optimize budget, but measured optimization is ~90-100 ms/frame
+> (FPS ~8) and the legacy Python attribution path was ~7000 ms/frame.**
+> Report as **optimization-budgeted / latency-aware online reconstruction**, never as `real-time 15 ms end-to-end`.
+> Production path is `gsplat`; `cuda/*.cu` are research prototypes (see `cuda/README_PROTOTYPE.md`).
 
 ### Key Engineering & Scientific Limitations:
 1. **Reference Python Attribution Bottleneck**: The reference implementation computes Gaussian-to-pixel attribution masks using unoptimized PyTorch tensor operations (`render_with_attribution`), requiring $\approx 6992\text{ ms}$ per frame. Fusing attribution tracing into a native CUDA rasterization kernel (Phase 13) is required for real-time $>30\text{ FPS}$ deployment.
@@ -322,18 +337,23 @@ $$T_{\text{frame}} \approx 7005\text{ ms}$$
 
 ---
 
-### Authoritative Final Confirmation Benchmark (TUM `fr2_xyz`, 8 Seeds, Budget = 15.0 ms)
+### Authoritative Phase-14 Corrected-Substrate Benchmark (TUM `fr2_xyz`, 8 Seeds, Budget = 15.0 ms)
+
+> [!CAUTION]
+> Prior `19.24 dB / 76.4%` numbers (pose-bugged C2W substrate) are **DEPRECATED** — see
+> `results/final_confirmation/DEPRECATED.md`. Authoritative is Phase-14 below
+> (`results/phase14_corrected/phase14_results.json`, corrected W2C pose + depth hygiene).
 
 Evaluated across **6 Policies** and **8 Seeds** (`[42, 43, 44, 45, 46, 47, 48, 49]`) for 150 frames at $320 \times 240$ resolution (48 continuous trajectories, 7,200 total processed frames, zero NaN/Inf crashes):
 
 | Policy | Mean PSNR (dB) | Final PSNR (dB) | Mean SSIM | FPS | Map Size ($N_{\text{final}}$) |
 |:---|:---:|:---:|:---:|:---:|:---:|
-| **NO_OP** | 13.45 ± 0.02 | 11.75 ± 0.04 | 0.4378 | 61.3 | 119,257 |
-| **ERROR_ONLY** | 15.54 ± 0.02 | 12.77 ± 0.10 | 0.5708 | 8.0 | 105,845 |
-| **ERROR_INFLUENCE** | 16.37 ± 0.06 | 13.53 ± 0.26 | 0.7379 | 7.8 | 150,000 |
-| **ERROR_INFLUENCE_TEMPORAL** | 16.28 ± 0.07 | 13.51 ± 0.19 | 0.7345 | 7.7 | 150,000 |
-| **OURS (Pure Throttling)** | **19.24 ± 0.05** | **17.64 ± 0.50** | **0.8433** | **8.7** | **39,251** |
-| **FULL (100% Upper Bound)** | 21.03 ± 0.04 | 19.31 ± 0.68 | 0.8767 | 5.8 | 150,000 |
+| **NO_OP** | 18.86 ± 0.01 | 14.88 ± 0.01 | 0.6882 | 106.3 | 23,523 |
+| **ERROR_ONLY** | 24.07 ± 0.14 | 20.01 ± 0.37 | 0.8850 | 8.9 | 74,640 |
+| **ERROR_INFLUENCE** | 25.04 ± 0.06 | 21.89 ± 0.09 | 0.9084 | 8.8 | 106,929 |
+| **RTG_SLAM_REIMPL** | 23.05 ± 0.26 | 20.04 ± 0.88 | 0.8663 | 8.0 | 67,231 |
+| **OURS (Pure Throttling)** | **27.67 ± 0.04** | **28.89 ± 0.11** | **0.9232** | **10.7** | **23,398** |
+| **FULL (100% Upper Bound)** | 27.85 ± 0.01 | 29.41 ± 0.06 | 0.9243 | 9.5 | 87,967 |
 
 ### Paired Statistical Significance (Family of Comparisons against OURS, Holm-Corrected, $n=8$ Seeds)
 
@@ -341,41 +361,44 @@ With $n=8$ independent seeds, the exact minimum two-sided Wilcoxon signed-rank $
 
 | Comparison | $\Delta$ Mean PSNR [95% CI] | Raw $p$ | Holm $p$ ($p_{\text{Holm}}$) | Paired Cohen's $d_z$ | $\Delta$ Final PSNR [95% CI] | Final Holm $p$ | $\Delta$ SSIM |
 |:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **OURS vs `no_op`** | **+5.80 dB** [+5.76, +5.83] | 0.0078 | **0.0391** :white_check_mark: | 111.39 | **+5.89 dB** [+5.51, +6.22] | 0.0391 :white_check_mark: | +0.4055 |
-| **OURS vs `error_only`** | **+3.70 dB** [+3.65, +3.74] | 0.0078 | **0.0313** :white_check_mark: | 54.98 | **+4.87 dB** [+4.48, +5.20] | 0.0313 :white_check_mark: | +0.2725 |
-| **OURS vs `error_influence`** | **+2.87 dB** [+2.83, +2.92] | 0.0078 | **0.0234** :white_check_mark: | 38.42 | **+4.11 dB** [+3.73, +4.48] | 0.0234 :white_check_mark: | +0.1054 |
-| **OURS vs `error_influence_temporal`** | **+2.97 dB** [+2.92, +3.01] | 0.0078 | **0.0156** :white_check_mark: | 41.87 | **+4.13 dB** [+3.75, +4.47] | 0.0156 :white_check_mark: | +0.1088 |
-| **OURS vs `full` (Unconstrained Ceiling)** | **-1.78 dB** [-1.83, -1.75] | 0.0078 | **0.0078** :white_check_mark: | -29.00 | **-1.67 dB** [-2.28, -1.12] | 0.0078 :white_check_mark: | -0.0334 |
+| **OURS vs `no_op`** | **+8.80 dB** | 0.0078 | **0.0391** :white_check_mark: | 168.8 | **+14.01 dB** | 0.0391 :white_check_mark: | +0.2350 |
+| **OURS vs `error_only`** | **+3.59 dB** [+3.48, +3.70] | 0.0078 | **0.0391** :white_check_mark: | 21.2 | **+8.88 dB** | 0.0391 :white_check_mark: | +0.0381 |
+| **OURS vs `error_influence`** | **+2.63 dB** [+2.56, +2.68] | 0.0078 | **0.0391** :white_check_mark: | 29.8 | **+6.99 dB** | 0.0391 :white_check_mark: | +0.0148 |
+| **OURS vs `rtg_slam_reimpl`** | **+4.62 dB** [+4.44, +4.82] | 0.0078 | **0.0391** :white_check_mark: | 15.4 | **+8.85 dB** | 0.0391 :white_check_mark: | +0.0568 |
+| **OURS vs `full` (Unconstrained Ceiling)** | **-0.18 dB** | 0.0078 | **0.0391** :white_check_mark: | -3.3 | **-0.52 dB** | 0.0391 :white_check_mark: | -0.0011 |
 
-- **Headroom Recovery Ratio**: $\eta = \frac{Q_{\text{OURS}} - Q_{\text{no\_op}}}{Q_{\text{full}} - Q_{\text{no\_op}}} = \frac{19.24 - 13.45}{21.03 - 13.45} = \mathbf{76.4\%}$ (Residual gap to unconstrained ceiling: **1.79 dB**). Because PSNR is a logarithmic decibel metric, reporting a raw percentage of unconstrained PSNR ($19.24 / 21.03 = 91.5\%$) is mathematically invalid; normalized headroom recovery $\eta$ correctly measures the fraction of achievable reconstruction improvement captured under the 15 ms budget.
-- **Effect Size**: Paired Cohen's $d_z = 38.42$ against the strongest selective baseline (`error_influence`), confirming that dual throttling produces massive, statistically robust improvements across all seeds under rigorous family-wise error control ($p_{\text{Holm}} \le 0.0391$).
+- **Headroom Recovery Ratio**: $\eta = \frac{Q_{\text{OURS}} - Q_{\text{no\_op}}}{Q_{\text{full}} - Q_{\text{no\_op}}} = \frac{27.67 - 18.86}{27.85 - 18.86} = \mathbf{98.0\%}$ (Residual gap to unconstrained ceiling: **0.18 dB**). Because PSNR is a logarithmic decibel metric, reporting a raw percentage of unconstrained PSNR is mathematically invalid; normalized headroom recovery $\eta$ correctly measures the fraction of achievable reconstruction improvement captured under the 15 ms budget.
+- **Effect Size**: Paired Cohen's $d_z = 29.8$ against the strongest selective baseline (`error_influence`) and $d_z = 15.4$ vs `rtg_slam_reimpl`, confirming that dual throttling produces massive, statistically robust improvements across all seeds under rigorous family-wise error control ($p_{\text{Holm}} = 0.0391$).
 
 ---
 
-### Cross-Scene Generalization Benchmark
+### Cross-Scene Generalization Benchmark (Phase-14 corrected substrate, 30f × 3 seeds [42-44], B=15ms)
 
-To evaluate performance across different sensor noise profiles and trajectory dynamics, we evaluated OURS against baselines on TUM RGB-D (`tum_fr1_xyz`, `tum_fr2_xyz`) and Replica (`replica_office0`):
+> [!CAUTION]
+> Table below replaces the pose-bugged cross-scene numbers. `n=3` → underpowered (min p=0.25);
+> treat deltas as pilot estimates. Full results: `results/phase14_multiscene/*/final_confirmation_results.json`.
 
-| Scene | Dataset | Frames | Policy | Mean PSNR (dB) | Final PSNR (dB) | Mean SSIM | Mean Depth L1 (m) | Optimization Latency |
-| :--- | :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: |
-| `tum_fr1_xyz` | TUM RGB-D | 30 | `no_op` | 12.76 | 11.22 | 0.7132 | 0.1428 | 0.0 ms |
-| `tum_fr1_xyz` | TUM RGB-D | 30 | `error_only` | **15.46** | **15.70** | 0.8362 | 0.1175 | 98.5 ms |
-| `tum_fr1_xyz` | TUM RGB-D | 30 | **OURS** | 15.40 | 15.28 | **0.8529** | **0.1042** | 91.9 ms |
-| `tum_fr1_xyz` | TUM RGB-D | 30 | `full` (Ceiling) | 16.27 | 17.13 | 0.8757 | 0.0884 | 86.5 ms |
-| `replica_office0` | Replica | 30 | `no_op` | 20.65 | 28.70 | 0.7446 | 0.5337 | 0.0 ms |
-| `replica_office0` | Replica | 30 | `error_only` | 27.64 | 35.46 | 0.9281 | 0.4770 | 68.1 ms |
-| `replica_office0` | Replica | 30 | **OURS** | **28.68** | **35.60** | **0.9337** | **0.4622** | 63.9 ms |
-| `replica_office0` | Replica | 30 | `full` (Ceiling) | 31.68 | 40.54 | 0.9567 | 0.4151 | 119.4 ms |
-| `tum_fr2_xyz` | TUM RGB-D | 150 | `no_op` | 13.49 | 10.07 | 0.4237 | 0.1850 | 0.0 ms |
-| `tum_fr2_xyz` | TUM RGB-D | 150 | `error_only` | 17.19 | 15.75 | 0.6948 | 0.1419 | 100.6 ms |
-| `tum_fr2_xyz` | TUM RGB-D | 150 | **OURS** | **18.51** | 15.03 | **0.8076** | **0.1312** | 98.8 ms |
-| `tum_fr2_xyz` | TUM RGB-D | 150 | `full` (Ceiling) | 20.61 | 20.28 | 0.8624 | 0.0953 | 187.3 ms |
+| Scene | Frames | Policy | Mean PSNR (dB) | Final PSNR | Mean SSIM | N_final | FPS | Δ vs OURS |
+| :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| `tum_fr1_xyz` | 30 | `error_only` | 23.42 | 26.17 | 0.9705 | 22,368 | 9.5 | +0.03 |
+| `tum_fr1_xyz` | 30 | `rtg_slam_reimpl` | 21.84 | 23.87 | 0.9627 | 22,430 | 8.9 | **+1.61 OURS** |
+| `tum_fr1_xyz` | 30 | **OURS** | **23.45** | **26.53** | **0.9701** | **16,546** | **11.8** | — |
+| `tum_fr1_xyz` | 30 | `full` | 23.56 | 26.63 | 0.9711 | 22,143 | 15.0 | -0.11 |
+| `replica_office0` | 30 | `error_only` | 29.48 | 37.88 | 0.9397 | 55,268 | 9.8 | **-5.48 OURS loses** |
+| `replica_office0` | 30 | `rtg_slam_reimpl` | 29.49 | 37.89 | 0.9400 | 55,272 | 10.0 | **-5.49 OURS loses** |
+| `replica_office0` | 30 | **OURS** | **23.99** | **28.99** | **0.8838** | **51,879** | **10.0** | — |
+| `replica_office0` | 30 | `full` | 30.30 | 38.41 | 0.9467 | 55,234 | 9.2 | -6.31 |
+| `tum_fr2_xyz` | 30 | `error_only` | 28.68 | 30.07 | 0.7618 | 13,577 | 17.2 | -0.01 (tie) |
+| `tum_fr2_xyz` | 30 | `rtg_slam_reimpl` | 27.69 | 28.20 | 0.7365 | 13,729 | 9.3 | **+0.98 OURS** |
+| `tum_fr2_xyz` | 30 | **OURS** | **28.66** | **30.04** | **0.7613** | **13,331** | **16.9** | — |
+| `tum_fr2_xyz` | 30 | `full` | 28.68 | 30.03 | 0.7616 | 13,560 | 16.9 | -0.01 |
+| `tum_fr2_xyz` | 150 | **OURS (8 seeds)** | **27.67** | **28.89** | **0.9232** | **23,398** | **10.7** | +2.63 vs error_influence ✅ |
 
 > [!NOTE]
-> **Scene-Dependent Empirical Findings**:
-> - **Significant PSNR Gains**: On `tum_fr2_xyz` (+1.31 dB, +16.2% SSIM) and `replica_office0` (+1.03 dB, +0.6% SSIM), OURS achieves substantial improvements over compute-matched `error_only`.
-> - **Structural & Depth Preservation on Rapid Trajectories**: On `tum_fr1_xyz` (characterized by fast handheld sensor displacement), OURS achieves comparable mean PSNR (-0.05 dB vs `error_only`) while delivering superior structural fidelity (**+2.0% SSIM**, $0.8529$ vs $0.8362$) and sharper geometry (**-11.3% Depth L1 error**, $0.1042$ vs $0.1175\text{ m}$).
-> - **Scientific Conclusion**: The performance advantage of dual map-growth throttling is **scene-dependent**: the largest PSNR gains occur on sequences with moderate baseline coverage dynamics (`tum_fr2_xyz`, `replica_office0`), whereas rapid-motion sequences (`tum_fr1_xyz`) exhibit comparable photometric PSNR but enhanced structural and depth accuracy.
+> **Scene-Dependent Empirical Findings (corrected substrate — including a clean negative result)**:
+> - **Throttling advantage compounds over time**: on `tum_fr2_xyz` at 30f OURS ties `error_only` (-0.01dB), but at 150f leads `+2.63~+3.59dB`. Map bloat takes dozens of frames to bite; short-horizon evals hide the effect. Always benchmark ≥100 frames.
+> - **Rapid motion (`tum_fr1_xyz`)**: OURS ties `error_only` (+0.03dB) while beating `rtg_slam_reimpl` (+1.61dB) with the smallest map (16.5K) — throttling is safe but not decisive here.
+> - **NEGATIVE RESULT on synthetic Replica + adaptive fix (8 seeds)**: OURS loses to `error_only` on `replica_office0` by **-5.5dB at 30f, +3.32dB at 150f inverted** (`results/phase14_corrected/adaptive_office0_150f_8seed.json`: error_only 30.17±0.02 vs ours 26.85±0.03, n=8, p=0.0078 ✅, d_z=71.9). κ-ablation (30f): `off` 24.79 / `κ0.90` 23.98 vs `error_only` 29.48 — throttling costs only **~0.8dB**; the rest is **selection** overfit. Scene-level noise-adaptive routing (v3 holes score: Replica ~0.02 → `error_only`, TUM ~0.5+ → temporal+throttling, 5/5 scenes) picks the winner on **both** substrates: +3.59dB on `fr2_xyz` (via OURS, n=8) and +3.32dB on `office0` (via error_only, n=8) over the respective fixed loser. Fixed policies lose one scene badly either way — adaptivity is necessary, not optional.
 
 ---
 
@@ -390,7 +413,7 @@ A dedicated component ablation study on `tum_fr2_xyz` over 5 seeds identified th
 | **A2** | A1 + Coverage Throttling | 16.57 dB | +1.04 dB | 45,204 | **Helpful**: Halts densification in well-reconstructed regions |
 | **A3** | A2 + Backlog Throttling | 16.61 dB | +1.08 dB | 43,824 | **Helpful**: Caps un-optimized primitive queue |
 | **A4** | A3 + Offline Utility Predictor + Adaptive-K | 13.99 dB | -1.54 dB | 43,824 | **Harmful**: Offline pairwise loss & feature shift degrade ranking |
-| **OURS** | Pure Throttling (Coverage + Backlog, No Warmup, Fixed $K=5$) | **19.24 dB** | **+3.71 dB** | **39,251** | **Optimal**: Preserves budget for mature Gaussian refinement |
+| **OURS** | Pure Throttling (Coverage + Backlog, No Warmup, Fixed $K=5$) | **19.24 dB (old substrate; 27.67 dB on Phase-14 corrected substrate)** | **+3.71 dB** | **39,251 (old; 23,398 corrected)** | **Optimal**: Preserves budget for mature Gaussian refinement |
 
 > [!TIP]
 > **Scientific Takeaway**:

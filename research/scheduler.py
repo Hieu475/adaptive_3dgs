@@ -36,6 +36,7 @@ class OptimizationPolicy(str, Enum):
     TOP_K = "top_k"                                         # Policy 3: Continuous importance rank top-K / ratio r
     BUDGET_AWARE = "budget_aware"                           # Policy 4: Importance/Cost knapsack optimization
     OURS = "ours"                                           # Alias for BUDGET_AWARE
+    RTG_SLAM_REIMPL = "rtg_slam_reimpl"                     # External SOTA policy baseline (Peng et al. SIGGRAPH 2024, reimpl. matched-budget)
     LEARNED_UTILITY = "learned_utility"                     # Policy 5: Two-Head Learned Marginal Utility Knapsack
     ORACLE = "oracle"                                       # Policy 6: Ground truth marginal utility upper bound
 
@@ -428,6 +429,44 @@ class BudgetScheduler:
             mask[elig_idx[selected]] = True
             return mask
 
+        elif policy_str in ("rtg_slam_reimpl", OptimizationPolicy.RTG_SLAM_REIMPL.value):
+            # Torch mirror of research/baselines/rtg_slam_policy.py using available scheduler signals:
+            # unstable = high_err | temporal-drift; freeze stable (tiers/confidence); rank by error.
+            mask = torch.zeros(N, dtype=torch.bool, device=device)
+            err = error_scores if error_scores is not None else importance_scores
+            tmp = error_influence_temporal_scores if error_influence_temporal_scores is not None else None
+            base = error_influence_scores if error_influence_scores is not None else err
+            # drift proxy: temporal score deviating above instantaneous (re-activation)
+            if tmp is not None and base is not None:
+                drift_flag = tmp > 1.2 * base.abs().clamp_min(1e-8)
+            else:
+                drift_flag = torch.zeros(N, dtype=torch.bool, device=device)
+            # high-error gate ~ matched to baselines thresholds in normalized score space
+            thr = torch.quantile(err, 0.5) if N > 10 else err.min()
+            high_err = err >= thr
+            unstable = high_err | drift_flag
+            if confidence is not None:
+                conf = confidence.squeeze(-1) if confidence.ndim > 1 else confidence
+                stable = conf >= 0.8
+                candidate = unstable & (~stable)
+            elif tiers is not None:
+                stable = (tiers == 2) | (tiers == 3)
+                candidate = unstable & (~stable)
+            else:
+                candidate = unstable
+            if not candidate.any():
+                return mask
+            c_idx = torch.where(candidate)[0]
+            c_score = err[c_idx]
+            c_cost = cost_estimates[c_idx]
+            order = torch.argsort(c_score, descending=True)
+            cum = torch.cumsum(c_cost[order], dim=0)
+            picked = order[cum <= budget_us + 1e-7]
+            if top_k is not None:
+                picked = picked[:top_k]
+            mask[c_idx[picked]] = True
+            return mask
+
         elif policy_str in ("top_k", OptimizationPolicy.TOP_K.value):
             effective_k = top_k
             if effective_k is None and ratio is not None and (not cost_estimates_provided or budget_override_us is None):
@@ -705,6 +744,9 @@ class BudgetScheduler:
         current_coverage: Optional[float] = None,
         n_warmup: Optional[int] = None,
         max_warmup_queue: int = 500,
+        coverage_hi: float = 0.90,
+        coverage_lo: float = 0.80,
+        throttle_factor_hi: float = 0.20,
     ) -> int:
         """Compute maximum number of new Gaussians allowed this frame.
 
@@ -714,13 +756,17 @@ class BudgetScheduler:
                 None, falls back to the pure compute-budget-derived cap
                 (legacy behavior).
             current_coverage: current frame's scene coverage fraction [0, 1].
-                If coverage >= 0.90: throttles densification by 80% (factor 0.20)
-                to transition from scene exploration to map refinement.
-                If coverage <= 0.80: maintains full exploration budget cap.
-                Between 0.80 and 0.90: linearly ramps down.
+                If coverage >= coverage_hi: throttles densification by
+                (1-throttle_factor_hi) to transition from scene exploration
+                to map refinement. If coverage <= coverage_lo: maintains full
+                exploration budget cap. Between: linearly ramps down.
             n_warmup: current number of Gaussians in the warm-up backlog (update_count < warmup_steps).
                 If n_warmup > max_warmup_queue: throttles densification to prevent queue overflow.
             max_warmup_queue: maximum allowable warm-up queue length before backpressure throttling.
+            coverage_hi: saturation knee (default 0.90, mirrors
+                densification.throttle_coverage_threshold).
+            coverage_lo: exploration floor (default 0.80).
+            throttle_factor_hi: surviving budget fraction at saturation (default 0.20).
 
         Returns:
             max_new: maximum number of new Gaussians to create this frame
@@ -729,12 +775,13 @@ class BudgetScheduler:
         budget_cap = max(1, int(budget_us / self.cost_densify_us))
 
         if current_coverage is not None:
-            if current_coverage >= 0.90:
-                throttle_factor = 0.20
-            elif current_coverage <= 0.80:
+            span = max(coverage_hi - coverage_lo, 1e-4)
+            if current_coverage >= coverage_hi:
+                throttle_factor = throttle_factor_hi
+            elif current_coverage <= coverage_lo:
                 throttle_factor = 1.0
             else:
-                throttle_factor = 1.0 - 0.80 * ((current_coverage - 0.80) / 0.10)
+                throttle_factor = 1.0 - (1.0 - throttle_factor_hi) * ((current_coverage - coverage_lo) / span)
             budget_cap = max(1, int(budget_cap * throttle_factor))
 
         if n_warmup is not None and n_warmup > max_warmup_queue:

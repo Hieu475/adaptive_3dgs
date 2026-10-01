@@ -2,6 +2,12 @@
 
 Ties together all research modules into a complete per-frame pipeline:
     initialize → [for each frame: track → render → errors → densify → schedule → optimize → prune]
+
+CANONICAL CONFIG SOURCE: _default_config() below. configs/default.yaml mirrors it.
+OURS (Phase 13): pure dual throttling (coverage κ≥0.90 + backlog, no warmup, K=5).
+Learned utility path is retained only as documented negative result.
+Split plan (do NOT split before paper freeze): map.py (init/densify/prune) |
+sched.py (selection) | optim.py (SelectiveAdam steps). See experiments/README.md.
 """
 import torch
 import torch.optim as optim
@@ -602,6 +608,9 @@ class OnlineReconstructionPipeline:
                 current_coverage=effective_coverage,
                 n_warmup=n_warmup_current,
                 max_warmup_queue=sched_cfg.get('max_warmup_queue', 500),
+                coverage_hi=dense_cfg.get('throttle_coverage_threshold', 0.90),
+                coverage_lo=dense_cfg.get('throttle_coverage_lo', 0.80),
+                throttle_factor_hi=dense_cfg.get('throttle_factor', 0.20),
             ),
             self.config['gaussian']['max_gaussians'] - self.gaussian_model.num_gaussians,
         )
@@ -1059,6 +1068,69 @@ class OnlineReconstructionPipeline:
                 torch.cuda.empty_cache()
         
         return metrics
+
+    def eval_frame(
+        self,
+        rgb: torch.Tensor,
+        depth: torch.Tensor,
+        pose: torch.Tensor,
+    ) -> Dict[str, Any]:
+        """Render-only evaluation at a held-out viewpoint. NO state change.
+
+        Sets no optimizer/StateStore/densification side effects: renders the
+        current map at ``pose`` and scores PSNR/SSIM/depth-L1 with the same
+        formulas as :meth:`process_frame` (post-optimization branch). Used by
+        the novel-view holdout harness (every Kth frame is evaluated but never
+        mapped). Restores ``current_pose`` on exit.
+
+        Returns:
+            Dict with psnr/ssim/depth_l1/n_gaussians (eval_only=True).
+        """
+        if not self.initialized:
+            raise RuntimeError("Pipeline not initialized. Call initialize() first.")
+        rgb = rgb.to(self.device)
+        depth = depth.to(self.device)
+        H, W = depth.shape
+        prev_pose = self.current_pose
+        self.current_pose = pose.to(self.device)
+        try:
+            with torch.no_grad():
+                cov3D = self.gaussian_model.build_covariance()
+                if self.gaussian_model.sh_degree > 0:
+                    from .rasterizer import _view_directions
+                    dirs = _view_directions(self.gaussian_model.positions, self.current_pose)
+                else:
+                    dirs = None
+                colors = self.gaussian_model.get_colors(dirs)
+                backend = self.config.get('rendering', {}).get(
+                    'backend', 'gsplat' if str(self.device).startswith('cuda') else 'reference')
+                res = rasterize_scene(
+                    means3D=self.gaussian_model.positions, cov3D=cov3D, colors=colors,
+                    opacities=self.gaussian_model.opacities.squeeze(-1),
+                    extrinsics=self.current_pose, intrinsics=self.intrinsics,
+                    image_width=W, image_height=H,
+                    tile_size=self.config['rendering']['tile_size'], backend=backend)
+                rc, rd = res['color'], res['depth']
+                valid = depth > 0
+                if valid.any():
+                    mse = ((rc[valid] - rgb[valid]) ** 2).mean() + 1e-8
+                    dl1 = (rd[valid] - depth[valid]).abs().mean().item()
+                else:
+                    mse = ((rc - rgb) ** 2).mean() + 1e-8
+                    dl1 = 0.0
+                psnr = -10 * torch.log10(mse).item()
+                c1, c2 = 0.01 ** 2, 0.03 ** 2
+                mu1, mu2 = rc.mean(dim=(0, 1)), rgb.mean(dim=(0, 1))
+                s1 = ((rc - mu1) ** 2).mean(dim=(0, 1))
+                s2 = ((rgb - mu2) ** 2).mean(dim=(0, 1))
+                s12 = ((rc - mu1) * (rgb - mu2)).mean(dim=(0, 1))
+                ssim = (((2 * mu1 * mu2 + c1) * (2 * s12 + c2)) / (
+                    (mu1 ** 2 + mu2 ** 2 + c1) * (s1 + s2 + c2))).mean().item()
+            return {'psnr': psnr, 'ssim': ssim, 'depth_l1': dl1,
+                    'n_gaussians': self.gaussian_model.num_gaussians,
+                    'eval_only': True, 'frame': self.frame_count}
+        finally:
+            self.current_pose = prev_pose
 
     def cleanup(self):
         """Release cached GPU memory and optimizer states."""
