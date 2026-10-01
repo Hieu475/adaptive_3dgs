@@ -91,6 +91,7 @@ phase6_context_utility/ablation/*.pt
 !qualitative_office0/*.json
 !qualitative_office0/*.md
 !gate1_headroom/*.json
+!gate1_headroom/diminishing_returns.json
 !phase14_budget_curve/*.json
 !phase14_budget_curve/*.md
 !phase14_adaptive_perframe/*.json

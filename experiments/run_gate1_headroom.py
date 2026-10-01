@@ -402,8 +402,8 @@ def run_gate1_multi_seed():
     print(f"Trials:                     {dim_res['n_trials']}")
     print(f"Mean Marginal Gain Delta_i(A) (|A|=2): {dim_res['mean_marginal_gain_A']:+.6f}")
     print(f"Mean Marginal Gain Delta_i(B) (|B|=6): {dim_res['mean_marginal_gain_B']:+.6f}")
-    print(f"Diminishing Consistency:   {dim_res['diminishing_rate']*100.0:.1f}%")
-    print(f"Hypothesis Delta_i(A) >= Delta_i(B):  {'CONFIRMED ✅' if dim_res['is_diminishing_consistent'] else 'REJECTED ❌'}")
+    print(f"Non-violation rate:        {dim_res['diminishing_rate']*100.0:.1f}% (equality counts)")
+    print(f"Hypothesis Delta_i(A) >= Delta_i(B):  {'NO VIOLATION OBSERVED (weak test)' if dim_res['is_diminishing_consistent'] else 'VIOLATED ❌'}")
     
     save_dir = os.path.join(repo_root, 'results', 'gate1_headroom')
     os.makedirs(save_dir, exist_ok=True)
@@ -510,8 +510,8 @@ def run_gate1_multi_seed():
         f"- **Condition:** $\\Delta_i(A) \\ge \\Delta_i(B)$ for $A \\subset B$ ($|A|=2, |B|=6$).",
         f"- **Marginal Gain in Small Context $\\mathbb{{E}}[\\Delta_i(A)]$:** **{dim_res['mean_marginal_gain_A']:+.6f}**",
         f"- **Marginal Gain in Large Context $\\mathbb{{E}}[\\Delta_i(B)]$:** **{dim_res['mean_marginal_gain_B']:+.6f}**",
-        f"- **Empirical Diminishing Consistency:** **{dim_res['diminishing_rate']*100.0:.1f}%** of trials satisfied $\\Delta_i(A) \\ge \\Delta_i(B)$.",
-        "- **Scientific Finding:** Empirical evidence is consistent with diminishing-return behavior under the evaluated intervention protocol, motivating budgeted knapsack selection over unconstrained allocation.",
+        f"- **Non-Violation Rate:** **{dim_res['diminishing_rate']*100.0:.1f}%** of trials satisfied $\\Delta_i(A) \\ge \\Delta_i(B)$ (equality counts; flat equal marginals also satisfy).",
+        "- **Scientific Finding:** No violation was observed in 10 spot checks; however, mean marginal gains were approximately equal across contexts, providing NO positive evidence of diminishing returns. Do not cite this as submodular-like behavior.",
         ""
     ])
     

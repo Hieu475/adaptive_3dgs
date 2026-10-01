@@ -46,12 +46,13 @@ Department of Computer Science\\
 \begin{abstract}
 Dense online reconstruction from streaming RGB-D sensors under a rigid per-frame compute budget ($15\,\mathrm{ms}$ optimize budget) is bottlenecked by a structural failure mode we call \textbf{compute dilution}: uncontrolled densification floods the Gaussian map with immature primitives ($\sim 100\mathrm{k}$ splats in 150 frames), so fixed-budget gradient steps are spread over ever more under-converged splats while mature surface geometry starves.
 Conventional wisdom blames candidate \textit{ranking} --- which Gaussians to optimize --- and proposes learned utility predictors.
-Through exact counterfactual measurement we show ranking is secondary: $21.37\%$ of isolated Gaussian updates have \textit{negative} marginal utility ($U_i^\star < 0$, rising to $23.86\%$ in the top-error decile), joint updates are severely non-additive ($R_{\mathrm{add}}(16) \approx 0.005$), and an offline-learned utility model with rank signal ($\rho \approx 0.20$) degrades closed-loop fidelity by $-2.51\,\mathrm{dB}$.
+Through exact counterfactual measurement we show ranking is secondary: isolated Gaussian updates have \textit{negative} marginal utility ($U_i^\star < 0$) in $18$--$39\%$ of interventions depending on geometry stratum (pose-fixed Gate-1 regen; flat regions worst), and an offline-learned utility model with rank signal ($\rho \approx 0.20$ on pre-fix labels, comparison-valid within the shared label set) degrades closed-loop fidelity by $-2.51\,\mathrm{dB}$.
+Interaction strength is protocol-dependent: corrected joint-group interventions stay relatively additive ($R_{\mathrm{add}}(4) = 0.95$, $R_{\mathrm{add}}(16) = 0.82$), while a separate pairwise protocol shows stronger interaction --- we claim no universal sub-additivity.
 The binding constraint is the map-growth process itself.
 We introduce \textbf{dual map-growth throttling} --- coverage-saturation throttling ($\kappa \ge 0.90$) plus unrefined-backlog backpressure --- which holds the map at $23\mathrm{k}$ vs $88\mathrm{k}$ primitives and directs the fixed budget at mature refinement.
 On TUM \texttt{fr2\_xyz} (150 frames $\times$ 8 seeds) this reaches $27.67\,\mathrm{dB}$ mean PSNR: \textbf{+2.63 dB} over the strongest selective baseline and \textbf{+4.62 dB} over an RTG-SLAM-policy baseline ($p_{\mathrm{Holm}} = 0.0391$), recovering \textbf{98.0\%} of headroom to the unconstrained ceiling (0.18 dB gap).
 We further show every \textit{fixed} rule overfits its sensor regime: the same pipeline loses $-3.32\,\mathrm{dB}$ ($p = 0.0078$) on clean synthetic Replica, where raw-error selection wins instead.
-A \textbf{sensor-adaptive router} driven by raw depth hole-rate (TUM $\sim 0.25$ vs Replica $\sim 0.000$, 300--500$\times$ separation, 5/5 scenes) selects the winning rule per substrate and wins on both.
+A \textbf{sensor-adaptive router} driven by raw depth hole-rate thresholds calibrated on five development scenes classifies seven unseen scenes correctly without retuning, and selects the winning rule per substrate (domain classification validated; PSNR routing confirmed on two substrates at 8 seeds each).
 All selective policies share the same modeled $15\,\mathrm{ms}$ optimization budget with paired Holm-corrected tests and frozen artifacts; FULL is reported separately as an unconstrained ceiling, not a budget-matched competitor. Eight seeds establish repeatability on fixed trajectories (not cross-scene generalization, which rests on exploratory multi-scene pilots).
 \end{abstract}
 
@@ -67,7 +68,7 @@ Because each new splat is born unrefined, it both demands optimization and degra
 We call this \textbf{compute dilution}, and we show it explains more of the quality gap than any ranking rule: removing growth control while keeping the best ranker loses far more than removing the ranker while keeping growth control (Sec.~\ref{sec:experiments}).
 
 Three empirical findings support this reframing.
-First, residual error does not imply positive optimization return: counterfactual single-Gaussian interventions degrade global quality in $21.37\%$ of cases.
+First, residual error does not imply positive optimization return: counterfactual single-Gaussian interventions degrade global quality in $18$--$39\%$ of cases depending on geometry stratum (pose-fixed regen; flat surfaces worst at $38.7\%$).
 Second, Gaussian utilities do not compose: groups of 16 jointly-optimized splats realize $0.5\%$ of the sum of their isolated gains, so pointwise ranking cannot be a combinatorial optimum and contextual re-ranking buys nothing measurable (rank stability $\bar{\rho} = 0.8916$ at $424\times$ overhead).
 Third, offline-learned utility prediction does not transfer: moderate offline rank correlation reverses to $-2.51\,\mathrm{dB}$ closed-loop under trajectory shift and gradient coupling.
 Together these rule out the ``better ranker'' research direction and point at the growth process.
@@ -81,7 +82,7 @@ A training-free router keyed on raw depth hole-rate --- missing measurements, i.
 \textbf{Contributions.}
 (1) A budgeted subset-selection formulation with an exact counterfactual oracle, exposing negative utility and non-additivity.
 (2) Dual coverage/backlog throttling reaching 98.0\% of unconstrained headroom with a $3.8\times$ smaller map (8 seeds, Holm-significant).
-(3) Sensor-adaptive routing from raw hole-rate with 5/5 scene separation and significant wins on both substrates.
+(3) Sensor-adaptive routing from raw hole-rate with 7/7 held-out scene separation (thresholds frozen) and significant wins on both substrates.
 (4) Fully reported negative results --- learned utility, contextual re-ranking, synthetic failure, and two failed noise features --- with frozen artifacts for every claim.
 
 \section{Related Work}
@@ -106,7 +107,7 @@ Per-frame scheduling solves
 \end{equation}
 with decoupled cost $C_i(K) = C_i^{\mathrm{base}} + K \cdot C_i^{\mathrm{step}}$ for $K$ microsteps and $\Delta Q$ measured by exact full-scene counterfactual renders (active edits embedded in all $N$ splats, avoiding the $31\%$ gradient error of affine-background approximations).
 The oracle $U_i^\star = \Delta Q_i^{\mathrm{exact}} / \Delta C_i$ is our measurement instrument, never a runtime input.
-It reveals: (i) negative utility in $21.37\%$ of interventions ($23.86\%$ top-error decile) --- high error marks silhouettes, discontinuities, and coupled layers where gradient steps hurt; (ii) non-additivity $R_{\mathrm{add}}(4) \approx -0.358$, $R_{\mathrm{add}}(16) \approx 0.0053$, so pointwise top-$K$ is a reference, not a bound, and greedy conditional oracles ($\arg\max_{i \notin S} \Delta Q(i \mid S)/\Delta C(i \mid S)$) coincide with static greedy in selection outcome (conditional advantage $0$); (iii) offline TwoHeadMLP rank signal ($\rho \approx 0.20$, NDCG@20 $0.46$) reverses to $-2.51\,\mathrm{dB}$ closed-loop.
+It reveals: (i) negative utility in $18$--$39\%$ of interventions by stratum (pose-fixed regen) --- high error marks silhouettes, discontinuities, and coupled layers where gradient steps hurt; (ii) interaction is protocol-dependent --- corrected joint-group measurements give $R_{\mathrm{add}}(4) = 0.95$, $R_{\mathrm{add}}(16) = 0.82$ (relatively additive), while a separate pairwise protocol shows stronger interaction; pointwise top-$K$ is therefore treated as a reference, not a bound, without a universality claim; (iii) offline TwoHeadMLP rank signal ($\rho \approx 0.20$, NDCG@20 $0.46$, measured on pre-pose-fix labels whose absolute values are polluted but whose within-set method comparison remains valid) reverses to $-2.51\,\mathrm{dB}$ closed-loop. Conditional-oracle selection numbers are withheld pending a rerun under fork-correct semantics.
 
 \section{Method}
 \textbf{Fast Approximate Attribution (FAA).}
@@ -123,7 +124,8 @@ Raw depth hole-rate is strongly associated with sensor domain: TUM $0.18$--$0.31
 The score $n = \mathrm{clip}(2.5 \cdot \mathrm{holes} + 1.0 \cdot \mathrm{edge})$ routes $n \le 0.10 \to$ raw-error selection ($\kappa = 0.98$) and $n \ge 0.30 \to$ temporal$\times$influence + throttling ($\kappa = 0.90$), computed pre-hygiene in milliseconds on CPU.
 Two earlier features failed held-out separation and are reported as such: post-hygiene invalid ratio (conflates far-but-valid geometry --- 18\% of Replica room0 exceeds $4\,\mathrm{m}$ --- with holes) and Laplacian texture energy (measures sharpness, inverted: crisp synthetic scores \textit{higher}).
 Operating on pre-hygiene raw depth was the fix (Fig.~\ref{fig:separation}).
-Thresholds were frozen after 5 development scenes; on 7 unseen scenes classification is 7/7 without retuning, but PSNR routing is so far validated on two substrates at 8 seeds each --- wider confirmation and per-frame routing remain future work.
+Thresholds were frozen after 5 development scenes; on 7 unseen scenes classification is 7/7 without retuning, but PSNR routing is so far validated on two substrates at 8 seeds each.
+A causal mixed-regime test (30\% holes injected mid-trajectory on Replica) switches routing 49/50 frames exactly at the boundary, proving within-sequence response; end-to-end it trails fixed \texttt{error\_only} by $0.85\,\mathrm{dB}$ (switch transients on synthetic shifts), so per-frame PSNR benefit on real mixed sequences remains future work.
 
 \begin{figure}[t]
 \centering
@@ -134,12 +136,12 @@ Thresholds were frozen after 5 development scenes; on 7 unseen scenes classifica
 
 \section{Why Ranking Fails: Negative Findings}
 \textbf{Learned utility reverses closed-loop} ($-2.51\,\mathrm{dB}$ factorial; GradNorm beats the MLP pointwise $0.51 > 0.25$): offline labels ignore trajectory shift and inter-Gaussian coupling, so we ship no learned component.
-\textbf{Contextual re-ranking is unnecessary}: ground-truth rank stability $\bar{\rho} = 0.8916$ (Kendall $0.80$), Top-5 overlap $80\%$, oracle conditional advantage exactly $0$, at $424\times$ selection overhead ($76.36$ vs $0.18\,\mathrm{ms}$).
+\textbf{Contextual re-ranking buys no online gain}: adaptive greedy shows no significant improvement over static pointwise selection in direct multi-seed budget sweeps (Wilcoxon n.s., CIs span zero) while incurring $424\times$ selection overhead ($76.36$ vs $0.18\,\mathrm{ms}$). Supporting rank-stability/oracle-gap numbers predate the fork-semantics fix and are withheld pending regen.
 \textbf{Fixed rules are sensor-overfit} (Sec.~\ref{sec:experiments}): the throttled pipeline gains $+3.59\,\mathrm{dB}$ on Kinect yet loses $-3.32\,\mathrm{dB}$ on synthetic, where $\kappa$-ablation attributes only $\sim 0.8\,\mathrm{dB}$ to throttling and $\sim 4.7\,\mathrm{dB}$ to selection --- the finding behind adaptive routing.
 
 \section{Experiments}
 \label{sec:experiments}
-\textbf{Protocol.} $320 \times 240$, $B_t = 15\,\mathrm{ms}$, seeds $[42..49]$, two-sided Wilcoxon paired + Holm-Bonferroni + bootstrap CIs; production \texttt{gsplat} backend; GT poses with tracking decoupled (mapping benchmark, not SLAM ATE); every 8th frame held out render-only (train--holdout gap $+0.47\,\mathrm{dB}$ mean over 30f$\times$3 seeds for both OURS and \texttt{error\_only}, \texttt{results/phase14\_holdout/}; small positive gap, no overfitting).
+\textbf{Protocol.} $320 \times 240$, $B_t = 15\,\mathrm{ms}$, seeds $[42..49]$, two-sided Wilcoxon paired + Holm-Bonferroni + bootstrap CIs; production \texttt{gsplat} backend; GT poses with tracking decoupled (mapping benchmark, not SLAM ATE); every 8th frame held out render-only (train--holdout gap $+0.47\,\mathrm{dB}$ mean over 30f$\times$3 seeds for both OURS and \texttt{error\_only}, \texttt{results/phase14\_holdout/}; no large gap under this same-trajectory proxy).
 Artifacts: \texttt{results/phase14\_corrected/}.
 
 \begin{table*}[t]
@@ -221,7 +223,7 @@ Supplementary video (\texttt{supp\_video.mp4}) shows both A/B directions.
 
 \section{Limitations}
 \label{sec:limitations}
-Ground-truth poses throughout (tracking decoupled; no ATE claim --- our ICP tracker is a stub); $150$-frame horizons rather than full SLAM sessions; $\kappa$/backlog thresholds calibrated on one real--synthetic pair; no learned components by design after documented failure; optimization-budgeted execution, not $15\,\mathrm{ms}$ end-to-end; prior $19.24\,\mathrm{dB}$/76.4\% numbers from a pose-bugged substrate are deprecated, not compared.
+The principal mapping benchmark uses ground-truth poses (no ATE claim there). We additionally report a separate 30-frame dense RGB-D Gauss-Newton odometry sanity check (ATE $0.8$/$1.1\,\mathrm{cm}$, no keyframes/relocalization/loop closure --- a baseline VO, not a SLAM system). $150$-frame horizons rather than full SLAM sessions; $\kappa$/backlog thresholds calibrated on one real--synthetic pair; no learned components by design after documented failure; optimization-budgeted execution, not $15\,\mathrm{ms}$ end-to-end; prior $19.24\,\mathrm{dB}$/76.4\% numbers from a pose-bugged substrate are deprecated, not compared.
 Statistically, $n=8$ seeds establish \textit{repeatability} under stochastic variation on fixed trajectories; they do not establish cross-scene generalization, whose unit is scenes, not seeds --- additional scenes are exploratory ($n=3$) until confirmed.
 
 \section{Conclusion}

@@ -43,5 +43,5 @@ Interaction error $I(S) = \frac{|\Delta Q(S) - \sum_{i \in S} \Delta Q_i|}{|\Del
 - **Condition:** $\Delta_i(A) \ge \Delta_i(B)$ for $A \subset B$ ($|A|=2, |B|=6$).
 - **Marginal Gain in Small Context $\mathbb{E}[\Delta_i(A)]$:** **+0.000005**
 - **Marginal Gain in Large Context $\mathbb{E}[\Delta_i(B)]$:** **+0.000005**
-- **Empirical Diminishing Consistency:** **100.0%** of trials satisfied $\Delta_i(A) \ge \Delta_i(B)$.
-- **Scientific Finding:** Empirical evidence is consistent with diminishing-return behavior under the evaluated intervention protocol, motivating budgeted knapsack selection over unconstrained allocation.
+- **Non-Violation Rate:** **100.0%** of trials satisfied $\Delta_i(A) \ge \Delta_i(B)$ (equality counts; flat equal marginals also satisfy).
+- **Scientific Finding:** No violation was observed in 10 spot checks; however, mean marginal gains were approximately equal across contexts, providing NO positive evidence of diminishing returns. Do not cite this as submodular-like behavior.

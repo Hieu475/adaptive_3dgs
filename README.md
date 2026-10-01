@@ -360,7 +360,7 @@ With $n=8$ independent seeds, the exact minimum two-sided Wilcoxon signed-rank $
 | **OURS vs `full` (Unconstrained Ceiling)** | **-0.18 dB** | 0.0078 | **0.0391** :white_check_mark: | -3.3 | **-0.52 dB** | 0.0391 :white_check_mark: | -0.0011 |
 
 - **Headroom Recovery Ratio**: $\eta = \frac{Q_{\text{OURS}} - Q_{\text{no\_op}}}{Q_{\text{full}} - Q_{\text{no\_op}}} = \frac{27.67 - 18.86}{27.85 - 18.86} = \mathbf{98.0\%}$ (Residual gap to unconstrained ceiling: **0.18 dB**). Because PSNR is a logarithmic decibel metric, reporting a raw percentage of unconstrained PSNR is mathematically invalid; normalized headroom recovery $\eta$ correctly measures the fraction of achievable reconstruction improvement captured under the 15 ms budget.
-- **Effect Size**: Paired Cohen's $d_z = 29.8$ against the strongest selective baseline (`error_influence`) and $d_z = 15.4$ vs `rtg_slam_reimpl`, confirming that dual throttling produces massive, statistically robust improvements across all seeds under rigorous family-wise error control ($p_{\text{Holm}} = 0.0391$).
+- **Effect Size**: Paired Cohen's $d_z = 29.8$ against the strongest selective baseline (`error_influence`) and $d_z = 15.4$ vs `rtg_slam_reimpl`, all eight paired differences favor OURS ($d_z = 29.8$ vs `error_influence`, $15.4$ vs `rtg_slam_reimpl`) under family-wise error control ($p_{\text{Holm}} = 0.0391$).
 
 ---
 
