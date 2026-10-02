@@ -1,0 +1,78 @@
+{
+ "metadata": {
+  "scenes": [
+   "tum_fr2_xyz",
+   "tum_fr1_xyz"
+  ],
+  "n_frames": 100,
+  "seeds": [
+   42,
+   43,
+   44
+  ],
+  "tracker": "DenseRGBDTracker frame-to-frame GN baseline (no KF/LC)",
+  "note": "baseline VO ATE; GT-anchored init frame 0"
+ },
+ "rows": [
+  {
+   "scene": "tum_fr2_xyz",
+   "seed": 42,
+   "policy": "ours",
+   "ate_rmse_m": 0.00883733690661534,
+   "ate_max_m": 0.02331588976085186,
+   "tracked_psnr": 31.283528566360474,
+   "fps": 7.761315621943552,
+   "N_final": 18559
+  },
+  {
+   "scene": "tum_fr2_xyz",
+   "seed": 43,
+   "policy": "ours",
+   "ate_rmse_m": 0.008153982529594525,
+   "ate_max_m": 0.02070268988609314,
+   "tracked_psnr": 31.33178198337555,
+   "fps": 9.24905461230228,
+   "N_final": 18299
+  },
+  {
+   "scene": "tum_fr2_xyz",
+   "seed": 44,
+   "policy": "ours",
+   "ate_rmse_m": 0.009296393721616267,
+   "ate_max_m": 0.024870436638593674,
+   "tracked_psnr": 31.38074126243591,
+   "fps": 10.132595919681497,
+   "N_final": 17546
+  },
+  {
+   "scene": "tum_fr1_xyz",
+   "seed": 42,
+   "policy": "ours",
+   "ate_rmse_m": 0.020259580603165288,
+   "ate_max_m": 0.0368318185210228,
+   "tracked_psnr": 26.66958432197571,
+   "fps": 6.561213364330212,
+   "N_final": 28253
+  },
+  {
+   "scene": "tum_fr1_xyz",
+   "seed": 43,
+   "policy": "ours",
+   "ate_rmse_m": 0.018683782276770214,
+   "ate_max_m": 0.03448643535375595,
+   "tracked_psnr": 26.621503782272338,
+   "fps": 6.64832254488717,
+   "N_final": 28107
+  },
+  {
+   "scene": "tum_fr1_xyz",
+   "seed": 44,
+   "policy": "ours",
+   "ate_rmse_m": 0.019799933193519078,
+   "ate_max_m": 0.03683755174279213,
+   "tracked_psnr": 26.61068832874298,
+   "fps": 5.848991649962223,
+   "N_final": 28123
+  }
+ ]
+}
