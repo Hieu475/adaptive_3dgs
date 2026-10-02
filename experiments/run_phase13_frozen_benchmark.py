@@ -211,6 +211,7 @@ def run_policy_trajectory(
             "frame": t,
             "psnr": float(m["psnr"]),
             "ssim": float(m["ssim"]),
+            "lpips": float(m.get("lpips", 0.0)),
             "depth_l1": float(m["depth_l1"]),
             "n_gaussians": int(m["n_gaussians"]),
             "n_new": n_new,
@@ -230,6 +231,7 @@ def run_policy_trajectory(
     # Trajectory-level summary aggregation
     psnrs = np.array([r["psnr"] for r in frame_logs])
     ssims = np.array([r["ssim"] for r in frame_logs])
+    lpipss = np.array([r.get("lpips", 0.0) for r in frame_logs])
     depths = np.array([r["depth_l1"] for r in frame_logs])
     n_news = np.array([r["n_new"] for r in frame_logs])
     n_opts = np.array([r["n_optimized"] for r in frame_logs])
@@ -254,6 +256,8 @@ def run_policy_trajectory(
         "mean_psnr": float(np.mean(psnrs)),
         "final_ssim": float(ssims[-1]) if len(ssims) > 0 else 0.0,
         "mean_ssim": float(np.mean(ssims)),
+        "final_lpips": float(lpipss[-1]) if len(lpipss) > 0 else 0.0,
+        "mean_lpips": float(np.mean(lpipss)),
         "final_depth_l1": float(depths[-1]) if len(depths) > 0 else 0.0,
         "mean_depth_l1": float(np.mean(depths)),
         "mean_n_optimized": float(np.mean(n_opts)),
