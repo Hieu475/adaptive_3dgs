@@ -131,14 +131,16 @@ Warmup pre-allocation is disabled (ablation $-0.75\,\mathrm{dB}$); microsteps fi
 Raw depth hole-rate is strongly associated with sensor domain: TUM $0.18$--$0.31$ vs Replica $\approx 0.000$ (300--500$\times$); we claim domain association within evaluated datasets, not content-independence in general.
 The score $n = \mathrm{clip}(2.5 \cdot \mathrm{holes} + 1.0 \cdot \mathrm{edge})$ routes $n \le 0.10 \to$ raw-error selection ($\kappa = 0.98$) and $n \ge 0.30 \to$ temporal$\times$influence + throttling ($\kappa = 0.90$), computed pre-hygiene in milliseconds on CPU.
 Formally, with $h_t$ the raw missing-depth rate and $e_t$ the raw edge density of frame $t$:
+{\footnotesize
 \begin{equation}
-n_t = \min(1, 2.5 h_t + 1.0 e_t), \quad
+n_t = \min(1,\, 2.5 h_t + 1.0 e_t), \quad
 \pi_t = \begin{cases}
-\texttt{error\_only} & n_t \le 0.10 \\
-\text{blend (nearest rule)} & 0.10 < n_t < 0.30 \\
-\texttt{temporal} + \text{throttle} & n_t \ge 0.30
+\texttt{err\_only} & n_t \le 0.10 \\
+\text{blend} & 0.10 < n_t < 0.30 \\
+\texttt{temporal} & n_t \ge 0.30
 \end{cases}
 \end{equation}
+}
 with coverage knee $\kappa \in \{0.98, 0.90\}$ tied to the chosen arm.
 All constants were frozen on five development scenes; the seven held-out scenes in Fig.~\ref{fig:separation} use identical values.
 Two earlier features failed held-out separation and are reported as such: post-hygiene invalid ratio (conflates far-but-valid geometry --- 18\% of Replica room0 exceeds $4\,\mathrm{m}$ --- with holes) and Laplacian texture energy (measures sharpness, inverted: crisp synthetic scores \textit{higher}).
@@ -146,7 +148,7 @@ Operating on pre-hygiene raw depth was the fix (Fig.~\ref{fig:separation}).
 Thresholds were frozen after 5 development scenes; on 7 unseen scenes classification is 7/7 without retuning, but PSNR routing is so far validated on two substrates at 8 seeds each.
 A causal mixed-regime test (30\% holes injected mid-trajectory on Replica) switches routing 49/50 frames exactly at the boundary, proving within-sequence response; end-to-end it trails fixed \texttt{error\_only} by $0.85\,\mathrm{dB}$ (switch transients on synthetic shifts), so per-frame PSNR benefit on real mixed sequences remains future work.
 
-\begin{figure}[t]
+\begin{figure}[tbp]
 \centering
 \includegraphics[width=\columnwidth]{figs/fig1_noise_separation.pdf}
 \caption{\textbf{Sensor separation.} v3 hole-rate score, development scenes: Replica $\le 0.022$ vs TUM $\ge 0.49$ (thresholds $0.10$/$0.30$, 5/5); 7 unseen scenes classify 7/7 frozen. Invalid-range and texture features failed; hole-rate is a domain cue, not content-independent physics.}
@@ -186,26 +188,26 @@ Artifacts: \texttt{results/phase14\_corrected/}.
 \textbf{Main result (Tab.~\ref{tab:main}, Fig.~\ref{fig:deltas}, Fig.~\ref{fig:pareto}).}
 OURS reaches $27.67 \pm 0.04\,\mathrm{dB}$: $+2.63$ over the strongest selective baseline, $+4.62$ over the RTG-SLAM-policy re-implementation, $+8.80$ over pass-through --- all eight paired differences favor OURS in every comparison ($p_{\mathrm{Holm}} = 0.0391$), while the unconstrained ceiling is only $0.18\,\mathrm{dB}$ ahead at $3.8\times$ the map.
 
-\begin{table}[t]
+\begin{table}[tbp]
 \centering
-\small
+\footnotesize\setlength{\tabcolsep}{3pt}
 \begin{tabular}{lcccc}
 \toprule
 \textbf{Policy} & \textbf{Mean} & \textbf{Final} & \textbf{SSIM} & \textbf{Map} \\
 \midrule
 Fixed OURS & 26.85 & 26.07 & 0.9244 & 78,825 \\
-Routed \texttt{error\_only} & 30.17 & 28.02 & 0.9584 & 115,964 \\
+Routed (err) & 30.17 & 28.02 & 0.9584 & 115,964 \\
 \midrule
-$\Delta$ (adaptive $-$ fixed) & +3.32 $\checkmark$ & +1.95 $\checkmark$ & +0.034 & --- \\
+$\Delta$ & +3.32 $\checkmark$ & +1.95 $\checkmark$ & +0.034 & --- \\
 \bottomrule
 \end{tabular}
 \caption{\textbf{Adaptive validation, Replica \texttt{office0}, 150f $\times$ 8 seeds.} Router picks \texttt{error\_only} (holes $\approx 0.02$): $p = 0.0078$, $d_z = 71.9$. No fixed policy wins both substrates.}
 \label{tab:adaptive}
 \end{table}
 
-\begin{table}[t]
+\begin{table}[tbp]
 \centering
-\small
+\footnotesize\setlength{\tabcolsep}{3pt}
 \begin{tabular}{lcccc}
 \toprule
 \textbf{Scene} & \textbf{Adaptive} & \textbf{Best fixed} & \textbf{$\Delta$} & \textbf{Route} \\
@@ -235,7 +237,7 @@ Both are visible in Tab.~\ref{tab:scenes} and motivate motion-aware routing (Fut
 \textbf{Horizon effect (Fig.~\ref{fig:dilution}):} at 30 frames OURS ties \texttt{error\_only} ($-0.01\,\mathrm{dB}$ on \texttt{fr2\_xyz}); the lead needs $\ge 100$ frames for bloat to bite --- short-horizon evals hide dilution, so we benchmark 150.
 The mechanism is visible frame-by-frame: the unthrottled map grows near-linearly past $70\mathrm{k}$ while the throttled map plateaus near $23\mathrm{k}$, and PSNR diverges exactly when the curves separate.
 
-\begin{figure}[t]
+\begin{figure}[tbp]
 \centering
 \includegraphics[width=\columnwidth]{figs/fig7_dilution.pdf}
 \caption{\textbf{Compute dilution visualized} (fr2\_xyz, seed 42, per-frame trace). Unthrottled growth dilutes the fixed budget; throttling plateaus the map and quality compounds.}
@@ -243,18 +245,18 @@ The mechanism is visible frame-by-frame: the unthrottled map grows near-linearly
 \end{figure}
 \textbf{Component ablation (Tab.~\ref{tab:ablation}, fr2\_xyz 150f$\times$5, pre-fix substrate --- absolutes deprecated, deltas transfer):} each mechanism isolated against the same old substrate. Warmup pre-allocation harms ($-0.75$); coverage throttling is the dominant gain ($+1.04$ with $3.1\times$ map shrink $141\mathrm{k}\to45\mathrm{k}$); backlog adds $+1.08$ total with queue cap; adding the learned predictor with adaptive-$K$ destroys the gain ($-1.54$ vs A0), confirming the negative finding at component level.
 
-\begin{table}[t]
+\begin{table}[tbp]
 \centering
-\small
+\footnotesize\setlength{\tabcolsep}{3pt}
 \begin{tabular}{lcccc}
 \toprule
 \textbf{Condition} & \textbf{Mean} & \textbf{$\Delta$ vs A0} & \textbf{Map} & \textbf{Finding} \\
 \midrule
-A0 old substrate & 16.07 & --- & 140,998 & bloat baseline \\
+A0 baseline & 16.07 & --- & 140,998 & bloated \\
 A1 + warmup & 15.32 & $-0.75$ & 140,038 & harmful \\
 A2 + coverage & 17.11 & $+1.04$ & 44,865 & decisive \\
-A3 + backlog & 17.15 & $+1.08$ & 43,824 & stabilizes \\
-A4 + learned + adapt-$K$ & 14.53 & $-1.54$ & 38,317 & harmful \\
+A3 + backlog & 17.15 & $+1.08$ & 43,824 & stable \\
+A4 + learned & 14.53 & $-1.54$ & 38,317 & harmful \\
 \bottomrule
 \end{tabular}
 \caption{\textbf{Component ablation} (old substrate; deltas only). \texttt{results/step1\_ablation\_5seeds/}.}
@@ -264,9 +266,9 @@ A4 + learned + adapt-$K$ & 14.53 & $-1.54$ & 38,317 & harmful \\
 \textbf{Baseline tracking (Tab.~\ref{tab:ate}):} a dense frame-to-frame photometric+depth Gauss-Newton odometer (no keyframes/loop closure, GT-anchored first frame) reaches ATE $0.9\,\mathrm{cm}$ (fr2\_xyz) and $2.0\,\mathrm{cm}$ (fr1\_xyz) over 100 frames at 3 seeds (\texttt{results/phase14\_tracking100/}), stable vs 30f with no late blowup; mapping evaluated at tracked poses holds $31.3$/$26.6\,\mathrm{dB}$ (above GT-pose PSNR since renders align to the tracker's own photometric optimum --- not comparable across pose sources).
 Published full-trajectory references (MonoGS $1.71$, SplaTAM $0.50$, Photo-SLAM $0.63\,\mathrm{cm}$ on fr2\_xyz) are shown for range only --- ours is a short-horizon sanity check, not a SLAM claim.
 
-\begin{table}[t]
+\begin{table}[tbp]
 \centering
-\small
+\footnotesize\setlength{\tabcolsep}{3pt}
 \begin{tabular}{lcccc}
 \toprule
 \textbf{Method} & \textbf{fr2\_xyz} & \textbf{fr1\_xyz} & \textbf{Horizon} & \textbf{System?} \\
@@ -288,9 +290,9 @@ To reproduce Tab.~\ref{tab:main}: \texttt{python experiments/run\_final\_confirm
 \textbf{Perceptual metric:} AlexNet LPIPS on fr2\_xyz 150f$\times$3 is $0.211$ (OURS) vs $0.294$ (\texttt{error\_only}).
 \textbf{Second confirmatory scene (Tab.~\ref{tab:confirm2}):} fr1\_xyz 150f$\times$8 gives OURS $23.47$ vs \texttt{error\_only} $21.09$ ($+2.38\,\mathrm{dB}$, $p=0.0078$); office1 routing validated at 8 seeds (routed \texttt{error\_only} $33.46$ vs fixed OURS $29.25$, $p=0.0078$).
 
-\begin{table}[t]
+\begin{table}[tbp]
 \centering
-\small
+\footnotesize\setlength{\tabcolsep}{3pt}
 \begin{tabular}{lccc}
 \toprule
 \textbf{Scene} & \textbf{OURS} & \textbf{\texttt{error\_only}} & \textbf{$\Delta$} \\
@@ -303,9 +305,9 @@ office1 100f$\times$8 & 29.25 & 33.46 & $-4.21$ (routed) $\checkmark$ \\
 \label{tab:confirm2}
 \end{table}
 
-\begin{table}[t]
+\begin{table}[tbp]
 \centering
-\small
+\footnotesize\setlength{\tabcolsep}{3pt}
 \begin{tabular}{lccc}
 \toprule
 \textbf{Method} & \textbf{Replica} & \textbf{fr2\_xyz} & \textbf{Protocol} \\
@@ -323,7 +325,7 @@ Ours (throttled) & 20--29 & \textbf{27.67} & budgeted, 100--150f \\
 \label{tab:sota}
 \end{table}
 
-\begin{figure}[t]
+\begin{figure}[tbp]
 \centering
 \includegraphics[width=\columnwidth]{figs/fig6_budget.pdf}
 \caption{\textbf{Budget curve} (fr2\_xyz, 30f$\times$3, matched budgets): saturation by $\sim$15\,ms; policies tie at short horizons --- dilution needs $\ge$100 frames to separate them.}
@@ -361,21 +363,21 @@ room2 (Rep.) & 99 & 22.86 & 25.88 & $-3.03$ & 78 / 146 & 3 \\
 \end{table*}
 Supplementary video (\texttt{supp\_video.mp4}) shows both A/B directions.
 
-\begin{figure}[t]
+\begin{figure}[tbp]
 \centering
 \includegraphics[width=\columnwidth]{figs/fig2_main_deltas.pdf}
 \caption{\textbf{Paired deltas vs OURS} with 95\% bootstrap CIs (fr2\_xyz, $n=8$). All selective/SLAM baselines lose; FULL ceiling is only $0.18\,\mathrm{dB}$ ahead.}
 \label{fig:deltas}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[tbp]
 \centering
 \includegraphics[width=\columnwidth]{figs/fig3_kappa_ablation.pdf}
 \caption{\textbf{Kappa ablation} (office0, 30f $\times$ 3): disabling throttling recovers $+0.8\,\mathrm{dB}$ but the $\sim 4.7\,\mathrm{dB}$ selection gap to \texttt{error\_only} remains.}
 \label{fig:kappa}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[tbp]
 \centering
 \includegraphics[width=\columnwidth]{figs/fig4_pareto.pdf}
 \caption{\textbf{Quality vs compactness.} OURS matches the ceiling at $3.8\times$ smaller map; all heuristic baselines bloat past $65\mathrm{k}$ (fr2\_xyz 150f $\times$ 8).}
