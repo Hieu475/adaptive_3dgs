@@ -65,7 +65,7 @@ Implicit in this response is an assumption we challenge: that reconstruction qua
 We argue the dominant effect is \textit{how many} Gaussians compete for the budget.
 Online pipelines spawn splats wherever rendering error exceeds a threshold; on real sequences the map grows past $100\mathrm{k}$ primitives within 150 frames.
 Because each new splat is born unrefined, it both demands optimization and degrades renders until converged --- the fixed budget is diluted across an ever-larger pool of ever-younger primitives while converged surfaces stop receiving updates.
-We call this \textbf{compute dilution}, and we show it explains more of the quality gap than any ranking rule: removing growth control while keeping the best ranker loses far more than removing the ranker while keeping growth control (Sec.~\ref{sec:experiments}).
+We call this \textbf{compute dilution}, and Sec.~\ref{sec:experiments} shows growth control dominates ranking: removing coverage throttling while keeping the ranker forfeits the $+1.04\,\mathrm{dB}$ gain (Tab.~\ref{tab:ablation}), whereas no ranker tested recovers it.
 
 Three empirical findings support this reframing.
 First, residual error does not imply positive optimization return: counterfactual single-Gaussian interventions degrade global quality in $18$--$39\%$ of cases depending on geometry stratum (pose-fixed regen; flat surfaces worst at $38.7\%$).
@@ -111,7 +111,7 @@ Per-frame scheduling solves
 \begin{equation}
 \max_{A_t \subseteq G_t} \Delta Q(A_t) \quad \text{s.t.} \quad \sum_{i \in A_t} C_i \le B_t,
 \end{equation}
-with decoupled cost $C_i(K) = C_i^{\mathrm{base}} + K \cdot C_i^{\mathrm{step}}$ for $K$ microsteps and $\Delta Q$ measured by exact full-scene counterfactual renders (active edits embedded in all $N$ splats, avoiding the $31\%$ gradient error of affine-background approximations).
+with decoupled cost $C_i(K) = C_i^{\mathrm{base}} + K \cdot C_i^{\mathrm{step}}$ for $K$ microsteps and $\Delta Q$ measured by exact full-scene counterfactual renders (active edits embedded in all $N$ splats, avoiding depth-interleaving gradient bias of affine-background approximations).
 The oracle $U_i^\star = \Delta Q_i^{\mathrm{exact}} / \Delta C_i$ is our measurement instrument, never a runtime input.
 It reveals: (i) negative utility in $18$--$39\%$ of interventions by stratum (pose-fixed regen) --- high error marks silhouettes, discontinuities, and coupled layers where gradient steps hurt; (ii) interaction is protocol-dependent --- corrected joint-group measurements give $R_{\mathrm{add}}(4) = 0.95$, $R_{\mathrm{add}}(16) = 0.82$ (relatively additive), while a separate pairwise protocol shows stronger interaction; pointwise top-$K$ is therefore treated as a reference, not a bound, without a universality claim; (iii) offline TwoHeadMLP rank signal ($\rho \approx 0.20$, NDCG@20 $0.46$, measured on pre-pose-fix labels whose absolute values are polluted but whose within-set method comparison remains valid) reverses to $-2.51\,\mathrm{dB}$ closed-loop. Conditional-oracle selection numbers are withheld pending a rerun under fork-correct semantics.
 
@@ -184,7 +184,7 @@ Artifacts: \texttt{results/phase14\_corrected/}.
 \end{table*}
 
 \textbf{Main result (Tab.~\ref{tab:main}, Fig.~\ref{fig:deltas}, Fig.~\ref{fig:pareto}).}
-OURS reaches $27.67 \pm 0.04\,\mathrm{dB}$: $+2.63$ over the strongest selective baseline, $+4.62$ over the RTG-SLAM-policy re-implementation, $+8.80$ over pass-through, all Holm-significant with $d_z \in [15.4, 168.8]$, while the unconstrained ceiling is only $0.18\,\mathrm{dB}$ ahead at $3.8\times$ the map.
+OURS reaches $27.67 \pm 0.04\,\mathrm{dB}$: $+2.63$ over the strongest selective baseline, $+4.62$ over the RTG-SLAM-policy re-implementation, $+8.80$ over pass-through --- all eight paired differences favor OURS in every comparison ($p_{\mathrm{Holm}} = 0.0391$), while the unconstrained ceiling is only $0.18\,\mathrm{dB}$ ahead at $3.8\times$ the map.
 
 \begin{table}[t]
 \centering
@@ -226,7 +226,7 @@ fr1\_rpy 100f & 19.93 & 21.06 (err) & $-1.13$ & temporal \\
 \textbf{Adaptivity is necessary (Tab.~\ref{tab:adaptive}).}
 On synthetic Replica the fixed throttled pipeline loses $-3.32\,\mathrm{dB}$; routing to raw-error selection recovers $+3.32$ [$+3.29$, $+3.35$], $p = 0.0078$.
 A $\kappa$-sweep (Fig.~\ref{fig:kappa}) attributes only $\sim 0.8\,\mathrm{dB}$ of the gap to throttling; the rest is selection overfit.
-\textbf{Seven-scene routing (Tab.~\ref{tab:routing7}, exploratory $n=3$, no scene labels):} the router matches or nearly matches the best fixed policy on five scenes (fr2\_xyz, office0/office1, room1, fr3\_static; worst gap $-0.37\,\mathrm{dB}$ from the $\kappa=0.98$ safety margin), but trails raw-error by $\approx -1.1\,\mathrm{dB}$ on exploration-heavy \texttt{fr1\_room} and rapid-rotation \texttt{fr1\_rpy}, where temporal smoothing reacts slower than instantaneous error.
+\textbf{Seven-scene routing (Tab.~\ref{tab:routing7}, exploratory $n=3$, no scene labels):} the router matches or nearly matches the best fixed policy on five scenes (fr2\_xyz, office0/office1, room1, fr3\_static; worst gap $-0.37\,\mathrm{dB}$), but trails raw-error by $\approx -1.1\,\mathrm{dB}$ on exploration-heavy \texttt{fr1\_room} and rapid-rotation \texttt{fr1\_rpy}, where temporal smoothing reacts slower than instantaneous error.
 Domain dependence is thus finer than real-vs-synthetic: motion and exploration regime matter within a sensor, and the current router does not capture them --- reported as-is.
 \textbf{Failure modes.} Two TUM scenes isolate where throttling hurts.
 \textit{Exploration starvation} (\texttt{fr1\_room}, $-1.04\,\mathrm{dB}$): in a large unseen room nearly every frame is novel, so coverage saturates slowly while the spawn cap binds throughout --- throttling taxes exploration itself, and the map ends smaller ($92\mathrm{k}$ vs $97\mathrm{k}$) but under-populated in far corners.
@@ -261,7 +261,7 @@ A4 + learned + adapt-$K$ & 14.53 & $-1.54$ & 38,317 & harmful \\
 \label{tab:ablation}
 \end{table}
 \textbf{Systems:} scheduler overhead $2.54\,\mathrm{ms}$; optimization-budgeted execution at $\sim 10\,\mathrm{FPS}$ measured --- \textit{not} end-to-end $15\,\mathrm{ms}$ real-time, reported as such.
-\textbf{Baseline tracking (Tab.~\ref{tab:ate}):} a dense frame-to-frame photometric+depth Gauss-Newton odometer (no keyframes/loop closure, GT-anchored first frame) reaches ATE $0.9\,\mathrm{cm}$ (fr2\_xyz) and $2.0\,\mathrm{cm}$ (fr1\_xyz) over 100 frames at 3 seeds (\texttt{results/phase14\_tracking100/}), stable vs 30f with no late blowup; mapping under tracked poses holds $31.3$/$26.6\,\mathrm{dB}$.
+\textbf{Baseline tracking (Tab.~\ref{tab:ate}):} a dense frame-to-frame photometric+depth Gauss-Newton odometer (no keyframes/loop closure, GT-anchored first frame) reaches ATE $0.9\,\mathrm{cm}$ (fr2\_xyz) and $2.0\,\mathrm{cm}$ (fr1\_xyz) over 100 frames at 3 seeds (\texttt{results/phase14\_tracking100/}), stable vs 30f with no late blowup; mapping evaluated at tracked poses holds $31.3$/$26.6\,\mathrm{dB}$ (above GT-pose PSNR since renders align to the tracker's own photometric optimum --- not comparable across pose sources).
 Published full-trajectory references (MonoGS $1.71$, SplaTAM $0.50$, Photo-SLAM $0.63\,\mathrm{cm}$ on fr2\_xyz) are shown for range only --- ours is a short-horizon sanity check, not a SLAM claim.
 
 \begin{table}[t]
@@ -330,7 +330,7 @@ Ours (throttled) & 20--29 & \textbf{27.67} & budgeted, 100--150f \\
 \label{fig:budget}
 \end{figure}
 \textbf{Published-SOTA context} (\texttt{results/sota\_comparison.md}, protocol-mismatched, for range only): Replica SOTA renders $33$--$42\,\mathrm{dB}$ with global refinement and full sequences vs our $20$--$33\,\mathrm{dB}$ budgeted online mapping; on TUM fr2\_xyz our $27.67\,\mathrm{dB}$ sits above published SplaTAM $24.50$, Photo-SLAM $21.07$ and MonoGS $16.17$ (different frames/resolution/views --- competitive range, not superiority).
-\textbf{Long horizons:} at 150f the lead widens beyond fr2\_xyz --- fr1\_xyz $+2.41\,\mathrm{dB}$ mean ($23.48$ vs $21.07$, map $39\mathrm{k}$ vs $81\mathrm{k}$), fr1\_desk $+0.22$ mean but $+2.7$ final (error-only collapses late); room0 error-only wins mean ($-1.93$) yet also collapses at the $150\mathrm{k}$ cap while OURS stays flat --- more dilution evidence.
+\textbf{Long horizons:} at 150f the lead widens beyond fr2\_xyz --- fr1\_xyz $+2.38\,\mathrm{dB}$ mean ($23.47$ vs $21.09$, map $39\mathrm{k}$ vs $81\mathrm{k}$), fr1\_desk $+0.22$ mean but $+2.7$ final (error-only collapses late); room0 error-only wins mean ($-1.93$) yet also collapses at the $150\mathrm{k}$ cap while OURS stays flat --- more dilution evidence.
 \textbf{Per-scene breakdown (Tab.~\ref{tab:scenes}, exploratory $n=3$ except fr2\_xyz/office0/office1/fr1\_xyz at $n=8$):} throttling wins or ties on all TUM scenes at long horizons except exploration-heavy room and rapid-rotation rpy means, while losing mean PSNR on all Replica scenes, where raw-error selection keeps taller maps; finals favor stability (no error-only collapse) in every scene.
 
 \begin{table*}[t]
@@ -340,7 +340,7 @@ Ours (throttled) & 20--29 & \textbf{27.67} & budgeted, 100--150f \\
 \toprule
 \textbf{Scene} & \textbf{Frames} & \textbf{OURS} & \textbf{\texttt{error\_only}} & \textbf{$\Delta$} & \textbf{Map (k)} & \textbf{$n$} \\
 \midrule
-fr2\_xyz (TUM) & 150 & 27.67 & 24.07 & $+3.60$ $\checkmark$ & 23 / 75 & 8 \\
+fr2\_xyz (TUM) & 150 & 27.67 & 24.07 & $+3.59$ $\checkmark$ & 23 / 75 & 8 \\
 fr1\_xyz (TUM) & 150 & 23.47 & 21.09 & $+2.38$ $\checkmark$ & 39 / 81 & 8 \\
 fr1\_desk (TUM) & 150 & 22.55 & 22.34 & $+0.21$ & 27 / 56 & 3 \\
 fr1\_room (TUM) & 100 & 15.53 & 16.54 & $-1.01$ & 92 / 97 & 3 \\
