@@ -36,42 +36,78 @@ fig.tight_layout(); fig.savefig(OUT / "fig1_noise_separation.pdf")
 json.dump({"scenes": scenes, "v3": v3}, open(OUT / "fig1.json", "w"), indent=1)
 
 # ---- Fig2: deltas vs OURS (Phase-14 main, 8 seeds) ----
-labels = ["no_op", "error_only", "error_influence", "rtg_slam", "FULL"]
-deltas = [8.80, 3.59, 2.63, 4.62, -0.18]
-ci_lo = [8.80, 3.48, 2.56, 4.44, -0.18]
-ci_hi = [8.80, 3.70, 2.68, 4.82, -0.18]
-cols2 = ["tab:red" if d > 0 else "tab:gray" for d in deltas]
-fig, ax = plt.subplots(figsize=(3.4, 1.9))
+# Same anchored numbers; redesigned: sorted bars, value labels, visible CIs.
+labels = ["FULL", "error_influence", "error_only", "rtg_slam", "no_op"]
+deltas = [-0.18, 2.63, 3.59, 4.62, 8.80]
+ci_lo = [-0.18, 2.56, 3.48, 4.44, 8.80]
+ci_hi = [-0.18, 2.68, 3.70, 4.82, 8.80]
+cols2 = ["tab:gray" if d < 0 else "tab:green" for d in deltas]
+fig, ax = plt.subplots(figsize=(3.4, 2.0))
 y = np.arange(len(labels))
-ax.barh(y, deltas, color=cols2)
-for i in range(len(labels)):
-    ax.plot([ci_lo[i], ci_hi[i]], [y[i], y[i]], color="k", lw=1.2)
-ax.set_yticks(y); ax.set_yticklabels(labels)
-ax.axvline(0, color="k", lw=0.7)
-ax.set_xlabel("OURS $-$ baseline mean PSNR (dB)")
-ax.set_title("OURS beats all selective/SLAM policies (n=8, Holm)", fontsize=9)
+ax.barh(y, deltas, color=cols2, height=0.55, edgecolor="k", lw=0.6)
+ax.errorbar(deltas, y, xerr=[np.array(deltas) - np.array(ci_lo),
+                             np.array(ci_hi) - np.array(deltas)],
+            fmt="none", ecolor="k", elinewidth=1.4, capsize=3)
+for i, d in enumerate(deltas):
+    if d >= 0:
+        ax.text(d + 0.22, y[i], f"+{d:.2f}\u2605", va="center", ha="left", fontsize=7.5)
+    else:
+        # negative bar is a sliver: label on the clear side of zero
+        ax.text(0.22, y[i], f"{d:.2f}\u2605", va="center", ha="left", fontsize=7.5)
+ax.set_yticks(y); ax.set_yticklabels(labels, fontsize=7.5)
+ax.axvline(0, color="k", lw=0.8)
+ax.set_xlabel("OURS $-$ baseline (dB)  \u2605 Holm", fontsize=8)
+ax.set_title("Paired deltas vs OURS (n=8)", fontsize=9)
+ax.set_xlim(-1.8, 10.6)
 fig.tight_layout(); fig.savefig(OUT / "fig2_main_deltas.pdf")
 
 # ---- Fig3: kappa ablation + selection gap (office0 30f x3) ----
+# Same anchored numbers; redesigned: truncated axis + value labels + effect brackets.
 conds = ["off", "k0.80", "k0.90", "k0.95", "error_only"]
 vals = [24.79, 24.00, 23.98, 24.19, 29.48]
 cols3 = ["tab:orange"] * 4 + ["tab:green"]
-fig, ax = plt.subplots(figsize=(3.4, 1.9))
-ax.bar(range(len(conds)), vals, color=cols3)
-ax.set_xticks(range(len(conds))); ax.set_xticklabels(conds)
+fig, ax = plt.subplots(figsize=(3.4, 2.2))
+x = np.arange(len(conds))
+bars = ax.bar(x, vals, color=cols3, edgecolor="k", lw=0.6)
+for xi, v in zip(x, vals):
+    ax.text(xi, v + 0.12, f"{v:.2f}", ha="center", fontsize=7.5)
+ax.set_xticks(x); ax.set_xticklabels(conds, fontsize=7.5)
 ax.set_ylabel("mean PSNR (dB)")
-ax.set_title("Throttling ~0.8dB; selection gap ~4.7dB (office0)", fontsize=9)
+ax.set_ylim(21.5, 31.0)
+ax.set_title("Decomposing the Replica gap (office0)", fontsize=9)
+ax.annotate("", xy=(0, 25.1), xytext=(2, 25.1),
+            arrowprops=dict(arrowstyle="<->", lw=1.2, color="tab:red"))
+ax.text(1, 25.45, "throttling \u22120.8 dB", ha="center", fontsize=7, color="tab:red")
+ax.annotate("", xy=(2, 26.6), xytext=(4, 26.6),
+            arrowprops=dict(arrowstyle="<->", lw=1.2, color="tab:blue"))
+ax.text(3, 26.95, "selection gap +4.7 dB", ha="center", fontsize=7, color="tab:blue")
 fig.tight_layout(); fig.savefig(OUT / "fig3_kappa_ablation.pdf")
 json.dump({"conds": conds, "psnr": vals}, open(OUT / "fig3.json", "w"), indent=1)
 
 # ---- Fig4: Pareto map-size vs PSNR ----
+# Same anchored numbers; redesigned: star for OURS, frontier, leader-line labels.
 names = ["no_op", "error_only", "error_influence", "rtg_slam", "OURS", "FULL"]
 psnr = [18.86, 24.07, 25.04, 23.05, 27.67, 27.85]
 nmap = [23.5, 74.6, 106.9, 67.2, 23.4, 88.0]
-fig, ax = plt.subplots(figsize=(3.4, 1.9))
+offsets = {"no_op": (-34, -11), "error_only": (6, -13), "error_influence": (6, 3),
+           "rtg_slam": (-54, 3), "OURS": (8, -15), "FULL": (6, 4)}
+fig, ax = plt.subplots(figsize=(3.4, 2.2))
 for x, y_, n in zip(nmap, psnr, names):
-    ax.scatter(x, y_, s=28, c="tab:red" if n == "OURS" else "tab:blue")
-    ax.annotate(n, (x, y_), fontsize=7, xytext=(3, 3), textcoords="offset points")
+    if n == "OURS":
+        ax.scatter(x, y_, s=90, c="tab:red", marker="*", edgecolors="k", lw=0.6, zorder=5)
+    elif n == "FULL":
+        ax.scatter(x, y_, s=40, c="tab:gray", marker="D", edgecolors="k", lw=0.5, zorder=4)
+    else:
+        ax.scatter(x, y_, s=32, c="tab:blue", zorder=3)
+    dx, dy = offsets[n]
+    ax.annotate(n, (x, y_), fontsize=7,
+                xytext=(dx, dy), textcoords="offset points",
+                arrowprops=dict(arrowstyle="-", lw=0.6, color="0.4"),
+                bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="0.7", lw=0.5))
+# nondominated frontier: no_op -> OURS -> FULL (smaller map + higher PSNR dominate)
+fx = [23.5, 23.4, 88.0]; fy = [18.86, 27.67, 27.85]
+ax.plot(fx, fy, ls=(0, (3, 2)), c="tab:red", lw=1.0, alpha=0.7)
+ax.text(50, 28.15, "Pareto frontier", fontsize=7, color="tab:red", alpha=0.9)
 ax.set_xlabel("final map size (K primitives)")
 ax.set_ylabel("mean PSNR (dB)")
 ax.set_title("Quality vs compactness (fr2_xyz 150f x8)", fontsize=9)
