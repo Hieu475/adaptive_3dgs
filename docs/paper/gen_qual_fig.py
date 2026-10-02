@@ -9,7 +9,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import numpy as np
 import cv2
 from pathlib import Path
@@ -72,7 +72,6 @@ for r, (scene, view, psnrs, subtitle) in enumerate(rows):
         axins.set_xticks([]); axins.set_yticks([])
         for spine in axins.spines.values():
             spine.set_edgecolor("red"); spine.set_linewidth(1.5)
-        mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="red", lw=0.8)
     axes[r, 0].set_ylabel(subtitle, fontsize=7)
 fig.suptitle("Same fixed policies, opposite winners (red: most-discriminative region, zoomed)",
              fontsize=9)
