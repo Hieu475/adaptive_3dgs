@@ -1,8 +1,8 @@
-"""
-Reproducibility, Provenance, and Statistical Confidence Utilities.
+"""Provenance and statistical-confidence utilities.
 
-Guarantees full scientific reproducibility by logging hardware state,
-git revisions, random seeds, and computing bootstrap confidence intervals.
+These helpers record run identity and seed Python, NumPy, and PyTorch RNGs.
+Seeding alone does not guarantee bitwise reproducibility for CUDA kernels,
+third-party GPU libraries, or algorithms with unstable tie handling.
 """
 import os
 import sys
@@ -66,7 +66,11 @@ def get_hardware_info() -> Dict[str, Any]:
 
 
 def set_seed(seed: int = 42) -> None:
-    """Strictly set deterministic random seed across random, numpy, and torch."""
+    """Seed Python, NumPy, and PyTorch RNGs and set cuDNN repeatability hints.
+
+    This does not enable ``torch.use_deterministic_algorithms`` and does not
+    guarantee identical CUDA execution or results across repeated runs.
+    """
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -206,6 +210,129 @@ def compute_config_hash(config: Union[Dict[str, Any], str]) -> str:
         return hashlib.sha256(config.encode("utf-8")).hexdigest()
     serialized = json.dumps(config, sort_keys=True, default=str)
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def classify_experiment_manifest(
+    manifest: Dict[str, Any], artifact_path: str = ""
+) -> Dict[str, Any]:
+    """Conservatively classify whether an experiment bundle is paper-usable.
+
+    This validator never upgrades an artifact based on its reported metrics.
+    It checks provenance fields and verifies any declared artifact hashes.
+    """
+    path_lower = str(artifact_path).replace("\\", "/").lower()
+    issues: List[str] = []
+    warnings: List[str] = []
+
+    if "final_confirmation" in path_lower and "phase14_corrected" not in path_lower:
+        return {
+            "status": "legacy",
+            "issues": ["Known pre-pose-fix final_confirmation artifact."],
+            "warnings": ["Do not use its absolute metrics in primary tables."],
+        }
+    if manifest.get("protocol_version") == "phase13-authoritative-v1":
+        return {
+            "status": "legacy",
+            "issues": ["Superseded Phase 13 v1 protocol lacks current pose/config provenance."],
+            "warnings": ["Re-run with the v3 protocol before using in primary tables."],
+        }
+
+    git_info = manifest.get("git", {}) if isinstance(manifest.get("git"), dict) else {}
+    source_snapshots = manifest.get("source_snapshots", [])
+    snapshot_commits = [str(s.get("commit", "")) for s in source_snapshots
+                        if isinstance(s, dict)] if isinstance(source_snapshots, list) else []
+    commit = str(manifest.get("git_sha") or git_info.get("sha") or
+                 manifest.get("source_snapshot_commit") or
+                 (snapshot_commits[0] if snapshot_commits else ""))
+    if not commit or commit == "unknown":
+        warnings.append("Missing commit SHA.")
+    if "dirty" in commit.lower():
+        issues.append("Commit SHA records a dirty worktree.")
+
+    config_hash = str(manifest.get("config_sha256") or "")
+    artifacts = manifest.get("artifacts", {})
+    if config_hash in ("", "none", "unknown"):
+        if isinstance(artifacts, dict) and artifacts.get("config_snapshot.yaml"):
+            config_hash = str(artifacts["config_snapshot.yaml"])
+        elif manifest.get("source_runner_sha256"):
+            config_hash = str(manifest["source_runner_sha256"])
+            warnings.append("Using runner source hash; no effective runtime config hash is recorded.")
+        else:
+            warnings.append("Missing effective configuration hash or config snapshot hash.")
+
+    scope = manifest.get("scope", {})
+    dataset = manifest.get("dataset_name") or manifest.get("dataset") or manifest.get("scene")
+    if not dataset:
+        protocol = manifest.get("protocol", {})
+        dataset = protocol.get("scene") if isinstance(protocol, dict) else None
+    if not dataset and isinstance(scope, dict):
+        dataset = scope.get("scenes") or scope.get("scene")
+    if not dataset:
+        warnings.append("Missing dataset/scene identity.")
+
+    protocol = manifest.get("protocol", {})
+    pose = manifest.get("pose_convention") or (
+        protocol.get("pose_convention") if isinstance(protocol, dict) else None
+    )
+    if not pose:
+        warnings.append("Missing camera pose convention.")
+
+    seeds = (manifest.get("seeds") or manifest.get("seed") or
+             (protocol.get("seeds") if isinstance(protocol, dict) else None) or
+             (scope.get("seeds") if isinstance(scope, dict) else None))
+    if not seeds and manifest.get("seed") is None:
+        warnings.append("Missing seed/replicate identity.")
+
+    backend = manifest.get("renderer_backend") or manifest.get("backend")
+    if not backend and isinstance(protocol, dict):
+        backend = protocol.get("backend")
+    if not backend and isinstance(scope, dict):
+        backend = scope.get("backend")
+    if not backend:
+        warnings.append("Missing renderer backend.")
+
+    declared_status = str(manifest.get("status", "")).lower()
+    tree_clean = git_info.get("experiment_relevant_tree_clean")
+    if tree_clean is False:
+        issues.append("Experiment-relevant worktree was not clean.")
+    if declared_status != "frozen":
+        warnings.append("Manifest does not declare a frozen protocol status.")
+    if source_snapshots and any(
+        isinstance(s, dict) and s.get("worktree_status") != "clean"
+        for s in source_snapshots
+    ):
+        issues.append("At least one recorded source snapshot was not clean.")
+
+    # Verify file hashes when an artifact directory and a hash inventory exist.
+    if artifact_path and isinstance(artifacts, dict):
+        import hashlib
+        for relpath, expected in artifacts.items():
+            expected_text = str(expected)
+            if len(expected_text) == 64 and all(c in "0123456789abcdefABCDEF" for c in expected_text):
+                candidate = os.path.join(artifact_path, relpath)
+                if not os.path.isfile(candidate):
+                    issues.append(f"Hashed artifact is missing: {relpath}.")
+                    continue
+                digest = hashlib.sha256()
+                with open(candidate, "rb") as f:
+                    for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                        digest.update(chunk)
+                if digest.hexdigest() != expected_text.lower():
+                    issues.append(f"Artifact hash mismatch: {relpath}.")
+            else:
+                import glob
+                pattern = expected_text.replace("<scene>", "*")
+                candidate = os.path.normpath(os.path.join(artifact_path, pattern))
+                if not glob.glob(candidate):
+                    issues.append(f"Declared artifact path is missing: {expected_text}.")
+
+    if issues:
+        status = "invalid"
+    elif declared_status == "frozen" and not warnings:
+        status = "paper_ready"
+    else:
+        status = "exploratory"
+    return {"status": status, "issues": issues, "warnings": warnings}
 
 
 def create_provenance_manifest(

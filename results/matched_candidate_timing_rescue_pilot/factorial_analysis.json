@@ -1,0 +1,1040 @@
+{
+  "schema": "timing-x-stale-mature-rescue-pilot-v1",
+  "status": "exploratory pilot; one seed per scene, three technical repeats",
+  "treatment": "2x2 early/late insertion crossed with global/stale-mature-rescue allocation",
+  "dose": {
+    "candidate_gaussians": 5000,
+    "micro_updates_per_mapped_frame": 5000,
+    "stale_fraction_requested": 0.5,
+    "mature_age_frames": 10,
+    "stale_after_frames": 10
+  },
+  "statistical_note": "Three replay repeats share one frozen prefix and candidate batch per scene. They are technical repeats, not independent seeds; report means and ranges, no seed-level confidence intervals.",
+  "scenes": {
+    "replica_room2": {
+      "seed": 57,
+      "technical_repeats": 3,
+      "arms": {
+        "early_global": {
+          "fixed_heldout_mean_psnr": {
+            "mean": 11.055768330891928,
+            "min": 11.054368416468302,
+            "max": 11.057394941647848,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": 1.131717711687088,
+            "min": 1.131409118572871,
+            "max": 1.1319820036490758,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": 0.07464693921307723,
+            "min": 0.07443689554929733,
+            "max": 0.07475297835965951,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_psnr": {
+            "mean": 10.884737926246846,
+            "min": 10.881652800382765,
+            "max": 10.88737367001255,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_depth_l1": {
+            "mean": 1.2589595345972562,
+            "min": 1.2588865197865309,
+            "max": 1.2590669425187913,
+            "technical_repeats": 3
+          },
+          "mean_mature_update_coverage": {
+            "mean": 0.5679836230194422,
+            "min": 0.5678896403237691,
+            "max": 0.5680552818971901,
+            "technical_repeats": 3
+          },
+          "mean_stale_mature_update_coverage": {
+            "mean": 0.07916243390672104,
+            "min": 0.07898016365491527,
+            "max": 0.07927550450529848,
+            "technical_repeats": 3
+          },
+          "realized_stale_update_fraction": {
+            "mean": 0.017189970501474926,
+            "min": 0.01718407079646018,
+            "max": 0.017194690265486725,
+            "technical_repeats": 3
+          },
+          "mean_opt_stage_sync_ms": {
+            "mean": 63.30980342489775,
+            "min": 63.01370064639878,
+            "max": 63.470966982360586,
+            "technical_repeats": 3
+          }
+        },
+        "late_global": {
+          "fixed_heldout_mean_psnr": {
+            "mean": 11.235333416197035,
+            "min": 11.21990958849589,
+            "max": 11.24324639638265,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": 1.1053855998648536,
+            "min": 1.1048180907964706,
+            "max": 1.1064465393622716,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": -0.004742248963642244,
+            "min": -0.00577781826723367,
+            "max": -0.0028834583063144237,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_psnr": {
+            "mean": 10.728204229236704,
+            "min": 10.720386341609785,
+            "max": 10.743138183534672,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_depth_l1": {
+            "mean": 1.3242438588522176,
+            "min": 1.3241093862900692,
+            "max": 1.3244851954215395,
+            "technical_repeats": 3
+          },
+          "mean_mature_update_coverage": {
+            "mean": 0.33507854914925617,
+            "min": 0.33485632999763376,
+            "max": 0.3354549132426225,
+            "technical_repeats": 3
+          },
+          "mean_stale_mature_update_coverage": {
+            "mean": 0.04947970163281655,
+            "min": 0.049038897324252956,
+            "max": 0.04993414827139598,
+            "technical_repeats": 3
+          },
+          "realized_stale_update_fraction": {
+            "mean": 0.0124,
+            "min": 0.012364601769911504,
+            "max": 0.012461946902654867,
+            "technical_repeats": 3
+          },
+          "mean_opt_stage_sync_ms": {
+            "mean": 62.85975897347896,
+            "min": 62.23970069900898,
+            "max": 63.6552184426372,
+            "technical_repeats": 3
+          }
+        },
+        "early_stale_rescue": {
+          "fixed_heldout_mean_psnr": {
+            "mean": 12.821734613842434,
+            "min": 12.821059823036194,
+            "max": 12.822356224060059,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": 1.1401204268137615,
+            "min": 1.1400873959064484,
+            "max": 1.1401417255401611,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": 0.03035574991049038,
+            "min": 0.03017029771581292,
+            "max": 0.03054357971996069,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_psnr": {
+            "mean": 11.07578105103653,
+            "min": 11.075368397003782,
+            "max": 11.076040863990784,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_depth_l1": {
+            "mean": 1.2974149176416847,
+            "min": 1.2974109773614766,
+            "max": 1.2974187808226696,
+            "technical_repeats": 3
+          },
+          "mean_mature_update_coverage": {
+            "mean": 0.5513993501995037,
+            "min": 0.5513635613866477,
+            "max": 0.5514284541897063,
+            "technical_repeats": 3
+          },
+          "mean_stale_mature_update_coverage": {
+            "mean": 0.7276118315134529,
+            "min": 0.7276067767872612,
+            "max": 0.7276205834204524,
+            "technical_repeats": 3
+          },
+          "realized_stale_update_fraction": {
+            "mean": 0.2875870206489676,
+            "min": 0.28757522123893803,
+            "max": 0.2875929203539823,
+            "technical_repeats": 3
+          },
+          "mean_opt_stage_sync_ms": {
+            "mean": 62.14220785261961,
+            "min": 61.49584552216749,
+            "max": 63.201305947200325,
+            "technical_repeats": 3
+          }
+        },
+        "late_stale_rescue": {
+          "fixed_heldout_mean_psnr": {
+            "mean": 12.965943018595377,
+            "min": 12.963974277178446,
+            "max": 12.967501282691956,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": 1.15132052037451,
+            "min": 1.1512832095225651,
+            "max": 1.1513773848613102,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": 0.0870545231219795,
+            "min": 0.08694246597588062,
+            "max": 0.08724968042224646,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_psnr": {
+            "mean": 11.037912936688876,
+            "min": 11.037452716742997,
+            "max": 11.03834169100871,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_depth_l1": {
+            "mean": 1.3489960916889805,
+            "min": 1.3489865145060869,
+            "max": 1.3490075165719058,
+            "technical_repeats": 3
+          },
+          "mean_mature_update_coverage": {
+            "mean": 0.3096660883570628,
+            "min": 0.30952166361419636,
+            "max": 0.30976929772778106,
+            "technical_repeats": 3
+          },
+          "mean_stale_mature_update_coverage": {
+            "mean": 0.6224820301987743,
+            "min": 0.6224684957433314,
+            "max": 0.622492197127431,
+            "technical_repeats": 3
+          },
+          "realized_stale_update_fraction": {
+            "mean": 0.2619882005899705,
+            "min": 0.26195575221238937,
+            "max": 0.2620088495575221,
+            "technical_repeats": 3
+          },
+          "mean_opt_stage_sync_ms": {
+            "mean": 63.40796954869818,
+            "min": 61.707483486686286,
+            "max": 64.3158245399549,
+            "technical_repeats": 3
+          }
+        }
+      },
+      "contrasts": {
+        "timing_global": {
+          "fixed_heldout_mean_psnr": {
+            "mean": 0.17956508530510776,
+            "min": 0.16251464684804162,
+            "max": 0.1884758472442627,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": -0.02633211182223431,
+            "min": -0.027089834213256836,
+            "max": -0.02531547347704577,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": -0.07938918817671947,
+            "min": -0.08052876199750851,
+            "max": -0.07763643666597393,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_psnr": {
+            "mean": -0.15653369701014222,
+            "min": -0.1669873284027652,
+            "max": -0.14204912481054954,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_depth_l1": {
+            "mean": 0.06528432425496151,
+            "min": 0.06504244377127799,
+            "max": 0.06556005393509312,
+            "technical_repeats": 3
+          },
+          "mean_mature_update_coverage": {
+            "mean": -0.232905073870186,
+            "min": -0.23313087768967788,
+            "max": -0.23255103359474477,
+            "technical_repeats": 3
+          },
+          "mean_stale_mature_update_coverage": {
+            "mean": -0.02968273227390449,
+            "min": -0.03019273623569642,
+            "max": -0.029046015383519287,
+            "technical_repeats": 3
+          },
+          "realized_stale_update_fraction": {
+            "mean": -0.004789970501474927,
+            "min": -0.004830088495575221,
+            "max": -0.004722123893805311,
+            "technical_repeats": 3
+          },
+          "mean_opt_stage_sync_ms": {
+            "mean": -0.4500444514187952,
+            "min": -1.205041946924915,
+            "max": 0.184251460276613,
+            "technical_repeats": 3
+          }
+        },
+        "timing_stale_rescue": {
+          "fixed_heldout_mean_psnr": {
+            "mean": 0.14420840475294305,
+            "min": 0.14218648274739465,
+            "max": 0.14529367287953754,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": 0.01120009356074858,
+            "min": 0.011141483982403999,
+            "max": 0.011245225866635566,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": 0.05669877321148912,
+            "min": 0.05639888625591993,
+            "max": 0.057079382706433535,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_psnr": {
+            "mean": -0.03786811434765506,
+            "min": -0.037989489800107634,
+            "max": -0.03769917298207304,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_depth_l1": {
+            "mean": 0.05158117404729564,
+            "min": 0.051575463166279034,
+            "max": 0.051592521830997606,
+            "technical_repeats": 3
+          },
+          "mean_mature_update_coverage": {
+            "mean": -0.24173326184244093,
+            "min": -0.2418418977724513,
+            "max": -0.24165915646192526,
+            "technical_repeats": 3
+          },
+          "mean_stale_mature_update_coverage": {
+            "mean": -0.10512980131467853,
+            "min": -0.10513828104392975,
+            "max": -0.10511593720521395,
+            "technical_repeats": 3
+          },
+          "realized_stale_update_fraction": {
+            "mean": -0.02559882005899705,
+            "min": -0.025619469026548658,
+            "max": -0.02558407079646019,
+            "technical_repeats": 3
+          },
+          "mean_opt_stage_sync_ms": {
+            "mean": 1.2657616960785703,
+            "min": -0.021988601804729058,
+            "max": 2.8199790177874107,
+            "technical_repeats": 3
+          }
+        },
+        "rescue_early": {
+          "fixed_heldout_mean_psnr": {
+            "mean": 1.7659662829505074,
+            "min": 1.7649612824122105,
+            "max": 1.7674193779627494,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": 0.00840271512667338,
+            "min": 0.00815972189108538,
+            "max": 0.0086782773335774,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": -0.044291189302586846,
+            "min": -0.04458064601446192,
+            "max": -0.04408352325359981,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_psnr": {
+            "mean": 0.19104312478968546,
+            "min": 0.18799472699123143,
+            "max": 0.1943880636080184,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_depth_l1": {
+            "mean": 0.0384553830444286,
+            "min": 0.03835183830387834,
+            "max": 0.03852847495437728,
+            "technical_repeats": 3
+          },
+          "mean_mature_update_coverage": {
+            "mean": -0.01658427281993846,
+            "min": -0.01664238545071961,
+            "max": -0.01648360530161197,
+            "technical_repeats": 3
+          },
+          "mean_stale_mature_update_coverage": {
+            "mean": 0.6484493976067318,
+            "min": 0.6483450789151539,
+            "max": 0.6486266131323459,
+            "technical_repeats": 3
+          },
+          "realized_stale_update_fraction": {
+            "mean": 0.27039705014749266,
+            "min": 0.27039115044247786,
+            "max": 0.27040176991150444,
+            "technical_repeats": 3
+          },
+          "mean_opt_stage_sync_ms": {
+            "mean": -1.1675955722781428,
+            "min": -1.715270557442878,
+            "max": -0.2696610351602615,
+            "technical_repeats": 3
+          }
+        },
+        "rescue_late": {
+          "fixed_heldout_mean_psnr": {
+            "mean": 1.7306096023983428,
+            "min": 1.7211300134658813,
+            "max": 1.7475916941960659,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": 0.04593492050965627,
+            "min": 0.044930845499038696,
+            "max": 0.0464828759431839,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": 0.09179677208562174,
+            "min": 0.08982592428219505,
+            "max": 0.09302749868948013,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_psnr": {
+            "mean": 0.30970870745217266,
+            "min": 0.2948062187802485,
+            "max": 0.3172535284430573,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_depth_l1": {
+            "mean": 0.024752232836762717,
+            "min": 0.024501319084547335,
+            "max": 0.02488485769887938,
+            "technical_repeats": 3
+          },
+          "mean_mature_update_coverage": {
+            "mean": -0.025412460792193392,
+            "min": -0.025933249628426136,
+            "max": -0.02514902626842286,
+            "technical_repeats": 3
+          },
+          "mean_stale_mature_update_coverage": {
+            "mean": 0.5730023285659578,
+            "min": 0.5725343474719354,
+            "max": 0.573453299803178,
+            "technical_repeats": 3
+          },
+          "realized_stale_update_fraction": {
+            "mean": 0.2495882005899705,
+            "min": 0.2494938053097345,
+            "max": 0.2496353982300885,
+            "technical_repeats": 3
+          },
+          "mean_opt_stage_sync_ms": {
+            "mean": 0.5482105752192226,
+            "min": -0.532217212322692,
+            "max": 1.631466761164205,
+            "technical_repeats": 3
+          }
+        }
+      },
+      "difference_in_differences": {
+        "fixed_heldout_mean_psnr": {
+          "mean": -0.03535668055216471,
+          "min": -0.046289364496868046,
+          "max": -0.01736958821614465,
+          "technical_repeats": 3
+        },
+        "fixed_heldout_mean_depth_l1": {
+          "mean": 0.03753220538298289,
+          "min": 0.036560699343681335,
+          "max": 0.038231318195660835,
+          "technical_repeats": 3
+        },
+        "fixed_heldout_mean_ssim": {
+          "mean": 0.13608796138820858,
+          "min": 0.13403532292189385,
+          "max": 0.13760814470394206,
+          "technical_repeats": 3
+        },
+        "trajectory_mean_psnr": {
+          "mean": 0.11866558266248717,
+          "min": 0.10405963501044191,
+          "max": 0.1290716481419807,
+          "technical_repeats": 3
+        },
+        "trajectory_mean_depth_l1": {
+          "mean": -0.013703150207665882,
+          "min": -0.013984516790482848,
+          "max": -0.013466980604998957,
+          "technical_repeats": 3
+        },
+        "mean_mature_update_coverage": {
+          "mean": -0.00882818797225493,
+          "min": -0.009290864177706526,
+          "max": -0.008528278772247377,
+          "technical_repeats": 3
+        },
+        "mean_stale_mature_update_coverage": {
+          "mean": -0.07544706904077404,
+          "min": -0.07609226566041047,
+          "max": -0.07492320096951753,
+          "technical_repeats": 3
+        },
+        "realized_stale_update_fraction": {
+          "mean": -0.020808849557522126,
+          "min": -0.02089734513274335,
+          "max": -0.020762831858407084,
+          "technical_repeats": 3
+        },
+        "mean_opt_stage_sync_ms": {
+          "mean": 1.7158061474973654,
+          "min": 0.8150432119764162,
+          "max": 3.1493218853954943,
+          "technical_repeats": 3
+        }
+      }
+    },
+    "replica_office3": {
+      "seed": 57,
+      "technical_repeats": 3,
+      "arms": {
+        "early_global": {
+          "fixed_heldout_mean_psnr": {
+            "mean": 11.648050447305044,
+            "min": 11.640785932540894,
+            "max": 11.652274032433828,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": 1.4070039722654555,
+            "min": 1.406443327665329,
+            "max": 1.4073253472646077,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": 0.30722456078769433,
+            "min": 0.30713278862337273,
+            "max": 0.30739563680253923,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_psnr": {
+            "mean": 11.00266802539516,
+            "min": 11.002419572488396,
+            "max": 11.002910543332058,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_depth_l1": {
+            "mean": 1.4683897106916504,
+            "min": 1.4682750082121485,
+            "max": 1.4684646690709402,
+            "technical_repeats": 3
+          },
+          "mean_mature_update_coverage": {
+            "mean": 0.45361959083441333,
+            "min": 0.45358529907826906,
+            "max": 0.45364625416094323,
+            "technical_repeats": 3
+          },
+          "mean_stale_mature_update_coverage": {
+            "mean": 0.07250229033975075,
+            "min": 0.07214093613621346,
+            "max": 0.07318740604826425,
+            "technical_repeats": 3
+          },
+          "realized_stale_update_fraction": {
+            "mean": 0.015411209439528024,
+            "min": 0.015405309734513274,
+            "max": 0.015415929203539822,
+            "technical_repeats": 3
+          },
+          "mean_opt_stage_sync_ms": {
+            "mean": 65.55603154574622,
+            "min": 64.75756991150082,
+            "max": 65.993363115101,
+            "technical_repeats": 3
+          }
+        },
+        "late_global": {
+          "fixed_heldout_mean_psnr": {
+            "mean": 12.182732092009651,
+            "min": 12.180205484231314,
+            "max": 12.185189227263132,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": 1.3869159287876553,
+            "min": 1.3868789275487263,
+            "max": 1.3869880437850952,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": 0.2039253248108758,
+            "min": 0.20381972193717957,
+            "max": 0.20400611807902655,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_psnr": {
+            "mean": 9.91073733761599,
+            "min": 9.91058380466647,
+            "max": 9.910879100845978,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_depth_l1": {
+            "mean": 1.573051399405727,
+            "min": 1.5729900727097967,
+            "max": 1.5731240552479187,
+            "technical_repeats": 3
+          },
+          "mean_mature_update_coverage": {
+            "mean": 0.4575043172560288,
+            "min": 0.457437150597781,
+            "max": 0.4576031295266345,
+            "technical_repeats": 3
+          },
+          "mean_stale_mature_update_coverage": {
+            "mean": 0.033283923802966596,
+            "min": 0.03327654822359238,
+            "max": 0.03329203497589491,
+            "technical_repeats": 3
+          },
+          "realized_stale_update_fraction": {
+            "mean": 0.010897935103244837,
+            "min": 0.010890265486725663,
+            "max": 0.01090796460176991,
+            "technical_repeats": 3
+          },
+          "mean_opt_stage_sync_ms": {
+            "mean": 63.92297266674845,
+            "min": 63.34221751342988,
+            "max": 64.64144973454825,
+            "technical_repeats": 3
+          }
+        },
+        "early_stale_rescue": {
+          "fixed_heldout_mean_psnr": {
+            "mean": 12.854104240735372,
+            "min": 12.852112452189127,
+            "max": 12.855441172917685,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": 1.4000015589925978,
+            "min": 1.3999216556549072,
+            "max": 1.4000635941823323,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": 0.3578491455150975,
+            "min": 0.35764725878834724,
+            "max": 0.35799728830655414,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_psnr": {
+            "mean": 10.772365206814094,
+            "min": 10.772297461475945,
+            "max": 10.772477689042555,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_depth_l1": {
+            "mean": 1.5129281679349664,
+            "min": 1.5129042205821097,
+            "max": 1.512957033462229,
+            "technical_repeats": 3
+          },
+          "mean_mature_update_coverage": {
+            "mean": 0.4641169793183808,
+            "min": 0.4640996713528425,
+            "max": 0.4641353923139814,
+            "technical_repeats": 3
+          },
+          "mean_stale_mature_update_coverage": {
+            "mean": 0.8181417277179754,
+            "min": 0.8181417277179754,
+            "max": 0.8181417277179754,
+            "technical_repeats": 3
+          },
+          "realized_stale_update_fraction": {
+            "mean": 0.2770117994100295,
+            "min": 0.27699115044247785,
+            "max": 0.2770442477876106,
+            "technical_repeats": 3
+          },
+          "mean_opt_stage_sync_ms": {
+            "mean": 63.76109983475035,
+            "min": 62.195043026562885,
+            "max": 65.0178859909145,
+            "technical_repeats": 3
+          }
+        },
+        "late_stale_rescue": {
+          "fixed_heldout_mean_psnr": {
+            "mean": 12.102127075195312,
+            "min": 12.097386717796326,
+            "max": 12.111166715621948,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": 1.4042544265588124,
+            "min": 1.4032036463419597,
+            "max": 1.4061565697193146,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": 0.2543685966067844,
+            "min": 0.2539232124884923,
+            "max": 0.2546030655503273,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_psnr": {
+            "mean": 9.836494147250082,
+            "min": 9.834639654222842,
+            "max": 9.839947321246155,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_depth_l1": {
+            "mean": 1.6253105723752386,
+            "min": 1.6250719842130104,
+            "max": 1.6257709734207761,
+            "technical_repeats": 3
+          },
+          "mean_mature_update_coverage": {
+            "mean": 0.44506361055936583,
+            "min": 0.43952208582230895,
+            "max": 0.44784443813316793,
+            "technical_repeats": 3
+          },
+          "mean_stale_mature_update_coverage": {
+            "mean": 0.6940904484885119,
+            "min": 0.6940901545061062,
+            "max": 0.6940905954797147,
+            "technical_repeats": 3
+          },
+          "realized_stale_update_fraction": {
+            "mean": 0.24880530973451329,
+            "min": 0.24878761061946902,
+            "max": 0.24882300884955752,
+            "technical_repeats": 3
+          },
+          "mean_opt_stage_sync_ms": {
+            "mean": 63.87682339819095,
+            "min": 62.279506690287135,
+            "max": 64.79860253078195,
+            "technical_repeats": 3
+          }
+        }
+      },
+      "contrasts": {
+        "timing_global": {
+          "fixed_heldout_mean_psnr": {
+            "mean": 0.534681644704607,
+            "min": 0.5291141072909049,
+            "max": 0.5444032947222386,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": -0.020088043477800133,
+            "min": -0.020362426837285286,
+            "max": -0.019564400116602654,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": -0.10329923597681855,
+            "min": -0.10344550238611797,
+            "max": -0.10312667054434618,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_psnr": {
+            "mean": -1.0919306877791701,
+            "min": -1.0921614359965375,
+            "max": -1.0915404716424177,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_depth_l1": {
+            "mean": 0.10466168871407662,
+            "min": 0.10452540363885654,
+            "max": 0.10484904703577014,
+            "technical_repeats": 3
+          },
+          "mean_mature_update_coverage": {
+            "mean": 0.0038847264216154884,
+            "min": 0.0037908964368377762,
+            "max": 0.004017830448365456,
+            "technical_repeats": 3
+          },
+          "mean_stale_mature_update_coverage": {
+            "mean": -0.039218366536784156,
+            "min": -0.03989537107236934,
+            "max": -0.03885774792680097,
+            "technical_repeats": 3
+          },
+          "realized_stale_update_fraction": {
+            "mean": -0.004513274336283186,
+            "min": -0.0045221238938053104,
+            "max": -0.004507964601769911,
+            "technical_repeats": 3
+          },
+          "mean_opt_stage_sync_ms": {
+            "mean": -1.6330588789977678,
+            "min": -2.1319108583696007,
+            "max": -1.3519133805527588,
+            "technical_repeats": 3
+          }
+        },
+        "timing_stale_rescue": {
+          "fixed_heldout_mean_psnr": {
+            "mean": -0.7519771655400594,
+            "min": -0.7576133807500209,
+            "max": -0.7409457365671788,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": 0.004252867566214717,
+            "min": 0.003281990687052483,
+            "max": 0.0060929755369822924,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": -0.10348054890831311,
+            "min": -0.10372404629985493,
+            "max": -0.10332337766885757,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_psnr": {
+            "mean": -0.9358710595640106,
+            "min": -0.9376578072531032,
+            "max": -0.9323731486776232,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_depth_l1": {
+            "mean": 0.11238240444027214,
+            "min": 0.11211495075078126,
+            "max": 0.11284772366021589,
+            "technical_repeats": 3
+          },
+          "mean_mature_update_coverage": {
+            "mean": -0.019053368759014977,
+            "min": -0.024577585530533574,
+            "max": -0.01627143615515053,
+            "technical_repeats": 3
+          },
+          "mean_stale_mature_update_coverage": {
+            "mean": -0.12405127922946353,
+            "min": -0.12405157321186921,
+            "max": -0.1240511322382607,
+            "technical_repeats": 3
+          },
+          "realized_stale_update_fraction": {
+            "mean": -0.028206489675516217,
+            "min": -0.02822123893805309,
+            "max": -0.028185840707964566,
+            "technical_repeats": 3
+          },
+          "mean_opt_stage_sync_ms": {
+            "mean": 0.1157235634406059,
+            "min": -0.2192834601325444,
+            "max": 0.4819904867301119,
+            "technical_repeats": 3
+          }
+        },
+        "rescue_early": {
+          "fixed_heldout_mean_psnr": {
+            "mean": 1.2060537934303284,
+            "min": 1.2010210752487183,
+            "max": 1.214655240376791,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": -0.007002413272857666,
+            "min": -0.007403691609700447,
+            "max": -0.006423900524775261,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": 0.050624584727403166,
+            "min": 0.050507252647851886,
+            "max": 0.0508520313693831,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_psnr": {
+            "mean": -0.23030281858106663,
+            "min": -0.23043285428950355,
+            "max": -0.2300991025646173,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_depth_l1": {
+            "mean": 0.04453845724331599,
+            "min": 0.04445858068962005,
+            "max": 0.04468202525008058,
+            "technical_repeats": 3
+          },
+          "mean_mature_update_coverage": {
+            "mean": 0.010497388483967474,
+            "min": 0.010469620127375234,
+            "max": 0.010514372274573469,
+            "technical_repeats": 3
+          },
+          "mean_stale_mature_update_coverage": {
+            "mean": 0.7456394373782247,
+            "min": 0.7449543216697112,
+            "max": 0.746000791581762,
+            "technical_repeats": 3
+          },
+          "realized_stale_update_fraction": {
+            "mean": 0.26160058997050145,
+            "min": 0.2615787610619469,
+            "max": 0.26162831858407076,
+            "technical_repeats": 3
+          },
+          "mean_opt_stage_sync_ms": {
+            "mean": -1.7949317109958731,
+            "min": -3.7221185840739395,
+            "max": 0.26031607941366985,
+            "technical_repeats": 3
+          }
+        },
+        "rescue_late": {
+          "fixed_heldout_mean_psnr": {
+            "mean": -0.08060501681433803,
+            "min": -0.08736143509546856,
+            "max": -0.06903876860936542,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": 0.017338497771157185,
+            "min": 0.016215602556864495,
+            "max": 0.019275754690170288,
+            "technical_repeats": 3
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": 0.050443271795908594,
+            "min": 0.04991709440946576,
+            "max": 0.050783343613147736,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_psnr": {
+            "mean": -0.0742431903659071,
+            "min": -0.07594415044362712,
+            "max": -0.07093177959982278,
+            "technical_repeats": 3
+          },
+          "trajectory_mean_depth_l1": {
+            "mean": 0.05225917296951151,
+            "min": 0.051947928965091705,
+            "max": 0.052780900710979406,
+            "technical_repeats": 3
+          },
+          "mean_mature_update_coverage": {
+            "mean": -0.012440706696662992,
+            "min": -0.01808104370432556,
+            "max": -0.009592712464613073,
+            "technical_repeats": 3
+          },
+          "mean_stale_mature_update_coverage": {
+            "mean": 0.6608065246855453,
+            "min": 0.6607981195302113,
+            "max": 0.6608140472561224,
+            "technical_repeats": 3
+          },
+          "realized_stale_update_fraction": {
+            "mean": 0.23790737463126843,
+            "min": 0.2378920353982301,
+            "max": 0.23791504424778762,
+            "technical_repeats": 3
+          },
+          "mean_opt_stage_sync_ms": {
+            "mean": -0.04614926855749957,
+            "min": -1.5057440619800886,
+            "max": 1.4563850173520692,
+            "technical_repeats": 3
+          }
+        }
+      },
+      "difference_in_differences": {
+        "fixed_heldout_mean_psnr": {
+          "mean": -1.2866588102446663,
+          "min": -1.3020166754722595,
+          "max": -1.2700598438580837,
+          "technical_repeats": 3
+        },
+        "fixed_heldout_mean_depth_l1": {
+          "mean": 0.02434091104401485,
+          "min": 0.02294803659121203,
+          "max": 0.026455402374267578,
+          "technical_repeats": 3
+        },
+        "fixed_heldout_mean_ssim": {
+          "mean": -0.0001813129314945742,
+          "min": -0.00059737575550875,
+          "max": 0.0001221247172603912,
+          "technical_repeats": 3
+        },
+        "trajectory_mean_psnr": {
+          "mean": 0.15605962821515953,
+          "min": 0.15443234844545195,
+          "max": 0.15916732296479452,
+          "technical_repeats": 3
+        },
+        "trajectory_mean_depth_l1": {
+          "mean": 0.007720715726195519,
+          "min": 0.007265903715011124,
+          "max": 0.008322320021359353,
+          "technical_repeats": 3
+        },
+        "mean_mature_update_coverage": {
+          "mean": -0.022938095180630464,
+          "min": -0.02859541597889903,
+          "max": -0.020062332591988308,
+          "technical_repeats": 3
+        },
+        "mean_stale_mature_update_coverage": {
+          "mean": -0.08483291269267938,
+          "min": -0.08519338431145973,
+          "max": -0.08415620213949987,
+          "technical_repeats": 3
+        },
+        "realized_stale_update_fraction": {
+          "mean": -0.023693215339233034,
+          "min": -0.023713274336283178,
+          "max": -0.023663716814159255,
+          "technical_repeats": 3
+        },
+        "mean_opt_stage_sync_ms": {
+          "mean": 1.7487824424383736,
+          "min": 1.1960689379383993,
+          "max": 2.216374522093851,
+          "technical_repeats": 3
+        }
+      }
+    }
+  },
+  "interpretation": "The rescue first stage worked: stale-mature update share increased from about 1\u20132% under global allocation to about 25\u201329% under rescue, with exact total compute. The quality response was scene-dependent. In room2 stale rescue lifted held-out PSNR for both timing arms, but depth worsened and the timing-by-rescue interaction was small. In office3, rescue improved the early arm's held-out PSNR but slightly reduced the late arm's; the interaction was large and negative, while depth and SSIM moved differently. This is evidence that update allocation can affect outcomes under matched update counts, but it does not establish a universal starvation mechanism or controller."
+}

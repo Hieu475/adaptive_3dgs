@@ -1,0 +1,184 @@
+{
+  "schema": "matched-candidate-timing-validation-v1",
+  "root": "results/matched_candidate_timing_rescue_pilot",
+  "expected_candidate_count_per_arm": 5000,
+  "expected_total_micro_updates_per_arm": 565000,
+  "valid_pairs": 6,
+  "total_pairs": 6,
+  "pairs": [
+    {
+      "artifact": "results/matched_candidate_timing_rescue_pilot/replica_room2/seed57_repeat1.json",
+      "scene": "replica_room2",
+      "seed": 57,
+      "valid": true,
+      "checks": {
+        "common_prefix_digest": true,
+        "same_candidate_batch": true,
+        "exact_manual_birth_count": true,
+        "no_automatic_births": true,
+        "exact_updates_per_frame": true,
+        "same_heldout_views": true,
+        "same_starting_map_size": true,
+        "same_total_update_budget": true,
+        "frozen_prefix_checkpoint_hash": true,
+        "frozen_candidate_file_hash": true,
+        "stale_rescue_first_stage_early": true,
+        "stale_rescue_first_stage_late": true
+      },
+      "final_gaussian_counts_by_arm": {
+        "early_global": 24148,
+        "late_global": 24139,
+        "early_stale_rescue": 24187,
+        "late_stale_rescue": 24187
+      },
+      "runner_reported_valid_before_reassessment": true,
+      "note": "Final map size is an outcome and is intentionally not a matching gate. The runner's valid flag and this audit both use causal-control gates.",
+      "run_id": "repeat1"
+    },
+    {
+      "artifact": "results/matched_candidate_timing_rescue_pilot/replica_room2/seed57_repeat2.json",
+      "scene": "replica_room2",
+      "seed": 57,
+      "valid": true,
+      "checks": {
+        "common_prefix_digest": true,
+        "same_candidate_batch": true,
+        "exact_manual_birth_count": true,
+        "no_automatic_births": true,
+        "exact_updates_per_frame": true,
+        "same_heldout_views": true,
+        "same_starting_map_size": true,
+        "same_total_update_budget": true,
+        "frozen_prefix_checkpoint_hash": true,
+        "frozen_candidate_file_hash": true,
+        "stale_rescue_first_stage_early": true,
+        "stale_rescue_first_stage_late": true
+      },
+      "final_gaussian_counts_by_arm": {
+        "early_global": 24147,
+        "late_global": 24139,
+        "early_stale_rescue": 24187,
+        "late_stale_rescue": 24187
+      },
+      "runner_reported_valid_before_reassessment": true,
+      "note": "Final map size is an outcome and is intentionally not a matching gate. The runner's valid flag and this audit both use causal-control gates.",
+      "run_id": "repeat2"
+    },
+    {
+      "artifact": "results/matched_candidate_timing_rescue_pilot/replica_room2/seed57_repeat3.json",
+      "scene": "replica_room2",
+      "seed": 57,
+      "valid": true,
+      "checks": {
+        "common_prefix_digest": true,
+        "same_candidate_batch": true,
+        "exact_manual_birth_count": true,
+        "no_automatic_births": true,
+        "exact_updates_per_frame": true,
+        "same_heldout_views": true,
+        "same_starting_map_size": true,
+        "same_total_update_budget": true,
+        "frozen_prefix_checkpoint_hash": true,
+        "frozen_candidate_file_hash": true,
+        "stale_rescue_first_stage_early": true,
+        "stale_rescue_first_stage_late": true
+      },
+      "final_gaussian_counts_by_arm": {
+        "early_global": 24148,
+        "late_global": 24139,
+        "early_stale_rescue": 24187,
+        "late_stale_rescue": 24187
+      },
+      "runner_reported_valid_before_reassessment": true,
+      "note": "Final map size is an outcome and is intentionally not a matching gate. The runner's valid flag and this audit both use causal-control gates.",
+      "run_id": "repeat3"
+    },
+    {
+      "artifact": "results/matched_candidate_timing_rescue_pilot/replica_office3/seed57_repeat1.json",
+      "scene": "replica_office3",
+      "seed": 57,
+      "valid": true,
+      "checks": {
+        "common_prefix_digest": true,
+        "same_candidate_batch": true,
+        "exact_manual_birth_count": true,
+        "no_automatic_births": true,
+        "exact_updates_per_frame": true,
+        "same_heldout_views": true,
+        "same_starting_map_size": true,
+        "same_total_update_budget": true,
+        "frozen_prefix_checkpoint_hash": true,
+        "frozen_candidate_file_hash": true,
+        "stale_rescue_first_stage_early": true,
+        "stale_rescue_first_stage_late": true
+      },
+      "final_gaussian_counts_by_arm": {
+        "early_global": 22652,
+        "late_global": 22651,
+        "early_stale_rescue": 22655,
+        "late_stale_rescue": 22654
+      },
+      "runner_reported_valid_before_reassessment": true,
+      "note": "Final map size is an outcome and is intentionally not a matching gate. The runner's valid flag and this audit both use causal-control gates.",
+      "run_id": "repeat1"
+    },
+    {
+      "artifact": "results/matched_candidate_timing_rescue_pilot/replica_office3/seed57_repeat2.json",
+      "scene": "replica_office3",
+      "seed": 57,
+      "valid": true,
+      "checks": {
+        "common_prefix_digest": true,
+        "same_candidate_batch": true,
+        "exact_manual_birth_count": true,
+        "no_automatic_births": true,
+        "exact_updates_per_frame": true,
+        "same_heldout_views": true,
+        "same_starting_map_size": true,
+        "same_total_update_budget": true,
+        "frozen_prefix_checkpoint_hash": true,
+        "frozen_candidate_file_hash": true,
+        "stale_rescue_first_stage_early": true,
+        "stale_rescue_first_stage_late": true
+      },
+      "final_gaussian_counts_by_arm": {
+        "early_global": 22652,
+        "late_global": 22651,
+        "early_stale_rescue": 22655,
+        "late_stale_rescue": 22654
+      },
+      "runner_reported_valid_before_reassessment": true,
+      "note": "Final map size is an outcome and is intentionally not a matching gate. The runner's valid flag and this audit both use causal-control gates.",
+      "run_id": "repeat2"
+    },
+    {
+      "artifact": "results/matched_candidate_timing_rescue_pilot/replica_office3/seed57_repeat3.json",
+      "scene": "replica_office3",
+      "seed": 57,
+      "valid": true,
+      "checks": {
+        "common_prefix_digest": true,
+        "same_candidate_batch": true,
+        "exact_manual_birth_count": true,
+        "no_automatic_births": true,
+        "exact_updates_per_frame": true,
+        "same_heldout_views": true,
+        "same_starting_map_size": true,
+        "same_total_update_budget": true,
+        "frozen_prefix_checkpoint_hash": true,
+        "frozen_candidate_file_hash": true,
+        "stale_rescue_first_stage_early": true,
+        "stale_rescue_first_stage_late": true
+      },
+      "final_gaussian_counts_by_arm": {
+        "early_global": 22652,
+        "late_global": 22651,
+        "early_stale_rescue": 22655,
+        "late_stale_rescue": 22654
+      },
+      "runner_reported_valid_before_reassessment": true,
+      "note": "Final map size is an outcome and is intentionally not a matching gate. The runner's valid flag and this audit both use causal-control gates.",
+      "run_id": "repeat3"
+    }
+  ]
+}

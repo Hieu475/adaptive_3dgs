@@ -53,6 +53,7 @@ from research.reproducibility import (
     get_git_commit,
     get_git_branch,
 )
+from research.rasterizer import get_renderer_backend
 
 
 POLICIES_CANONICAL = [
@@ -83,6 +84,9 @@ def build_pipeline_config(
     use_learned = use_learned_utility if use_learned_utility is not None else (
         policy in ["learned_utility", OptimizationPolicy.LEARNED_UTILITY.value]
     )
+    renderer_backend = get_renderer_backend(
+        device_type="cuda" if str(device).startswith("cuda") else "cpu"
+    )
     return {
         "seed": seed,
         "system": {
@@ -106,7 +110,7 @@ def build_pipeline_config(
             "use_surface_aware_depth": False,
             "attribution_top_k": 4,
             "use_fast_attribution": True,
-            "backend": "gsplat" if device.startswith("cuda") else "reference",
+            "backend": renderer_backend,
         },
         "scheduler": {
             "gpu_budget_ms": budget_ms,
@@ -118,7 +122,8 @@ def build_pipeline_config(
             # OURS: no warmup (ablation: warmup hurts -0.75 dB)
             "enable_warmup": False,
             "warmup_budget_ratio": 0.0,
-            "max_warmup_queue": 500 if apply_throttling else 999999,  # backlog throttle
+            "max_warmup_queue": 500 if apply_throttling else 999999,
+            "enable_backlog_throttling": False,  # historical headline: warmup off, backlog inactive
         },
         "training": {
             "n_micro_steps": 5,
@@ -157,6 +162,7 @@ def run_policy_trajectory(
     H: int = 240,
     config_override: Optional[Dict[str, Any]] = None,
     custom_config: Optional[Dict[str, Any]] = None,
+    final_gaussian_target: Optional[int] = None,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """Execute a single policy trajectory across preloaded frames."""
     set_seed(seed)
@@ -210,14 +216,41 @@ def run_policy_trajectory(
         record = {
             "frame": t,
             "psnr": float(m["psnr"]),
+            "psnr_pre": float(m.get("psnr_pre", m["psnr"])),
+            "psnr_post": float(m.get("psnr_post", m["psnr"])),
             "ssim": float(m["ssim"]),
             "lpips": float(m.get("lpips", 0.0)),
             "depth_l1": float(m["depth_l1"]),
+            "depth_l1_pre": float(m.get("depth_l1_pre", m["depth_l1"])),
+            "depth_l1_post": float(m.get("depth_l1_post", m["depth_l1"])),
             "n_gaussians": int(m["n_gaussians"]),
+            "n_active_gaussians": int(m.get("n_active_gaussians", m["n_gaussians"])),
             "n_new": n_new,
+            "n_spawned": int(m.get("n_spawned", n_new)),
+            "n_spawned_fallback": int(m.get("n_spawned_fallback", 0)),
+            "spawn_quota_this_frame": m.get("spawn_quota_this_frame"),
+            "spawn_control_total": m.get("spawn_control_total"),
             "n_optimized": int(m["n_optimized"]),
+            "n_micro_updates": int(m.get("n_micro_updates", m["n_optimized"] * m.get("mean_k", 0.0))),
+            "age_quota_mature_micro_updates": m.get("age_quota_mature_micro_updates"),
+            "age_quota_young_micro_updates": m.get("age_quota_young_micro_updates"),
+            "selected_young": int(m.get("selected_young", 0)),
+            "selected_old": int(m.get("selected_old", 0)),
+            "mature_eligible": int(m.get("mature_eligible", 0)),
+            "mature_updated": int(m.get("mature_updated", 0)),
+            "mature_update_coverage": float(m.get("mature_update_coverage", 0.0)),
+            "growth_pressure": float(m.get("growth_pressure", 0.0)),
+            "compute_return_db_per_opt_ms": float(m.get("compute_return_db_per_opt_ms", 0.0)),
+            "population_young": int(m.get("population_young", 0)),
+            "population_old": int(m.get("population_old", 0)),
+            "budget_young_us": float(m.get("budget_young_us", 0.0)),
+            "budget_old_us": float(m.get("budget_old_us", 0.0)),
+            "n_backlog": int(m.get("n_backlog", 0)),
+            "mean_opacity": float(m.get("mean_opacity", 0.0)),
+            "loss": float(m.get("loss", 0.0)),
             "mean_k": float(m.get("mean_k", 0.0)),
             "opt_time_ms": float(m["opt_time_ms"]),
+            "opt_stage_sync_ms": float(m.get("opt_stage_sync_ms", 0.0)),
             "frame_time_ms": t_frame_ms,
             "peak_vram_mb": float(m.get("peak_vram_mb", 0.0)),
             "coverage": float(m.get("coverage", 0.0)),
@@ -226,6 +259,41 @@ def run_policy_trajectory(
         }
         frame_logs.append(record)
 
+    matched_final_map = None
+    if final_gaussian_target is not None:
+        # Compact naturally pruned tombstones first, then remove the lowest
+        # opacity survivors so final evaluation uses the requested map size.
+        from research.gaussian_repr import GaussianState
+        model = pipeline.gaussian_model
+        keep_existing = model._state != GaussianState.PRUNED
+        if not bool(keep_existing.all()):
+            keep = model.compact()
+            pipeline.importance_estimator.prune_buffers(keep)
+        target = int(final_gaussian_target)
+        current = model.num_gaussians
+        if target <= 0 or current < target:
+            matched_final_map = {"target_gaussians": target, "n_gaussians": current,
+                                 "valid": False,
+                                 "reason": "trajectory ended below requested target"}
+        else:
+            remove_n = current - target
+            if remove_n:
+                opacity = model.opacities.squeeze(-1)
+                remove_indices = torch.topk(opacity, k=remove_n, largest=False).indices
+                remove_mask = torch.zeros(current, dtype=torch.bool, device=opacity.device)
+                remove_mask[remove_indices] = True
+                model.prune_gaussians(remove_mask)
+                keep = model.compact()
+                pipeline.importance_estimator.prune_buffers(keep)
+            final_pose = frames[-1].get("pose", pipeline.current_pose)
+            final_eval = pipeline.eval_frame(frames[-1]["rgb"], frames[-1]["depth"], final_pose)
+            matched_final_map = {"target_gaussians": target,
+                                 "n_gaussians": int(final_eval["n_gaussians"]),
+                                 "psnr": float(final_eval["psnr"]),
+                                 "ssim": float(final_eval["ssim"]),
+                                 "depth_l1": float(final_eval["depth_l1"]),
+                                 "valid": int(final_eval["n_gaussians"]) == target}
+
     total_wall_sec = time.perf_counter() - t_traj_start
 
     # Trajectory-level summary aggregation
@@ -233,6 +301,7 @@ def run_policy_trajectory(
     ssims = np.array([r["ssim"] for r in frame_logs])
     lpipss = np.array([r.get("lpips", 0.0) for r in frame_logs])
     depths = np.array([r["depth_l1"] for r in frame_logs])
+    depths_pre = np.array([r["depth_l1_pre"] for r in frame_logs])
     n_news = np.array([r["n_new"] for r in frame_logs])
     n_opts = np.array([r["n_optimized"] for r in frame_logs])
     ks = np.array([r["mean_k"] for r in frame_logs])
@@ -250,6 +319,7 @@ def run_policy_trajectory(
         "n_frames": len(frame_logs),
         "N_init": n_init,
         "N_final": int(frame_logs[-1]["n_gaussians"]) if frame_logs else n_init,
+        "N_final_active": int(frame_logs[-1]["n_active_gaussians"]) if frame_logs else n_init,
         "N_new_total": int(np.sum(n_news)),
         "mean_new_per_frame": float(np.mean(n_news)),
         "final_psnr": float(psnrs[-1]) if len(psnrs) > 0 else 0.0,
@@ -260,6 +330,8 @@ def run_policy_trajectory(
         "mean_lpips": float(np.mean(lpipss)),
         "final_depth_l1": float(depths[-1]) if len(depths) > 0 else 0.0,
         "mean_depth_l1": float(np.mean(depths)),
+        "final_depth_l1_pre": float(depths_pre[-1]) if len(depths_pre) > 0 else 0.0,
+        "mean_depth_l1_pre": float(np.mean(depths_pre)),
         "mean_n_optimized": float(np.mean(n_opts)),
         "mean_k": float(np.mean(ks)),
         "mean_opt_time_ms": float(np.mean(opt_times)),
@@ -269,6 +341,8 @@ def run_policy_trajectory(
         "total_wall_sec": total_wall_sec,
         "catastrophic_failures": int(np.sum(np.isnan(psnrs) | np.isinf(psnrs))),
     }
+    if matched_final_map is not None:
+        summary["matched_final_map"] = matched_final_map
 
     # Safe resource cleanup
     pipeline.cleanup()
@@ -308,6 +382,8 @@ def aggregate_policy_runs(runs: List[Dict[str, Any]]) -> Dict[str, Any]:
         "final_ssim": stats_for("final_ssim"),
         "mean_depth_l1": stats_for("mean_depth_l1"),
         "final_depth_l1": stats_for("final_depth_l1"),
+        "mean_depth_l1_pre": stats_for("mean_depth_l1_pre"),
+        "final_depth_l1_pre": stats_for("final_depth_l1_pre"),
         "N_final": stats_for("N_final", do_ci=False),
         "mean_new_per_frame": stats_for("mean_new_per_frame", do_ci=False),
         "mean_n_optimized": stats_for("mean_n_optimized", do_ci=False),
@@ -378,12 +454,15 @@ def generate_markdown_summary(
         d_temp = by_pol["ours"]["mean_psnr"]["mean"] - by_pol["error_influence_temporal"]["mean_psnr"]["mean"]
         md.append(rf"- **Gain over Temporal Error×Influence ($\Delta Q$)**: `{d_temp:+.2f} dB`")
 
-    md.append("\n## 3. Provenance & Reproducibility Guarantees\n")
+    md.append("\n## 3. Provenance & Repeatability Scope\n")
     md.append(f"- **Git Commit Hash**: `{manifest['git_sha']}`")
     md.append(f"- **CUDA Rendering Backend**: `{manifest['renderer_backend']}` (Production: gsplat, Prototypes: custom_cuda)")
     md.append(f"- **VRAM Guard Applied**: Yes (`max_vram_fraction=0.70`, reserved OS headroom: 1.8 GB)")
     md.append(f"- **Catastrophic Failures (NaN/Inf)**: `{sum(a['catastrophic_failures'] for a in aggregated_results)}`")
-    md.append("- **Verification**: Frozen benchmark conducted on current repository HEAD with exact seed control.\n")
+    md.append(f"- **Config SHA-256**: `{manifest['config_sha256']}` (all policy/seed pipeline configs).")
+    md.append("- **Statistical unit**: independent run-level summaries per seed; frames within one trajectory are repeated measurements, not independent samples.")
+    md.append("- **Seed scope**: each seed initializes the run RNGs, but does not guarantee bitwise-identical CUDA results when gsplat atomic gradient accumulation is active.")
+    md.append("- **Interpretation**: confidence intervals resample seed-level run summaries; five seeds provide limited uncertainty resolution.\n")
 
     return "\n".join(md)
 
@@ -435,23 +514,50 @@ def run_phase13_frozen_benchmark(
     print(f">> Loaded {len(frames)} frames in {time.time() - t_load_0:.2f}s.")
 
     # 2. Provenance Manifest
+    benchmark_configs = {
+        policy: {
+            str(seed): build_pipeline_config(
+                policy=policy,
+                seed=seed,
+                budget_ms=budget_ms,
+                W=W,
+                H=H,
+                device=device,
+            )
+            for seed in seeds
+        }
+        for policy in policies
+    }
+    active_renderer = get_renderer_backend(
+        device_type="cuda" if str(device).startswith("cuda") else "cpu"
+    )
     manifest = create_provenance_manifest(
+        config=benchmark_configs,
         dataset_name=dataset_name,
-        renderer_backend=os.environ.get("ADAPTIVE_3DGS_RENDERER", "gsplat" if device.startswith("cuda") else "reference"),
+        renderer_backend=active_renderer,
         init_stride=2,
         scale_pixel_multiplier=1.5,
         initial_opacity=0.8,
         n_micro_steps=5,
         psnr_mask="valid_depth",
         extra_metadata={
-            "protocol_version": "phase13-authoritative-v1",
+            "status": "frozen",
+            "protocol_version": "phase13-authoritative-v3-provenance-repeatability",
+            "quality_metric_definition": "PSNR, SSIM, and depth L1 are rendered from the final map after optimization, spawn/prune, and compaction. depth_l1_pre retains the pre-update depth residual.",
             "experiment": "Phase 13 Frozen Benchmark Across 6 Policies x 5 Seeds",
             "scene": dataset_name,
+            "pose_convention": "TUM ground-truth C2W inverted to W2C; Replica ground-truth extrinsics passed through as stored.",
+            "backend": active_renderer,
             "seeds": seeds,
             "policies": policies,
             "budget_ms": budget_ms,
             "n_frames_evaluated": n_frames,
             "resolution": f"{W}x{H}",
+            "config_sha256_scope": "Nested policy -> seed -> effective pipeline config, serialized as sorted JSON.",
+            "replicate_unit": "one complete trajectory run per seed and policy",
+            "statistical_unit": "run-level per-seed summary; frames within a trajectory are repeated measurements, not independent samples",
+            "confidence_interval_method": "percentile bootstrap over per-seed run summaries (1000 resamples); interpret cautiously with five seeds",
+            "seed_repeatability_scope": "seed initializes RNGs but does not guarantee bitwise-identical CUDA behavior for gsplat atomic gradient accumulation",
         }
     )
     with open(out_path / "manifest.json", "w") as f:

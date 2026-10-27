@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-10-27T16:25:48",
+  "git_sha": "47fcdba2da345ce4083a0f3eaee38ceca539bb51-dirty",
+  "git_branch": "phase13-cuda-acceleration",
+  "config_sha256": "10ee1ba81b8cb12bac1f985954e3d8a98b26afdcd9f99e087e030aa40ca2a25c",
+  "dataset_name": "replica_room2,replica_office3",
+  "dataset_path": null,
+  "renderer_backend": "gsplat",
+  "cuda_extension": "available (prototype)",
+  "torch_version": "2.11.0+cu128",
+  "cuda_version": "12.8",
+  "gpu": "NVIDIA GeForce RTX 4050 Laptop GPU",
+  "vram_gb": 5.64,
+  "init_stride": null,
+  "scale_pixel_multiplier": null,
+  "initial_opacity": null,
+  "n_micro_steps": null,
+  "psnr_mask": "valid_depth",
+  "experiment": "matched_candidate_timing_replay",
+  "pose_convention": "Phase 10 sequence loader ground-truth W2C poses",
+  "seed_list": [
+    58,
+    59,
+    60
+  ]
+}

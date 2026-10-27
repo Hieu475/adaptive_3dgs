@@ -1,0 +1,814 @@
+{
+  "schema": "timing-x-stale-mature-rescue-seed-replication-v1",
+  "seed_design": "Seed57 is the mean of three technical replays from one frozen prefix; seeds58-60 have independently rebuilt prefixes and candidate batches.",
+  "validation": {
+    "pilot": "results/matched_candidate_timing_rescue_pilot/validation.json",
+    "replication": "results/matched_candidate_timing_rescue_replication/validation.json"
+  },
+  "scenes": {
+    "replica_room2": {
+      "per_seed": {
+        "57": {
+          "arms": {
+            "early_global": {
+              "fixed_heldout_mean_psnr": 11.055768330891928,
+              "fixed_heldout_mean_depth_l1": 1.131717711687088,
+              "fixed_heldout_mean_ssim": 0.07464693921307723,
+              "realized_stale_update_fraction": 0.017189970501474926,
+              "total_micro_updates": 565000.0
+            },
+            "late_global": {
+              "fixed_heldout_mean_psnr": 11.235333416197035,
+              "fixed_heldout_mean_depth_l1": 1.1053855998648536,
+              "fixed_heldout_mean_ssim": -0.004742248963642244,
+              "realized_stale_update_fraction": 0.0124,
+              "total_micro_updates": 565000.0
+            },
+            "early_stale_rescue": {
+              "fixed_heldout_mean_psnr": 12.821734613842434,
+              "fixed_heldout_mean_depth_l1": 1.1401204268137615,
+              "fixed_heldout_mean_ssim": 0.03035574991049038,
+              "realized_stale_update_fraction": 0.2875870206489676,
+              "total_micro_updates": 565000.0
+            },
+            "late_stale_rescue": {
+              "fixed_heldout_mean_psnr": 12.965943018595377,
+              "fixed_heldout_mean_depth_l1": 1.15132052037451,
+              "fixed_heldout_mean_ssim": 0.0870545231219795,
+              "realized_stale_update_fraction": 0.2619882005899705,
+              "total_micro_updates": 565000.0
+            }
+          },
+          "contrasts": {
+            "timing_global": {
+              "fixed_heldout_mean_psnr": 0.17956508530510717,
+              "fixed_heldout_mean_depth_l1": -0.026332111822234383,
+              "fixed_heldout_mean_ssim": -0.07938918817671947
+            },
+            "timing_stale_rescue": {
+              "fixed_heldout_mean_psnr": 0.14420840475294305,
+              "fixed_heldout_mean_depth_l1": 0.01120009356074858,
+              "fixed_heldout_mean_ssim": 0.056698773211489126
+            },
+            "rescue_early": {
+              "fixed_heldout_mean_psnr": 1.7659662829505063,
+              "fixed_heldout_mean_depth_l1": 0.008402715126673455,
+              "fixed_heldout_mean_ssim": -0.04429118930258685
+            },
+            "rescue_late": {
+              "fixed_heldout_mean_psnr": 1.7306096023983422,
+              "fixed_heldout_mean_depth_l1": 0.04593492050965642,
+              "fixed_heldout_mean_ssim": 0.09179677208562174
+            }
+          },
+          "difference_in_differences": {
+            "fixed_heldout_mean_psnr": -0.03535668055216412,
+            "fixed_heldout_mean_depth_l1": 0.037532205382982964,
+            "fixed_heldout_mean_ssim": 0.1360879613882086
+          },
+          "technical_repeats": 3
+        },
+        "58": {
+          "arms": {
+            "early_global": {
+              "fixed_heldout_mean_psnr": 10.805622935295105,
+              "fixed_heldout_mean_depth_l1": 1.140124907096227,
+              "fixed_heldout_mean_ssim": 0.05220200369755427,
+              "realized_stale_update_fraction": 0.017187610619469027,
+              "total_micro_updates": 565000.0
+            },
+            "late_global": {
+              "fixed_heldout_mean_psnr": 11.2082306543986,
+              "fixed_heldout_mean_depth_l1": 1.1048846691846848,
+              "fixed_heldout_mean_ssim": -0.008002238348126411,
+              "realized_stale_update_fraction": 0.01235575221238938,
+              "total_micro_updates": 565000.0
+            },
+            "early_stale_rescue": {
+              "fixed_heldout_mean_psnr": 12.89365311463674,
+              "fixed_heldout_mean_depth_l1": 1.1473589142163594,
+              "fixed_heldout_mean_ssim": 0.03555788084243735,
+              "realized_stale_update_fraction": 0.28931858407079647,
+              "total_micro_updates": 565000.0
+            },
+            "late_stale_rescue": {
+              "fixed_heldout_mean_psnr": 13.083997368812561,
+              "fixed_heldout_mean_depth_l1": 1.1561294744412105,
+              "fixed_heldout_mean_ssim": 0.10724102985113859,
+              "realized_stale_update_fraction": 0.2629646017699115,
+              "total_micro_updates": 565000.0
+            }
+          },
+          "contrasts": {
+            "timing_global": {
+              "fixed_heldout_mean_psnr": 0.4026077191034947,
+              "fixed_heldout_mean_depth_l1": -0.03524023791154218,
+              "fixed_heldout_mean_ssim": -0.06020424204568068
+            },
+            "timing_stale_rescue": {
+              "fixed_heldout_mean_psnr": 0.19034425417582135,
+              "fixed_heldout_mean_depth_l1": 0.00877056022485112,
+              "fixed_heldout_mean_ssim": 0.07168314900870124
+            },
+            "rescue_early": {
+              "fixed_heldout_mean_psnr": 2.0880301793416347,
+              "fixed_heldout_mean_depth_l1": 0.007234007120132446,
+              "fixed_heldout_mean_ssim": -0.01664412285511692
+            },
+            "rescue_late": {
+              "fixed_heldout_mean_psnr": 1.8757667144139614,
+              "fixed_heldout_mean_depth_l1": 0.05124480525652575,
+              "fixed_heldout_mean_ssim": 0.115243268199265
+            }
+          },
+          "difference_in_differences": {
+            "fixed_heldout_mean_psnr": -0.21226346492767334,
+            "fixed_heldout_mean_depth_l1": 0.0440107981363933,
+            "fixed_heldout_mean_ssim": 0.1318873910543819
+          },
+          "technical_repeats": 1
+        },
+        "59": {
+          "arms": {
+            "early_global": {
+              "fixed_heldout_mean_psnr": 11.401540637016296,
+              "fixed_heldout_mean_depth_l1": 1.1387455711762111,
+              "fixed_heldout_mean_ssim": 0.054225812355677284,
+              "realized_stale_update_fraction": 0.0172,
+              "total_micro_updates": 565000.0
+            },
+            "late_global": {
+              "fixed_heldout_mean_psnr": 11.49774173895518,
+              "fixed_heldout_mean_depth_l1": 1.1466673215230305,
+              "fixed_heldout_mean_ssim": 0.02073664280275504,
+              "realized_stale_update_fraction": 0.012345132743362831,
+              "total_micro_updates": 565000.0
+            },
+            "early_stale_rescue": {
+              "fixed_heldout_mean_psnr": 13.913567463556925,
+              "fixed_heldout_mean_depth_l1": 1.1510876268148422,
+              "fixed_heldout_mean_ssim": 0.13671274669468403,
+              "realized_stale_update_fraction": 0.28784070796460176,
+              "total_micro_updates": 565000.0
+            },
+            "late_stale_rescue": {
+              "fixed_heldout_mean_psnr": 13.065197865168253,
+              "fixed_heldout_mean_depth_l1": 1.1565687706073124,
+              "fixed_heldout_mean_ssim": 0.10368585834900539,
+              "realized_stale_update_fraction": 0.2617345132743363,
+              "total_micro_updates": 565000.0
+            }
+          },
+          "contrasts": {
+            "timing_global": {
+              "fixed_heldout_mean_psnr": 0.09620110193888287,
+              "fixed_heldout_mean_depth_l1": 0.007921750346819412,
+              "fixed_heldout_mean_ssim": -0.03348916955292225
+            },
+            "timing_stale_rescue": {
+              "fixed_heldout_mean_psnr": -0.8483695983886719,
+              "fixed_heldout_mean_depth_l1": 0.005481143792470222,
+              "fixed_heldout_mean_ssim": -0.03302688834567864
+            },
+            "rescue_early": {
+              "fixed_heldout_mean_psnr": 2.5120268265406285,
+              "fixed_heldout_mean_depth_l1": 0.012342055638631111,
+              "fixed_heldout_mean_ssim": 0.08248693433900675
+            },
+            "rescue_late": {
+              "fixed_heldout_mean_psnr": 1.5674561262130737,
+              "fixed_heldout_mean_depth_l1": 0.009901449084281921,
+              "fixed_heldout_mean_ssim": 0.08294921554625034
+            }
+          },
+          "difference_in_differences": {
+            "fixed_heldout_mean_psnr": -0.9445707003275547,
+            "fixed_heldout_mean_depth_l1": -0.0024406065543491895,
+            "fixed_heldout_mean_ssim": 0.0004622812072436061
+          },
+          "technical_repeats": 1
+        },
+        "60": {
+          "arms": {
+            "early_global": {
+              "fixed_heldout_mean_psnr": 11.353747844696045,
+              "fixed_heldout_mean_depth_l1": 1.1171040038267772,
+              "fixed_heldout_mean_ssim": 0.11062102857977152,
+              "realized_stale_update_fraction": 0.017398230088495576,
+              "total_micro_updates": 565000.0
+            },
+            "late_global": {
+              "fixed_heldout_mean_psnr": 11.236163973808289,
+              "fixed_heldout_mean_depth_l1": 1.104434569676717,
+              "fixed_heldout_mean_ssim": -0.008218584426989159,
+              "realized_stale_update_fraction": 0.012410619469026548,
+              "total_micro_updates": 565000.0
+            },
+            "early_stale_rescue": {
+              "fixed_heldout_mean_psnr": 13.01686942577362,
+              "fixed_heldout_mean_depth_l1": 1.1492403248945873,
+              "fixed_heldout_mean_ssim": 0.06417574003959696,
+              "realized_stale_update_fraction": 0.2881769911504425,
+              "total_micro_updates": 565000.0
+            },
+            "late_stale_rescue": {
+              "fixed_heldout_mean_psnr": 13.079648415247599,
+              "fixed_heldout_mean_depth_l1": 1.1558551490306854,
+              "fixed_heldout_mean_ssim": 0.10759257494161527,
+              "realized_stale_update_fraction": 0.2620353982300885,
+              "total_micro_updates": 565000.0
+            }
+          },
+          "contrasts": {
+            "timing_global": {
+              "fixed_heldout_mean_psnr": -0.11758387088775635,
+              "fixed_heldout_mean_depth_l1": -0.012669434150060166,
+              "fixed_heldout_mean_ssim": -0.11883961300676067
+            },
+            "timing_stale_rescue": {
+              "fixed_heldout_mean_psnr": 0.06277898947397809,
+              "fixed_heldout_mean_depth_l1": 0.006614824136098152,
+              "fixed_heldout_mean_ssim": 0.04341683490201831
+            },
+            "rescue_early": {
+              "fixed_heldout_mean_psnr": 1.6631215810775757,
+              "fixed_heldout_mean_depth_l1": 0.03213632106781006,
+              "fixed_heldout_mean_ssim": -0.04644528854017456
+            },
+            "rescue_late": {
+              "fixed_heldout_mean_psnr": 1.8434844414393101,
+              "fixed_heldout_mean_depth_l1": 0.051420579353968376,
+              "fixed_heldout_mean_ssim": 0.11581115936860442
+            }
+          },
+          "difference_in_differences": {
+            "fixed_heldout_mean_psnr": 0.18036286036173443,
+            "fixed_heldout_mean_depth_l1": 0.019284258286158318,
+            "fixed_heldout_mean_ssim": 0.16225644790877897
+          },
+          "technical_repeats": 1
+        }
+      },
+      "aggregate": {
+        "fixed_heldout_mean_psnr": {
+          "mean": -0.25295699636141444,
+          "sd_across_seeds": 0.48822859218647724,
+          "min": -0.9445707003275547,
+          "max": 0.18036286036173443,
+          "n_seeds": 4,
+          "positive_seeds": 1,
+          "negative_seeds": 3
+        },
+        "fixed_heldout_mean_depth_l1": {
+          "mean": 0.02459666381279635,
+          "sd_across_seeds": 0.020844443613221183,
+          "min": -0.0024406065543491895,
+          "max": 0.0440107981363933,
+          "n_seeds": 4,
+          "positive_seeds": 3,
+          "negative_seeds": 1
+        },
+        "fixed_heldout_mean_ssim": {
+          "mean": 0.10767352038965328,
+          "sd_across_seeds": 0.07272605625087103,
+          "min": 0.0004622812072436061,
+          "max": 0.16225644790877897,
+          "n_seeds": 4,
+          "positive_seeds": 4,
+          "negative_seeds": 0
+        },
+        "timing_global": {
+          "fixed_heldout_mean_psnr": {
+            "mean": 0.1401975088649321,
+            "sd_across_seeds": 0.21509366028300472,
+            "min": -0.11758387088775635,
+            "max": 0.4026077191034947,
+            "n_seeds": 4,
+            "positive_seeds": 3,
+            "negative_seeds": 1
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": -0.01658000838425433,
+            "sd_across_seeds": 0.018787730563970196,
+            "min": -0.03524023791154218,
+            "max": 0.007921750346819412,
+            "n_seeds": 4,
+            "positive_seeds": 1,
+            "negative_seeds": 3
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": -0.07298055319552077,
+            "sd_across_seeds": 0.03590230947862801,
+            "min": -0.11883961300676067,
+            "max": -0.03348916955292225,
+            "n_seeds": 4,
+            "positive_seeds": 0,
+            "negative_seeds": 4
+          }
+        },
+        "timing_stale_rescue": {
+          "fixed_heldout_mean_psnr": {
+            "mean": -0.11275948749648235,
+            "sd_across_seeds": 0.49323434863047644,
+            "min": -0.8483695983886719,
+            "max": 0.19034425417582135,
+            "n_seeds": 4,
+            "positive_seeds": 3,
+            "negative_seeds": 1
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": 0.008016655428542019,
+            "sd_across_seeds": 0.002523000925658107,
+            "min": 0.005481143792470222,
+            "max": 0.01120009356074858,
+            "n_seeds": 4,
+            "positive_seeds": 4,
+            "negative_seeds": 0
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": 0.03469296719413251,
+            "sd_across_seeds": 0.046599763058288765,
+            "min": -0.03302688834567864,
+            "max": 0.07168314900870124,
+            "n_seeds": 4,
+            "positive_seeds": 3,
+            "negative_seeds": 1
+          }
+        },
+        "rescue_early": {
+          "fixed_heldout_mean_psnr": {
+            "mean": 2.0072862174775863,
+            "sd_across_seeds": 0.3820851901358035,
+            "min": 1.6631215810775757,
+            "max": 2.5120268265406285,
+            "n_seeds": 4,
+            "positive_seeds": 4,
+            "negative_seeds": 0
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": 0.015028774738311768,
+            "sd_across_seeds": 0.011612488523638687,
+            "min": 0.007234007120132446,
+            "max": 0.03213632106781006,
+            "n_seeds": 4,
+            "positive_seeds": 4,
+            "negative_seeds": 0
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": -0.006223416589717895,
+            "sd_across_seeds": 0.06067693626490159,
+            "min": -0.04644528854017456,
+            "max": 0.08248693433900675,
+            "n_seeds": 4,
+            "positive_seeds": 1,
+            "negative_seeds": 3
+          }
+        },
+        "rescue_late": {
+          "fixed_heldout_mean_psnr": {
+            "mean": 1.7543292211161718,
+            "sd_across_seeds": 0.13925981952223876,
+            "min": 1.5674561262130737,
+            "max": 1.8757667144139614,
+            "n_seeds": 4,
+            "positive_seeds": 4,
+            "negative_seeds": 0
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": 0.039625438551108116,
+            "sd_across_seeds": 0.019978823302049163,
+            "min": 0.009901449084281921,
+            "max": 0.051420579353968376,
+            "n_seeds": 4,
+            "positive_seeds": 4,
+            "negative_seeds": 0
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": 0.10145010379993538,
+            "sd_across_seeds": 0.01665293748417226,
+            "min": 0.08294921554625034,
+            "max": 0.11581115936860442,
+            "n_seeds": 4,
+            "positive_seeds": 4,
+            "negative_seeds": 0
+          }
+        }
+      },
+      "prefix_hashes_by_seed": {
+        "57": "015eca4302a64bda25b1e6d638301284bc84864763bb44e28198994d5dea4339",
+        "58": "ea31eb8085efe089f98c327eb3ad1be00c31e8c0ab1123c37230bef5e7fae3c4",
+        "59": "5685af9bce98cef78947c82788121100b601eecae08e5dbe394e9626c5d1b963",
+        "60": "0a00740928c8141aced8619eaa01e8facc52050d9f3325d392e1305aa0da1e9b"
+      },
+      "candidate_hashes_by_seed": {
+        "57": "981698994b1843c360f46f4f26c4b727f2517260354f025f585f6c75db0c77ec",
+        "58": "8778b6172ee3f9c5a333d3e8ee9816517a869c9ee16462f014fc53dff1940d99",
+        "59": "1baff6972465d76b48fa5ba32d0a8275bfb5819213c6d4e447e954798079ca20",
+        "60": "9ac617286d810be7a896e2b23b953b53ab5137ab017d3bfcc128a21efccb9d2a"
+      },
+      "distinct_prefixes_and_candidate_batches_across_seeds": true
+    },
+    "replica_office3": {
+      "per_seed": {
+        "57": {
+          "arms": {
+            "early_global": {
+              "fixed_heldout_mean_psnr": 11.648050447305044,
+              "fixed_heldout_mean_depth_l1": 1.4070039722654555,
+              "fixed_heldout_mean_ssim": 0.30722456078769433,
+              "realized_stale_update_fraction": 0.015411209439528024,
+              "total_micro_updates": 565000.0
+            },
+            "late_global": {
+              "fixed_heldout_mean_psnr": 12.182732092009651,
+              "fixed_heldout_mean_depth_l1": 1.3869159287876553,
+              "fixed_heldout_mean_ssim": 0.2039253248108758,
+              "realized_stale_update_fraction": 0.010897935103244837,
+              "total_micro_updates": 565000.0
+            },
+            "early_stale_rescue": {
+              "fixed_heldout_mean_psnr": 12.854104240735372,
+              "fixed_heldout_mean_depth_l1": 1.4000015589925978,
+              "fixed_heldout_mean_ssim": 0.3578491455150975,
+              "realized_stale_update_fraction": 0.2770117994100295,
+              "total_micro_updates": 565000.0
+            },
+            "late_stale_rescue": {
+              "fixed_heldout_mean_psnr": 12.102127075195312,
+              "fixed_heldout_mean_depth_l1": 1.4042544265588124,
+              "fixed_heldout_mean_ssim": 0.2543685966067844,
+              "realized_stale_update_fraction": 0.24880530973451329,
+              "total_micro_updates": 565000.0
+            }
+          },
+          "contrasts": {
+            "timing_global": {
+              "fixed_heldout_mean_psnr": 0.534681644704607,
+              "fixed_heldout_mean_depth_l1": -0.020088043477800133,
+              "fixed_heldout_mean_ssim": -0.10329923597681853
+            },
+            "timing_stale_rescue": {
+              "fixed_heldout_mean_psnr": -0.75197716554006,
+              "fixed_heldout_mean_depth_l1": 0.004252867566214569,
+              "fixed_heldout_mean_ssim": -0.1034805489083131
+            },
+            "rescue_early": {
+              "fixed_heldout_mean_psnr": 1.2060537934303284,
+              "fixed_heldout_mean_depth_l1": -0.007002413272857666,
+              "fixed_heldout_mean_ssim": 0.050624584727403166
+            },
+            "rescue_late": {
+              "fixed_heldout_mean_psnr": -0.08060501681433863,
+              "fixed_heldout_mean_depth_l1": 0.017338497771157035,
+              "fixed_heldout_mean_ssim": 0.0504432717959086
+            }
+          },
+          "difference_in_differences": {
+            "fixed_heldout_mean_psnr": -1.286658810244667,
+            "fixed_heldout_mean_depth_l1": 0.0243409110440147,
+            "fixed_heldout_mean_ssim": -0.00018131293149456496
+          },
+          "technical_repeats": 3
+        },
+        "58": {
+          "arms": {
+            "early_global": {
+              "fixed_heldout_mean_psnr": 12.072836558024088,
+              "fixed_heldout_mean_depth_l1": 1.4089165230592091,
+              "fixed_heldout_mean_ssim": 0.32352260251839954,
+              "realized_stale_update_fraction": 0.015557522123893806,
+              "total_micro_updates": 565000.0
+            },
+            "late_global": {
+              "fixed_heldout_mean_psnr": 12.255062758922577,
+              "fixed_heldout_mean_depth_l1": 1.384708861509959,
+              "fixed_heldout_mean_ssim": 0.21313478549321493,
+              "realized_stale_update_fraction": 0.010950442477876106,
+              "total_micro_updates": 565000.0
+            },
+            "early_stale_rescue": {
+              "fixed_heldout_mean_psnr": 12.463028828303019,
+              "fixed_heldout_mean_depth_l1": 1.3861792137225468,
+              "fixed_heldout_mean_ssim": 0.35639604677756626,
+              "realized_stale_update_fraction": 0.2776637168141593,
+              "total_micro_updates": 565000.0
+            },
+            "late_stale_rescue": {
+              "fixed_heldout_mean_psnr": 12.326700091362,
+              "fixed_heldout_mean_depth_l1": 1.4101456701755524,
+              "fixed_heldout_mean_ssim": 0.29151181131601334,
+              "realized_stale_update_fraction": 0.24916814159292036,
+              "total_micro_updates": 565000.0
+            }
+          },
+          "contrasts": {
+            "timing_global": {
+              "fixed_heldout_mean_psnr": 0.18222620089848895,
+              "fixed_heldout_mean_depth_l1": -0.024207661549250137,
+              "fixed_heldout_mean_ssim": -0.1103878170251846
+            },
+            "timing_stale_rescue": {
+              "fixed_heldout_mean_psnr": -0.1363287369410191,
+              "fixed_heldout_mean_depth_l1": 0.023966456453005547,
+              "fixed_heldout_mean_ssim": -0.06488423546155292
+            },
+            "rescue_early": {
+              "fixed_heldout_mean_psnr": 0.39019227027893066,
+              "fixed_heldout_mean_depth_l1": -0.022737309336662292,
+              "fixed_heldout_mean_ssim": 0.03287344425916672
+            },
+            "rescue_late": {
+              "fixed_heldout_mean_psnr": 0.07163733243942261,
+              "fixed_heldout_mean_depth_l1": 0.02543680866559339,
+              "fixed_heldout_mean_ssim": 0.0783770258227984
+            }
+          },
+          "difference_in_differences": {
+            "fixed_heldout_mean_psnr": -0.31855493783950806,
+            "fixed_heldout_mean_depth_l1": 0.048174118002255684,
+            "fixed_heldout_mean_ssim": 0.045503581563631684
+          },
+          "technical_repeats": 1
+        },
+        "59": {
+          "arms": {
+            "early_global": {
+              "fixed_heldout_mean_psnr": 12.859850923220316,
+              "fixed_heldout_mean_depth_l1": 1.404239575068156,
+              "fixed_heldout_mean_ssim": 0.3510941006243229,
+              "realized_stale_update_fraction": 0.015598230088495575,
+              "total_micro_updates": 565000.0
+            },
+            "late_global": {
+              "fixed_heldout_mean_psnr": 12.56556749343872,
+              "fixed_heldout_mean_depth_l1": 1.371155748764674,
+              "fixed_heldout_mean_ssim": 0.20168904401361942,
+              "realized_stale_update_fraction": 0.010920353982300885,
+              "total_micro_updates": 565000.0
+            },
+            "early_stale_rescue": {
+              "fixed_heldout_mean_psnr": 11.913047631581625,
+              "fixed_heldout_mean_depth_l1": 1.408654272556305,
+              "fixed_heldout_mean_ssim": 0.3523168129225572,
+              "realized_stale_update_fraction": 0.2778230088495575,
+              "total_micro_updates": 565000.0
+            },
+            "late_stale_rescue": {
+              "fixed_heldout_mean_psnr": 12.193846503893534,
+              "fixed_heldout_mean_depth_l1": 1.4002374013264973,
+              "fixed_heldout_mean_ssim": 0.2668835346897443,
+              "realized_stale_update_fraction": 0.24857522123893805,
+              "total_micro_updates": 565000.0
+            }
+          },
+          "contrasts": {
+            "timing_global": {
+              "fixed_heldout_mean_psnr": -0.2942834297815953,
+              "fixed_heldout_mean_depth_l1": -0.033083826303482056,
+              "fixed_heldout_mean_ssim": -0.14940505661070347
+            },
+            "timing_stale_rescue": {
+              "fixed_heldout_mean_psnr": 0.2807988723119088,
+              "fixed_heldout_mean_depth_l1": -0.00841687122980761,
+              "fixed_heldout_mean_ssim": -0.08543327823281288
+            },
+            "rescue_early": {
+              "fixed_heldout_mean_psnr": -0.946803291638691,
+              "fixed_heldout_mean_depth_l1": 0.004414697488148933,
+              "fixed_heldout_mean_ssim": 0.0012227122982342853
+            },
+            "rescue_late": {
+              "fixed_heldout_mean_psnr": -0.37172098954518695,
+              "fixed_heldout_mean_depth_l1": 0.02908165256182338,
+              "fixed_heldout_mean_ssim": 0.06519449067612487
+            }
+          },
+          "difference_in_differences": {
+            "fixed_heldout_mean_psnr": 0.5750823020935041,
+            "fixed_heldout_mean_depth_l1": 0.024666955073674446,
+            "fixed_heldout_mean_ssim": 0.06397177837789059
+          },
+          "technical_repeats": 1
+        },
+        "60": {
+          "arms": {
+            "early_global": {
+              "fixed_heldout_mean_psnr": 12.683205008506775,
+              "fixed_heldout_mean_depth_l1": 1.4017870326836903,
+              "fixed_heldout_mean_ssim": 0.33792202671368915,
+              "realized_stale_update_fraction": 0.015394690265486725,
+              "total_micro_updates": 565000.0
+            },
+            "late_global": {
+              "fixed_heldout_mean_psnr": 12.200844784577688,
+              "fixed_heldout_mean_depth_l1": 1.386246105035146,
+              "fixed_heldout_mean_ssim": 0.202523835003376,
+              "realized_stale_update_fraction": 0.010925663716814159,
+              "total_micro_updates": 565000.0
+            },
+            "early_stale_rescue": {
+              "fixed_heldout_mean_psnr": 12.763898173967997,
+              "fixed_heldout_mean_depth_l1": 1.3777854641278584,
+              "fixed_heldout_mean_ssim": 0.3560451753437519,
+              "realized_stale_update_fraction": 0.2775575221238938,
+              "total_micro_updates": 565000.0
+            },
+            "late_stale_rescue": {
+              "fixed_heldout_mean_psnr": 12.235942482948303,
+              "fixed_heldout_mean_depth_l1": 1.4113321006298065,
+              "fixed_heldout_mean_ssim": 0.28476882974306744,
+              "realized_stale_update_fraction": 0.24851327433628317,
+              "total_micro_updates": 565000.0
+            }
+          },
+          "contrasts": {
+            "timing_global": {
+              "fixed_heldout_mean_psnr": -0.48236022392908673,
+              "fixed_heldout_mean_depth_l1": -0.015540927648544312,
+              "fixed_heldout_mean_ssim": -0.13539819171031314
+            },
+            "timing_stale_rescue": {
+              "fixed_heldout_mean_psnr": -0.5279556910196934,
+              "fixed_heldout_mean_depth_l1": 0.03354663650194811,
+              "fixed_heldout_mean_ssim": -0.07127634560068447
+            },
+            "rescue_early": {
+              "fixed_heldout_mean_psnr": 0.08069316546122174,
+              "fixed_heldout_mean_depth_l1": -0.02400156855583191,
+              "fixed_heldout_mean_ssim": 0.018123148630062758
+            },
+            "rescue_late": {
+              "fixed_heldout_mean_psnr": 0.03509769837061505,
+              "fixed_heldout_mean_depth_l1": 0.025085995594660515,
+              "fixed_heldout_mean_ssim": 0.08224499473969143
+            }
+          },
+          "difference_in_differences": {
+            "fixed_heldout_mean_psnr": -0.04559546709060669,
+            "fixed_heldout_mean_depth_l1": 0.049087564150492424,
+            "fixed_heldout_mean_ssim": 0.06412184610962868
+          },
+          "technical_repeats": 1
+        }
+      },
+      "aggregate": {
+        "fixed_heldout_mean_psnr": {
+          "mean": -0.2689317282703194,
+          "sd_across_seeds": 0.7746977142345449,
+          "min": -1.286658810244667,
+          "max": 0.5750823020935041,
+          "n_seeds": 4,
+          "positive_seeds": 1,
+          "negative_seeds": 3
+        },
+        "fixed_heldout_mean_depth_l1": {
+          "mean": 0.036567387067609314,
+          "sd_across_seeds": 0.013935303306994924,
+          "min": 0.0243409110440147,
+          "max": 0.049087564150492424,
+          "n_seeds": 4,
+          "positive_seeds": 4,
+          "negative_seeds": 0
+        },
+        "fixed_heldout_mean_ssim": {
+          "mean": 0.043353973279914096,
+          "sd_across_seeds": 0.030311386145649617,
+          "min": -0.00018131293149456496,
+          "max": 0.06412184610962868,
+          "n_seeds": 4,
+          "positive_seeds": 3,
+          "negative_seeds": 1
+        },
+        "timing_global": {
+          "fixed_heldout_mean_psnr": {
+            "mean": -0.014933952026896513,
+            "sd_across_seeds": 0.46096741766936605,
+            "min": -0.48236022392908673,
+            "max": 0.534681644704607,
+            "n_seeds": 4,
+            "positive_seeds": 2,
+            "negative_seeds": 2
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": -0.02323011474476916,
+            "sd_across_seeds": 0.0074620694020878274,
+            "min": -0.033083826303482056,
+            "max": -0.015540927648544312,
+            "n_seeds": 4,
+            "positive_seeds": 0,
+            "negative_seeds": 4
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": -0.12462257533075494,
+            "sd_across_seeds": 0.021506575986362398,
+            "min": -0.14940505661070347,
+            "max": -0.10329923597681853,
+            "n_seeds": 4,
+            "positive_seeds": 0,
+            "negative_seeds": 4
+          }
+        },
+        "timing_stale_rescue": {
+          "fixed_heldout_mean_psnr": {
+            "mean": -0.2838656802972159,
+            "sd_across_seeds": 0.45435723925083193,
+            "min": -0.75197716554006,
+            "max": 0.2807988723119088,
+            "n_seeds": 4,
+            "positive_seeds": 1,
+            "negative_seeds": 3
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": 0.013337272322840155,
+            "sd_across_seeds": 0.018948765371286327,
+            "min": -0.00841687122980761,
+            "max": 0.03354663650194811,
+            "n_seeds": 4,
+            "positive_seeds": 3,
+            "negative_seeds": 1
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": -0.08126860205084084,
+            "sd_across_seeds": 0.017117318407563364,
+            "min": -0.1034805489083131,
+            "max": -0.06488423546155292,
+            "n_seeds": 4,
+            "positive_seeds": 0,
+            "negative_seeds": 4
+          }
+        },
+        "rescue_early": {
+          "fixed_heldout_mean_psnr": {
+            "mean": 0.18253398438294743,
+            "sd_across_seeds": 0.890035392297083,
+            "min": -0.946803291638691,
+            "max": 1.2060537934303284,
+            "n_seeds": 4,
+            "positive_seeds": 3,
+            "negative_seeds": 1
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": -0.012331648419300734,
+            "sd_across_seeds": 0.013580692957506033,
+            "min": -0.02400156855583191,
+            "max": 0.004414697488148933,
+            "n_seeds": 4,
+            "positive_seeds": 1,
+            "negative_seeds": 3
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": 0.02571097247871673,
+            "sd_across_seeds": 0.021049457908370983,
+            "min": 0.0012227122982342853,
+            "max": 0.050624584727403166,
+            "n_seeds": 4,
+            "positive_seeds": 4,
+            "negative_seeds": 0
+          }
+        },
+        "rescue_late": {
+          "fixed_heldout_mean_psnr": {
+            "mean": -0.08639774388737198,
+            "sd_across_seeds": 0.20098021298851962,
+            "min": -0.37172098954518695,
+            "max": 0.07163733243942261,
+            "n_seeds": 4,
+            "positive_seeds": 2,
+            "negative_seeds": 2
+          },
+          "fixed_heldout_mean_depth_l1": {
+            "mean": 0.02423573864830858,
+            "sd_across_seeds": 0.004940321158112658,
+            "min": 0.017338497771157035,
+            "max": 0.02908165256182338,
+            "n_seeds": 4,
+            "positive_seeds": 4,
+            "negative_seeds": 0
+          },
+          "fixed_heldout_mean_ssim": {
+            "mean": 0.06906494575863083,
+            "sd_across_seeds": 0.014401107480378572,
+            "min": 0.0504432717959086,
+            "max": 0.08224499473969143,
+            "n_seeds": 4,
+            "positive_seeds": 4,
+            "negative_seeds": 0
+          }
+        }
+      },
+      "prefix_hashes_by_seed": {
+        "57": "52e4cefbf9d6ecab8aec1670ffa46a8f0b25a8b26fa941a2b01167a6e04492f4",
+        "58": "8e95c24c2c21797b0024e867d52070a7eb37b888aa904db0eeaf038d6b751d98",
+        "59": "45bba4a9e5322e9258faf9d72b7253c3eef7d2e1cde98ba7e7ca64d92e0a8311",
+        "60": "b5f719a660e16adf8578325d63b5bd59355b1696d3412146d16592a594a1dc61"
+      },
+      "candidate_hashes_by_seed": {
+        "57": "73f044143c3e72b3b539d3d740c568a9cec896051d9afcf2952e3434610aa608",
+        "58": "74f8cd36c82090439d00fa081a6c74f541d1c96b0db7fc7dac2f270ff0e39c25",
+        "59": "d5ab0b23d1dff85ddd75408fc544646039ecf8a592f6c1bb4f649719fe6ec8ff",
+        "60": "cddab522d6438d48d3b4c4b19dd5354197eb623c809954ad7746f0ab0358423d"
+      },
+      "distinct_prefixes_and_candidate_batches_across_seeds": true
+    }
+  }
+}

@@ -4,7 +4,8 @@ Ties together all research modules into a complete per-frame pipeline:
     initialize → [for each frame: track → render → errors → densify → schedule → optimize → prune]
 
 CANONICAL CONFIG SOURCE: _default_config() below. configs/default.yaml mirrors it.
-OURS (Phase 13): pure dual throttling (coverage κ≥0.90 + backlog, no warmup, K=5).
+OURS (Phase 13): coverage throttling (κ≥0.90, no warmup, K=5).
+Backlog throttling is an independent opt-in for the corrected factorial study.
 Learned utility path is retained only as documented negative result.
 Split plan (do NOT split before paper freeze): map.py (init/densify/prune) |
 sched.py (selection) | optim.py (SelectiveAdam steps). See experiments/README.md.
@@ -12,6 +13,7 @@ sched.py (selection) | optim.py (SelectiveAdam steps). See experiments/README.md
 import torch
 import torch.optim as optim
 import time
+import hashlib
 from typing import Dict, Optional, Any
 import numpy as np
 import yaml
@@ -108,6 +110,9 @@ class OnlineReconstructionPipeline:
         self.scheduler = BudgetScheduler(
             gpu_budget_ms=self.config['scheduler']['gpu_budget_ms'],
         )
+        if 'densify_budget_override_ms' in self.config['scheduler']:
+            self.scheduler.densify_budget_override_ms = float(
+                self.config['scheduler']['densify_budget_override_ms'])
         
         # Optimizer (initialized after first frame)
         self.optimizer: Optional[optim.Adam] = None
@@ -163,6 +168,7 @@ class OnlineReconstructionPipeline:
         # State
 
         self.frame_count = 0
+        self._spawn_control_count = 0
         self.current_pose = torch.eye(4, device=device)
         self.intrinsics: Optional[torch.Tensor] = None
         self.initialized = False
@@ -176,6 +182,68 @@ class OnlineReconstructionPipeline:
         # Signature: selector_fn(pipeline: OnlineReconstructionPipeline, N: int) -> torch.Tensor (bool mask)
         self._custom_selector_fn = None
         self._pre_scheduling_hook = None
+        # Expensive, opt-in per-stage hashes used only to localize run-to-run
+        # divergence. Disabled in all benchmark configs by default.
+        self._repro_trace_enabled = bool(self.config.get('system', {}).get('repro_trace', False))
+        self._repro_trace = []
+        self._init_repro_trace = []
+        self._init_gradient_snapshots = {}
+
+    @staticmethod
+    def _hash_trace_tensors(tensors: Dict[str, Optional[torch.Tensor]]) -> Dict[str, str]:
+        """Return exact SHA256 hashes for a small set of diagnostic tensors."""
+        result = {}
+        for name, tensor in tensors.items():
+            if tensor is None:
+                result[name] = 'none'
+                continue
+            value = tensor.detach().contiguous().cpu()
+            digest = hashlib.sha256()
+            digest.update(str(value.dtype).encode('ascii'))
+            digest.update(repr(tuple(value.shape)).encode('ascii'))
+            digest.update(value.numpy().tobytes())
+            result[name] = digest.hexdigest()
+        return result
+
+    def _trace_stage(self, stage: str, tensors: Dict[str, Optional[torch.Tensor]]):
+        if self._repro_trace_enabled:
+            self._repro_trace.append({
+                'stage': stage,
+                'hashes': self._hash_trace_tensors(tensors),
+            })
+
+    def _trace_init_stage(self, stage: str, tensors: Dict[str, Optional[torch.Tensor]]):
+        if self._repro_trace_enabled:
+            if (stage == 'init_step_0_gradients'
+                    and self.config.get('system', {}).get('repro_trace_dump_init_gradients', False)):
+                self._init_gradient_snapshots = {
+                    name: tensor.detach().float().cpu().clone()
+                    for name, tensor in tensors.items() if tensor is not None
+                }
+            trace_row = {
+                'stage': stage,
+                'hashes': self._hash_trace_tensors(tensors),
+            }
+            if (self.config.get('system', {}).get('repro_trace_summaries', False)
+                    and 'gradients' in stage):
+                summaries = {}
+                for name, tensor in tensors.items():
+                    if tensor is None:
+                        summaries[name] = None
+                        continue
+                    value = tensor.detach().float()
+                    finite = torch.isfinite(value)
+                    finite_values = value[finite]
+                    summaries[name] = {
+                        'shape': list(value.shape),
+                        'finite_count': int(finite.sum().item()),
+                        'nonfinite_count': int((~finite).sum().item()),
+                        'mean_abs': float(finite_values.abs().mean().item()) if finite_values.numel() else None,
+                        'rms': float(torch.sqrt((finite_values.square().mean())).item()) if finite_values.numel() else None,
+                        'max_abs': float(finite_values.abs().max().item()) if finite_values.numel() else None,
+                    }
+                trace_row['summaries'] = summaries
+            self._init_repro_trace.append(trace_row)
     
     @staticmethod
     def _default_config() -> Dict:
@@ -300,6 +368,11 @@ class OnlineReconstructionPipeline:
         """
         self.intrinsics = intrinsics.to(self.device)
         self.current_pose = (pose if pose is not None else torch.eye(4)).to(self.device)
+        self._init_repro_trace = []
+        self._trace_init_stage('frame0_inputs', {
+            'rgb': rgb, 'depth': depth,
+            'intrinsics': intrinsics, 'pose': self.current_pose,
+        })
         # Anchor the visual tracker on the init frame (GT pose if given).
         try:
             if hasattr(self.tracker, "reset"):
@@ -338,6 +411,9 @@ class OnlineReconstructionPipeline:
         # Unproject to 3D
         from .densification import unproject_pixels
         points = unproject_pixels(uv, depth, intrinsics, self.current_pose)
+        self._trace_init_stage('initial_point_selection', {
+            'uv': uv, 'depth_values': d_vals, 'points': points,
+        })
         
         # Get colors
         colors = rgb[uv[:, 1].long(), uv[:, 0].long()]
@@ -359,6 +435,14 @@ class OnlineReconstructionPipeline:
             initial_scale=init_scale,
             initial_opacity=self.config['gaussian']['initial_opacity'],
         )
+        self._trace_init_stage('initial_gaussian_map', {
+            'xyz': self.gaussian_model._xyz,
+            'scaling': self.gaussian_model._scaling,
+            'rotation': self.gaussian_model._rotation,
+            'opacity': self.gaussian_model._opacity,
+            'features_dc': self.gaussian_model._features_dc,
+            'features_rest': self.gaussian_model._features_rest,
+        })
         
         self._setup_optimizer()
         self.initialized = True
@@ -371,9 +455,10 @@ class OnlineReconstructionPipeline:
                 'color': self.config.get('losses', {}).get('weight_color', 0.8),
                 'depth': self.config.get('losses', {}).get('weight_depth', 0.5),
                 'ssim': self.config.get('losses', {}).get('weight_ssim', 0.2),
+                'ssim_implementation': self.config.get('losses', {}).get('ssim_implementation', 'direct'),
             }
             tile_size = self.config.get('rendering', {}).get('tile_size', 16)
-            for _ in range(init_refine_steps):
+            for init_step in range(init_refine_steps):
                 self.optimizer.zero_grad()
                 cov3D = self.gaussian_model.build_covariance()
                 rendered = rasterize_scene(
@@ -386,7 +471,18 @@ class OnlineReconstructionPipeline:
                     image_width=W,
                     image_height=H,
                     tile_size=tile_size,
+                    backend=self.config.get('rendering', {}).get('backend'),
                 )
+                if self._repro_trace_enabled:
+                    rendered['color'].register_hook(
+                        lambda grad, step=init_step: self._trace_init_stage(
+                            f'init_step_{step}_render_color_gradient', {'grad': grad}))
+                    rendered['depth'].register_hook(
+                        lambda grad, step=init_step: self._trace_init_stage(
+                            f'init_step_{step}_render_depth_gradient', {'grad': grad}))
+                self._trace_init_stage(f'init_step_{init_step}_render', {
+                    'color': rendered['color'], 'depth': rendered['depth'],
+                })
                 d_mask = (rendered['depth'] > 0) & (depth > 0)
                 losses = total_loss(
                     rendered['color'], rgb,
@@ -394,9 +490,25 @@ class OnlineReconstructionPipeline:
                     weights,
                     depth_valid_mask=d_mask,
                 )
+                self._trace_init_stage(f'init_step_{init_step}_loss', {
+                    'loss': losses['total'].detach().reshape(1),
+                })
                 if losses['total'].requires_grad:
                     losses['total'].backward()
+                    self._trace_init_stage(f'init_step_{init_step}_gradients', {
+                        'xyz_grad': self.gaussian_model._xyz.grad,
+                        'scale_grad': self.gaussian_model._scaling.grad,
+                        'opacity_grad': self.gaussian_model._opacity.grad,
+                        'features_dc_grad': self.gaussian_model._features_dc.grad,
+                    })
                     self.optimizer.step()
+                    self._trace_init_stage(f'init_step_{init_step}_updated_map', {
+                        'xyz': self.gaussian_model._xyz,
+                        'scaling': self.gaussian_model._scaling,
+                        'rotation': self.gaussian_model._rotation,
+                        'opacity': self.gaussian_model._opacity,
+                        'features_dc': self.gaussian_model._features_dc,
+                    })
 
         # Set update_counts of initial primitives to warmup_steps so they enter stream mature
         if hasattr(self.gaussian_model, 'state_store') and self.gaussian_model.state_store is not None:
@@ -434,6 +546,8 @@ class OnlineReconstructionPipeline:
             raise RuntimeError("Pipeline not initialized. Call initialize() first.")
 
         frame_start = time.time()
+        if self._repro_trace_enabled:
+            self._repro_trace = []
         rgb = rgb.to(self.device)
         depth = depth.to(self.device)
         H, W = depth.shape
@@ -445,6 +559,21 @@ class OnlineReconstructionPipeline:
             self.current_pose = self.tracker.track_frame(
                 rgb, depth, self.gaussian_model,
                 intrinsics=self.intrinsics).to(self.device)
+
+        self._trace_stage('inputs_and_pose', {
+            'rgb': rgb, 'depth': depth, 'pose': self.current_pose,
+        })
+        self._trace_stage('map_before_render', {
+            'xyz': self.gaussian_model._xyz,
+            'scaling': self.gaussian_model._scaling,
+            'rotation': self.gaussian_model._rotation,
+            'opacity': self.gaussian_model._opacity,
+            'features_dc': self.gaussian_model._features_dc,
+            'features_rest': self.gaussian_model._features_rest,
+            'normals': self.gaussian_model._normals,
+            'confidence': self.gaussian_model._confidence,
+            'state': self.gaussian_model._state,
+        })
 
         # === 1b. Per-frame adaptive routing (no-op unless enabled) ===
         adapt_cfg = self.config.get('adaptive_routing', {})
@@ -522,6 +651,11 @@ class OnlineReconstructionPipeline:
                 rendered_depth = depth_result['depth']  # (H, W)
             else:
                 rendered_depth = render_result['depth']  # (H, W)
+
+        self._trace_stage('pre_update_render', {
+            'color': rendered_color, 'depth': rendered_depth,
+            'transmission': transmission,
+        })
         
         # === 3. Per-Gaussian Error Attribution ===
         # Compute true per-Gaussian statistics
@@ -560,6 +694,14 @@ class OnlineReconstructionPipeline:
         depth_valid = depth > 0
         depth_err = torch.zeros_like(depth)
         depth_err[depth_valid] = (rendered_depth[depth_valid] - depth[depth_valid]).abs()
+        self._trace_stage('attribution_and_residuals', {
+            'color_error': per_gaussian_color_err,
+            'depth_error': per_gaussian_depth_err,
+            'visibility': visibility_mask,
+            'screen_area': per_gaussian_screen_area,
+            'pixel_color_error': color_err,
+            'pixel_depth_error': depth_err,
+        })
         
         # === 4. Importance Estimation ===
         self.importance_estimator.update_statistics(
@@ -621,7 +763,7 @@ class OnlineReconstructionPipeline:
         sched_cfg = self.config.get('scheduler', {})
         enable_warmup = sched_cfg.get('enable_warmup', True) and sched_cfg.get('warmup_budget_ratio', 0.20) > 0
         n_warmup_current = None
-        if enable_warmup and hasattr(self.gaussian_model, 'update_counts'):
+        if (enable_warmup or sched_cfg.get('enable_backlog_throttling', False)) and hasattr(self.gaussian_model, 'update_counts'):
             warmup_steps = sched_cfg.get('warmup_steps', 3)
             n_warmup_current = int((self.gaussian_model.update_counts < warmup_steps).sum().item())
 
@@ -643,20 +785,75 @@ class OnlineReconstructionPipeline:
             ),
             self.config['gaussian']['max_gaussians'] - self.gaussian_model.num_gaussians,
         )
+        # Optional experimental intervention. A fixed total spawn target is
+        # allocated within a configured frame window; the per-frame allowance
+        # adapts to any missed quota so the run can catch up before the window
+        # closes. Default mapping behavior is unchanged when absent.
+        spawn_control = dense_cfg.get('spawn_control')
+        spawn_quota_this_frame = None
+        if spawn_control:
+            target_total = max(0, int(spawn_control['target_total']))
+            start_frame = int(spawn_control.get('start_frame', 1))
+            end_frame = int(spawn_control.get('end_frame', 150))
+            remaining = max(0, target_total - self._spawn_control_count)
+            # The control owns the spawn allowance; do not let the ordinary
+            # error-pressure scheduler silently reduce the requested quota.
+            available_capacity = max(0, self.config['gaussian']['max_gaussians']
+                                     - self.gaussian_model.num_gaussians)
+            max_new = min(dense_cfg['max_new_per_frame'], available_capacity)
+            if start_frame <= self.frame_count <= end_frame and remaining:
+                active_frames_left = end_frame - self.frame_count + 1
+                spawn_quota_this_frame = (remaining + active_frames_left - 1) // active_frames_left
+                max_new = min(max_new, spawn_quota_this_frame)
+            else:
+                spawn_quota_this_frame = 0
+                max_new = 0
         
-        if max_new > 0 and error_masks['combined_mask'].any():
-            candidates = sample_candidates(
-                error_mask=error_masks['combined_mask'],
-                num_samples=max_new,
-                strategy=dense_cfg.get('strategy', 'importance'),
-                color_err=color_err,
-                depth_err=depth_err,
-                transmission=transmission,
-                lambda_color=dense_cfg.get('lambda_color', 1.0),
-                lambda_depth=dense_cfg.get('lambda_depth', 1.0),
-                lambda_transmission=dense_cfg.get('lambda_transmission', 0.5),
-            )
+        n_spawned = 0
+        n_spawned_fallback = 0
+        trace_candidates = None
+        if max_new > 0 and (error_masks['combined_mask'].any() or spawn_control):
+            if spawn_control and spawn_control.get('candidate_mode') == 'uniform_depth':
+                candidates = sample_candidates(
+                    error_mask=depth_valid, num_samples=max_new, strategy='uniform')
+                if candidates.numel():
+                    in_error_mask = error_masks['combined_mask'][candidates[:, 1], candidates[:, 0]]
+                    n_spawned_fallback = int((~in_error_mask).sum().item())
+            else:
+                candidates = sample_candidates(
+                    error_mask=error_masks['combined_mask'],
+                    num_samples=max_new,
+                    strategy=dense_cfg.get('strategy', 'importance'),
+                    color_err=color_err,
+                    depth_err=depth_err,
+                    transmission=transmission,
+                    lambda_color=dense_cfg.get('lambda_color', 1.0),
+                    lambda_depth=dense_cfg.get('lambda_depth', 1.0),
+                    lambda_transmission=dense_cfg.get('lambda_transmission', 0.5),
+                )
+            if spawn_control and spawn_control.get('candidate_mode') != 'uniform_depth':
+                if candidates.numel():
+                    valid_candidates = depth[candidates[:, 1], candidates[:, 0]] > 0
+                    candidates = candidates[valid_candidates]
+            if (spawn_control and spawn_control.get('candidate_mode') != 'uniform_depth'
+                    and candidates.shape[0] < max_new):
+                # For matched-count experiments, fill a shortfall from distinct
+                # observed-depth pixels. This keeps the requested spawn count
+                # independent of how large the current error mask happens to be.
+                fallback_mask = depth_valid.clone()
+                if candidates.numel():
+                    fallback_mask[candidates[:, 1], candidates[:, 0]] = False
+                n_needed = max_new - int(candidates.shape[0])
+                fallback = sample_candidates(
+                    error_mask=fallback_mask,
+                    num_samples=n_needed,
+                    strategy='uniform',
+                )
+                n_spawned_fallback = int(fallback.shape[0])
+                if n_spawned_fallback:
+                    candidates = torch.cat([candidates, fallback], dim=0)
             if candidates.shape[0] > 0:
+                trace_candidates = candidates
                 new_gaussians = create_gaussians_from_candidates(
                     candidates, rgb, depth,
                     self.intrinsics, self.current_pose,
@@ -666,6 +863,8 @@ class OnlineReconstructionPipeline:
                     initial_opacity=self.config['gaussian'].get('initial_opacity', 0.5),
                 )
                 if new_gaussians['xyz'].shape[0] > 0:
+                    n_spawned = int(new_gaussians['xyz'].shape[0])
+                    self._spawn_control_count += n_spawned
                     self.gaussian_model.add_gaussians(new_gaussians, frame_idx=self.frame_count)
                     self.importance_estimator.expand_buffers(
                         new_gaussians['xyz'].shape[0], self.device
@@ -677,6 +876,16 @@ class OnlineReconstructionPipeline:
                         self.optimizer.extend_state(new_gaussians['xyz'].shape[0], device=self.device)
                     else:
                         self._setup_optimizer()
+
+        self._trace_stage('spawn_decision_and_map', {
+            'candidate_pixels': trace_candidates,
+            'xyz': self.gaussian_model._xyz,
+            'scaling': self.gaussian_model._scaling,
+            'rotation': self.gaussian_model._rotation,
+            'opacity': self.gaussian_model._opacity,
+            'features_dc': self.gaussian_model._features_dc,
+            'features_rest': self.gaussian_model._features_rest,
+        })
         
         # === 6. Budget-Aware Scheduling ===
         # Recompute importance for updated Gaussian set
@@ -817,14 +1026,463 @@ class OnlineReconstructionPipeline:
         else:
             k_alloc = None
 
+        # Optional causal-control hook: force an exact number of Gaussian
+        # micro-updates per frame while retaining the current importance
+        # ranking. This matches optimizer update count, not wall-clock cost.
+        optimization_control = self.config.get('training', {}).get('optimization_control')
+        age_quota_mature_updates = None
+        age_quota_young_updates = None
+        stale_quota_micro_updates = None
+        other_quota_micro_updates = None
+        randomized_assignment_diagnostics = None
+        if optimization_control:
+            target_updates = max(0, int(optimization_control['micro_updates_per_frame']))
+            max_k = max(1, int(self.config.get('training', {}).get('n_micro_steps', 5)))
+            scores = importance[:N_updated].float()
+            scores = torch.nan_to_num(scores, nan=float('-inf'), posinf=float('inf'), neginf=float('-inf'))
+            k_alloc = torch.zeros(N_updated, dtype=torch.long, device=self.device)
+            if 'fixed_persistent_id_k_alloc' in optimization_control:
+                fixed_entries = optimization_control['fixed_persistent_id_k_alloc']
+                store_ids = self.gaussian_model.state_store.persistent_ids[:N_updated]
+                order_ids = torch.argsort(store_ids)
+                sorted_ids = store_ids[order_ids]
+                requested_ids = torch.as_tensor(
+                    [int(entry['persistent_id']) for entry in fixed_entries],
+                    dtype=torch.long, device=self.device)
+                requested_k = torch.as_tensor(
+                    [int(entry['k']) for entry in fixed_entries],
+                    dtype=torch.long, device=self.device)
+                if requested_ids.numel():
+                    positions = torch.searchsorted(sorted_ids, requested_ids)
+                    in_range = positions < sorted_ids.numel()
+                    safe_positions = positions.clamp(max=max(sorted_ids.numel() - 1, 0))
+                    found = (in_range & (sorted_ids[safe_positions] == requested_ids)
+                             if sorted_ids.numel() else torch.zeros_like(in_range))
+                    if (optimization_control.get('fixed_persistent_id_k_alloc_strict', True)
+                            and not bool(found.all())):
+                        missing = requested_ids[~found].detach().cpu().tolist()[:8]
+                        raise RuntimeError(
+                            f"Fixed update schedule references missing persistent IDs: {missing}")
+                    resolved = order_ids[safe_positions[found]]
+                    resolved_k = requested_k[found]
+                    if (optimization_control.get('fixed_persistent_id_k_alloc_strict', True)
+                            and (resolved_k < 0).any()):
+                        raise ValueError("Fixed per-ID update counts must be nonnegative")
+                    k_alloc[resolved] = resolved_k.clamp(min=0, max=max_k)
+            elif 'mature_update_fraction' in optimization_control:
+                ages_control = self.gaussian_model.state_store.creation_frames[:N_updated]
+                mature_control = (self.frame_count - ages_control) >= int(optimization_control.get('mature_age_frames', 10))
+                visible_control = visibility_mask[:N_updated].bool()
+                young_candidates = visible_control & ~mature_control
+                mature_candidates = visible_control & mature_control
+                cap_young = int(young_candidates.sum().item()) * max_k
+                cap_mature = int(mature_candidates.sum().item()) * max_k
+                alloc_total = min(target_updates, cap_young + cap_mature)
+                fraction_setting = optimization_control['mature_update_fraction']
+                if isinstance(fraction_setting, str):
+                    if fraction_setting != 'coverage_saturating':
+                        raise ValueError(
+                            f"Unknown mature_update_fraction policy: {fraction_setting}"
+                        )
+                    # Allocate at most one update to each visible mature
+                    # Gaussian, while retaining a fixed upper bound so new
+                    # Gaussians keep a minimum share of the frame budget.
+                    fraction_cap = min(1.0, max(0.0, float(
+                        optimization_control.get('mature_update_fraction_cap', 0.75)
+                    )))
+                    desired_mature_updates = min(
+                        round(alloc_total * fraction_cap),
+                        int(mature_candidates.sum().item()),
+                    )
+                    fraction = (desired_mature_updates / alloc_total
+                                if alloc_total > 0 else 0.0)
+                else:
+                    fraction = min(1.0, max(0.0, float(fraction_setting)))
+                age_quota_mature_updates = min(round(alloc_total * fraction), cap_mature)
+                age_quota_young_updates = min(alloc_total - age_quota_mature_updates, cap_young)
+                # Transfer quota that one age group cannot use to the other.
+                unallocated = alloc_total - age_quota_mature_updates - age_quota_young_updates
+                extra_mature = min(unallocated, cap_mature - age_quota_mature_updates)
+                age_quota_mature_updates += extra_mature
+                unallocated -= extra_mature
+                age_quota_young_updates += min(unallocated, cap_young - age_quota_young_updates)
+
+                def assign_age_quota(mask, quota):
+                    if quota <= 0 or not mask.any():
+                        return
+                    ids = torch.where(mask)[0]
+                    order = ids[torch.argsort(scores[ids], descending=True, stable=True)]
+                    left = int(quota)
+                    for _ in range(max_k):
+                        if left <= 0:
+                            break
+                        take = min(left, len(order))
+                        k_alloc[order[:take]] += 1
+                        left -= take
+
+                assign_age_quota(mature_candidates, age_quota_mature_updates)
+                assign_age_quota(young_candidates, age_quota_young_updates)
+            elif 'stale_update_fraction' in optimization_control:
+                # Mechanism experiment: reserve a controlled share of the same
+                # update budget for visible mature Gaussians that have not been
+                # optimized for a configurable number of frames. This is an
+                # opt-in intervention; ordinary scheduler behavior is unchanged.
+                store = self.gaussian_model.state_store
+                mature_age = int(optimization_control.get('mature_age_frames', 10))
+                stale_after = int(optimization_control.get('stale_after_frames', 10))
+                ages_control = store.creation_frames[:N_updated]
+                last_updates_control = store.last_update_frames[:N_updated]
+                mature_control = (self.frame_count - ages_control) >= mature_age
+                stale_control = (self.frame_count - last_updates_control) >= stale_after
+                visible_control = visibility_mask[:N_updated].bool()
+                stale_candidates = visible_control & mature_control & stale_control
+                # The stale cohort is visibility constrained. Fill the rest of
+                # the same global update budget from every non-stale Gaussian,
+                # matching the ordinary exact-update selector's candidate
+                # domain. Restricting this pool to visible Gaussians can leave
+                # the rescue arm with fewer updates than its matched control on
+                # frames with sparse visibility.
+                other_candidates = ~stale_candidates
+                cap_stale = int(stale_candidates.sum().item()) * max_k
+                cap_other = int(other_candidates.sum().item()) * max_k
+                alloc_total = min(target_updates, cap_stale + cap_other)
+                fraction = min(1.0, max(0.0, float(optimization_control['stale_update_fraction'])))
+                stale_quota = min(round(alloc_total * fraction), cap_stale)
+                other_quota = min(alloc_total - stale_quota, cap_other)
+                unallocated = alloc_total - stale_quota - other_quota
+                extra_stale = min(unallocated, cap_stale - stale_quota)
+                stale_quota += extra_stale
+                unallocated -= extra_stale
+                other_quota += min(unallocated, cap_other - other_quota)
+
+                def assign_stale_quota(mask, quota):
+                    if quota <= 0 or not mask.any():
+                        return
+                    ids = torch.where(mask)[0]
+                    order = ids[torch.argsort(scores[ids], descending=True, stable=True)]
+                    left = int(quota)
+                    for _ in range(max_k):
+                        if left <= 0:
+                            break
+                        available = order[k_alloc[order] < max_k]
+                        take = min(left, len(available))
+                        if take <= 0:
+                            break
+                        chosen = available[:take]
+                        k_alloc[chosen] += 1
+                        left -= take
+
+                assign_stale_quota(stale_candidates, stale_quota)
+                assign_stale_quota(other_candidates, other_quota)
+                stale_quota_micro_updates = stale_quota
+                other_quota_micro_updates = other_quota
+            elif 'randomized_candidate_persistent_ids' in optimization_control:
+                # Local randomized trial: treatment is assigned within the
+                # supplied pre-snapshot cohort, further blocked by age,
+                # staleness, and current-view residual. One optimizer step is
+                # assigned to treated IDs; controls receive none.
+                store = self.gaussian_model.state_store
+                requested_ids = torch.as_tensor(
+                    optimization_control['randomized_candidate_persistent_ids'],
+                    dtype=torch.long, device=self.device)
+                ids_now = store.persistent_ids[:N_updated]
+                order_ids = torch.argsort(ids_now)
+                sorted_ids = ids_now[order_ids]
+                positions = torch.searchsorted(sorted_ids, requested_ids)
+                in_range = positions < sorted_ids.numel()
+                safe_pos = positions.clamp(max=max(sorted_ids.numel() - 1, 0))
+                found = (in_range & (sorted_ids[safe_pos] == requested_ids)
+                         if sorted_ids.numel() else torch.zeros_like(in_range))
+                cohort_idx = order_ids[safe_pos[found]] if sorted_ids.numel() else torch.empty(0, dtype=torch.long, device=self.device)
+                eligible = torch.zeros(N_updated, dtype=torch.bool, device=self.device)
+                if cohort_idx.numel():
+                    cohort_idx = cohort_idx[visibility_mask[cohort_idx].bool()]
+                    cohort_idx = cohort_idx[self.gaussian_model._state[cohort_idx] != GaussianState.PRUNED]
+                    eligible[cohort_idx] = True
+
+                ages_now = (self.frame_count - store.creation_frames[:N_updated]).clamp(min=0)
+                stale_now = (self.frame_count - store.last_update_frames[:N_updated]).clamp(min=0)
+                rgb_now = torch.nan_to_num(per_gaussian_color_err[:N_updated].float(), nan=0.0, posinf=0.0, neginf=0.0)
+                age_groups = {'young': ages_now < int(optimization_control.get('mature_age_frames', 10)),
+                              'mature': ages_now >= int(optimization_control.get('mature_age_frames', 10))}
+                stale_groups = {'0_2': stale_now <= 2,
+                                '3_9': (stale_now >= 3) & (stale_now <= 9),
+                                '10_plus': stale_now >= 10}
+                generator = torch.Generator(device=self.device)
+                generator.manual_seed(int(optimization_control.get('randomization_seed', 0)))
+                treated_indices = []
+                assignment_strata = []
+                assignment_units = []
+                cohort_base = eligible.clone()
+                # Residual median is calculated within each age/staleness block
+                # before assignment; ties remain in the lower half.
+                for age_name, age_mask in age_groups.items():
+                    for stale_name, stale_mask in stale_groups.items():
+                        block = torch.where(cohort_base & age_mask & stale_mask)[0]
+                        if block.numel() < 2:
+                            if block.numel():
+                                eligible[block] = False
+                                assignment_units.extend({'persistent_id': int(store.persistent_ids[idx].item()),
+                                    'stratum': f'{age_name}/{stale_name}/not_randomizable', 'treated': False}
+                                    for idx in block)
+                                assignment_strata.append({'stratum': f'{age_name}/{stale_name}',
+                                    'residual_band': 'not_randomizable', 'eligible': int(block.numel()),
+                                    'treated': 0, 'control': int(block.numel())})
+                            continue
+                        vals = rgb_now[block]
+                        median = torch.quantile(vals, 0.5)
+                        bands = {'residual_low': block[vals <= median],
+                                 'residual_high': block[vals > median]}
+                        # If ties collapse a band, retain one residual band so
+                        # the block can still be randomized without selection.
+                        nonempty = [(name, idx) for name, idx in bands.items() if idx.numel()]
+                        if len(nonempty) == 1:
+                            nonempty = [('residual_all', block)]
+                        for band_name, candidates in nonempty:
+                            if candidates.numel() < 2:
+                                eligible[candidates] = False
+                                assignment_units.extend({'persistent_id': int(store.persistent_ids[idx].item()),
+                                    'stratum': f'{age_name}/{stale_name}/{band_name}/not_randomizable', 'treated': False}
+                                    for idx in candidates)
+                                assignment_strata.append({'stratum': f'{age_name}/{stale_name}',
+                                    'residual_band': f'{band_name}/not_randomizable', 'eligible': int(candidates.numel()),
+                                    'treated': 0, 'control': int(candidates.numel())})
+                                continue
+                            perm = torch.randperm(candidates.numel(), generator=generator, device=self.device)
+                            n_treated = int(candidates.numel() // 2)
+                            if candidates.numel() % 2 and bool(torch.randint(0, 2, (), generator=generator, device=self.device).item()):
+                                n_treated += 1
+                            chosen = candidates[perm[:n_treated]]
+                            chosen_set = set(chosen.detach().cpu().tolist())
+                            assignment_units.extend({'persistent_id': int(store.persistent_ids[idx].item()),
+                                'stratum': f'{age_name}/{stale_name}/{band_name}',
+                                'treated': int(idx.item()) in chosen_set}
+                                for idx in candidates)
+                            treated_indices.append(chosen)
+                            assignment_strata.append({'stratum': f'{age_name}/{stale_name}',
+                                'residual_band': band_name, 'eligible': int(candidates.numel()),
+                                'treated': int(n_treated), 'control': int(candidates.numel() - n_treated)})
+                if treated_indices:
+                    chosen = torch.cat(treated_indices)
+                    k_alloc[chosen] = 1
+                else:
+                    chosen = torch.empty(0, dtype=torch.long, device=self.device)
+                selected_ids = store.persistent_ids[chosen]
+                randomized_assignment_diagnostics = {
+                    'assignment': '1:1 randomization within age x staleness x current-view RGB-residual median blocks',
+                    'seed': int(optimization_control.get('randomization_seed', 0)),
+                    'cohort_requested': int(requested_ids.numel()),
+                    'cohort_present_and_visible': int(cohort_idx.numel()),
+                    'randomizable_ids': int(sum(x['eligible'] for x in assignment_strata if not x['residual_band'].endswith('not_randomizable'))),
+                    'treated_ids': int(chosen.numel()),
+                    'control_ids': int(sum(x['control'] for x in assignment_strata if not x['residual_band'].endswith('not_randomizable'))),
+                    'selected_persistent_ids': selected_ids.detach().cpu().tolist(),
+                    'strata': assignment_strata,
+                    'assignment_units': assignment_units,
+                    'micro_update_policy': 'one update per treated ID; all other cohort IDs receive zero',
+                }
+            else:
+                order = torch.argsort(scores, descending=True, stable=True)
+                remaining = min(target_updates, N_updated * max_k)
+                for _ in range(max_k):
+                    if remaining <= 0:
+                        break
+                    take = min(remaining, N_updated)
+                    k_alloc[order[:take]] += 1
+                    remaining -= take
+            optimize_mask = k_alloc > 0
+
         self._last_optimize_mask = optimize_mask
+        self._last_k_alloc = (k_alloc.detach().clone() if k_alloc is not None
+                              else optimize_mask.to(torch.long))
+        self._trace_stage('update_selection', {
+            'optimize_mask': optimize_mask,
+            'k_alloc': k_alloc,
+            'importance': importance,
+        })
+        # Snapshot before optimization/pruning: these are actual selected primitives
+        # and modeled optimization costs, grouped by age at the current frame.
+        ages = self.gaussian_model.state_store.creation_frames[:N_updated]
+        young = (self.frame_count - ages) < 10
+        selected_young = optimize_mask[:N_updated] & young
+        selected_old = optimize_mask[:N_updated] & ~young
+        selected_young_count = int(selected_young.sum().item())
+        selected_old_count = int(selected_old.sum().item())
+        young_population = int(young.sum().item())
+        old_population = N_updated - young_population
+        mature_eligible_mask = (~young) & visibility_mask[:N_updated].bool()
+        mature_updated_mask = mature_eligible_mask & optimize_mask[:N_updated]
+        mature_eligible_count = int(mature_eligible_mask.sum().item())
+        mature_updated_count = int(mature_updated_mask.sum().item())
+        mature_update_coverage = mature_updated_count / mature_eligible_count if mature_eligible_count else 0.0
+        stale_after_frames = int((optimization_control or {}).get('stale_after_frames', 10))
+        stale_frames = (self.frame_count - self.gaussian_model.state_store.last_update_frames[:N_updated]).clamp(min=0)
+        stale_mature_eligible_mask = mature_eligible_mask & (stale_frames >= stale_after_frames)
+        stale_mature_updated_mask = stale_mature_eligible_mask & optimize_mask[:N_updated]
+        stale_mature_eligible_count = int(stale_mature_eligible_mask.sum().item())
+        stale_mature_updated_count = int(stale_mature_updated_mask.sum().item())
+        stale_mature_micro_updates = (int(k_alloc[stale_mature_eligible_mask].sum().item())
+                                      if k_alloc is not None and stale_mature_eligible_count else 0)
+        stale_mature_update_coverage = (stale_mature_updated_count / stale_mature_eligible_count
+                                        if stale_mature_eligible_count else 0.0)
+
+        # Optional read-only summaries for same-snapshot quota replay studies.
+        # Attribution tensors describe the pre-spawn render, so newly spawned
+        # Gaussians are deliberately excluded from residual statistics.
+        age_stratified_diagnostics = None
+        identity_trace = None
+        if optimization_control and optimization_control.get('capture_age_diagnostics', False):
+            n_attributed = min(
+                int(per_gaussian_color_err.shape[0]),
+                int(per_gaussian_depth_err.shape[0]),
+                int(visibility_mask.shape[0]),
+                int(self.gaussian_model.state_store.creation_frames.shape[0]),
+            )
+            diag_ages = self.frame_count - self.gaussian_model.state_store.creation_frames[:n_attributed]
+            diag_active = self.gaussian_model._state[:n_attributed] != GaussianState.PRUNED
+            diag_visible = visibility_mask[:n_attributed].bool() & diag_active
+            diag_color = per_gaussian_color_err[:n_attributed]
+            diag_depth = per_gaussian_depth_err[:n_attributed]
+
+            def age_summary(age_mask):
+                population = age_mask & diag_active
+                visible = age_mask & diag_visible
+                count = int(visible.sum().item())
+                if count:
+                    color_mean = float(diag_color[visible].float().mean().item())
+                    depth_mean = float(diag_depth[visible].float().mean().item())
+                else:
+                    color_mean = 0.0
+                    depth_mean = 0.0
+                return {
+                    'population_attributed': int(population.sum().item()),
+                    'visible_attributed': count,
+                    'visible_fraction_attributed': count / max(int(population.sum().item()), 1),
+                    'visible_color_error_mean': color_mean,
+                    'visible_depth_error_mean': depth_mean,
+                }
+
+            diag_mature = diag_ages >= 10
+            diag_young = ~diag_mature
+            diag_staleness = (
+                self.frame_count - self.gaussian_model.state_store.last_update_frames[:n_attributed]
+            ).clamp(min=0)
+            diag_update_counts = self.gaussian_model.state_store.update_counts[:n_attributed]
+            revisit_bins = (("staleness_0_2_frames", 0, 2),
+                            ("staleness_3_5_frames", 3, 5),
+                            ("staleness_6_9_frames", 6, 9),
+                            ("staleness_10_19_frames", 10, 19),
+                            ("staleness_20_plus_frames", 20, None))
+            mature_revisit_strata = {}
+            for bin_name, lower, upper in revisit_bins:
+                in_staleness = diag_staleness >= lower
+                if upper is not None:
+                    in_staleness &= diag_staleness <= upper
+                group = diag_mature & diag_active & in_staleness
+                visible_group = group & diag_visible
+                group_count = int(group.sum().item())
+                visible_count = int(visible_group.sum().item())
+                mature_revisit_strata[bin_name] = {
+                    'population_attributed': group_count,
+                    'visible_attributed': visible_count,
+                    'visible_fraction_attributed': visible_count / max(group_count, 1),
+                    'mean_staleness_frames': (float(diag_staleness[group].float().mean().item())
+                                              if group_count else 0.0),
+                    'mean_update_count': (float(diag_update_counts[group].float().mean().item())
+                                          if group_count else 0.0),
+                    'visible_color_error_mean': (float(diag_color[visible_group].float().mean().item())
+                                                 if visible_count else 0.0),
+                    'visible_depth_error_mean': (float(diag_depth[visible_group].float().mean().item())
+                                                 if visible_count else 0.0),
+                }
+            age_stratified_diagnostics = {
+                'stage': 'pre_optimization; attribution from pre_spawn_render',
+                'mature_age_frames': 10,
+                'n_gaussians_attributed': n_attributed,
+                'n_gaussians_after_spawn': int(N_updated),
+                'unattributed_after_spawn': max(0, int(N_updated) - n_attributed),
+                'view_coverage_valid_depth': float(current_coverage),
+                'young_lt_10_frames': age_summary(diag_young),
+                'mature_ge_10_frames': age_summary(diag_mature),
+                'mature_revisit_strata': mature_revisit_strata,
+            }
+
+        # Optional bounded trace of a cohort selected at the common snapshot.
+        # IDs are resolved on every frame, so compaction/reordering does not
+        # change cohort identity. Residuals below are attribution errors for
+        # the current input view, not post-optimizer residuals.
+        trace_ids_cfg = (optimization_control or {}).get('trace_persistent_ids')
+        if trace_ids_cfg:
+            store = self.gaussian_model.state_store
+            trace_ids = torch.as_tensor(trace_ids_cfg, dtype=torch.long, device=self.device)
+            n_trace_state = min(N_updated, int(store.persistent_ids.shape[0]),
+                                int(visibility_mask.shape[0]),
+                                int(per_gaussian_color_err.shape[0]),
+                                int(per_gaussian_depth_err.shape[0]))
+            ids_now = store.persistent_ids[:n_trace_state]
+            order_ids = torch.argsort(ids_now)
+            sorted_ids = ids_now[order_ids]
+            positions = torch.searchsorted(sorted_ids, trace_ids)
+            in_range = positions < sorted_ids.numel()
+            safe_positions = positions.clamp(max=max(sorted_ids.numel() - 1, 0))
+            present = in_range & (sorted_ids[safe_positions] == trace_ids) if sorted_ids.numel() else torch.zeros_like(in_range)
+            indices = order_ids[safe_positions] if sorted_ids.numel() else torch.zeros_like(safe_positions)
+            active_trace = present & (self.gaussian_model._state[indices] != GaussianState.PRUNED) if sorted_ids.numel() else present
+            present = active_trace
+            def trace_values(tensor, default=0):
+                out = torch.full(trace_ids.shape, default, dtype=tensor.dtype, device=self.device)
+                if present.any():
+                    out[present] = tensor[indices[present]]
+                return out.detach().cpu().tolist()
+            identity_trace = {
+                'persistent_ids': trace_ids.detach().cpu().tolist(),
+                'present_pre': present.detach().cpu().tolist(),
+                'visible_pre': (visibility_mask[indices].bool() & present).detach().cpu().tolist() if sorted_ids.numel() else [False] * len(trace_ids),
+                'age_frames_pre': (self.frame_count - store.creation_frames[indices]).clamp(min=0).detach().cpu().tolist() if sorted_ids.numel() else [0] * len(trace_ids),
+                'staleness_frames_pre': (self.frame_count - store.last_update_frames[indices]).clamp(min=0).detach().cpu().tolist() if sorted_ids.numel() else [0] * len(trace_ids),
+                'rgb_residual_pre': (per_gaussian_color_err[indices].detach().float().cpu().tolist() if sorted_ids.numel() else [0.0] * len(trace_ids)),
+                'depth_residual_pre': (per_gaussian_depth_err[indices].detach().float().cpu().tolist() if sorted_ids.numel() else [0.0] * len(trace_ids)),
+                'selected_pre': (optimize_mask[indices].detach().cpu().tolist() if sorted_ids.numel() else [False] * len(trace_ids)),
+                'micro_updates_allocated_pre': (k_alloc[indices].detach().cpu().tolist() if sorted_ids.numel() else [0] * len(trace_ids)),
+                'last_update_frame_pre': trace_values(store.last_update_frames),
+                'update_count_pre': trace_values(store.update_counts),
+                'stage': 'pre_optimizer_attribution; residual is current-view pre-update error',
+            }
+        budget_young_us = float(cost_estimates[selected_young].sum().item())
+        budget_old_us = float(cost_estimates[selected_old].sum().item())
         
         # === 7. True Selective Optimization with Frozen Background Cache (R21/R29) ===
         n_optimized = int(optimize_mask.sum().item()) if optimize_mask is not None else 0
         opt_loss_val = 0.0
         cache_time = 0.0
         n_cache_rebuilds = 0
+        cache_cuda_event_pairs = []
+        cache_cuda_event_ms = 0.0
+        optimizer_forward_cuda_event_pairs = []
+        optimizer_backward_cuda_event_pairs = []
+        optimizer_backward_only_cuda_event_pairs = []
+        optimizer_step_cuda_event_pairs = []
+        optimizer_iteration_count = 0
+        optimizer_forward_cuda_event_ms = 0.0
+        optimizer_backward_cuda_event_ms = 0.0
+        optimizer_backward_only_cuda_event_ms = 0.0
+        optimizer_step_cuda_event_ms = 0.0
         opt_time = 0.0
+        opt_stage_sync_ms = 0.0
+        opt_stage_cuda_event_ms = 0.0
+        sync_stage_timing = bool(self.config.get('system', {}).get('synchronized_stage_timing', False))
+        sync_stage_start = None
+        sync_stage_start_unix_ns = None
+        sync_stage_end_unix_ns = None
+        cuda_stage_start_event = None
+        cuda_stage_end_event = None
+        if sync_stage_timing and str(self.device).startswith('cuda') and torch.cuda.is_available():
+            torch.cuda.synchronize(self.device)
+            cuda_stage_start_event = torch.cuda.Event(enable_timing=True)
+            cuda_stage_end_event = torch.cuda.Event(enable_timing=True)
+            cuda_stage_start_event.record()
+            sync_stage_start_unix_ns = time.time_ns()
+            sync_stage_start = time.perf_counter()
         
         if k_alloc is not None and (k_alloc > 0).any():
             mean_k = float(k_alloc[k_alloc > 0].float().mean().item())
@@ -838,6 +1496,10 @@ class OnlineReconstructionPipeline:
             frozen_mask = ~optimize_mask[:self.gaussian_model.num_gaussians]
             if frozen_mask.any():
                 c_start = time.time()
+                cache_event_start = None
+                if sync_stage_timing and str(self.device).startswith('cuda') and torch.cuda.is_available():
+                    cache_event_start = torch.cuda.Event(enable_timing=True)
+                    cache_event_start.record()
                 self.bg_cache.build_cache(
                     model=self.gaussian_model,
                     frozen_mask=frozen_mask,
@@ -846,7 +1508,12 @@ class OnlineReconstructionPipeline:
                     image_width=W,
                     image_height=H,
                     tile_size=self.config['rendering']['tile_size'],
+                    backend=renderer_backend,
                 )
+                if cache_event_start is not None:
+                    cache_event_end = torch.cuda.Event(enable_timing=True)
+                    cache_event_end.record()
+                    cache_cuda_event_pairs.append((cache_event_start, cache_event_end))
                 cache_time = time.time() - c_start
                 n_cache_rebuilds = 1
             else:
@@ -859,6 +1526,7 @@ class OnlineReconstructionPipeline:
                 'color': self.config.get('losses', {}).get('weight_color', 0.8),
                 'depth': self.config.get('losses', {}).get('weight_depth', 0.5),
                 'ssim': self.config.get('losses', {}).get('weight_ssim', 0.2),
+                'ssim_implementation': self.config.get('losses', {}).get('ssim_implementation', 'direct'),
             }
             
             n_optimized = 0
@@ -867,6 +1535,7 @@ class OnlineReconstructionPipeline:
                 step_mask = (k_alloc > step_i) if (use_adaptive_k and k_alloc is not None) else optimize_mask
                 if not step_mask.any():
                     break
+                optimizer_iteration_count += 1
 
                 # Progressive Background Caching (True Adaptive-K Compute Scaling):
                 # When primitives graduate at step_i (k_alloc == step_i), absorb them into
@@ -875,6 +1544,10 @@ class OnlineReconstructionPipeline:
                 if use_adaptive_k and k_alloc is not None and step_i > 0 and (k_alloc[:n_gaussians] == step_i).any():
                     frozen_mask = (k_alloc[:n_gaussians] <= step_i)
                     rb_start = time.time()
+                    cache_event_start = None
+                    if sync_stage_timing and str(self.device).startswith('cuda') and torch.cuda.is_available():
+                        cache_event_start = torch.cuda.Event(enable_timing=True)
+                        cache_event_start.record()
                     self.bg_cache.build_cache(
                         model=self.gaussian_model,
                         frozen_mask=frozen_mask,
@@ -883,12 +1556,21 @@ class OnlineReconstructionPipeline:
                         image_width=W,
                         image_height=H,
                         tile_size=self.config['rendering']['tile_size'],
+                        backend=renderer_backend,
                     )
+                    if cache_event_start is not None:
+                        cache_event_end = torch.cuda.Event(enable_timing=True)
+                        cache_event_end.record()
+                        cache_cuda_event_pairs.append((cache_event_start, cache_event_end))
                     cache_time += (time.time() - rb_start)
                     n_cache_rebuilds += 1
 
                 self.optimizer.zero_grad()
                 # Active subset contains strictly {i | K_i > step_i} (O(M_k) backward compute)
+                forward_event_start = None
+                if sync_stage_timing and str(self.device).startswith('cuda') and torch.cuda.is_available():
+                    forward_event_start = torch.cuda.Event(enable_timing=True)
+                    forward_event_start.record()
                 active_subset = self.gaussian_model.get_optimization_subset(step_mask, extrinsics=self.current_pose)
                 
                 composite_opt = self.bg_cache.composite_with_active(
@@ -898,6 +1580,7 @@ class OnlineReconstructionPipeline:
                     image_width=W,
                     image_height=H,
                     tile_size=self.config['rendering']['tile_size'],
+                    backend=renderer_backend,
                 )
                 
                 rendered_opt_color = composite_opt['color']
@@ -910,43 +1593,79 @@ class OnlineReconstructionPipeline:
                     weights,
                     depth_valid_mask=depth_valid_mask,
                 )
+                if forward_event_start is not None:
+                    forward_event_end = torch.cuda.Event(enable_timing=True)
+                    forward_event_end.record()
+                    optimizer_forward_cuda_event_pairs.append(
+                        (forward_event_start, forward_event_end))
                 
                 # 4. Backward: computes gradients strictly for active_subset M_k
+                backward_event_start = None
+                if sync_stage_timing and str(self.device).startswith('cuda') and torch.cuda.is_available():
+                    backward_event_start = torch.cuda.Event(enable_timing=True)
+                    backward_event_start.record()
                 if losses['total'].requires_grad:
+                    backward_only_event_start = None
+                    if sync_stage_timing and str(self.device).startswith('cuda') and torch.cuda.is_available():
+                        backward_only_event_start = torch.cuda.Event(enable_timing=True)
+                        backward_only_event_start.record()
                     losses['total'].backward()
+                    if backward_only_event_start is not None:
+                        backward_only_event_end = torch.cuda.Event(enable_timing=True)
+                        backward_only_event_end.record()
+                        optimizer_backward_only_cuda_event_pairs.append(
+                            (backward_only_event_start, backward_only_event_end))
                     # 5. Selective Optimizer update: updates strictly M_k active parameters
+                    optimizer_step_event_start = None
+                    if sync_stage_timing and str(self.device).startswith('cuda') and torch.cuda.is_available():
+                        optimizer_step_event_start = torch.cuda.Event(enable_timing=True)
+                        optimizer_step_event_start.record()
                     self.optimizer.step(active_idx=active_subset['indices'])
+                    if optimizer_step_event_start is not None:
+                        optimizer_step_event_end = torch.cuda.Event(enable_timing=True)
+                        optimizer_step_event_end.record()
+                        optimizer_step_cuda_event_pairs.append(
+                            (optimizer_step_event_start, optimizer_step_event_end))
                     n_optimized = max(n_optimized, step_mask.sum().item())
                 else:
                     break
+                if backward_event_start is not None:
+                    backward_event_end = torch.cuda.Event(enable_timing=True)
+                    backward_event_end.record()
+                    optimizer_backward_cuda_event_pairs.append(
+                        (backward_event_start, backward_event_end))
                     
             opt_loss_val = losses['total'].item()
             opt_time = time.time() - opt_start
+
+        self._trace_stage('post_optimization', {
+            'xyz': self.gaussian_model._xyz,
+            'scaling': self.gaussian_model._scaling,
+            'rotation': self.gaussian_model._rotation,
+            'opacity': self.gaussian_model._opacity,
+            'features_dc': self.gaussian_model._features_dc,
+            'features_rest': self.gaussian_model._features_rest,
+        })
         
-        # === 7b. Post-Optimization Quality Assessment ===
-        # Re-render after optimization to measure actual quality improvement
-        if n_optimized > 0:
-            with torch.no_grad():
-                cov3D_post = self.gaussian_model.build_covariance()
-                if self.gaussian_model.sh_degree > 0:
-                    from .rasterizer import _view_directions
-                    post_dirs = _view_directions(self.gaussian_model.positions, self.current_pose)
-                else:
-                    post_dirs = None
-                post_render = rasterize_scene(
-                    means3D=self.gaussian_model.positions,
-                    cov3D=cov3D_post,
-                    colors=self.gaussian_model.get_colors(post_dirs),
-                    opacities=self.gaussian_model.opacities.squeeze(-1),
-                    extrinsics=self.current_pose,
-                    intrinsics=self.intrinsics,
-                    image_width=W,
-                    image_height=H,
-                    tile_size=self.config['rendering']['tile_size'],
-                )
-                rendered_color_post = post_render['color']
-        else:
-            rendered_color_post = rendered_color
+        # End the optimization-stage timer before state bookkeeping, pruning,
+        # and final-map quality rendering. End-to-end frame latency includes
+        # all of those stages and is measured by the benchmark runner.
+        if sync_stage_start is not None:
+            cuda_stage_end_event.record()
+            torch.cuda.synchronize(self.device)
+            opt_stage_sync_ms = (time.perf_counter() - sync_stage_start) * 1000.0
+            opt_stage_cuda_event_ms = float(cuda_stage_start_event.elapsed_time(cuda_stage_end_event))
+            cache_cuda_event_ms = sum(float(start.elapsed_time(end))
+                                      for start, end in cache_cuda_event_pairs)
+            optimizer_forward_cuda_event_ms = sum(float(start.elapsed_time(end))
+                                                  for start, end in optimizer_forward_cuda_event_pairs)
+            optimizer_backward_cuda_event_ms = sum(float(start.elapsed_time(end))
+                                                   for start, end in optimizer_backward_cuda_event_pairs)
+            optimizer_backward_only_cuda_event_ms = sum(float(start.elapsed_time(end))
+                                                        for start, end in optimizer_backward_only_cuda_event_pairs)
+            optimizer_step_cuda_event_ms = sum(float(start.elapsed_time(end))
+                                               for start, end in optimizer_step_cuda_event_pairs)
+            sync_stage_end_unix_ns = time.time_ns()
 
         # Synchronize StateStore update counts and signals (Age-Aware Warmup lifecycle)
         if hasattr(self.gaussian_model, 'state_store') and self.gaussian_model.state_store is not None:
@@ -976,19 +1695,28 @@ class OnlineReconstructionPipeline:
                 optimized_mask=optimize_mask,
                 positions=self.gaussian_model.positions.detach(),
             )
+            if identity_trace is not None:
+                identity_trace['last_update_frame_post'] = trace_values(store.last_update_frames)
+                identity_trace['update_count_post'] = trace_values(store.update_counts)
+                identity_trace['ema_rgb_post'] = trace_values(store.ema_rgb)
+                identity_trace['ema_depth_post'] = trace_values(store.ema_depth)
 
         # === 8. Pruning ===
         enable_persistent_prune = self.config.get('densification', {}).get('enable_persistent_prune', True)
-        zero_frames = self.importance_estimator._zero_contrib_frames if enable_persistent_prune else None
-        prune_low_value(
-            self.gaussian_model, importance[:self.gaussian_model.num_gaussians],
-            opacity_threshold=0.005,
-            zero_contrib_frames=zero_frames,
-            prune_patience=self.importance_estimator.prune_patience,
-        )
+        if not self.config.get('densification', {}).get('disable_pruning', False):
+            zero_frames = self.importance_estimator._zero_contrib_frames if enable_persistent_prune else None
+            prune_low_value(
+                self.gaussian_model, importance[:self.gaussian_model.num_gaussians],
+                opacity_threshold=0.005,
+                zero_contrib_frames=zero_frames,
+                prune_patience=self.importance_estimator.prune_patience,
+            )
         
-        # Compact every 100 frames — preserve optimizer momentum and state store identity
-        if self.frame_count % 100 == 0:
+        # Compact every 100 frames — preserve optimizer momentum and state store identity.
+        # Fixed-decision causal rollouts may disable compaction so persistent IDs
+        # remain comparable across the full replay horizon.
+        if (self.frame_count % 100 == 0
+                and not self.config.get('system', {}).get('disable_periodic_compaction', False)):
             keep_mask = self.gaussian_model.compact()
             self.importance_estimator.prune_buffers(keep_mask)
             if self.optimizer is not None:
@@ -998,6 +1726,58 @@ class OnlineReconstructionPipeline:
                 self._reregister_optimizer_params()
             else:
                 self._setup_optimizer()
+
+        self._trace_stage('post_prune_compact', {
+            'xyz': self.gaussian_model._xyz,
+            'scaling': self.gaussian_model._scaling,
+            'rotation': self.gaussian_model._rotation,
+            'opacity': self.gaussian_model._opacity,
+            'features_dc': self.gaussian_model._features_dc,
+            'features_rest': self.gaussian_model._features_rest,
+            'state': self.gaussian_model._state,
+            'persistent_ids': self.gaussian_model.state_store.persistent_ids,
+        })
+
+        # Evaluate the final map after optimization, spawn/prune, and compaction.
+        # The pre-action render above is retained only for pre-update diagnostics.
+        with torch.no_grad():
+            cov3D_post = self.gaussian_model.build_covariance()
+            if self.gaussian_model.sh_degree > 0:
+                from .rasterizer import _view_directions
+                post_dirs = _view_directions(self.gaussian_model.positions, self.current_pose)
+            else:
+                post_dirs = None
+            renderer_backend = self.config.get('rendering', {}).get(
+                'backend', 'gsplat' if str(self.device).startswith('cuda') else 'reference')
+            post_render = rasterize_scene(
+                means3D=self.gaussian_model.positions,
+                cov3D=cov3D_post,
+                colors=self.gaussian_model.get_colors(post_dirs),
+                opacities=self.gaussian_model.opacities.squeeze(-1),
+                extrinsics=self.current_pose,
+                intrinsics=self.intrinsics,
+                image_width=W,
+                image_height=H,
+                tile_size=self.config['rendering']['tile_size'],
+                backend=renderer_backend,
+            )
+            rendered_color_post = post_render['color']
+            if self.config['rendering'].get('use_surface_aware_depth', False):
+                depth_result_post = render_depth_surface_aware(
+                    means3D=self.gaussian_model.positions,
+                    normals=self.gaussian_model._normals,
+                    opacities=self.gaussian_model.opacities.squeeze(-1),
+                    cov3D=cov3D_post,
+                    extrinsics=self.current_pose,
+                    intrinsics=self.intrinsics,
+                    image_width=W,
+                    image_height=H,
+                    opacity_threshold=self.config['rendering'].get('depth_threshold_opaque', 0.5),
+                    tile_size=self.config['rendering']['tile_size'],
+                )
+                rendered_depth_post = depth_result_post['depth']
+            else:
+                rendered_depth_post = post_render['depth']
         
         # === Collect Metrics & Feedback ===
         frame_time = time.time() - frame_start
@@ -1024,7 +1804,14 @@ class OnlineReconstructionPipeline:
             # Post-optimization PSNR (primary metric)
             psnr_post = -10 * torch.log10(mse_post).item()
             psnr = psnr_post  # Primary metric is post-optimization
-            depth_l1 = depth_err[depth_valid].mean().item() if depth_valid.any() else 0.0
+            # Keep the pre-update residual for diagnostics, while the canonical
+            # depth_l1 follows PSNR/SSIM and measures the post-action render.
+            depth_l1_pre = depth_err[depth_valid].mean().item() if depth_valid.any() else 0.0
+            depth_l1_post = (
+                (rendered_depth_post[depth_valid] - depth[depth_valid]).abs().mean().item()
+                if depth_valid.any() else 0.0
+            )
+            depth_l1 = depth_l1_post
             
             # SSIM computation (structural similarity)
             def _compute_ssim_simple(img1, img2):
@@ -1060,9 +1847,47 @@ class OnlineReconstructionPipeline:
             'ssim': ssim,
             'lpips': lpips_val,
             'depth_l1': depth_l1,
+            'depth_l1_pre': depth_l1_pre,
+            'depth_l1_post': depth_l1_post,
             'color_loss': per_gaussian_color_err.mean().item(),
             'n_gaussians': self.gaussian_model.num_gaussians,
+            'n_active_gaussians': int((self.gaussian_model._state != GaussianState.PRUNED).sum().item()),
             'n_optimized': n_optimized,
+            'n_cache_rebuilds': n_cache_rebuilds,
+            'n_cache_frozen_gaussians': int(getattr(self.bg_cache, 'n_frozen', 0)),
+            'optimizer_iteration_count': optimizer_iteration_count,
+            'n_micro_updates': int(k_alloc.sum().item()) if k_alloc is not None else int(n_optimized * self.config.get('training', {}).get('n_micro_steps', 5)),
+            'age_quota_mature_micro_updates': age_quota_mature_updates,
+            'age_quota_young_micro_updates': age_quota_young_updates,
+            'stale_quota_micro_updates': stale_quota_micro_updates,
+            'other_quota_micro_updates': other_quota_micro_updates,
+            'randomized_assignment': randomized_assignment_diagnostics,
+            'n_spawned': n_spawned,
+            'n_spawned_fallback': n_spawned_fallback,
+            'spawn_quota_this_frame': spawn_quota_this_frame,
+            'spawn_control_total': self._spawn_control_count if spawn_control else None,
+            'n_backlog': n_warmup_current if n_warmup_current is not None else 0,
+            'selected_young': selected_young_count,
+            'selected_old': selected_old_count,
+            'population_young': young_population,
+            'population_old': old_population,
+            'mature_eligible': mature_eligible_count,
+            'mature_updated': mature_updated_count,
+            'mature_update_coverage': mature_update_coverage,
+            'stale_after_frames': stale_after_frames,
+            'stale_mature_eligible': stale_mature_eligible_count,
+            'stale_mature_updated': stale_mature_updated_count,
+            'stale_mature_update_coverage': stale_mature_update_coverage,
+            'stale_mature_micro_updates': stale_mature_micro_updates,
+            'growth_pressure': float(n_spawned) / max(int((self.gaussian_model._state != GaussianState.PRUNED).sum().item()), 1),
+            'compute_return_db_per_opt_ms': (float(psnr_post - psnr_pre) /
+                (opt_stage_sync_ms if opt_stage_sync_ms > 0 else opt_time * 1000.0))
+                if (opt_stage_sync_ms > 0 or opt_time > 0) else 0.0,
+            'compute_return_timing_source': ('synchronized_stage_wall_ms' if opt_stage_sync_ms > 0
+                else 'pipeline_host_timer_unsynchronized'),
+            'budget_young_us': budget_young_us,
+            'budget_old_us': budget_old_us,
+            'mean_opacity': float(self.gaussian_model.opacities.mean().item()),
             'mean_k': mean_k,
             'peak_vram_mb': float(torch.cuda.max_memory_allocated(self.device) / (1024.0 * 1024.0)) if str(self.device).startswith('cuda') and torch.cuda.is_available() else 0.0,
             'n_tier_a': (tiers == Tier.A).sum().item(),
@@ -1071,6 +1896,15 @@ class OnlineReconstructionPipeline:
             'n_tier_d': (tiers == Tier.D).sum().item(),
             'frame_time_ms': frame_time * 1000.0,
             'opt_time_ms': opt_time * 1000.0,
+            'opt_stage_sync_ms': opt_stage_sync_ms,
+            'opt_stage_cuda_event_ms': opt_stage_cuda_event_ms,
+            'cache_cuda_event_ms': cache_cuda_event_ms,
+            'optimizer_forward_cuda_event_ms': optimizer_forward_cuda_event_ms,
+            'optimizer_backward_cuda_event_ms': optimizer_backward_cuda_event_ms,
+            'optimizer_backward_only_cuda_event_ms': optimizer_backward_only_cuda_event_ms,
+            'optimizer_step_cuda_event_ms': optimizer_step_cuda_event_ms,
+            'opt_stage_start_unix_ns': sync_stage_start_unix_ns,
+            'opt_stage_end_unix_ns': sync_stage_end_unix_ns,
             'cache_time_ms': cache_time * 1000.0,
             'fps': 1.0 / max(frame_time, 1e-8),
             'loss': opt_loss_val,
@@ -1092,6 +1926,12 @@ class OnlineReconstructionPipeline:
             'n_warmup': int(((update_counts < warmup_steps) & visibility_mask[:N_updated]).sum().item()) if enable_warmup else 0,
             'n_warmup_optimized': int((optimize_mask[:N_updated] & (update_counts < warmup_steps) & visibility_mask[:N_updated]).sum().item()) if enable_warmup else 0,
         }
+        if age_stratified_diagnostics is not None:
+            metrics['age_stratified_diagnostics'] = age_stratified_diagnostics
+        if identity_trace is not None:
+            metrics['identity_trace'] = identity_trace
+        if self._repro_trace_enabled:
+            metrics['repro_trace'] = self._repro_trace
         self.metrics_history.append(metrics)
         self.frame_count += 1
 
@@ -1108,6 +1948,7 @@ class OnlineReconstructionPipeline:
         rgb: torch.Tensor,
         depth: torch.Tensor,
         pose: torch.Tensor,
+        trace_persistent_ids: Optional[list] = None,
     ) -> Dict[str, Any]:
         """Render-only evaluation at a held-out viewpoint. NO state change.
 
@@ -1160,9 +2001,49 @@ class OnlineReconstructionPipeline:
                 s12 = ((rc - mu1) * (rgb - mu2)).mean(dim=(0, 1))
                 ssim = (((2 * mu1 * mu2 + c1) * (2 * s12 + c2)) / (
                     (mu1 ** 2 + mu2 ** 2 + c1) * (s1 + s2 + c2))).mean().item()
-            return {'psnr': psnr, 'ssim': ssim, 'depth_l1': dl1,
-                    'n_gaussians': self.gaussian_model.num_gaussians,
-                    'eval_only': True, 'frame': self.frame_count}
+                result = {'psnr': psnr, 'ssim': ssim, 'depth_l1': dl1,
+                          'n_gaussians': self.gaussian_model.num_gaussians,
+                          'eval_only': True, 'frame': self.frame_count}
+                if trace_persistent_ids:
+                    stats = compute_fast_gaussian_statistics(
+                        means3D=self.gaussian_model.positions,
+                        cov3D=cov3D,
+                        opacities=self.gaussian_model.opacities.squeeze(-1),
+                        rendered_color=rc, rendered_depth=rd,
+                        gt_color=rgb, gt_depth=depth,
+                        extrinsics=self.current_pose, intrinsics=self.intrinsics)
+                    store = self.gaussian_model.state_store
+                    trace_ids = torch.as_tensor(trace_persistent_ids,
+                                                dtype=torch.long, device=self.device)
+                    ids_now = store.persistent_ids[:self.gaussian_model.num_gaussians]
+                    order_ids = torch.argsort(ids_now)
+                    sorted_ids = ids_now[order_ids]
+                    positions = torch.searchsorted(sorted_ids, trace_ids)
+                    in_range = positions < sorted_ids.numel()
+                    safe_positions = positions.clamp(max=max(sorted_ids.numel() - 1, 0))
+                    present = (in_range & (sorted_ids[safe_positions] == trace_ids)
+                               if sorted_ids.numel() else torch.zeros_like(in_range))
+                    indices = (order_ids[safe_positions] if sorted_ids.numel()
+                               else torch.zeros_like(safe_positions))
+                    if sorted_ids.numel():
+                        present &= self.gaussian_model._state[indices] != GaussianState.PRUNED
+                    visible = torch.zeros_like(present)
+                    rgb_err = torch.zeros(trace_ids.shape, dtype=stats['color_error'].dtype,
+                                          device=self.device)
+                    depth_err = torch.zeros_like(rgb_err)
+                    if present.any():
+                        visible[present] = stats['visibility_mask'][indices[present]]
+                        rgb_err[present] = stats['color_error'][indices[present]]
+                        depth_err[present] = stats['depth_error'][indices[present]]
+                    result['identity_reference_residual'] = {
+                        'persistent_ids': trace_ids.detach().cpu().tolist(),
+                        'present': present.detach().cpu().tolist(),
+                        'visible': visible.detach().cpu().tolist(),
+                        'rgb_center_abs_error': rgb_err.detach().cpu().tolist(),
+                        'depth_center_abs_error': depth_err.detach().cpu().tolist(),
+                        'metric_definition': 'projected Gaussian-center pixel residual on this fixed GT view; not contribution-weighted attribution',
+                    }
+            return result
         finally:
             self.current_pose = prev_pose
 
@@ -1310,6 +2191,8 @@ class OnlineReconstructionPipeline:
         depth = frame['depth'].to(device)
         pose = frame.get('pose', self.current_pose).to(device)
         H, W = rgb.shape[:2]
+        renderer_backend = self.config.get('rendering', {}).get(
+            'backend', 'gsplat' if str(self.device).startswith('cuda') else 'reference')
         
         # Backup state
         saved_state = {k: v.clone() for k, v in self.gaussian_model.state_dict().items()}
@@ -1325,6 +2208,7 @@ class OnlineReconstructionPipeline:
                 intrinsics=self.intrinsics,
                 image_width=W,
                 image_height=H,
+                backend=renderer_backend,
             )
             psnr_before = -10 * torch.log10(((render_before['color'] - rgb)**2).mean() + 1e-8).item()
             valid_d = depth > 0
@@ -1347,9 +2231,15 @@ class OnlineReconstructionPipeline:
             frozen_mask = ~opt_mask
             
             if frozen_mask.any():
-                trial_cache.build_cache(self.gaussian_model, frozen_mask, pose, self.intrinsics, W, H)
+                trial_cache.build_cache(
+                    self.gaussian_model, frozen_mask, pose, self.intrinsics, W, H,
+                    backend=renderer_backend,
+                )
                 
-            comp_out = trial_cache.composite_with_active(active_subset, pose, self.intrinsics, W, H)
+            comp_out = trial_cache.composite_with_active(
+                active_subset, pose, self.intrinsics, W, H,
+                backend=renderer_backend,
+            )
             losses = total_loss(comp_out['color'], rgb, comp_out['depth'], depth, {'color': 1.0, 'depth': 0.5})
             if losses['total'].requires_grad:
                 losses['total'].backward()
@@ -1370,6 +2260,7 @@ class OnlineReconstructionPipeline:
                 intrinsics=self.intrinsics,
                 image_width=W,
                 image_height=H,
+                backend=renderer_backend,
             )
             psnr_after = -10 * torch.log10(((render_after['color'] - rgb)**2).mean() + 1e-8).item()
             depth_l1_after = (render_after['depth'][valid_d] - depth[valid_d]).abs().mean().item() if valid_d.any() else 0.0
@@ -1464,6 +2355,3 @@ class OnlineReconstructionPipeline:
         ], dtype=np.float32)
 
         return np.nan_to_num(ctx, nan=0.0, posinf=1.0, neginf=0.0)
-
-
-
