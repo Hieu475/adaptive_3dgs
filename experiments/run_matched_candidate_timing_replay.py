@@ -178,6 +178,51 @@ def _process(pipeline, frame, args):
     return metrics, wall_ms
 
 
+def _make_common_prefix_row(metrics, raw_frame_idx, wall_ms, args):
+    """Compact exact-update/timing record for a shared pre-intervention frame."""
+    return {
+        "dataset_frame": int(raw_frame_idx),
+        "pipeline_frame": int(metrics["frame"]),
+        "psnr": float(metrics["psnr"]),
+        "psnr_valid_gt": float(metrics["psnr_valid_gt"]),
+        "ssim": float(metrics["ssim"]),
+        "ssim_standard": float(metrics["ssim_standard"]),
+        "ssim_legacy": float(metrics["ssim_legacy"]),
+        "depth_l1": float(metrics["depth_l1"]),
+        "depth_l1_gt_valid": float(metrics["depth_l1_gt_valid"]),
+        "depth_rmse_gt_valid": float(metrics["depth_rmse_gt_valid"]),
+        "depth_l1_overlap": float(metrics["depth_l1_overlap"]),
+        "depth_rmse_overlap": float(metrics["depth_rmse_overlap"]),
+        "pred_depth_coverage": float(metrics["pred_depth_coverage"]),
+        "valid_gt_pixel_count": int(metrics["valid_gt_pixel_count"]),
+        "overlap_pixel_count": int(metrics["overlap_pixel_count"]),
+        "n_gaussians": int(metrics["n_gaussians"]),
+        "manual_batch_added": 0,
+        "n_spawned_automatic": int(metrics.get("n_spawned", 0)),
+        "n_micro_updates": int(metrics.get("n_micro_updates", 0)),
+        "mature_eligible": int(metrics.get("mature_eligible", 0)),
+        "mature_updated": int(metrics.get("mature_updated", 0)),
+        "mature_update_coverage": float(metrics.get("mature_update_coverage", 0.0)),
+        "stale_mature_eligible": int(metrics.get("stale_mature_eligible", 0)),
+        "stale_mature_updated": int(metrics.get("stale_mature_updated", 0)),
+        "stale_mature_update_coverage": float(metrics.get("stale_mature_update_coverage", 0.0)),
+        "stale_mature_micro_updates": int(metrics.get("stale_mature_micro_updates", 0)),
+        "stale_quota_micro_updates": metrics.get("stale_quota_micro_updates"),
+        "age_quota_mature_micro_updates": metrics.get("age_quota_mature_micro_updates"),
+        "age_quota_young_micro_updates": metrics.get("age_quota_young_micro_updates"),
+        "opt_stage_sync_ms": float(metrics.get("opt_stage_sync_ms", 0.0)),
+        "time_opt_cuda_ms": metrics.get("time_opt_cuda_ms"),
+        "time_opt_stage_wall_ms": metrics.get("time_opt_stage_wall_ms"),
+        "time_frame_wall_ms": float(metrics.get("time_frame_wall_ms", wall_ms)),
+        "budget_opt_modeled_ms": float(metrics.get("budget_opt_modeled_ms", args.budget_ms)),
+        "violation_opt": metrics.get("violation_opt"),
+        "violation_frame": metrics.get("violation_frame"),
+        "gain_train_psnr_db": metrics.get("gain_train_psnr_db"),
+        "gain_holdout_psnr_db": metrics.get("gain_holdout_psnr_db"),
+        "frame_wall_sync_ms": float(wall_ms),
+    }
+
+
 def _append_batch(pipeline, batch):
     n = int(batch["xyz"].shape[0])
     if n <= 0:
@@ -193,7 +238,8 @@ def _append_batch(pipeline, batch):
 
 
 def _run_branch(base, rng_state, candidate_batch, frames, intrinsics, scene, seed,
-                arm, args, eval_frames, expected_prefix_hash, candidate_hash):
+                arm, args, eval_frames, expected_prefix_hash, candidate_hash,
+                start_frame, common_prefix_rows=None):
     _restore_rng(rng_state)
     memo = {}
     _memoize_detached_nonleaf_tensors(base, memo)
@@ -212,13 +258,30 @@ def _run_branch(base, rng_state, candidate_batch, frames, intrinsics, scene, see
             "stale_update_fraction": args.stale_fraction,
             "stale_after_frames": args.stale_after_frames,
         })
+    elif arm["allocation"] in ("age_only", "random_mature"):
+        optimization_control.update({
+            "mature_update_fraction": args.mature_fraction,
+        })
+        if arm["allocation"] == "random_mature":
+            optimization_control.update({
+                "randomize_mature_selection": True,
+                "randomization_seed": int(seed * 1000003 + arm["insert_frame"]),
+            })
+    elif arm["allocation"] in ("stale_residual", "stale_visible_residual"):
+        optimization_control.update({
+            "stale_update_fraction": args.stale_fraction,
+            "stale_after_frames": args.stale_after_frames,
+            "stale_selection_policy": "residual_percentile",
+            "stale_require_visibility": arm["allocation"] == "stale_visible_residual",
+        })
     elif arm["allocation"] != "global":
         raise ValueError(f"Unknown update-allocation mode: {arm['allocation']}")
-    pipeline.config.setdefault("training", {})["optimization_control"] = optimization_control
+    training_config = pipeline.config.setdefault("training", {})
     start_count = int(pipeline.gaussian_model.num_gaussians)
     rows, wall_times = [], []
     injected = False
-    for raw_frame_idx in range(1, args.n_frames + 1):
+    common_prefix_rows = common_prefix_rows or []
+    for raw_frame_idx in range(start_frame, args.n_frames + 1):
         if raw_frame_idx in eval_frames:
             continue
         if raw_frame_idx == arm["insert_frame"]:
@@ -226,6 +289,7 @@ def _run_branch(base, rng_state, candidate_batch, frames, intrinsics, scene, see
             injected = True
         else:
             added = 0
+        training_config["optimization_control"] = optimization_control
         metrics, wall_ms = _process(pipeline, frames[raw_frame_idx], args)
         wall_times.append(wall_ms)
         rows.append({
@@ -257,6 +321,8 @@ def _run_branch(base, rng_state, candidate_batch, frames, intrinsics, scene, see
             "stale_mature_update_coverage": float(metrics.get("stale_mature_update_coverage", 0.0)),
             "stale_mature_micro_updates": int(metrics.get("stale_mature_micro_updates", 0)),
             "stale_quota_micro_updates": metrics.get("stale_quota_micro_updates"),
+            "age_quota_mature_micro_updates": metrics.get("age_quota_mature_micro_updates"),
+            "age_quota_young_micro_updates": metrics.get("age_quota_young_micro_updates"),
             "opt_stage_sync_ms": float(metrics.get("opt_stage_sync_ms", 0.0)),
             "time_opt_cuda_ms": metrics.get("time_opt_cuda_ms"),
             "time_opt_stage_wall_ms": metrics.get("time_opt_stage_wall_ms"),
@@ -292,16 +358,24 @@ def _run_branch(base, rng_state, candidate_batch, frames, intrinsics, scene, see
                    ("psnr", "ssim", "ssim_legacy", "depth_l1", "depth_l1_overlap",
                     "pred_depth_coverage", "n_micro_updates",
                     "mature_update_coverage", "stale_mature_update_coverage",
-                    "stale_mature_micro_updates", "opt_stage_sync_ms")}
+                    "stale_mature_micro_updates", "age_quota_mature_micro_updates",
+                    "age_quota_young_micro_updates", "opt_stage_sync_ms")}
+    accounting_rows = common_prefix_rows + rows
+    accounting_update_count = sum(int(r["n_micro_updates"]) for r in accounting_rows)
     record = {
         "arm": arm,
         "prefix_state_sha256": prefix_hash,
         "candidate_batch_sha256": candidate_hash,
+        "intervention_snapshot_frame": int(start_frame - 1),
+        "intervention_start_frame": int(start_frame),
+        "shared_pre_intervention_micro_updates": int(sum(
+            int(r["n_micro_updates"]) for r in common_prefix_rows)),
         "start_gaussians": start_count,
         "final_gaussians": int(pipeline.gaussian_model.num_gaussians),
         "automatic_births": int(sum(r["n_spawned_automatic"] for r in rows)),
         "manual_batch_births": int(sum(r["manual_batch_added"] for r in rows)),
-        "exact_micro_update_gate": all(v == args.micro_updates for v in rows_by_key["n_micro_updates"]),
+        "exact_micro_update_gate": all(
+            int(r["n_micro_updates"]) == args.micro_updates for r in accounting_rows),
         "trajectory_mean_psnr": float(np.mean(rows_by_key["psnr"])) if rows else None,
         "trajectory_mean_depth_l1": float(np.mean(rows_by_key["depth_l1"])) if rows else None,
         "mean_mature_update_coverage": float(np.mean(rows_by_key["mature_update_coverage"])) if rows else None,
@@ -311,19 +385,27 @@ def _run_branch(base, rng_state, candidate_batch, frames, intrinsics, scene, see
             float(sum(rows_by_key["stale_mature_micro_updates"]))
             / max(sum(rows_by_key["n_micro_updates"]), 1)
         ),
-        "total_micro_updates": int(sum(rows_by_key["n_micro_updates"])),
-        "mean_opt_stage_sync_ms": float(np.mean(rows_by_key["opt_stage_sync_ms"])) if rows else None,
+        "realized_mature_update_fraction": (
+            float(sum(v or 0 for v in rows_by_key["age_quota_mature_micro_updates"]))
+            / max(sum(rows_by_key["n_micro_updates"]), 1)
+        ),
+        "total_micro_updates": int(accounting_update_count),
+        "mean_opt_stage_sync_ms": float(np.mean([
+            r["opt_stage_sync_ms"] for r in accounting_rows])) if accounting_rows else None,
         "mean_time_opt_cuda_ms": float(np.mean([
-            r["time_opt_cuda_ms"] for r in rows
-            if r["time_opt_cuda_ms"] is not None])) if rows else None,
+            r["time_opt_cuda_ms"] for r in accounting_rows
+            if r["time_opt_cuda_ms"] is not None])) if accounting_rows else None,
         "total_time_opt_cuda_ms": float(sum(
-            r["time_opt_cuda_ms"] for r in rows
+            r["time_opt_cuda_ms"] for r in accounting_rows
             if r["time_opt_cuda_ms"] is not None)),
-        "mean_time_frame_wall_ms": float(np.mean([r["time_frame_wall_ms"] for r in rows])) if rows else None,
+        "mean_time_frame_wall_ms": float(np.mean([
+            r["time_frame_wall_ms"] for r in accounting_rows])) if accounting_rows else None,
         "budget_opt_modeled_ms": float(args.budget_ms),
         "logical_update_budget": int(sum(rows_by_key["n_micro_updates"])),
-        "mean_frame_wall_sync_ms": float(np.mean(wall_times)) if wall_times else None,
-        "p95_frame_wall_sync_ms": float(np.percentile(wall_times, 95)) if wall_times else None,
+        "mean_frame_wall_sync_ms": float(np.mean([
+            r["frame_wall_sync_ms"] for r in accounting_rows])) if accounting_rows else None,
+        "p95_frame_wall_sync_ms": float(np.percentile([
+            r["frame_wall_sync_ms"] for r in accounting_rows], 95)) if accounting_rows else None,
         "fixed_heldout_mean_psnr": float(np.mean([r["psnr"] for r in final_views])) if final_views else None,
         "fixed_heldout_mean_psnr_valid_gt": float(np.mean([r["psnr_valid_gt"] for r in final_views])) if final_views else None,
         "fixed_heldout_mean_ssim": float(np.mean([r["ssim"] for r in final_views])) if final_views else None,
@@ -354,9 +436,13 @@ def main():
     ap.add_argument("--candidate_count", type=int, default=5000)
     ap.add_argument("--micro_updates", type=int, default=5000)
     ap.add_argument("--mature_age_frames", type=int, default=10)
-    ap.add_argument("--allocation_modes", nargs="+", choices=("global", "stale_rescue"),
+    ap.add_argument("--allocation_modes", nargs="+", choices=(
+                        "global", "stale_rescue", "random_mature", "age_only",
+                        "stale_residual", "stale_visible_residual"),
                     default=["global", "stale_rescue"])
     ap.add_argument("--stale_fraction", type=float, default=0.50)
+    ap.add_argument("--mature_fraction", type=float, default=0.50,
+                    help="Requested update share for mature Gaussians in age-only control arms")
     ap.add_argument("--stale_after_frames", type=int, default=10)
     ap.add_argument("--heldout_frames", nargs="+", type=int, default=[20, 40, 60, 80, 100, 119])
     ap.add_argument("--budget_ms", type=float, default=15.0)
@@ -401,16 +487,34 @@ def main():
         torch.cuda.set_per_process_memory_fraction(0.70, 0)
 
     protocol_config = {
-        "design": "same-prefix, frozen-candidate-parameter replay; insertion timing crossed with global vs stale-mature-rescue update allocation",
+        "design": "chronological frozen-candidate replay; early/late timing crossed with allocation controls, with one shared late pre-intervention snapshot",
         "candidate_frame": args.candidate_frame,
         "early_insert_frame": args.early_insert_frame,
         "late_insert_frame": args.late_insert_frame,
         "candidate_count": args.candidate_count,
         "micro_updates_per_mapped_frame": args.micro_updates,
+        "replay_start_frame": args.candidate_frame,
+        "expected_total_micro_updates_per_arm": (
+            args.n_frames - args.candidate_frame + 1
+            - sum(int(frame >= args.candidate_frame) for frame in args.heldout_frames)
+        ) * args.micro_updates,
         "allocation_modes": args.allocation_modes,
+        "allocation_definitions": {
+            "global": "all exact updates ranked by current importance",
+            "age_only": "split updates by mature/young age quota; rank importance within age and prefer currently visible IDs",
+            "random_mature": "same age quota as age_only; randomize mature IDs with deterministic per-frame seed, with visible IDs first",
+            "stale_rescue": "requested stale-mature quota ranked by current importance and restricted to current visibility",
+            "stale_residual": "stale-mature quota ranked by summed within-cohort RGB/depth residual percentiles, without a visibility gate",
+            "stale_visible_residual": "same residual ranking, restricted to currently visible stale-mature IDs",
+        },
         "stale_rescue": {"fraction": args.stale_fraction,
                          "mature_age_frames": args.mature_age_frames,
                          "stale_after_frames": args.stale_after_frames},
+        "mature_allocation": {"fraction": args.mature_fraction,
+                              "random_mature": "uniform random ordering within visible mature IDs first, then invisible mature IDs; young quota remains importance-ranked"},
+        "residual_selection": "sum of within-stale-candidate RGB and depth residual percentile ranks; visibility requirement is explicit per arm",
+        "allocation_intervention_start": "candidate insertion frame; all arms use the same global exact-update selector before insertion",
+        "late_snapshot_construction": "one shared global exact-update rollout from candidate_frame through late_insert_frame-1; each late selector forks from its frozen final state",
         "heldout_frames_excluded_from_mapping": args.heldout_frames,
         "n_frames": args.n_frames,
         "budget_ms_modeled": args.budget_ms,
@@ -441,6 +545,7 @@ def main():
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     source_paths = [Path(__file__), ROOT / "research" / "pipeline.py",
                     ROOT / "research" / "mechanism" / "metrics.py",
+                    ROOT / "research" / "mechanism" / "selection.py",
                     ROOT / "research" / "pipeline_checkpoint.py",
                     ROOT / "research" / "densification.py",
                     ROOT / "experiments" / "run_dilution_factorial.py",
@@ -534,6 +639,53 @@ def main():
                     prefix_path, base, scene=scene, seed=seed,
                     snapshot_frame=args.candidate_frame - 1)
                 base_rng = _capture_rng(args.device)
+            late_memo = {}
+            _memoize_detached_nonleaf_tensors(base, late_memo)
+            _restore_rng(base_rng)
+            late_base = copy.deepcopy(base, late_memo)
+            late_common_rows = []
+            global_control = {
+                "micro_updates_per_frame": args.micro_updates,
+                "selection": "descending_importance_stable",
+                "capture_age_diagnostics": True,
+                "mature_age_frames": args.mature_age_frames,
+            }
+            for raw_frame_idx in range(args.candidate_frame, args.late_insert_frame):
+                if raw_frame_idx in eval_set:
+                    continue
+                late_base.config.setdefault("training", {})[
+                    "optimization_control"] = global_control
+                common_metrics, common_wall_ms = _process(
+                    late_base, frames[raw_frame_idx], args)
+                if int(common_metrics.get("n_micro_updates", -1)) != args.micro_updates:
+                    raise RuntimeError(
+                        f"Late common prefix used {common_metrics.get('n_micro_updates')} updates "
+                        f"at frame {raw_frame_idx}; expected {args.micro_updates}")
+                late_common_rows.append(_make_common_prefix_row(
+                    common_metrics, raw_frame_idx, common_wall_ms, args))
+            late_prefix_hash = _pipeline_state_sha256(late_base)
+            late_rng = _capture_rng(args.device)
+            late_prefix_path = args.out_dir / scene / (
+                f"seed{seed}_common_global_prefix_frame{args.late_insert_frame - 1}.checkpoint.pt")
+            if late_prefix_path.exists() and not args.force:
+                raise FileExistsError(
+                    f"Late intervention snapshot already exists: {late_prefix_path}; use a fresh output directory or --force")
+            save_pipeline_checkpoint(
+                late_prefix_path, late_base, scene=scene, seed=seed,
+                snapshot_frame=args.late_insert_frame - 1)
+            late_prefix_file_sha256 = hashlib.sha256(
+                late_prefix_path.read_bytes()).hexdigest()
+            timing_snapshots = {
+                "early": {
+                    "base": base, "rng": base_rng, "digest": prefix_hash,
+                    "start_frame": args.early_insert_frame, "common_rows": [],
+                },
+                "late": {
+                    "base": late_base, "rng": late_rng, "digest": late_prefix_hash,
+                    "start_frame": args.late_insert_frame,
+                    "common_rows": late_common_rows,
+                },
+            }
             prefix_checkpoint_sha256 = hashlib.sha256(prefix_path.read_bytes()).hexdigest()
             candidate_file_sha256 = hashlib.sha256(candidate_path.read_bytes()).hexdigest()
             arms = []
@@ -543,12 +695,19 @@ def main():
                 for timing_name, insert_frame in timing_arms:
                     arm = {"name": f"{timing_name}_{allocation}",
                            "timing": timing_name, "allocation": allocation,
-                           "insert_frame": insert_frame}
+                           "insert_frame": insert_frame,
+                           "allocation_start_frame": insert_frame,
+                           "snapshot_frame": timing_snapshots[timing_name]["start_frame"] - 1}
                     print(f"RUN {scene} seed={seed} arm={arm['name']} insert={arm['insert_frame']} "
                           f"candidates={args.candidate_count}", flush=True)
-                    arms.append(_run_branch(base, base_rng, candidate_batch, frames, intrinsics,
-                                            scene, seed, arm, args, sorted(eval_set), prefix_hash,
-                                            candidate_hash))
+                    snapshot = timing_snapshots[timing_name]
+                    arms.append(_run_branch(
+                        snapshot["base"], snapshot["rng"], candidate_batch, frames,
+                        intrinsics, scene, seed, arm, args, sorted(eval_set),
+                        snapshot["digest"], candidate_hash,
+                        start_frame=snapshot["start_frame"],
+                        common_prefix_rows=snapshot["common_rows"],
+                    ))
             by_condition = {f"{arm['arm']['timing']}_{arm['arm']['allocation']}": arm
                             for arm in arms}
             metric_keys = ("trajectory_mean_psnr", "trajectory_mean_depth_l1",
@@ -579,15 +738,28 @@ def main():
             else:
                 difference_in_differences = None
             record = {
-                "schema": "matched-candidate-timing-rescue-factorial-v2",
+                "schema": "matched-candidate-timing-rescue-controls-v4",
         "metric_protocol": "rgbd-metrics-v2",
-                "experiment": "frozen candidate insertion timing x stale-mature update rescue factorial",
+                "experiment": "frozen candidate insertion timing x matched update-allocation controls",
                 "scene": scene, "seed": seed,
                 "protocol": protocol_config,
                 "candidate_batch_sha256": candidate_hash,
                 "candidate_uv_sha256": hashlib.sha256(uv.detach().cpu().numpy().tobytes()).hexdigest(),
                 "source_hashes": source_hashes,
                 "prefix_state_sha256": prefix_hash,
+                "intervention_snapshot_sha256_by_timing": {
+                    timing: snapshot["digest"]
+                    for timing, snapshot in timing_snapshots.items()
+                },
+                "shared_late_pre_intervention": {
+                    "snapshot_frame": args.late_insert_frame - 1,
+                    "map_sha256": late_prefix_hash,
+                    "checkpoint": str(late_prefix_path.relative_to(ROOT)),
+                    "checkpoint_sha256": late_prefix_file_sha256,
+                    "n_common_frames": len(late_common_rows),
+                    "n_common_micro_updates": sum(
+                        int(row["n_micro_updates"]) for row in late_common_rows),
+                },
                 "frozen_prefix_checkpoint": str(prefix_path.relative_to(ROOT)),
                 "frozen_prefix_checkpoint_sha256": prefix_checkpoint_sha256,
                 "frozen_candidate_file": str(candidate_path.relative_to(ROOT)),
@@ -599,19 +771,24 @@ def main():
                 "arms_by_condition": {name: {
                     key: value[key] for key in metric_keys + ("final_gaussians",
                         "mean_stale_mature_update_coverage", "realized_stale_update_fraction",
-                        "total_stale_mature_micro_updates")
+                        "realized_mature_update_fraction", "total_stale_mature_micro_updates")
                 } for name, value in by_condition.items()},
                 "late_minus_early_by_allocation": timing_contrasts,
                 "stale_rescue_minus_global_by_timing": rescue_contrasts,
                 "timing_by_rescue_difference_in_differences": difference_in_differences,
                 "valid": all(a["exact_micro_update_gate"] and a["automatic_births"] == 0
                              and a["manual_batch_births"] == args.candidate_count for a in arms)
-                    and all(a["start_gaussians"] == int(base.gaussian_model.num_gaussians)
-                            for a in arms)
-                    and all(a["prefix_state_sha256"] == prefix_hash for a in arms)
+                    and all(len({a["start_gaussians"] for a in arms
+                                 if a["arm"]["timing"] == timing}) == 1
+                            for timing in timing_snapshots)
+                    and all(all(a["prefix_state_sha256"] == timing_snapshots[timing]["digest"]
+                                for a in arms if a["arm"]["timing"] == timing)
+                            for timing in timing_snapshots)
                     and all(a["candidate_batch_sha256"] == candidate_hash for a in arms)
                     and len({tuple(a["final_map_heldout_frames"]) for a in arms}) == 1
-                    and len({a["total_micro_updates"] for a in arms}) == 1,
+                    and len({a["total_micro_updates"] for a in arms}) == 1
+                    and all(a["total_micro_updates"] == protocol_config[
+                        "expected_total_micro_updates_per_arm"] for a in arms),
                 "replayed_from_frozen_artifacts": bool(args.reuse_frozen_artifacts),
                 "run_id": args.run_id or "initial",
             }

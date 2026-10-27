@@ -47,6 +47,7 @@ from .selective_optimizer import SelectiveAdam
 from .utility_features import extract_online_feature_tensor
 from .utility_predictor import FrozenUtilityPredictor
 from .mechanism.metrics import depth_metric_bundle, rgb_metric_bundle
+from .mechanism.selection import combined_residual_percentile
 from enum import Enum
 
 
@@ -1049,6 +1050,16 @@ class OnlineReconstructionPipeline:
         other_quota_micro_updates = None
         randomized_assignment_diagnostics = None
         if optimization_control:
+            color_residual_control = depth_residual_control = None
+            if optimization_control.get('stale_selection_policy') == 'residual_percentile':
+                color_residual_control = torch.zeros(
+                    N_updated, dtype=per_gaussian_color_err.dtype, device=self.device)
+                depth_residual_control = torch.zeros(
+                    N_updated, dtype=per_gaussian_depth_err.dtype, device=self.device)
+                n_color_residual = min(N_updated, per_gaussian_color_err.numel())
+                n_depth_residual = min(N_updated, per_gaussian_depth_err.numel())
+                color_residual_control[:n_color_residual] = per_gaussian_color_err[:n_color_residual]
+                depth_residual_control[:n_depth_residual] = per_gaussian_depth_err[:n_depth_residual]
             target_updates = max(0, int(optimization_control['micro_updates_per_frame']))
             max_k = max(1, int(self.config.get('training', {}).get('n_micro_steps', 5)))
             scores = importance[:N_updated].float()
@@ -1086,8 +1097,11 @@ class OnlineReconstructionPipeline:
                 ages_control = self.gaussian_model.state_store.creation_frames[:N_updated]
                 mature_control = (self.frame_count - ages_control) >= int(optimization_control.get('mature_age_frames', 10))
                 visible_control = visibility_mask[:N_updated].bool()
-                young_candidates = visible_control & ~mature_control
-                mature_candidates = visible_control & mature_control
+                # Preserve the requested logical update count if the visible
+                # age strata cannot absorb the entire quota. Visible IDs are
+                # ordered first, then invisible IDs provide capacity fallback.
+                young_candidates = ~mature_control
+                mature_candidates = mature_control
                 cap_young = int(young_candidates.sum().item()) * max_k
                 cap_mature = int(mature_candidates.sum().item()) * max_k
                 alloc_total = min(target_updates, cap_young + cap_mature)
@@ -1105,7 +1119,7 @@ class OnlineReconstructionPipeline:
                     )))
                     desired_mature_updates = min(
                         round(alloc_total * fraction_cap),
-                        int(mature_candidates.sum().item()),
+                        int((visible_control & mature_control).sum().item()),
                     )
                     fraction = (desired_mature_updates / alloc_total
                                 if alloc_total > 0 else 0.0)
@@ -1120,11 +1134,27 @@ class OnlineReconstructionPipeline:
                 unallocated -= extra_mature
                 age_quota_young_updates += min(unallocated, cap_young - age_quota_young_updates)
 
-                def assign_age_quota(mask, quota):
+                def assign_age_quota(mask, quota, random_order=False):
                     if quota <= 0 or not mask.any():
                         return
                     ids = torch.where(mask)[0]
-                    order = ids[torch.argsort(scores[ids], descending=True, stable=True)]
+
+                    def order_group(group):
+                        if not group.numel():
+                            return group
+                        if random_order:
+                            generator = torch.Generator(device=self.device)
+                            seed_base = int(optimization_control.get(
+                                'randomization_seed', self.config.get('seed', 42)))
+                            generator.manual_seed(seed_base + int(self.frame_count) * 1009)
+                            return group[torch.randperm(
+                                group.numel(), generator=generator, device=self.device)]
+                        return group[torch.argsort(
+                            scores[group], descending=True, stable=True)]
+
+                    visible_ids = ids[visible_control[ids]]
+                    invisible_ids = ids[~visible_control[ids]]
+                    order = torch.cat((order_group(visible_ids), order_group(invisible_ids)))
                     left = int(quota)
                     for _ in range(max_k):
                         if left <= 0:
@@ -1133,7 +1163,10 @@ class OnlineReconstructionPipeline:
                         k_alloc[order[:take]] += 1
                         left -= take
 
-                assign_age_quota(mature_candidates, age_quota_mature_updates)
+                assign_age_quota(
+                    mature_candidates, age_quota_mature_updates,
+                    random_order=bool(optimization_control.get(
+                        'randomize_mature_selection', False)))
                 assign_age_quota(young_candidates, age_quota_young_updates)
             elif 'stale_update_fraction' in optimization_control:
                 # Mechanism experiment: reserve a controlled share of the same
@@ -1148,13 +1181,14 @@ class OnlineReconstructionPipeline:
                 mature_control = (self.frame_count - ages_control) >= mature_age
                 stale_control = (self.frame_count - last_updates_control) >= stale_after
                 visible_control = visibility_mask[:N_updated].bool()
-                stale_candidates = visible_control & mature_control & stale_control
-                # The stale cohort is visibility constrained. Fill the rest of
-                # the same global update budget from every non-stale Gaussian,
-                # matching the ordinary exact-update selector's candidate
-                # domain. Restricting this pool to visible Gaussians can leave
-                # the rescue arm with fewer updates than its matched control on
-                # frames with sparse visibility.
+                if optimization_control.get('stale_require_visibility', True):
+                    stale_candidates = visible_control & mature_control & stale_control
+                else:
+                    stale_candidates = mature_control & stale_control
+                # The default stale cohort is visibility constrained. The
+                # explicit no-visibility arm is a control for the value of
+                # observing the stale Gaussian in the current view. Fill the
+                # rest of the same global update budget from all non-stale IDs.
                 other_candidates = ~stale_candidates
                 cap_stale = int(stale_candidates.sum().item()) * max_k
                 cap_other = int(other_candidates.sum().item()) * max_k
@@ -1168,11 +1202,24 @@ class OnlineReconstructionPipeline:
                 unallocated -= extra_stale
                 other_quota += min(unallocated, cap_other - other_quota)
 
+                stale_selection = optimization_control.get(
+                    'stale_selection_policy', 'importance')
+
                 def assign_stale_quota(mask, quota):
                     if quota <= 0 or not mask.any():
                         return
                     ids = torch.where(mask)[0]
-                    order = ids[torch.argsort(scores[ids], descending=True, stable=True)]
+                    if stale_selection == 'residual_percentile':
+                        residual_rank = combined_residual_percentile(
+                            color_residual_control[ids], depth_residual_control[ids])
+                        order = ids[torch.argsort(
+                            residual_rank, descending=True, stable=True)]
+                    elif stale_selection == 'importance':
+                        order = ids[torch.argsort(
+                            scores[ids], descending=True, stable=True)]
+                    else:
+                        raise ValueError(
+                            f"Unknown stale_selection_policy: {stale_selection}")
                     left = int(quota)
                     for _ in range(max_k):
                         if left <= 0:

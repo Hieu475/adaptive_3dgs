@@ -4,27 +4,58 @@ import argparse
 import hashlib
 import json
 import math
+import subprocess
 from pathlib import Path
 
 
-def validate_pair(path, expected_candidates, expected_updates):
+def validate_pair(path, expected_candidates, updates_per_frame, source_commit=None):
     record = json.loads(path.read_text())
     arms = record["arms"]
     source_hashes_path = path.parents[1] / "source_hashes.json"
     source_hashes = json.loads(source_hashes_path.read_text()) if source_hashes_path.exists() else {}
     recorded_source_hashes = record.get("source_hashes", {})
     source_inventory_matches = bool(source_hashes) and recorded_source_hashes == source_hashes
-    source_checkout_matches = bool(source_hashes) and all(
-        (Path(relpath).is_file()
-         and hashlib.sha256(Path(relpath).read_bytes()).hexdigest() == expected)
-        for relpath, expected in source_hashes.items()
-    )
+    if source_commit:
+        def matches_source_commit(relpath, expected):
+            try:
+                content = subprocess.check_output(
+                    ["git", "show", f"{source_commit}:{relpath}"],
+                    stderr=subprocess.DEVNULL,
+                )
+            except subprocess.CalledProcessError:
+                return False
+            return hashlib.sha256(content).hexdigest() == expected
+
+        source_checkout_matches = bool(source_hashes) and all(
+            matches_source_commit(relpath, expected)
+            for relpath, expected in source_hashes.items()
+        )
+    else:
+        source_checkout_matches = bool(source_hashes) and all(
+            (Path(relpath).is_file()
+             and hashlib.sha256(Path(relpath).read_bytes()).hexdigest() == expected)
+            for relpath, expected in source_hashes.items()
+        )
     prefix_artifact = Path(record.get("frozen_prefix_checkpoint", ""))
     candidate_artifact = Path(record.get("frozen_candidate_file", ""))
     prefix_file_ok = prefix_artifact.is_file() and hashlib.sha256(
         prefix_artifact.read_bytes()).hexdigest() == record.get("frozen_prefix_checkpoint_sha256")
     candidate_file_ok = candidate_artifact.is_file() and hashlib.sha256(
         candidate_artifact.read_bytes()).hexdigest() == record.get("frozen_candidate_file_sha256")
+    protocol = record.get("protocol", {})
+    expected_updates = int(protocol.get(
+        "expected_total_micro_updates_per_arm",
+        (int(protocol.get("n_frames", 119))
+         - len(protocol.get("heldout_frames_excluded_from_mapping", [])))
+        * int(updates_per_frame),
+    ))
+    shared_late = record.get("shared_late_pre_intervention", {})
+    shared_late_path = Path(shared_late.get("checkpoint", ""))
+    shared_late_file_ok = (
+        shared_late_path.is_file()
+        and hashlib.sha256(shared_late_path.read_bytes()).hexdigest()
+            == shared_late.get("checkpoint_sha256")
+    ) if shared_late else True
     by_condition = {
         f"{arm.get('arm', {}).get('timing')}_{arm.get('arm', {}).get('allocation')}": arm
         for arm in arms if arm.get("arm", {}).get("timing") is not None
@@ -35,7 +66,9 @@ def validate_pair(path, expected_candidates, expected_updates):
     has_per_arm_candidate_hashes = all(arm_candidate_hashes)
     checks = {
         "common_prefix_digest": (record.get("prefix_state_sha256") is not None
-            and all(arm.get("prefix_state_sha256") == record.get("prefix_state_sha256")
+            and all(arm.get("prefix_state_sha256") == record.get(
+                "intervention_snapshot_sha256_by_timing", {}).get(
+                    arm.get("arm", {}).get("timing"), record.get("prefix_state_sha256"))
                     for arm in arms)),
         "same_candidate_batch": (
             all(value == record.get("candidate_batch_sha256") for value in arm_candidate_hashes)
@@ -55,12 +88,17 @@ def validate_pair(path, expected_candidates, expected_updates):
         ),
         "same_heldout_views": len({tuple(arm.get("final_map_heldout_frames", []))
                                     for arm in arms}) == 1,
-        "same_starting_map_size": len({arm.get("start_gaussians") for arm in arms}) == 1,
+        "same_starting_map_size": all(
+            len({arm.get("start_gaussians") for arm in arms
+                 if arm.get("arm", {}).get("timing") == timing}) == 1
+            for timing in {arm.get("arm", {}).get("timing") for arm in arms}
+        ),
         "same_total_update_budget": len({arm.get("total_micro_updates") for arm in arms}) == 1,
         "frozen_prefix_checkpoint_hash": prefix_file_ok,
         "frozen_candidate_file_hash": candidate_file_ok,
         "source_inventory_matches_run": source_inventory_matches,
-        "source_files_match_current_checkout": source_checkout_matches,
+        ("source_files_match_reference_commit" if source_commit
+         else "source_files_match_current_checkout"): source_checkout_matches,
     }
     metric_required = {
         "psnr_valid_gt", "ssim_standard", "ssim_legacy", "depth_l1_gt_valid",
@@ -84,6 +122,38 @@ def validate_pair(path, expected_candidates, expected_updates):
     )
     checks["rgbd_metric_v2_fields_complete"] = metric_fields_complete
     checks["rgbd_metric_v2_values_valid"] = metric_values_valid
+    quota_checks = []
+    for arm in arms:
+        allocation = arm.get("arm", {}).get("allocation")
+        frames = arm.get("frames", [])
+        if allocation in ("age_only", "random_mature"):
+            quota_checks.append(bool(frames) and all(
+                frame.get("age_quota_mature_micro_updates") is not None
+                and frame.get("age_quota_young_micro_updates") is not None
+                and int(frame["age_quota_mature_micro_updates"])
+                    + int(frame["age_quota_young_micro_updates"])
+                    == int(frame["n_micro_updates"])
+                for frame in frames
+            ))
+        if allocation in ("stale_residual", "stale_visible_residual"):
+            quota_checks.append(bool(frames) and all(
+                frame.get("stale_quota_micro_updates") is not None
+                for frame in frames
+            ))
+    checks["allocation_quota_accounting_valid"] = all(quota_checks) if quota_checks else True
+    if shared_late:
+        late_arms = [arm for arm in arms if arm.get("arm", {}).get("timing") == "late"]
+        expected_shared = int(shared_late.get("n_common_micro_updates", 0))
+        checks["shared_late_snapshot_artifact_hash"] = shared_late_file_ok
+        checks["shared_late_snapshot_budget_matches_arms"] = bool(late_arms) and all(
+            int(arm.get("shared_pre_intervention_micro_updates", -1)) == expected_shared
+            for arm in late_arms
+        )
+        checks["shared_late_prefix_frames_exact_updates"] = (
+            int(shared_late.get("n_common_frames", 0))
+            * int(protocol.get("micro_updates_per_mapped_frame", updates_per_frame))
+            == expected_shared
+        )
     if str(record.get("protocol", {}).get("device", "")).startswith("cuda"):
         checks["cuda_stage_timing_recorded"] = bool(per_frame_rows) and all(
             frame.get("time_opt_cuda_ms") is not None
@@ -109,6 +179,8 @@ def validate_pair(path, expected_candidates, expected_updates):
         "final_gaussian_counts_by_arm": {name: arm.get("final_gaussians")
                                           for name, arm in by_condition.items()},
         "runner_reported_valid_before_reassessment": record.get("valid"),
+        "expected_total_micro_updates_per_arm": expected_updates,
+        "source_reference_commit": source_commit,
         "note": ("Final map size is an outcome and is intentionally not a matching gate. "
                  + ("The earlier runner's valid flag also required equal final count; "
                     "this audit reassesses the causal-control gates without editing raw runs."
@@ -127,9 +199,10 @@ def main():
                     help="Optional repeated-run suffixes; expects seedN_SUFFIX.json")
     ap.add_argument("--candidate_count", type=int, default=5000)
     ap.add_argument("--updates_per_frame", type=int, default=5000)
+    ap.add_argument("--source_commit", default=None,
+                    help="Validate recorded source hashes against this Git commit instead of the current worktree")
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
-    expected_updates = args.updates_per_frame * (119 - 6)
     pairs = []
     run_ids = args.run_ids if args.run_ids else [None]
     for scene in args.scenes:
@@ -138,14 +211,15 @@ def main():
                 suffix = f"_{run_id}" if run_id else ""
                 pair = validate_pair(
                     args.root / scene / f"seed{seed}{suffix}.json",
-                    args.candidate_count, expected_updates)
+                    args.candidate_count, args.updates_per_frame,
+                    source_commit=args.source_commit)
                 pair["run_id"] = run_id or "initial"
                 pairs.append(pair)
     report = {
         "schema": "matched-candidate-timing-validation-v1",
         "root": str(args.root),
         "expected_candidate_count_per_arm": args.candidate_count,
-        "expected_total_micro_updates_per_arm": expected_updates,
+        "updates_per_frame": args.updates_per_frame,
         "valid_pairs": sum(pair["valid"] for pair in pairs),
         "total_pairs": len(pairs),
         "pairs": pairs,
