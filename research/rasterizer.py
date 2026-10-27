@@ -246,7 +246,9 @@ def render(
         backend: optional backend override ('gsplat', 'reference', 'custom_cuda')
     
     Returns:
-        Dict with 'color' (H,W,3), 'depth' (H,W), 'transmission' (H,W)
+        Dict with expected camera-z ``depth`` (H,W), alpha-weighted
+        ``depth_accumulated`` for layered compositing, ``alpha`` and
+        ``transmission``.
     """
     from .projection import (
         world_to_camera, project_to_screen,
@@ -263,6 +265,8 @@ def render(
         return {
             'color': bg_color.unsqueeze(0).unsqueeze(0).expand(image_height, image_width, 3),
             'depth': torch.zeros(image_height, image_width, device=device),
+            'depth_accumulated': torch.zeros(image_height, image_width, device=device),
+            'alpha': torch.zeros(image_height, image_width, device=device),
             'transmission': torch.ones(image_height, image_width, device=device),
         }
 
@@ -297,6 +301,7 @@ def render(
                 Ks=K,
                 width=image_width,
                 height=image_height,
+                near_plane=0.1,
                 backgrounds=None,
                 render_mode='RGB+D',
             )
@@ -304,8 +309,17 @@ def render(
             raise RuntimeError(f"gsplat.rasterization execution failed: {e}") from e
 
         raw_color = renders[0, :, :, :3]
-        raw_depth = renders[0, :, :, 3]
+        depth_accumulated = renders[0, :, :, 3]
         transmission = (1.0 - alphas[0, :, :, 0]).clamp(min=0.0, max=1.0)
+        alpha = 1.0 - transmission
+        # gsplat RGB+D returns sum_i(weight_i * z_i). Normalize to expected
+        # camera-z depth for losses/metrics; retain the accumulated value for
+        # alpha-compositing cached layers.
+        depth_expected = torch.where(
+            alpha > 1e-10,
+            depth_accumulated / alpha.clamp_min(1e-10),
+            torch.zeros_like(depth_accumulated),
+        )
         
         if bg_color.any():
             final_color = raw_color + transmission.unsqueeze(-1) * bg_color.unsqueeze(0).unsqueeze(0)
@@ -314,7 +328,9 @@ def render(
             
         return {
             'color': final_color,
-            'depth': raw_depth,
+            'depth': depth_expected,
+            'depth_accumulated': depth_accumulated,
+            'alpha': alpha,
             'transmission': transmission,
         }
 
@@ -348,6 +364,8 @@ def render(
         return {
             'color': bg_color.unsqueeze(0).unsqueeze(0).expand(image_height, image_width, 3),
             'depth': torch.zeros(image_height, image_width, device=device),
+            'depth_accumulated': torch.zeros(image_height, image_width, device=device),
+            'alpha': torch.zeros(image_height, image_width, device=device),
             'transmission': torch.ones(image_height, image_width, device=device),
         }
     
@@ -414,9 +432,17 @@ def render(
         depth_image[py_start:py_end, px_start:px_end] = tile_depth.reshape(h, w)
         trans_image[py_start:py_end, px_start:px_end] = tile_T.reshape(h, w)
     
+    alpha_image = 1.0 - trans_image
+    depth_expected = torch.where(
+        alpha_image > 1e-10,
+        depth_image / alpha_image.clamp_min(1e-10),
+        torch.zeros_like(depth_image),
+    )
     return {
         'color': color_image,
-        'depth': depth_image,
+        'depth': depth_expected,
+        'depth_accumulated': depth_image,
+        'alpha': alpha_image,
         'transmission': trans_image,
     }
 
@@ -470,6 +496,7 @@ def render_frozen(
     image_height: int,
     tile_size: int = 16,
     bg_color: Optional[torch.Tensor] = None,
+    backend: Optional[str] = None,
 ) -> Dict[str, torch.Tensor]:
     """Render detached frozen Gaussians (for background caching)."""
     from .background_cache import FrozenBackgroundCache
@@ -483,6 +510,7 @@ def render_frozen(
         image_height=image_height,
         tile_size=tile_size,
         bg_color=bg_color,
+        backend=backend,
     )
 
 

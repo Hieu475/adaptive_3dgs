@@ -50,6 +50,7 @@ class FrozenBackgroundCache:
         image_height: int,
         tile_size: int = 16,
         bg_color: Optional[torch.Tensor] = None,
+        backend: Optional[str] = None,
     ) -> Dict[str, torch.Tensor]:
         """Render and cache the frozen Gaussian subset (no gradient tracking)."""
         if bg_color is None:
@@ -69,6 +70,7 @@ class FrozenBackgroundCache:
             return {
                 'color': self.color,
                 'depth': self.depth,
+                'depth_accumulated': self.depth,
                 'transmission': self.transmission,
                 'alpha': self.alpha
             }
@@ -95,18 +97,21 @@ class FrozenBackgroundCache:
             image_width=image_width,
             image_height=image_height,
             bg_color=bg_color,
-            tile_size=tile_size
+            tile_size=tile_size,
+            backend=backend,
         )
         
         self.color = frozen_render['color']
-        self.depth = frozen_render['depth']
+        self.depth = frozen_render['depth_accumulated']
         self.transmission = frozen_render['transmission']
         self.alpha = 1.0 - self.transmission
         self.is_valid = True
         
         return {
             'color': self.color,
-            'depth': self.depth,
+            'depth': frozen_render['depth'],
+            'depth_accumulated': self.depth,
+            'alpha': self.alpha,
             'transmission': self.transmission,
             'alpha': self.alpha
         }
@@ -120,6 +125,7 @@ class FrozenBackgroundCache:
         image_height: int,
         tile_size: int = 16,
         bg_color: Optional[torch.Tensor] = None,
+        backend: Optional[str] = None,
     ) -> Dict[str, torch.Tensor]:
         """Composite active Gaussians with the cached frozen background.
         
@@ -134,9 +140,15 @@ class FrozenBackgroundCache:
             
         M = len(active_subset.get('indices', []))
         if M == 0 and self.is_valid and self.color is not None:
+            expected_depth = torch.where(
+                self.alpha > 1e-10,
+                self.depth / self.alpha.clamp_min(1e-10),
+                torch.zeros_like(self.depth),
+            )
             return {
                 'color': self.color,
-                'depth': self.depth,
+                'depth': expected_depth,
+                'depth_accumulated': self.depth,
                 'transmission': self.transmission,
                 'alpha': self.alpha
             }
@@ -153,7 +165,8 @@ class FrozenBackgroundCache:
             image_width=image_width,
             image_height=image_height,
             bg_color=bg_color,
-            tile_size=tile_size
+            tile_size=tile_size,
+            backend=backend,
         )
         
         if not self.is_valid or self.color is None:
@@ -162,17 +175,24 @@ class FrozenBackgroundCache:
         # Alpha Compositing with background cache:
         c_active = active_render['color']
         t_active = active_render['transmission'].unsqueeze(-1)
-        d_active = active_render['depth']
+        d_active = active_render['depth_accumulated']
         
         composite_color = c_active + t_active * self.color
         composite_depth = d_active + active_render['transmission'] * self.depth
         composite_trans = active_render['transmission'] * self.transmission
+        composite_alpha = 1.0 - composite_trans
+        composite_depth_expected = torch.where(
+            composite_alpha > 1e-10,
+            composite_depth / composite_alpha.clamp_min(1e-10),
+            torch.zeros_like(composite_depth),
+        )
         
         return {
             'color': composite_color,
-            'depth': composite_depth,
+            'depth': composite_depth_expected,
+            'depth_accumulated': composite_depth,
             'transmission': composite_trans,
-            'alpha': 1.0 - composite_trans,
+            'alpha': composite_alpha,
             'active_color': c_active,
-            'active_depth': d_active
+            'active_depth': active_render['depth']
         }

@@ -78,6 +78,56 @@ def _tensor_bundle_sha256(bundle):
     return digest.hexdigest()
 
 
+def _save_evaluation_visualization(images, output_path):
+    """Save RGB/depth/error/coverage panels for one fixed evaluation view."""
+    import matplotlib.pyplot as plt
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    rgb_gt = images["rgb_ground_truth"].numpy()
+    rgb_pred = images["rgb_prediction"].numpy()
+    depth_gt = images["depth_ground_truth"].numpy()
+    depth_pred = images["depth_prediction"].numpy()
+    error = images["depth_absolute_error_gt_valid"].numpy()
+    gt_valid = images["gt_valid_mask"].numpy().astype(bool)
+    coverage = images["pred_depth_coverage_mask"].numpy().astype(bool)
+    np.savez_compressed(
+        output_path.with_suffix(".npz"),
+        rgb_ground_truth=rgb_gt,
+        rgb_prediction=rgb_pred,
+        depth_ground_truth=depth_gt,
+        depth_prediction=depth_pred,
+        depth_absolute_error_gt_valid=error,
+        depth_accumulated=images["depth_accumulated"].numpy(),
+        render_alpha=images["render_alpha"].numpy(),
+        gt_valid_mask=gt_valid,
+        pred_depth_coverage_mask=coverage,
+    )
+    finite_gt = depth_gt[gt_valid]
+    depth_vmax = float(np.percentile(finite_gt, 98)) if finite_gt.size else 1.0
+    depth_vmax = max(depth_vmax, 1e-6)
+    fig, axes = plt.subplots(2, 3, figsize=(13, 8), constrained_layout=True)
+    axes[0, 0].imshow(np.clip(rgb_gt, 0, 1)); axes[0, 0].set_title("RGB ground truth")
+    axes[0, 1].imshow(np.clip(rgb_pred, 0, 1)); axes[0, 1].set_title("RGB prediction")
+    axes[0, 2].imshow(np.ma.masked_where(~gt_valid, depth_gt), cmap="viridis", vmin=0, vmax=depth_vmax)
+    axes[0, 2].set_title("GT depth (m)")
+    axes[1, 0].imshow(np.ma.masked_where(~np.isfinite(depth_pred) | (depth_pred <= 0), depth_pred),
+                      cmap="viridis", vmin=0, vmax=depth_vmax)
+    axes[1, 0].set_title("Rendered depth (m)")
+    axes[1, 1].imshow(np.ma.masked_invalid(error), cmap="magma", vmin=0,
+                      vmax=max(float(np.nanpercentile(error, 98)) if np.isfinite(error).any() else 1.0, 1e-6))
+    axes[1, 1].set_title("Absolute depth error on GT-valid pixels (m)")
+    coverage_rgb = np.zeros((*gt_valid.shape, 3), dtype=np.float32)
+    coverage_rgb[..., 1] = coverage.astype(np.float32)
+    coverage_rgb[..., 0] = (gt_valid & ~coverage).astype(np.float32)
+    axes[1, 2].imshow(coverage_rgb)
+    axes[1, 2].set_title("Coverage: green=predicted, red=missing")
+    for ax in axes.flat:
+        ax.axis("off")
+    fig.savefig(output_path, dpi=140)
+    plt.close(fig)
+
+
 def _pipeline_state_sha256(pipeline):
     digest = hashlib.sha256()
     for name, tensor in sorted(pipeline.gaussian_model.state_dict().items()):
@@ -182,8 +232,19 @@ def _run_branch(base, rng_state, candidate_batch, frames, intrinsics, scene, see
             "dataset_frame": raw_frame_idx,
             "pipeline_frame": int(metrics["frame"]),
             "psnr": float(metrics["psnr"]),
+            "psnr_valid_gt": float(metrics["psnr_valid_gt"]),
             "ssim": float(metrics["ssim"]),
+            "ssim_standard": float(metrics["ssim_standard"]),
+            "ssim_standard_valid_gt": float(metrics["ssim_standard_valid_gt"]),
+            "ssim_legacy": float(metrics["ssim_legacy"]),
             "depth_l1": float(metrics["depth_l1"]),
+            "depth_l1_gt_valid": float(metrics["depth_l1_gt_valid"]),
+            "depth_rmse_gt_valid": float(metrics["depth_rmse_gt_valid"]),
+            "depth_l1_overlap": float(metrics["depth_l1_overlap"]),
+            "depth_rmse_overlap": float(metrics["depth_rmse_overlap"]),
+            "pred_depth_coverage": float(metrics["pred_depth_coverage"]),
+            "valid_gt_pixel_count": int(metrics["valid_gt_pixel_count"]),
+            "overlap_pixel_count": int(metrics["overlap_pixel_count"]),
             "n_gaussians": int(metrics["n_gaussians"]),
             "manual_batch_added": added,
             "n_spawned_automatic": int(metrics.get("n_spawned", 0)),
@@ -197,19 +258,39 @@ def _run_branch(base, rng_state, candidate_batch, frames, intrinsics, scene, see
             "stale_mature_micro_updates": int(metrics.get("stale_mature_micro_updates", 0)),
             "stale_quota_micro_updates": metrics.get("stale_quota_micro_updates"),
             "opt_stage_sync_ms": float(metrics.get("opt_stage_sync_ms", 0.0)),
+            "time_opt_cuda_ms": metrics.get("time_opt_cuda_ms"),
+            "time_opt_stage_wall_ms": metrics.get("time_opt_stage_wall_ms"),
+            "time_frame_wall_ms": float(metrics.get("time_frame_wall_ms", wall_ms)),
+            "budget_opt_modeled_ms": float(metrics.get("budget_opt_modeled_ms", args.budget_ms)),
+            "violation_opt": metrics.get("violation_opt"),
+            "violation_frame": metrics.get("violation_frame"),
+            "gain_train_psnr_db": metrics.get("gain_train_psnr_db"),
+            "gain_holdout_psnr_db": metrics.get("gain_holdout_psnr_db"),
             "frame_wall_sync_ms": wall_ms,
         })
     if not injected:
         raise RuntimeError(f"Batch was not inserted for arm {arm['name']}")
     final_views = []
+    visualization_root = getattr(args, "visualization_dir", None)
     for idx in eval_frames:
         out = pipeline.eval_frame(rgb=frames[idx]["rgb"], depth=frames[idx]["depth"],
-                                  pose=frames[idx].get("pose", pipeline.current_pose))
-        final_views.append({"frame": idx, "psnr": float(out["psnr"]),
-                            "ssim": float(out["ssim"]),
-                            "depth_l1": float(out["depth_l1"])})
+                                  pose=frames[idx].get("pose", pipeline.current_pose),
+                                  return_images=visualization_root is not None)
+        final_views.append({key: out[key] for key in (
+            "psnr", "psnr_valid_gt", "ssim", "ssim_standard",
+            "ssim_standard_valid_gt", "ssim_legacy", "depth_l1",
+            "depth_l1_gt_valid", "depth_rmse_gt_valid", "depth_l1_overlap",
+            "depth_rmse_overlap", "pred_depth_coverage", "valid_gt_pixel_count",
+            "overlap_pixel_count")} | {"frame": idx})
+        if visualization_root is not None:
+            _save_evaluation_visualization(
+                out["images"],
+                Path(visualization_root) / scene / f"seed{seed}" / arm["name"] /
+                f"frame_{idx:04d}.png",
+            )
     rows_by_key = {key: [r[key] for r in rows] for key in
-                   ("psnr", "ssim", "depth_l1", "n_micro_updates",
+                   ("psnr", "ssim", "ssim_legacy", "depth_l1", "depth_l1_overlap",
+                    "pred_depth_coverage", "n_micro_updates",
                     "mature_update_coverage", "stale_mature_update_coverage",
                     "stale_mature_micro_updates", "opt_stage_sync_ms")}
     record = {
@@ -232,11 +313,24 @@ def _run_branch(base, rng_state, candidate_batch, frames, intrinsics, scene, see
         ),
         "total_micro_updates": int(sum(rows_by_key["n_micro_updates"])),
         "mean_opt_stage_sync_ms": float(np.mean(rows_by_key["opt_stage_sync_ms"])) if rows else None,
+        "mean_time_opt_cuda_ms": float(np.mean([
+            r["time_opt_cuda_ms"] for r in rows
+            if r["time_opt_cuda_ms"] is not None])) if rows else None,
+        "total_time_opt_cuda_ms": float(sum(
+            r["time_opt_cuda_ms"] for r in rows
+            if r["time_opt_cuda_ms"] is not None)),
+        "mean_time_frame_wall_ms": float(np.mean([r["time_frame_wall_ms"] for r in rows])) if rows else None,
+        "budget_opt_modeled_ms": float(args.budget_ms),
+        "logical_update_budget": int(sum(rows_by_key["n_micro_updates"])),
         "mean_frame_wall_sync_ms": float(np.mean(wall_times)) if wall_times else None,
         "p95_frame_wall_sync_ms": float(np.percentile(wall_times, 95)) if wall_times else None,
         "fixed_heldout_mean_psnr": float(np.mean([r["psnr"] for r in final_views])) if final_views else None,
+        "fixed_heldout_mean_psnr_valid_gt": float(np.mean([r["psnr_valid_gt"] for r in final_views])) if final_views else None,
         "fixed_heldout_mean_ssim": float(np.mean([r["ssim"] for r in final_views])) if final_views else None,
+        "fixed_heldout_mean_ssim_legacy": float(np.mean([r["ssim_legacy"] for r in final_views])) if final_views else None,
         "fixed_heldout_mean_depth_l1": float(np.mean([r["depth_l1"] for r in final_views])) if final_views else None,
+        "fixed_heldout_mean_depth_l1_overlap": float(np.nanmean([r["depth_l1_overlap"] for r in final_views])) if final_views else None,
+        "fixed_heldout_mean_pred_depth_coverage": float(np.mean([r["pred_depth_coverage"] for r in final_views])) if final_views else None,
         "fixed_heldout_views": final_views,
         "final_map_heldout_frames": [int(row["frame"]) for row in final_views],
         "frames": rows,
@@ -272,6 +366,8 @@ def main():
                     default=ROOT / "results" / "matched_candidate_timing_replay")
     ap.add_argument("--artifact_dir", type=Path, default=None,
                     help="Directory for frozen prefix checkpoints and candidate batches")
+    ap.add_argument("--visualization_dir", type=Path, default=None,
+                    help="Optional directory for held-out RGB/depth/error/coverage figures")
     ap.add_argument("--reuse_frozen_artifacts", action="store_true",
                     help="Load existing prefix checkpoint and candidate batch instead of rebuilding them")
     ap.add_argument("--run_id", default="",
@@ -297,6 +393,8 @@ def main():
         args.artifact_dir = args.out_dir / "frozen_artifacts"
     elif not args.artifact_dir.is_absolute():
         args.artifact_dir = ROOT / args.artifact_dir
+    if args.visualization_dir is not None and not args.visualization_dir.is_absolute():
+        args.visualization_dir = ROOT / args.visualization_dir
     args.out_dir.mkdir(parents=True, exist_ok=True)
     args.artifact_dir.mkdir(parents=True, exist_ok=True)
     if args.device.startswith("cuda"):
@@ -316,6 +414,13 @@ def main():
         "heldout_frames_excluded_from_mapping": args.heldout_frames,
         "n_frames": args.n_frames,
         "budget_ms_modeled": args.budget_ms,
+        "device": args.device,
+        "evaluation_metric_protocol": "rgbd-metrics-v2: torchmetrics spatial SSIM; GT-valid depth L1 penalizes missing prediction as zero; overlap depth L1 and prediction coverage reported separately",
+        "prediction_support_rule": {
+            "alpha_threshold": 0.5,
+            "source": "1 - renderer transmission; aligned with depth_threshold_opaque default",
+        },
+        "budget_accounting": "exact Gaussian micro-update count, CUDA-event optimization-stage time, synchronized stage wall time, and end-to-end frame wall time are separate fields",
         "automatic_spawning": "disabled in both arms",
         "primary_endpoints": ["final heldout mean PSNR", "final heldout mean Depth L1",
                               "timing x rescue difference-in-differences"],
@@ -335,9 +440,12 @@ def main():
     if not manifest_path.exists():
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     source_paths = [Path(__file__), ROOT / "research" / "pipeline.py",
+                    ROOT / "research" / "mechanism" / "metrics.py",
+                    ROOT / "research" / "pipeline_checkpoint.py",
                     ROOT / "research" / "densification.py",
                     ROOT / "experiments" / "run_dilution_factorial.py",
-                    ROOT / "experiments" / "run_phase13_frozen_benchmark.py"]
+                    ROOT / "experiments" / "run_phase13_frozen_benchmark.py",
+                    ROOT / "requirements.txt"]
     source_hashes = {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
                      for path in source_paths}
     (args.out_dir / "source_hashes.json").write_text(json.dumps(source_hashes, indent=2) + "\n")
@@ -445,8 +553,11 @@ def main():
                             for arm in arms}
             metric_keys = ("trajectory_mean_psnr", "trajectory_mean_depth_l1",
                            "mean_mature_update_coverage", "mean_stale_mature_update_coverage",
-                           "mean_opt_stage_sync_ms", "fixed_heldout_mean_psnr",
-                           "fixed_heldout_mean_ssim", "fixed_heldout_mean_depth_l1")
+                           "mean_opt_stage_sync_ms", "mean_time_opt_cuda_ms",
+                           "fixed_heldout_mean_psnr", "fixed_heldout_mean_psnr_valid_gt",
+                           "fixed_heldout_mean_ssim", "fixed_heldout_mean_ssim_legacy",
+                           "fixed_heldout_mean_depth_l1", "fixed_heldout_mean_depth_l1_overlap",
+                           "fixed_heldout_mean_pred_depth_coverage")
             timing_contrasts = {}
             for allocation in args.allocation_modes:
                 early_arm = by_condition[f"early_{allocation}"]
@@ -468,12 +579,14 @@ def main():
             else:
                 difference_in_differences = None
             record = {
-                "schema": "matched-candidate-timing-rescue-factorial-v1",
+                "schema": "matched-candidate-timing-rescue-factorial-v2",
+        "metric_protocol": "rgbd-metrics-v2",
                 "experiment": "frozen candidate insertion timing x stale-mature update rescue factorial",
                 "scene": scene, "seed": seed,
                 "protocol": protocol_config,
                 "candidate_batch_sha256": candidate_hash,
                 "candidate_uv_sha256": hashlib.sha256(uv.detach().cpu().numpy().tobytes()).hexdigest(),
+                "source_hashes": source_hashes,
                 "prefix_state_sha256": prefix_hash,
                 "frozen_prefix_checkpoint": str(prefix_path.relative_to(ROOT)),
                 "frozen_prefix_checkpoint_sha256": prefix_checkpoint_sha256,

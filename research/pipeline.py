@@ -21,7 +21,7 @@ import yaml
 
 from .gaussian_repr import GaussianModel, GaussianState
 from .projection import world_to_camera, project_to_screen, compute_2d_covariance
-from .rasterizer import render as rasterize_scene
+from .rasterizer import render as rasterize_scene, get_renderer_backend
 from .losses import total_loss, color_loss, depth_loss
 from .depth_render import render_depth_surface_aware
 from .importance import GaussianImportanceEstimator, Tier
@@ -46,6 +46,7 @@ from .background_cache import FrozenBackgroundCache
 from .selective_optimizer import SelectiveAdam
 from .utility_features import extract_online_feature_tensor
 from .utility_predictor import FrozenUtilityPredictor
+from .mechanism.metrics import depth_metric_bundle, rgb_metric_bundle
 from enum import Enum
 
 
@@ -86,6 +87,10 @@ class OnlineReconstructionPipeline:
         """
         self.config = self._merge_config(self._default_config(), config)
         self.device = device
+        self.config.setdefault('rendering', {})['backend'] = get_renderer_backend(
+            explicit_backend=self.config.get('rendering', {}).get('backend'),
+            device_type=torch.device(device).type,
+        )
         
         # Memory Guard: Cap PyTorch allocation to protect OS and desktop compositor
         if str(self.device).startswith('cuda') and torch.cuda.is_available():
@@ -483,7 +488,9 @@ class OnlineReconstructionPipeline:
                 self._trace_init_stage(f'init_step_{init_step}_render', {
                     'color': rendered['color'], 'depth': rendered['depth'],
                 })
-                d_mask = (rendered['depth'] > 0) & (depth > 0)
+                initial_alpha_mask = rendered.get('alpha', torch.ones_like(depth)) >= self.config.get(
+                    'rendering', {}).get('depth_threshold_opaque', 0.5)
+                d_mask = initial_alpha_mask & torch.isfinite(depth) & (depth > 0)
                 losses = total_loss(
                     rendered['color'], rgb,
                     rendered['depth'], depth,
@@ -634,6 +641,7 @@ class OnlineReconstructionPipeline:
             
             rendered_color = render_result['color']  # (H, W, 3)
             transmission = render_result['transmission']  # (H, W)
+            alpha_threshold = float(self.config['rendering'].get('depth_threshold_opaque', 0.5))
             
             if self.config['rendering'].get('use_surface_aware_depth', False):
                 depth_result = render_depth_surface_aware(
@@ -649,8 +657,13 @@ class OnlineReconstructionPipeline:
                     tile_size=self.config['rendering']['tile_size'],
                 )
                 rendered_depth = depth_result['depth']  # (H, W)
+                rendered_depth_support = depth_result['hit_mask']
             else:
                 rendered_depth = render_result['depth']  # (H, W)
+                rendered_depth_support = render_result.get(
+                    'alpha', 1.0 - transmission) >= alpha_threshold
+            rendered_depth = torch.where(
+                rendered_depth_support, rendered_depth, torch.zeros_like(rendered_depth))
 
         self._trace_stage('pre_update_render', {
             'color': rendered_color, 'depth': rendered_depth,
@@ -691,7 +704,7 @@ class OnlineReconstructionPipeline:
         
         # Pixel-level errors for densification masks
         color_err = (rendered_color - rgb).abs().mean(dim=-1)  # (H, W)
-        depth_valid = depth > 0
+        depth_valid = torch.isfinite(depth) & (depth > 0)
         depth_err = torch.zeros_like(depth)
         depth_err[depth_valid] = (rendered_depth[depth_valid] - depth[depth_valid]).abs()
         self._trace_stage('attribution_and_residuals', {
@@ -1585,7 +1598,10 @@ class OnlineReconstructionPipeline:
                 
                 rendered_opt_color = composite_opt['color']
                 rendered_opt_depth = composite_opt['depth']
-                depth_valid_mask = (rendered_opt_depth > 0) & (depth > 0)
+                depth_valid_mask = (
+                    (composite_opt['alpha'] >= alpha_threshold)
+                    & torch.isfinite(depth) & (depth > 0)
+                )
                 
                 losses = total_loss(
                     rendered_opt_color, rgb,
@@ -1776,8 +1792,16 @@ class OnlineReconstructionPipeline:
                     tile_size=self.config['rendering']['tile_size'],
                 )
                 rendered_depth_post = depth_result_post['depth']
+                rendered_depth_post_support = depth_result_post['hit_mask']
             else:
                 rendered_depth_post = post_render['depth']
+                rendered_depth_post_support = post_render.get(
+                    'alpha', 1.0 - post_render['transmission']) >= alpha_threshold
+            rendered_depth_post = torch.where(
+                rendered_depth_post_support,
+                rendered_depth_post,
+                torch.zeros_like(rendered_depth_post),
+            )
         
         # === Collect Metrics & Feedback ===
         frame_time = time.time() - frame_start
@@ -1791,43 +1815,23 @@ class OnlineReconstructionPipeline:
             n_cache_rebuilds=n_cache_rebuilds,
         )
         
-        # Compute quality metrics (pre and post optimization)
+        # Compute quality metrics (pre and post optimization). Canonical RGB
+        # SSIM is spatial-window SSIM; the historic global-statistics score is
+        # retained under ssim_legacy for artifact compatibility audits.
         with torch.no_grad():
-            if depth_valid.any():
-                mse_pre = ((rendered_color[depth_valid] - rgb[depth_valid]) ** 2).mean() + 1e-8
-                mse_post = ((rendered_color_post[depth_valid] - rgb[depth_valid]) ** 2).mean() + 1e-8
-            else:
-                mse_pre = ((rendered_color - rgb) ** 2).mean() + 1e-8
-                mse_post = ((rendered_color_post - rgb) ** 2).mean() + 1e-8
-            # Pre-optimization PSNR (diagnostic)
-            psnr_pre = -10 * torch.log10(mse_pre).item()
-            # Post-optimization PSNR (primary metric)
-            psnr_post = -10 * torch.log10(mse_post).item()
-            psnr = psnr_post  # Primary metric is post-optimization
-            # Keep the pre-update residual for diagnostics, while the canonical
-            # depth_l1 follows PSNR/SSIM and measures the post-action render.
-            depth_l1_pre = depth_err[depth_valid].mean().item() if depth_valid.any() else 0.0
-            depth_l1_post = (
-                (rendered_depth_post[depth_valid] - depth[depth_valid]).abs().mean().item()
-                if depth_valid.any() else 0.0
-            )
+            rgb_pre_metrics = rgb_metric_bundle(rendered_color, rgb, valid_gt_mask=depth_valid)
+            rgb_post_metrics = rgb_metric_bundle(rendered_color_post, rgb, valid_gt_mask=depth_valid)
+            psnr_pre = rgb_pre_metrics['psnr_valid_gt']
+            psnr_post = rgb_post_metrics['psnr_valid_gt']
+            psnr = psnr_post
+            ssim = rgb_post_metrics['ssim_standard']
+            ssim_legacy = rgb_post_metrics['ssim_legacy']
+            depth_post_metrics = depth_metric_bundle(rendered_depth_post, depth,
+                                                     valid_gt_mask=depth_valid,
+                                                     pred_valid_mask=rendered_depth_post_support)
+            depth_l1_pre = float(depth_err[depth_valid].mean().item()) if depth_valid.any() else float('nan')
+            depth_l1_post = depth_post_metrics['depth_l1_gt_valid']
             depth_l1 = depth_l1_post
-            
-            # SSIM computation (structural similarity)
-            def _compute_ssim_simple(img1, img2):
-                """Compute mean SSIM between two (H,W,3) images."""
-                c1, c2 = 0.01 ** 2, 0.03 ** 2
-                mu1 = img1.mean(dim=(0, 1))
-                mu2 = img2.mean(dim=(0, 1))
-                sig1_sq = ((img1 - mu1) ** 2).mean(dim=(0, 1))
-                sig2_sq = ((img2 - mu2) ** 2).mean(dim=(0, 1))
-                sig12 = ((img1 - mu1) * (img2 - mu2)).mean(dim=(0, 1))
-                ssim_map = ((2 * mu1 * mu2 + c1) * (2 * sig12 + c2)) / (
-                    (mu1 ** 2 + mu2 ** 2 + c1) * (sig1_sq + sig2_sq + c2)
-                )
-                return ssim_map.mean().item()
-            
-            ssim = _compute_ssim_simple(rendered_color_post, rgb)
             
             lpips_val = 0.0
             if self._lpips_metric is not None:
@@ -1835,20 +1839,44 @@ class OnlineReconstructionPipeline:
                 img_gt = rgb.permute(2, 0, 1).unsqueeze(0).clamp(0.0, 1.0)
                 lpips_val = float(self._lpips_metric(img_pred, img_gt).item())
         
-        budget_ms = self.config['scheduler'].get('gpu_budget_ms', 16.6)
-        budget_violated = (frame_time * 1000.0) > budget_ms if budget_ms > 0 else False
-        overshoot_ms = max(0.0, (frame_time * 1000.0) - budget_ms) if budget_ms > 0 else 0.0
+        budget_ms = float(self.config['scheduler'].get('gpu_budget_ms', 16.6))
+        cuda_timing_available = bool(sync_stage_timing and str(self.device).startswith('cuda')
+                                    and torch.cuda.is_available())
+        time_opt_cuda_ms = opt_stage_cuda_event_ms if cuda_timing_available else None
+        time_opt_stage_wall_ms = opt_stage_sync_ms if cuda_timing_available else None
+        frame_deadline_ms = self.config.get('system', {}).get('frame_deadline_ms')
+        violation_opt = (time_opt_cuda_ms > budget_ms) if (
+            time_opt_cuda_ms is not None and budget_ms > 0) else None
+        violation_frame = (frame_time * 1000.0 > float(frame_deadline_ms)) if (
+            frame_deadline_ms is not None and float(frame_deadline_ms) > 0) else None
+        overshoot_opt_ms = (max(0.0, time_opt_cuda_ms - budget_ms)
+                            if time_opt_cuda_ms is not None and budget_ms > 0 else None)
+        gain_train_psnr_db = float(psnr_post - psnr_pre) if (
+            psnr_post is not None and psnr_pre is not None) else None
+        legacy_frame_budget_violated = (frame_time * 1000.0) > budget_ms if budget_ms > 0 else False
+        legacy_frame_overshoot_ms = max(0.0, (frame_time * 1000.0) - budget_ms) if budget_ms > 0 else 0.0
 
         metrics = {
             'frame': self.frame_count,
             'psnr': psnr,
+            'psnr_valid_gt': psnr_post,
             'psnr_pre': psnr_pre,
             'psnr_post': psnr_post,
             'ssim': ssim,
+            'ssim_standard': ssim,
+            'ssim_standard_valid_gt': rgb_post_metrics['ssim_standard_valid_gt'],
+            'ssim_legacy': ssim_legacy,
             'lpips': lpips_val,
             'depth_l1': depth_l1,
             'depth_l1_pre': depth_l1_pre,
             'depth_l1_post': depth_l1_post,
+            'depth_l1_gt_valid': depth_post_metrics['depth_l1_gt_valid'],
+            'depth_rmse_gt_valid': depth_post_metrics['depth_rmse_gt_valid'],
+            'depth_l1_overlap': depth_post_metrics['depth_l1_overlap'],
+            'depth_rmse_overlap': depth_post_metrics['depth_rmse_overlap'],
+            'pred_depth_coverage': depth_post_metrics['pred_depth_coverage'],
+            'valid_gt_pixel_count': depth_post_metrics['valid_gt_pixel_count'],
+            'overlap_pixel_count': depth_post_metrics['overlap_pixel_count'],
             'color_loss': per_gaussian_color_err.mean().item(),
             'n_gaussians': self.gaussian_model.num_gaussians,
             'n_active_gaussians': int((self.gaussian_model._state != GaussianState.PRUNED).sum().item()),
@@ -1883,6 +1911,12 @@ class OnlineReconstructionPipeline:
             'compute_return_db_per_opt_ms': (float(psnr_post - psnr_pre) /
                 (opt_stage_sync_ms if opt_stage_sync_ms > 0 else opt_time * 1000.0))
                 if (opt_stage_sync_ms > 0 or opt_time > 0) else 0.0,
+            'compute_return_db_per_opt_ms_legacy_training_frame': (
+                float(psnr_post - psnr_pre) /
+                (opt_stage_sync_ms if opt_stage_sync_ms > 0 else opt_time * 1000.0)
+            ) if (opt_stage_sync_ms > 0 or opt_time > 0) else 0.0,
+            'gain_train_psnr_db': gain_train_psnr_db,
+            'gain_holdout_psnr_db': None,
             'compute_return_timing_source': ('synchronized_stage_wall_ms' if opt_stage_sync_ms > 0
                 else 'pipeline_host_timer_unsynchronized'),
             'budget_young_us': budget_young_us,
@@ -1895,9 +1929,12 @@ class OnlineReconstructionPipeline:
             'n_tier_c': (tiers == Tier.C).sum().item(),
             'n_tier_d': (tiers == Tier.D).sum().item(),
             'frame_time_ms': frame_time * 1000.0,
+            'time_frame_wall_ms': frame_time * 1000.0,
             'opt_time_ms': opt_time * 1000.0,
             'opt_stage_sync_ms': opt_stage_sync_ms,
             'opt_stage_cuda_event_ms': opt_stage_cuda_event_ms,
+            'time_opt_cuda_ms': time_opt_cuda_ms,
+            'time_opt_stage_wall_ms': time_opt_stage_wall_ms,
             'cache_cuda_event_ms': cache_cuda_event_ms,
             'optimizer_forward_cuda_event_ms': optimizer_forward_cuda_event_ms,
             'optimizer_backward_cuda_event_ms': optimizer_backward_cuda_event_ms,
@@ -1910,8 +1947,14 @@ class OnlineReconstructionPipeline:
             'loss': opt_loss_val,
             # Budget metrics
             'budget_ms': budget_ms,
-            'budget_violated': budget_violated,
-            'overshoot_ms': overshoot_ms,
+            'budget_opt_modeled_ms': budget_ms,
+            'frame_deadline_ms': frame_deadline_ms,
+            'violation_opt': violation_opt,
+            'violation_frame': violation_frame,
+            'budget_violated': violation_opt if violation_opt is not None else False,
+            'overshoot_opt_ms': overshoot_opt_ms,
+            'legacy_frame_budget_violated': legacy_frame_budget_violated,
+            'legacy_frame_budget_overshoot_ms': legacy_frame_overshoot_ms,
             # Attribution metrics
             'n_visible': visibility_mask.sum().item(),
             'importance_std': importance.std().item() if importance.numel() > 0 else 0.0,
@@ -1949,6 +1992,7 @@ class OnlineReconstructionPipeline:
         depth: torch.Tensor,
         pose: torch.Tensor,
         trace_persistent_ids: Optional[list] = None,
+        return_images: bool = False,
     ) -> Dict[str, Any]:
         """Render-only evaluation at a held-out viewpoint. NO state change.
 
@@ -1959,7 +2003,9 @@ class OnlineReconstructionPipeline:
         mapped). Restores ``current_pose`` on exit.
 
         Returns:
-            Dict with psnr/ssim/depth_l1/n_gaussians (eval_only=True).
+            Dict with standard/legacy RGB metrics, GT-valid and overlap depth
+            metrics, coverage, and n_gaussians. If ``return_images`` is true,
+            the rendered/GT tensors and coverage/error maps are also returned.
         """
         if not self.initialized:
             raise RuntimeError("Pipeline not initialized. Call initialize() first.")
@@ -1986,24 +2032,43 @@ class OnlineReconstructionPipeline:
                     image_width=W, image_height=H,
                     tile_size=self.config['rendering']['tile_size'], backend=backend)
                 rc, rd = res['color'], res['depth']
-                valid = depth > 0
-                if valid.any():
-                    mse = ((rc[valid] - rgb[valid]) ** 2).mean() + 1e-8
-                    dl1 = (rd[valid] - depth[valid]).abs().mean().item()
-                else:
-                    mse = ((rc - rgb) ** 2).mean() + 1e-8
-                    dl1 = 0.0
-                psnr = -10 * torch.log10(mse).item()
-                c1, c2 = 0.01 ** 2, 0.03 ** 2
-                mu1, mu2 = rc.mean(dim=(0, 1)), rgb.mean(dim=(0, 1))
-                s1 = ((rc - mu1) ** 2).mean(dim=(0, 1))
-                s2 = ((rgb - mu2) ** 2).mean(dim=(0, 1))
-                s12 = ((rc - mu1) * (rgb - mu2)).mean(dim=(0, 1))
-                ssim = (((2 * mu1 * mu2 + c1) * (2 * s12 + c2)) / (
-                    (mu1 ** 2 + mu2 ** 2 + c1) * (s1 + s2 + c2))).mean().item()
-                result = {'psnr': psnr, 'ssim': ssim, 'depth_l1': dl1,
+                valid = torch.isfinite(depth) & (depth > 0)
+                rgb_metrics = rgb_metric_bundle(rc, rgb, valid_gt_mask=valid)
+                alpha_threshold = float(self.config['rendering'].get('depth_threshold_opaque', 0.5))
+                pred_depth_support = res.get('alpha', 1.0 - res['transmission']) >= alpha_threshold
+                rd = torch.where(pred_depth_support, rd, torch.zeros_like(rd))
+                depth_metrics = depth_metric_bundle(
+                    rd, depth, valid_gt_mask=valid,
+                    pred_valid_mask=pred_depth_support)
+                result = {
+                          'psnr': rgb_metrics['psnr_valid_gt'],
+                          'psnr_valid_gt': rgb_metrics['psnr_valid_gt'],
+                          'ssim': rgb_metrics['ssim_standard'],
+                          'ssim_standard': rgb_metrics['ssim_standard'],
+                          'ssim_standard_valid_gt': rgb_metrics['ssim_standard_valid_gt'],
+                          'ssim_legacy': rgb_metrics['ssim_legacy'],
+                          'depth_l1': depth_metrics['depth_l1_gt_valid'],
+                          **depth_metrics,
                           'n_gaussians': self.gaussian_model.num_gaussians,
                           'eval_only': True, 'frame': self.frame_count}
+                if return_images:
+                    pred_valid = pred_depth_support
+                    safe_rd = torch.where(pred_valid, rd, torch.zeros_like(rd))
+                    result['images'] = {
+                        'rgb_prediction': rc.detach().cpu(),
+                        'rgb_ground_truth': rgb.detach().cpu(),
+                        'depth_prediction': rd.detach().cpu(),
+                        'depth_accumulated': res.get(
+                            'depth_accumulated', rd).detach().cpu(),
+                        'render_alpha': res.get(
+                            'alpha', 1.0 - res['transmission']).detach().cpu(),
+                        'depth_ground_truth': depth.detach().cpu(),
+                        'depth_absolute_error_gt_valid': torch.where(
+                            valid, (safe_rd - depth).abs(), torch.full_like(depth, float('nan'))
+                        ).detach().cpu(),
+                        'pred_depth_coverage_mask': (valid & pred_valid).detach().cpu(),
+                        'gt_valid_mask': valid.detach().cpu(),
+                    }
                 if trace_persistent_ids:
                     stats = compute_fast_gaussian_statistics(
                         means3D=self.gaussian_model.positions,
@@ -2151,7 +2216,10 @@ class OnlineReconstructionPipeline:
         psnrs = [m['psnr'] for m in self.metrics_history]
         depths = [m['depth_l1'] for m in self.metrics_history]
         fps_list = [m['fps'] for m in self.metrics_history]
-        violations = [m.get('budget_violated', False) for m in self.metrics_history]
+        measured_opt_violations = [m['violation_opt'] for m in self.metrics_history
+                                   if m.get('violation_opt') is not None]
+        measured_frame_violations = [m['violation_frame'] for m in self.metrics_history
+                                     if m.get('violation_frame') is not None]
         
         latency_stats = self.scheduler.get_latency_statistics()
         
@@ -2162,7 +2230,12 @@ class OnlineReconstructionPipeline:
             'avg_fps': float(np.mean(fps_list)),
             'final_n_gaussians': self.metrics_history[-1]['n_gaussians'],
             'avg_frame_time_ms': float(np.mean([m['frame_time_ms'] for m in self.metrics_history])),
-            'budget_violation_rate': float(np.mean(violations)),
+            'budget_violation_rate': (float(np.mean(measured_opt_violations))
+                                      if measured_opt_violations else None),
+            'optimization_budget_violation_rate': (
+                float(np.mean(measured_opt_violations)) if measured_opt_violations else None),
+            'frame_deadline_violation_rate': (
+                float(np.mean(measured_frame_violations)) if measured_frame_violations else None),
             'latency_stats': latency_stats,
         }
 

@@ -142,6 +142,18 @@ class TestCUDAKernels:
         assert res_gsplat['color'].sum() > 10.0
         assert (res_gsplat['depth'] > 0).any()
         assert (res_gsplat['transmission'] < 1.0).any()
+        supported = res_gsplat['alpha'] >= 0.5
+        assert supported.any()
+        # Rendered depth is expected camera-z, not alpha-weighted accumulated
+        # depth. A single plane at z=2 should remain at z=2 on supported pixels.
+        assert torch.allclose(
+            res_gsplat['depth'][supported],
+            torch.full_like(res_gsplat['depth'][supported], 2.0),
+            atol=1e-3,
+        )
+        assert torch.allclose(
+            res_gsplat['depth'][supported], res_ref['depth'][supported], atol=1e-3
+        )
         
         # Compare total energy between gsplat and reference within 2% margin
         sum_gsplat = res_gsplat['color'].sum()

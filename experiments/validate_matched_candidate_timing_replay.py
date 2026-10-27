@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path
 
 
@@ -11,6 +12,13 @@ def validate_pair(path, expected_candidates, expected_updates):
     arms = record["arms"]
     source_hashes_path = path.parents[1] / "source_hashes.json"
     source_hashes = json.loads(source_hashes_path.read_text()) if source_hashes_path.exists() else {}
+    recorded_source_hashes = record.get("source_hashes", {})
+    source_inventory_matches = bool(source_hashes) and recorded_source_hashes == source_hashes
+    source_checkout_matches = bool(source_hashes) and all(
+        (Path(relpath).is_file()
+         and hashlib.sha256(Path(relpath).read_bytes()).hexdigest() == expected)
+        for relpath, expected in source_hashes.items()
+    )
     prefix_artifact = Path(record.get("frozen_prefix_checkpoint", ""))
     candidate_artifact = Path(record.get("frozen_candidate_file", ""))
     prefix_file_ok = prefix_artifact.is_file() and hashlib.sha256(
@@ -51,7 +59,39 @@ def validate_pair(path, expected_candidates, expected_updates):
         "same_total_update_budget": len({arm.get("total_micro_updates") for arm in arms}) == 1,
         "frozen_prefix_checkpoint_hash": prefix_file_ok,
         "frozen_candidate_file_hash": candidate_file_ok,
+        "source_inventory_matches_run": source_inventory_matches,
+        "source_files_match_current_checkout": source_checkout_matches,
     }
+    metric_required = {
+        "psnr_valid_gt", "ssim_standard", "ssim_legacy", "depth_l1_gt_valid",
+        "depth_rmse_gt_valid", "depth_l1_overlap", "depth_rmse_overlap",
+        "pred_depth_coverage", "valid_gt_pixel_count", "overlap_pixel_count",
+    }
+    metric_rows = [view for arm in arms for view in arm.get("fixed_heldout_views", [])]
+    per_frame_rows = [frame for arm in arms for frame in arm.get("frames", [])]
+    metric_fields_complete = bool(metric_rows) and all(
+        metric_required.issubset(view) for view in metric_rows
+    ) and all(metric_required.issubset(frame) for frame in per_frame_rows)
+    metric_values_valid = bool(metric_rows) and all(
+        math.isfinite(float(view["pred_depth_coverage"]))
+        and 0.0 <= float(view["pred_depth_coverage"]) <= 1.0
+        and int(view["overlap_pixel_count"]) <= int(view["valid_gt_pixel_count"])
+        and int(view["valid_gt_pixel_count"]) > 0
+        and math.isfinite(float(view["ssim_standard"]))
+        and (int(view["overlap_pixel_count"]) == 0
+             or math.isfinite(float(view["depth_l1_overlap"])))
+        for view in metric_rows
+    )
+    checks["rgbd_metric_v2_fields_complete"] = metric_fields_complete
+    checks["rgbd_metric_v2_values_valid"] = metric_values_valid
+    if str(record.get("protocol", {}).get("device", "")).startswith("cuda"):
+        checks["cuda_stage_timing_recorded"] = bool(per_frame_rows) and all(
+            frame.get("time_opt_cuda_ms") is not None
+            and frame.get("time_opt_stage_wall_ms") is not None
+            for frame in per_frame_rows
+        )
+    else:
+        checks["cuda_stage_timing_recorded"] = True
     if "early_global" in by_condition and "early_stale_rescue" in by_condition:
         for timing in ("early", "late"):
             global_arm = by_condition[f"{timing}_global"]
