@@ -1,0 +1,75 @@
+{
+  "experiment": "phase14_projected_area_fix_sensitivity",
+  "status": "frozen",
+  "protocol_version": "phase14-post-area-mask-sensitivity-v1",
+  "timestamp_utc": "2026-10-17T09:07:32.794501+00:00",
+  "git_sha": "c3484a6723bf89ca5264deae3611f46dc1bbe159",
+  "git_branch": "master",
+  "git_status_short": [],
+  "source_sha256": {
+    "experiments/run_final_confirmation.py": "ad685fca7dcced1278579497800d96f23917185dd4c3911f8324f231709483f6",
+    "experiments/run_phase13_frozen_benchmark.py": "ced3f339df2c77537b7c0238bb965f7e8907aeede2c15edfc19b150d171beb44",
+    "research/attribution.py": "e415f83276d5938b41770888dbe559af575c141ef477288bf15ef263cada7af8",
+    "research/pipeline.py": "7f2fc76a883150136ff23b7ecd483b920c2d70ba6463ac325765d85f993db6da",
+    "research/scheduler.py": "93a87f7b471f3b561e13ebb9962402631fc3cc49f6252631f40b792584a4b5d3",
+    "research/reproducibility.py": "661b0c19e98f42f77e84bb6605094be54bad778449e6cf0c48d4a966738b0af0",
+    "experiments/write_phase14_fix_sensitivity_manifest.py": "6ff7192fe810c6eace3ad8dd91c57fee7a279e4a6cb3da9530bbcc101b06d5e6"
+  },
+  "config_sha256": "6c7478a785b5286bbfe870d0beaafd17b1ec539de7d105fcf8f589754a46e08a",
+  "dataset_name": "tum_fr2_xyz",
+  "dataset_path": "/tmp/adaptive_3dgs_phase14_postfix_clean_20261017/datasets/TUM/rgbd_dataset_freiburg2_xyz",
+  "renderer_backend": "gsplat",
+  "pose_convention": "TUM ground-truth W2C via TUMDataset.w2c_pose; mapping-only, tracker decoupled",
+  "protocol": {
+    "scene": "tum_fr2_xyz",
+    "n_frames": 150,
+    "resolution_wh": [
+      320,
+      240
+    ],
+    "seeds": [
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49
+    ],
+    "policies": [
+      "no_op",
+      "error_only",
+      "error_influence",
+      "error_influence_temporal",
+      "ours",
+      "full"
+    ],
+    "budget_ms": 15.0,
+    "budget_scope": "modeled optimization budget, not end-to-end latency",
+    "backend": "gsplat",
+    "pose_convention": "TUM ground-truth W2C via TUMDataset.w2c_pose",
+    "statistical_unit": "complete trajectory per seed"
+  },
+  "hardware": {
+    "os": "Linux-6.8.0-94-generic-x86_64-with-glibc2.39",
+    "python": "3.12.13",
+    "pytorch": "2.11.0+cu128",
+    "cuda_available": true,
+    "cuda_version": "12.8",
+    "device_name": "NVIDIA GeForce RTX 4050 Laptop GPU",
+    "vram_gb": 5.64,
+    "cpu_count": 20
+  },
+  "artifacts": {
+    "final_confirmation_results.json": "c7c8844e41407bb4598f135a24372e6af43532d330ebd224d30fb61510e234f8",
+    "final_confirmation_report.md": "a6adec219d2c92daf82af02c7a1661a6e8ef9d610254a29757291f5c2c3f8945",
+    "config_snapshot.json": "cef0e7f2d263d24e6b3baccef7a919a3d401b1f935e14904975878fefff1a6d4"
+  },
+  "source_status": "clean committed snapshot; source files are individually SHA-256 hashed above",
+  "limitations": [
+    "No matching prior temporal-policy artifact exists for a paired delta.",
+    "Comparisons to prior dirty Phase-14 artifacts are descriptive; this rerun itself is from a clean frozen source snapshot.",
+    "Mean end-to-end latency exceeds the 15 ms modeled optimization budget."
+  ]
+}

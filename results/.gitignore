@@ -105,6 +105,19 @@ phase6_context_utility/ablation/*.pt
 !full_sequence_benchmark/**
 !diagnostics_lifetime_convergence_*.json
 !multiscene_benchmark/**
+!phase14_generalization_postfix/**/*.json
+!phase14_generalization_postfix/**/*.csv
+!phase14_generalization_postfix/**/*.md
 demo_output/
 
 
+
+# Bundles that back the paper's tables (small JSON/MD only; no checkpoints).
+!dilution_factorial/**/*.json
+!dilution_factorial/**/*.md
+!depth_intervention/**/*.json
+!depth_intervention/**/*.md
+!phase14_projected_area_fix_clean_8seeds/*.json
+!phase14_projected_area_fix_clean_8seeds/*.md
+!phase14_projected_area_fix_clean_7policy_8seeds/*.json
+!phase14_projected_area_fix_clean_7policy_8seeds/*.md

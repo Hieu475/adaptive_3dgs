@@ -1,0 +1,102 @@
+{
+  "replica_office0": {
+    "0.0": {
+      "n_seeds": 3,
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "mean_error_psnr": 30.17772438550236,
+      "mean_temporal_coverage_psnr": 26.842788148809362,
+      "temporal_minus_error_db": -3.334936236693,
+      "paired_seed_ci95_db": [
+        -3.341458012359311,
+        -3.3223636463435007
+      ],
+      "mean_post_intervention_hole_rate": 0.0005920573076582514
+    },
+    "0.15": {
+      "n_seeds": 3,
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "mean_error_psnr": 30.321389035343724,
+      "mean_temporal_coverage_psnr": 26.745262310561106,
+      "temporal_minus_error_db": -3.576126724782616,
+      "paired_seed_ci95_db": [
+        -3.625123139583703,
+        -3.5454915509079434
+      ],
+      "mean_post_intervention_hole_rate": 0.15034514293074608
+    },
+    "0.3": {
+      "n_seeds": 3,
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "mean_error_psnr": 30.31381013016107,
+      "mean_temporal_coverage_psnr": 26.619675604984014,
+      "temporal_minus_error_db": -3.6941345251770534,
+      "paired_seed_ci95_db": [
+        -3.7764371043503893,
+        -3.6222364204098483
+      ],
+      "mean_post_intervention_hole_rate": 0.3004477500915527
+    }
+  },
+  "tum_fr2_xyz": {
+    "0.0": {
+      "n_seeds": 3,
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "mean_error_psnr": 24.11857706970639,
+      "mean_temporal_coverage_psnr": 27.689408789740668,
+      "temporal_minus_error_db": 3.5708317200342825,
+      "paired_seed_ci95_db": [
+        3.5145832220713302,
+        3.6163289388020843
+      ],
+      "mean_post_intervention_hole_rate": 0.3758882706528468
+    },
+    "0.5": {
+      "n_seeds": 3,
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "mean_error_psnr": 24.10284658273061,
+      "mean_temporal_coverage_psnr": 27.638043366538152,
+      "temporal_minus_error_db": 3.5351967838075424,
+      "paired_seed_ci95_db": [
+        3.4384243408838913,
+        3.7132928689320863
+      ],
+      "mean_post_intervention_hole_rate": 0.3758882706528468
+    },
+    "1.0": {
+      "n_seeds": 3,
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "mean_error_psnr": 24.208849610222714,
+      "mean_temporal_coverage_psnr": 27.623613415824043,
+      "temporal_minus_error_db": 3.4147638056013307,
+      "paired_seed_ci95_db": [
+        3.294315346082051,
+        3.603644895553586
+      ],
+      "mean_post_intervention_hole_rate": 0.3758882706528468
+    }
+  }
+}
