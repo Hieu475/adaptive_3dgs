@@ -1,26 +1,34 @@
 {
- "names": [
-  "no_op",
-  "error_only",
-  "error_influence",
-  "rtg_slam",
-  "OURS",
-  "FULL"
+ "source": "results/phase14_projected_area_fix_clean_7policy_8seeds/final_confirmation_results.json",
+ "points": {
+  "no_op": [
+   23.523125,
+   19.05776254038016
+  ],
+  "ours": [
+   23.764875,
+   27.63805623650551
+  ],
+  "rtg_slam_reimpl": [
+   65.959625,
+   23.16283624470234
+  ],
+  "error_only": [
+   73.382625,
+   24.044523466626803
+  ],
+  "full": [
+   90.5815,
+   27.850797170400618
+  ],
+  "error_influence": [
+   105.4385,
+   25.031669187545774
+  ]
+ },
+ "pareto_frontier": [
+  "ours",
+  "full"
  ],
- "psnr": [
-  18.86,
-  24.07,
-  25.04,
-  23.05,
-  27.67,
-  27.85
- ],
- "mapK": [
-  23.5,
-  74.6,
-  106.9,
-  67.2,
-  23.4,
-  88.0
- ]
+ "heuristic_map_threshold_k": 65
 }

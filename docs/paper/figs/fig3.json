@@ -1,16 +1,19 @@
 {
- "conds": [
-  "off",
+ "source": "results/phase14_multiscene/replica_kappa_ablation.json",
+ "conditions": [
   "k0.80",
   "k0.90",
   "k0.95",
-  "error_only"
+  "off",
+  "error_only_ref"
  ],
- "psnr": [
-  24.79,
-  24.0,
-  23.98,
-  24.19,
+ "mean_psnr": [
+  24.00041162967682,
+  23.976786692937214,
+  24.19405433866713,
+  24.794305059644913,
   29.48
- ]
+ ],
+ "off_minus_k090_db": 0.8175183667076986,
+ "error_only_minus_off_db": 4.685694940355088
 }

@@ -19,4 +19,23 @@ scratch/
 .ipynb_checkpoints/
 *.patch
 
+# LaTeX build intermediates (keep generated PDFs and figure sources).
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.synctex.gz
+*.toc
+*.out
+*.lof
+*.lot
+*.bbl
+*.blg
+*.bcf
+*.run.xml
+*.xdv
+
+# Downloaded reference paper; keep it local rather than in the project tree.
+2608.14902v1.pdf
+
 

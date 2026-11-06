@@ -1,0 +1,483 @@
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{microtype}
+\usepackage{cite}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage[breaklinks,colorlinks]{hyperref}
+\usepackage{geometry}
+\geometry{top=0.62in,bottom=0.62in,left=0.65in,right=0.65in}
+
+\renewcommand{\topfraction}{0.95}
+\renewcommand{\bottomfraction}{0.95}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.85}
+\setcounter{topnumber}{5}
+\setcounter{bottomnumber}{5}
+\setcounter{totalnumber}{8}
+\setcounter{dbltopnumber}{4}
+
+\setlength{\textfloatsep}{5pt plus 1pt minus 1pt}
+\setlength{\floatsep}{5pt plus 1pt minus 1pt}
+\setlength{\intextsep}{5pt plus 1pt minus 1pt}
+\setlength{\abovecaptionskip}{3pt}
+\setlength{\belowcaptionskip}{3pt}
+
+\title{\textbf{Map Growth and Policy Routing in Budgeted Online RGB-D 3DGS}}
+
+\author{
+Anonymous ICCV Submission\\
+Paper ID: TBD
+}
+
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Online RGB-D 3D Gaussian Splatting (3DGS) must allocate a bounded per-frame optimization budget while its map grows. We test \textbf{compute dilution}: whether map growth reduces the share of updates available to established Gaussians. A corrected-pose $2\times3$ selector--throttle factorial on two TUM scenes (150 frames, eight seeds each) shows that coverage throttling improves raw-error selection by $+3.33$ and $+1.77\,\mathrm{dB}$; fourfold optimization budget with the original spawn allowance improves it by $+3.29$ and $+3.07\,\mathrm{dB}$. On \texttt{fr2\_xyz}, the fraction of mature Gaussians selected per frame rises from $0.36$ to $0.82$ under coverage throttling. These interventions support a compute-allocation mechanism, while the selector also contributes.
+We compare selection heuristics, map-growth throttling, and a training-free router. Single-Gaussian counterfactuals have negative measured utility in $2.7$--$38.7\%$ of interventions across geometry strata ($n=75$ per stratum); a uniform-random selector over the same pools has an expected $20.3\%$ negative rate. On the clean-source TUM benchmark (150 frames, eight seeds), temporal-influence selection with coverage throttling reaches $27.64\,\mathrm{dB}$, $2.61\,\mathrm{dB}$ above the strongest budgeted baseline, recovering $97.6\%$ of headroom above no-op or $92.5\%$ above the strongest budgeted baseline, with a $3.8\times$ smaller map than FULL. The tested offline utility model degrades closed-loop PSNR by $2.51\,\mathrm{dB}$.
+The same fixed policy loses $3.32\,\mathrm{dB}$ to raw-error selection on Replica. A frozen hole-rate router selects the better tested policy on two original dataset substrates, but within-scene depth interventions do not reverse the policy ranking: adding 30\% random holes to Replica leaves raw error ahead by $3.69\,\mathrm{dB}$, while filtering valid TUM depth leaves temporal selection ahead by $3.41\,\mathrm{dB}$ (three seeds each). Hole rate is therefore a dataset-associated cue in this study, not an established sensor-noise mechanism. The $15\,\mathrm{ms}$ limit applies to modeled optimization, not end-to-end latency; measured throughput is about 10 FPS. Seeds characterize repeatability on fixed trajectories, not generalization across scenes.
+\end{abstract}
+
+\section{Introduction}
+3D Gaussian Splatting (3DGS)~\cite{kerbl3Dgaussians} has become the dominant primitive for photorealistic dense mapping, driving online RGB-D systems such as SplaTAM~\cite{keetha2023splatam}, Point-SLAM~\cite{sandstrom2023pointslam}, MonoGS~\cite{matsuki2024gaussian}, Photo-SLAM~\cite{huang2024photoslam} and RTG-SLAM~\cite{peng2024rtgslam}.
+Deployed on robots and headsets, these systems face a hard constraint the offline literature ignores: each streaming frame admits only milliseconds of optimization.
+One common response is \textit{selection} --- rank Gaussians by residual error, influence, or a learned utility score, and optimize a subset.
+We ask whether map growth and selection policy jointly affect reconstruction quality under a fixed budget.
+
+We examine how map growth changes the effect of a fixed optimization budget. Online pipelines add splats in response to rendering error; in our long-horizon runs, some maps exceed $100\mathrm{k}$ primitives within 150 frames. We test \textbf{compute dilution} with a corrected-pose factorial, a fourfold optimization-budget control, map caps, and per-frame update allocation by Gaussian age. The interventions support this mechanism on two TUM scenes, while the quality effect remains sensitive to selector and densification policy.
+
+Several observations motivate this investigation.
+First, residual error does not imply positive optimization return: pose-fixed counterfactuals are negative in 29/75 flat, 16/75 texture, 14/75 edge, and 2/75 depth-discontinuity interventions. These are candidate-level proportions from five seeds; cluster-aware confidence intervals are not available.
+Uniform random selection from the same stratified candidate pools has an expected negative-intervention rate of $20.3\%$ (95\% seed-cluster bootstrap CI $16.0$--$24.3\%$). The stratum range alone therefore does not establish ranking quality; the per-candidate labels needed to compare the selected top-error subset were not saved.
+Second, interaction strength is protocol-dependent, not universally severe: corrected joint-group interventions stay relatively additive ($R_{\mathrm{add}}(16) = 0.82$), while a separate pairwise protocol shows stronger coupling --- so pointwise ranking is treated as a reference rather than a bound, without universality claims. Contextual re-ranking buys no measured online gain while incurring $424\times$ selection overhead.
+Third, one offline-learned utility model does not transfer in our tested setup: its comparison on pre-fix labels is followed by a $-2.51\,\mathrm{dB}$ closed-loop result.
+This result rejects that model and training protocol; it does not rule out learned ranking generally. The corrected-label dataset has not yet been regenerated.
+
+Our response has two parts.
+\textbf{Coverage throttling} regulates spawning with a coverage-saturation knee ($\kappa_t \ge 0.90$ measured by transmission) that ramps new-primitive allowance $1.0 \to 0.20$. The configured backlog limit was inactive in the headline runs because warmup was disabled; the corrected-substrate factorial evaluates it as an independent option.
+\textbf{Hole-rate-routed policy selection} addresses the observed difference between our two evaluated dataset substrates.
+The combined policy gains $3.59\,\mathrm{dB}$ over error-only on TUM and loses $3.32\,\mathrm{dB}$ to raw-error selection on synthetic Replica.
+A training-free router keyed on raw missing-depth rate separates TUM from Replica in the original evaluation (TUM $0.18$--$0.31$ vs Replica $\approx 0.000$) and picks the better measured policy on two substrates. Within-scene depth interventions in Sec.~\ref{sec:experiments} leave the preferred fixed policy unchanged, so the observed hole-rate association does not explain the cross-dataset reversal. Exploratory 7-scene evaluation matches the best fixed policy on five scenes and trails on two motion-heavy TUM scenes.
+
+\textbf{Contributions.}
+(1) A counterfactual analysis measuring negative single-Gaussian utility, with interaction conclusions explicitly limited to the tested protocols.
+(2) A corrected-pose two-scene factorial and budget/map-size controls that identify a large coverage effect and support compute dilution, alongside a combined policy that reaches 97.6\% of headroom above no-op (92.5\% above the strongest budgeted baseline) on \texttt{fr2\_xyz} with a $3.8\times$ smaller map.
+(3) A frozen hole-rate router that classifies seven exploratory scenes by dataset-associated depth statistics, plus within-scene perturbations that reject a simple missing-depth explanation for its two-substrate policy split.
+(4) Fully reported negative results --- learned utility, contextual re-ranking, synthetic failure, and two failed noise features --- with frozen artifacts for every claim.
+
+\section{Related Work}
+\textbf{Online 3DGS SLAM and dense mapping.}
+SplaTAM~\cite{keetha2023splatam} established silhouette-guided differentiable SLAM with 3D Gaussians; Point-SLAM~\cite{sandstrom2023pointslam} uses dynamic neural point clouds; MonoGS~\cite{matsuki2024gaussian} and Photo-SLAM~\cite{huang2024photoslam} push toward real-time operation with loop closure; RTG-SLAM~\cite{peng2024rtgslam} adds compact opaque/transparent roles with rule-based stable/unstable selection and is our primary external policy baseline (re-implemented under exactly matched budgets, since native-system comparison would confound renderer, tracker, and scheduler effects).
+Unlike these systems, our object of study is not the full SLAM stack but the compute-allocation layer inside it; we evaluate mapping under ground-truth poses with tracking explicitly decoupled (Sec.~\ref{sec:limitations}).
+\textbf{Scalable and efficient Gaussian mapping.}
+Recent systems address online map scalability through representation and update design. VTGaussian-SLAM~\cite{hu2025vtgs} ties Gaussians to RGB-D views and avoids keeping every primitive learnable, targeting large scenes and memory use. SEGS-SLAM~\cite{wen2025segs} improves structure and appearance consistency, while DyGS-SLAM~\cite{hu2025dygs} focuses on dynamic-scene localization and reconstruction. In parallel, SteepGS~\cite{wang2025steepgs} derives compact density-control updates for 3DGS reconstruction. A recent online-mapping preprint studies geometry-aware initialization and densification under short optimization schedules~\cite{luu2026geometry}.
+These methods make clear that map representation, density control, and online optimization are coupled. Our study asks how growth rate and update policy should respond to coverage and observable scene statistics under a fixed per-frame budget and Gaussian representation. We do not claim density control or efficient Gaussian mapping as new in general. The per-scene SOTA numbers in Appendix Tab.~\ref{tab:sota} are protocol-mismatched context.
+\textbf{Evaluation protocols in dense SLAM.}
+Published systems report full-sequence train-view rendering with global refinement at full resolution (Replica $33$--$42\,\mathrm{dB}$ for MonoGS/Point-SLAM/RTG-SLAM; TUM fr2\_xyz $16$--$25\,\mathrm{dB}$ for MonoGS/SplaTAM/Photo-SLAM) plus full-trajectory ATE. Our protocol is deliberately narrower --- budgeted online mapping on fixed horizons --- so cross-paper numbers are contextual range, never superiority claims (Tab.~\ref{tab:sota}).
+\textbf{Budgeted and utility-driven selection.}
+Error-only, error$\times$influence, gradient-norm, and temporal-filtered heuristics all trade quality for compute.
+We benchmark them under identical modeled budgets with paired Holm-corrected tests rather than reporting best-of-sweep numbers. Their ordering differs between the evaluated TUM and Replica scenes, motivating a test of observable routing cues.
+\textbf{Submodular maximization and knapsack allocation.}
+Budgeted set selection is related to monotone submodular maximization, for which approximation guarantees exist under explicit assumptions and appropriate algorithms~\cite{nemhauser1978analysis,sviridenko2004knapsack}. Those assumptions are not established for our measured reconstruction objective, and our fractional-knapsack ranker does not inherit those guarantees. The measured interactions vary by protocol, so we treat pointwise ranks as references and test map-growth control empirically.
+
+\section{Problem Formulation}
+Let $G_t = \{g_1, \dots, g_N\}$ be the active map, $g_i = (\mu_i, \Sigma_i, \alpha_i, c_i)$, with streaming observation $(I_t, D_t)$ and pose $T_t$.
+Differentiable alpha compositing renders
+$\hat{I}(u) = \sum_i c_i \alpha_i \mathcal{G}_i(u) \prod_{j<i}(1-\alpha_j \mathcal{G}_j(u))$
+(and depth analogously).
+Per-frame scheduling solves
+\begin{equation}
+\max_{A_t \subseteq G_t} \Delta Q(A_t) \quad \text{s.t.} \quad \sum_{i \in A_t} C_i \le B_t,
+\end{equation}
+with decoupled cost $C_i(K) = C_i^{\mathrm{base}} + K \cdot C_i^{\mathrm{step}}$ for $K$ microsteps and $\Delta Q$ measured by exact full-scene counterfactual renders (active edits embedded in all $N$ splats, avoiding depth-interleaving gradient bias of affine-background approximations).
+The oracle $U_i^\star = \Delta Q_i^{\mathrm{exact}} / \Delta C_i$ is our measurement instrument, never a runtime input.
+It reveals: (i) negative utility in $2.7$--$38.7\%$ of interventions by stratum (pose-fixed regeneration), with only 2/75 negative interventions at depth discontinuities; (ii) interaction is protocol-dependent --- corrected joint-group measurements give $R_{\mathrm{add}}(4) = 0.95$, $R_{\mathrm{add}}(16) = 0.82$ (relatively additive), while a separate pairwise protocol shows stronger interaction; pointwise top-$K$ is therefore treated as a reference, not a bound, without a universality claim; (iii) offline TwoHeadMLP rank signal ($\rho \approx 0.20$, NDCG@20 $0.46$, measured on pre-pose-fix labels whose absolute values are polluted but whose within-set method comparison remains valid) reverses to $-2.51\,\mathrm{dB}$ closed-loop. Conditional-oracle selection numbers are withheld pending a rerun under fork-correct semantics.
+
+\section{Method}
+\textbf{Fast Approximate Attribution (FAA).}
+Exact Gaussian-to-pixel attribution costs $523.9\,\mathrm{ms}$/frame.
+Center-sampled projection ($\tilde{m}_i = \alpha_i \det(\Sigma_{2D,i})^{1/4} e(\lfloor \mu_{2D,i} \rceil)$) cuts this to $\mathbf{0.85\,\mathrm{ms}}$ ($614.5\times$) at Spearman $\rho = 0.9079$ and Pearson $r = 0.9028$ against exact attribution.
+\textbf{Selection.}
+Candidates are scored by error $\times$ influence mass with temporal EMA filtering ($\beta = 0.90$) and packed by fractional-knapsack value density $s_i / C_i$ under $B_t = 15\,\mathrm{ms}$ with safety factor $1.10$ (effective cap $13.6\,\mathrm{ms}$).
+Each selected Gaussian receives $K = 5$ microsteps; cost is modeled decoupled as $C_i(K) = C_i^{\mathrm{base}} + K \cdot C_i^{\mathrm{step}}$, calibrated so modeled vs wall-clock optimization time agree within measurement noise on the RTX 4050 backend.
+The scheduler runs in $2.54\,\mathrm{ms}$ total ($0.38$ extraction, $0.85$ FAA, $0.77$ knapsack ordering, $0.39$ state sync), leaving the budget headroom to optimization proper.
+\textbf{Coverage throttling.}
+Coverage $\kappa_t$ = fraction of valid pixels with transmission $< 0.5$.
+The per-frame spawn cap ramps $1.0 \to 0.20$ over $\kappa_t \in [0.80, 0.90]$ (configurable knee, no longer hardcoded). The backlog term was inactive in the headline configuration because its count was only computed when warmup was enabled.
+Warmup pre-allocation is disabled (ablation $-0.75\,\mathrm{dB}$); microsteps fixed at $K = 5$.
+\textbf{Hole-rate policy routing.}
+Raw depth hole-rate separates the evaluated TUM and Replica datasets: TUM $0.18$--$0.31$ vs Replica $\approx 0.000$ (300--500$\times$). Since the datasets also differ in rendering, pose quality, and scene content, this association does not establish that sensor noise causes the policy ranking to change.
+The score $n = \mathrm{clip}(2.5 \cdot \mathrm{holes} + 1.0 \cdot \mathrm{edge})$ routes $n \le 0.10 \to$ raw-error selection ($\kappa = 0.98$) and $n \ge 0.30 \to$ temporal$\times$influence + throttling ($\kappa = 0.90$), computed pre-hygiene in milliseconds on CPU.
+Formally, with $h_t$ the raw missing-depth rate and $e_t$ the raw edge density of frame $t$:
+{\footnotesize
+\begin{equation}
+n_t = \min(1,\, 2.5 h_t + 1.0 e_t), \quad
+\pi_t = \begin{cases}
+\texttt{err\_only} & n_t \le 0.10 \\
+\text{blend} & 0.10 < n_t < 0.30 \\
+\texttt{temporal} & n_t \ge 0.30
+\end{cases}
+\end{equation}
+}
+with coverage knee $\kappa \in \{0.98, 0.90\}$ tied to the chosen arm.
+The score and thresholds were chosen after inspecting five development scenes (Fig.~\ref{fig:separation}), including \texttt{fr1\_xyz}. That scene is therefore development evidence for the router, although its separate 150-frame mapping-policy comparison uses frozen settings. A seven-scene audit is reported separately in Tab.~\ref{tab:routing7}; scene-level independence must be tracked separately from seed-level repeats.
+Two earlier features failed held-out separation and are reported as such: post-hygiene invalid ratio (conflates far-but-valid geometry --- 18\% of Replica room0 exceeds $4\,\mathrm{m}$ --- with holes) and Laplacian texture energy (measures sharpness, inverted: crisp synthetic scores \textit{higher}).
+Operating on pre-hygiene raw depth was the fix (Fig.~\ref{fig:separation}).
+A mixed-regime test injects 30\% holes mid-trajectory on Replica and the router changes arms on 49/50 frames at the transition. This verifies feature-triggered switching in that test; end-to-end PSNR trails fixed \texttt{error\_only} by $0.85\,\mathrm{dB}$, so a quality benefit on mixed real sequences is not established.
+
+\begin{figure}[tbp]
+\centering
+\includegraphics[width=\columnwidth]{figs/fig1_noise_separation.pdf}
+\caption{\textbf{Depth score on five development scenes.} The five plotted scenes include \texttt{fr1\_xyz}; its mapping-policy comparison is distinct from independent router validation. The seven-scene router audit appears in Tab.~\ref{tab:routing7}. The separation shown here measures dataset association, not sensor-noise causality.}
+\label{fig:separation}
+\end{figure}
+
+\section{Negative Results for the Tested Ranking Policies}
+\textbf{Learned utility reverses closed-loop} ($-2.51\,\mathrm{dB}$ in the historical one-seed factorial on the pre-fix substrate; GradNorm beats the MLP pointwise $0.51 > 0.25$): offline labels ignore trajectory shift and inter-Gaussian coupling, so we ship no learned component. This result is separate from the corrected-pose factorial in Tab.~\ref{tab:factorial}.
+\textbf{Contextual re-ranking buys no online gain}: adaptive greedy shows no significant improvement over static pointwise selection in direct multi-seed budget sweeps (Wilcoxon n.s., CIs span zero) while incurring $424\times$ selection overhead ($76.36$ vs $0.18\,\mathrm{ms}$). Supporting rank-stability/oracle-gap numbers predate the fork-semantics fix and are withheld pending regen.
+
+\section{Experiments}
+\label{sec:experiments}
+\textbf{Protocol.} $320 \times 240$, $B_t = 15\,\mathrm{ms}$, seeds $[42..49]$, two-sided Wilcoxon paired + Holm-Bonferroni + bootstrap CIs; production \texttt{gsplat} backend; GT poses with tracking decoupled (mapping benchmark, not SLAM ATE).
+Artifacts: \texttt{results/phase14\_projected\_area\_fix\_clean\_7policy\_8seeds/} (frozen source commit and manifest).
+\textbf{Holdout protocol.} Because online mapping optimizes on the evaluated trajectory, train-view PSNR overstates generalization. We hold out every 8th frame render-only (never mapped, never selected): the train--holdout gap is $+0.47\,\mathrm{dB}$ mean over 30f$\times$3 seeds for both OURS and \texttt{error\_only} (\texttt{results/phase14\_holdout/}) --- small under this same-trajectory proxy, which we explicitly do \textit{not} present as independent novel-trajectory generalization. A strict novel-trajectory split (withheld rooms) remains future work.
+
+\begin{table*}[t]
+\centering
+\small
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Policy} & \textbf{Mean PSNR} & \textbf{Final PSNR} & \textbf{SSIM} & \textbf{FPS} & \textbf{Map} & \textbf{$\Delta$ vs OURS} \\
+\midrule
+\texttt{no\_op} & 19.06 & 14.88 & 0.6920 & 90.0 & 23,523 & +8.58 $\checkmark$ \\
+\texttt{error\_only} & 24.04 & 20.12 & 0.8838 & 9.8 & 73,383 & +3.59 $\checkmark$ \\
+\texttt{error\_influence} & 25.03 & 21.83 & 0.9083 & 9.5 & 105,438 & +2.61 $\checkmark$ \\
+\texttt{error\_influence\_temporal} & 24.94 & 21.61 & 0.9079 & 9.5 & 106,392 & +2.70 $\checkmark$ \\
+\texttt{rtg\_slam\_reimpl} & 23.16 & 20.04 & 0.8669 & 8.9 & 65,960 & +4.48 $\checkmark$ \\
+\textbf{OURS} & \textbf{27.64} & \textbf{28.82} & \textbf{0.9231} & \textbf{11.1} & \textbf{23,765} & --- \\
+\textit{FULL} & \textit{27.85} & \textit{29.34} & \textit{0.9245} & \textit{9.6} & \textit{90,582} & $-0.21$ $\checkmark$ \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Main benchmark, TUM \texttt{fr2\_xyz}, 150 frames $\times$ 8 seeds.} All six controls differ significantly from OURS after Holm correction ($p_{\mathrm{Holm}} = 0.0469$). FULL is $0.21\,\mathrm{dB}$ higher. Headroom recovery is $97.6\%$ relative to no-op and $92.5\%$ relative to the strongest budgeted baseline, at $3.8\times$ smaller map than FULL.}
+\label{tab:main}
+\end{table*}
+
+\begin{table*}[t]
+\centering
+\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcccccc}
+\toprule
+& \multicolumn{3}{c}{TUM \texttt{fr2\_xyz}} & \multicolumn{3}{c}{TUM \texttt{fr1\_xyz}} \\
+\textbf{Selector / map control} & \textbf{PSNR} & \textbf{Depth L1} & \textbf{Map (k)} & \textbf{PSNR} & \textbf{Depth L1} & \textbf{Map (k)} \\
+\midrule
+Error, no throttle & 24.05 & .0236 & 80.3 & 21.12 & .0505 & 80.6 \\
+Error, coverage & 27.38 & .0148 & 24.4 & 22.89 & .0443 & 37.9 \\
+Error, coverage + backlog & 27.36 & .0149 & 24.4 & 22.95 & .0456 & 35.9 \\
+Temporal$\times$influence, no throttle & 24.96 & .0165 & 105.5 & 22.06 & .0484 & 89.1 \\
+Temporal$\times$influence, coverage & 27.64 & .0130 & 23.8 & 23.48 & .0425 & 38.7 \\
+Temporal$\times$influence, coverage + backlog & 27.66 & .0131 & 23.4 & 23.55 & .0450 & 32.5 \\
+\midrule
+Error, optimization budget $\times4$ & 27.34 & .0142 & 93.8 & 24.19 & .0402 & 79.3 \\
+Error, hard map cap 23k & 26.69 & .0215 & 23.0 & 22.30 & .1023 & 23.0 \\
+Error, hard map cap 39k & --- & --- & --- & 21.15 & .1046 & 39.0 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Corrected-pose factorial and dilution controls, 150 frames $\times$ 8 seeds per scene.} All factorial cells use the same modeled $15\,\mathrm{ms}$ optimization budget. The $\times4$ control uses $60\,\mathrm{ms}$ for optimization while keeping the original $15\,\mathrm{ms}$ spawn allowance. Depth L1 is in meters. Hard caps harm depth on \texttt{fr1\_xyz}; the 39k cap matches the coverage map size there but gives no PSNR gain. Backlog is enabled independently of warmup only in the last throttle level. Per-run traces and paired intervals are in \texttt{results/dilution\_factorial/}.}
+\label{tab:factorial}
+\end{table*}
+
+\textbf{Main result (Tab.~\ref{tab:main}, Fig.~\ref{fig:deltas}, Fig.~\ref{fig:pareto}).}
+OURS reaches $27.64 \pm 0.04\,\mathrm{dB}$: $+2.61$ over the strongest budgeted baseline, $+4.48$ over the RTG-SLAM-policy re-implementation, and $+8.58$ over pass-through. These results evaluate the combined policy on this trajectory.
+
+\textbf{Selector $\times$ throttle factorial (Tab.~\ref{tab:factorial}).} With selector fixed to raw error, coverage adds $+3.33$ $[3.19,3.50]$ dB on \texttt{fr2\_xyz} and $+1.77$ $[1.73,1.81]$ dB on \texttt{fr1\_xyz}. With temporal$\times$influence fixed, its gains are $+2.68$ $[2.64,2.72]$ and $+1.42$ $[1.41,1.44]$ dB. Brackets are paired seed-bootstrap 95\% CIs; all four coverage contrasts have two-sided paired Wilcoxon $p=.0078$. Temporal selection itself adds $+0.26$ dB with coverage on \texttt{fr2\_xyz} and $+0.59$ dB on \texttt{fr1\_xyz}; the interaction is negative ($-0.65$ and $-0.35$ dB), so selector and coverage effects are not additive. The independent backlog option adds $-0.02$/$+0.02$ dB on \texttt{fr2\_xyz} and only $+0.07$/$+0.07$ dB on \texttt{fr1\_xyz} for error/temporal selection; on the latter scene its lower map size accompanies worse depth L1.
+
+\textbf{Dilution controls and direct allocation.} Holding the spawn allowance at its $15\,\mathrm{ms}$ value, giving raw-error selection $60\,\mathrm{ms}$ for optimization raises PSNR by $+3.29$ $[3.18,3.41]$ and $+3.07$ $[3.04,3.11]$ dB on \texttt{fr2\_xyz}/\texttt{fr1\_xyz}, despite maps of $94\mathrm{k}$/$79\mathrm{k}$. Capping the error-only map at 23k adds $+2.64$ $[2.53,2.76]$ and $+1.18$ $[1.15,1.22]$ dB, but doubles depth L1 on \texttt{fr1\_xyz}. A 39k cap matching that scene's coverage map adds only $+0.04$ $[-0.06,0.11]$ dB and also harms depth. Thus a static size limit does not reproduce coverage throttling's effect on \texttt{fr1\_xyz}. For raw-error selection on \texttt{fr2\_xyz}, coverage reduces the share of modeled update budget spent on Gaussians younger than ten frames from $22.5\%$ to $10.7\%$, while the per-frame selection rate among mature Gaussians rises from $35.8\%$ to $82.3\%$. The corresponding mature selection rate on \texttt{fr1\_xyz} rises from $28.6\%$ to $56.3\%$. Allocation shifts and the budget intervention support compute dilution under the tested protocol, but coverage also changes densification thresholds and the optimization trajectory. Map size alone is not identified as the unique cause.
+
+\textbf{Exploratory transfer to two more TUM scenes} (150f$\times$3 seeds, same six factorial cells): coverage adds $+0.34$/$+0.10\,\mathrm{dB}$ to error/temporal selection on \texttt{fr1\_desk}, but depth L1 worsens from $0.0481$/$0.0476$ to $0.0590$/$0.0595\,\mathrm{m}$. On \texttt{fr3\_static}, coverage adds $+0.77$/$+0.38\,\mathrm{dB}$ and slightly improves depth L1. Adding backlog to temporal selection on \texttt{fr1\_desk} loses $0.59\,\mathrm{dB}$. These scene-level differences limit any claim that one growth rule is optimal across sensor and motion conditions; the three-seed comparisons are descriptive (full traces in \texttt{results/dilution\_factorial/}).
+
+\begin{table}[tbp]
+\centering
+\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Policy} & \textbf{Mean} & \textbf{Final} & \textbf{SSIM} & \textbf{Map} \\
+\midrule
+Fixed OURS & 26.85 & 26.07 & 0.9244 & 78,825 \\
+Routed (err) & 30.17 & 28.02 & 0.9584 & 115,964 \\
+\midrule
+$\Delta$ & +3.32 $\checkmark$ & +1.95 $\checkmark$ & +0.034 & --- \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Adaptive validation, Replica \texttt{office0}, 150f $\times$ 8 seeds.} Router picks \texttt{error\_only} (holes $\approx 0.02$): $p = 0.0078$, $d_z = 71.9$. No fixed policy wins both substrates.}
+\label{tab:adaptive}
+\end{table}
+
+\begin{table}[tbp]
+\centering
+\footnotesize\setlength{\tabcolsep}{2pt}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Scene} & \textbf{Level} & \textbf{Error} & \textbf{Temporal} & \textbf{$\Delta$} \\
+\midrule
+Replica office0 & 0\% & 30.18 & 26.84 & $-3.33$ \\
+ & 15\% & 30.32 & 26.75 & $-3.58$ \\
+ & 30\% & 30.31 & 26.62 & $-3.69$ \\
+\midrule
+TUM fr2\_xyz & 0 & 24.12 & 27.69 & $+3.57$ \\
+ & 0.5 & 24.10 & 27.64 & $+3.54$ \\
+ & 1.0 & 24.21 & 27.62 & $+3.41$ \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Within-scene depth interventions} (150 frames $\times$ 3 seeds). $\Delta$ is temporal$\times$influence with coverage minus unthrottled raw error, measured on identical perturbed frames. Replica also receives Gaussian depth noise with standard deviation $0.05$ times the hole fraction in meters. TUM smoothing acts only on valid depth after the standard hygiene stage; it does not remove remaining holes. No level reverses policy ordering. Full paired intervals: \texttt{results/depth\_intervention/analysis.json}.}
+\label{tab:depth_intervention}
+\end{table}
+
+\begin{table}[tbp]
+\centering
+\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Scene} & \textbf{Routed PSNR} & \textbf{Fixed reference} & \textbf{Route} \\
+\midrule
+fr2\_xyz 150f & 27.66 & 27.64 (ours) & temporal \\
+office0 150f & 30.36 & 30.17 (err) & error\_only \\
+office1 100f & 33.11 & 33.48 (err) & error\_only \\
+room1 100f & 24.17 & 24.29 (err) & error\_only \\
+fr3\_static 100f & 25.95 & 25.96 (ours) & temporal \\
+fr1\_room 100f & 15.50 & 16.54 (err) & temporal \\
+fr1\_rpy 100f & 19.93 & 21.06 (err) & temporal \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{7-scene router audit.} Routed PSNR uses $n=3$; fixed values are unpaired references. Office0 uses $n=3$ routed vs $n=8$ fixed. Five scenes are held out; two overlap development.}
+\label{tab:routing7}
+\end{table}
+
+\textbf{Policy choice differs across the two evaluated substrates (Tab.~\ref{tab:adaptive}).}
+On synthetic Replica the fixed combined policy loses $3.32\,\mathrm{dB}$; routing to raw-error selection recovers $3.32$ [$3.29$, $3.35$], $p = 0.0078$.
+\textbf{Seven-scene routing (Tab.~\ref{tab:routing7}, exploratory $n=3$, no scene labels):} routed PSNR is close to fixed-policy reference values on five scenes and about $1.1\,\mathrm{dB}$ lower on exploration-heavy \texttt{fr1\_room} and rapid-rotation \texttt{fr1\_rpy}. These are unpaired, exploratory comparisons; the table reports references rather than inferential deltas.
+Domain dependence is thus finer than real-vs-synthetic: motion and exploration regime matter within a sensor, and the current router does not capture them --- reported as-is.
+\textbf{Depth intervention (Tab.~\ref{tab:depth_intervention}).} On Replica \texttt{office0}, raising random missing-depth rate to 30\% with accompanying $1.5\,\mathrm{cm}$ Gaussian noise makes the frozen score exceed its temporal-route threshold, yet raw-error selection remains ahead by $3.69$ $[3.62,3.78]$ dB across three seeds. On TUM \texttt{fr2\_xyz}, bilateral smoothing of valid depth after the standard hygiene stage changes the temporal-minus-error advantage only from $+3.57$ to $+3.41$ dB. These interventions do not support a causal claim that missing depth alone determines the better policy. The Replica masks are independent pixel noise rather than a full Kinect artifact model; the TUM intervention leaves missing pixels masked. Thresholds were not recalibrated on independent scenes because every available TUM and Replica scene appears in the reported scene set, and no third sensor domain is present locally.
+\textbf{Observed failure cases.} Two TUM scenes show where the combined policy trails raw-error selection.
+\textit{Exploration-heavy motion} (\texttt{fr1\_room}, $-1.04\,\mathrm{dB}$) coincides with a smaller final map ($92\mathrm{k}$ vs $97\mathrm{k}$); the available run does not isolate whether throttling or selection causes the gap.
+\textit{Rapid rotation} (\texttt{fr1\_rpy}, $-1.13\,\mathrm{dB}$ mean, finals $24.5$ vs $24.1$) is consistent with a lag from temporal smoothing, but this attribution has not been tested independently.
+These exploratory cases motivate motion-aware routing, with coverage \textit{velocity} and angular rate as candidate cues.
+\textbf{Horizon effect (Fig.~\ref{fig:dilution}):} at 30 frames OURS ties \texttt{error\_only} ($-0.01\,\mathrm{dB}$ on \texttt{fr2\_xyz}); the gap appears at longer horizons. The new age-group logs in Tab.~\ref{tab:factorial} link this divergence to a smaller update share for mature Gaussians in the growing map.
+Around frame 65 in seed 42, both error-only variants encounter difficult views; the unthrottled run continues spawning roughly 500--900 splats per frame and its PSNR remains low after frame 70, whereas the coverage run spawns roughly 90--130 and recovers by frame 75. The unthrottled loss rises from about $0.07$ at frame 65 to $0.13$ at frame 70 and stays high; opacity declines while the map expands. This is sustained divergence following shared hard views, not evidence for a single isolated gradient explosion. The logs cannot rule out floaters without a spatial geometry audit.
+
+\begin{figure*}[tbp]
+\centering
+\includegraphics[width=0.92\textwidth]{figs/fig7_dilution.pdf}
+\caption{\textbf{Map growth and reconstruction quality over time} on TUM \texttt{fr2\_xyz} and \texttt{fr1\_xyz} (150 frames, eight seeds). Lines show the seed mean and shaded bands show $\pm1$ standard deviation. \texttt{error\_only} versus \texttt{error + coverage} holds the selector fixed to show the coverage effect; \texttt{temporal + coverage} adds the combined policy. Paired sequence-level contrasts are reported in Tab.~\ref{tab:factorial}.}
+\label{fig:dilution}
+\end{figure*}
+
+
+\textbf{Systems:} scheduler overhead $2.54\,\mathrm{ms}$; optimization-budgeted execution at $\sim 10\,\mathrm{FPS}$ measured --- \textit{not} end-to-end $15\,\mathrm{ms}$ real-time, reported as such.
+\textbf{Baseline tracking (Tab.~\ref{tab:ate}):} a dense frame-to-frame photometric+depth Gauss-Newton odometer (no keyframes/loop closure, GT-anchored first frame) reaches ATE $0.9\,\mathrm{cm}$ (fr2\_xyz) and $2.0\,\mathrm{cm}$ (fr1\_xyz) over 100 frames at 3 seeds (\texttt{results/phase14\_tracking100/}), stable vs 30f with no late blowup; mapping evaluated at tracked poses holds $31.3$/$26.6\,\mathrm{dB}$ (above GT-pose PSNR since renders align to the tracker's own photometric optimum --- not comparable across pose sources).
+Published full-trajectory references (MonoGS $1.71$, SplaTAM $0.50$, Photo-SLAM $0.63\,\mathrm{cm}$ on fr2\_xyz) are shown for range only --- ours is a short-horizon sanity check, not a SLAM claim.
+
+
+
+\textbf{Reproducibility.} The headline table uses \texttt{results/phase14\_projected\_area\_fix\_clean\_7policy\_8seeds/}, audited as paper-ready with per-policy configs, source hashes, artifact hashes, pose protocol, and clean source commit \texttt{c4e8e3a}. The six-policy confirmation, separate RTG-SLAM run, and deterministic merge are reproduced with \texttt{experiments/run\_final\_confirmation.py}, \texttt{experiments/merge\_phase14\_clean\_rtg\_results.py}, and \texttt{experiments/write\_phase14\_fix\_sensitivity\_manifest.py}. The prior \texttt{results/phase14\_corrected/} bundle is retained as historical reference. The factorial, controls, and per-frame allocation logs remain separate under \texttt{results/dilution\_factorial/}. Prior pose-bugged numbers ($19.24\,\mathrm{dB}$) are quarantined in \texttt{results/final\_confirmation/DEPRECATED.md}, never compared.
+Environment: RTX 4050 Laptop GPU (6\,GB, driver 595.84), PyTorch 2.11+cu128 (CUDA 12.8), \texttt{gsplat} 1.5.3 production backend, Python 3.12.
+The OS memory guard caps the process at 70\% VRAM, reserving $\sim$1.8\,GB for the desktop compositor; peak measured allocation stays under $3.5\,\mathrm{GB}$, so all benchmarks run on a laptop GPU with desktop usable throughout --- the intended deployment envelope for budgeted online mapping, not a datacenter A100 setup whose headroom would mask dilution.
+To reproduce Tab.~\ref{tab:main}, run the default six policies to \texttt{results/phase14\_projected\_area\_fix\_clean\_8seeds/}, run \texttt{--policies rtg\_slam\_reimpl} to \texttt{results/phase14\_projected\_area\_fix\_clean\_rtg8/}, then run the merge and manifest scripts named above.
+\textbf{Perceptual and geometric metrics:} AlexNet LPIPS on fr2\_xyz 150f$\times$3 is $0.211$ (OURS) vs $0.294$ (\texttt{error\_only}). The new eight-seed factorial reports rendered depth L1 in Tab.~\ref{tab:factorial}; it does not report surface reconstruction accuracy against a 3D mesh.
+\textbf{Second confirmatory scene (Tab.~\ref{tab:confirm2}):} fr1\_xyz 150f$\times$8 gives OURS $23.47$ vs \texttt{error\_only} $21.09$ ($+2.38\,\mathrm{dB}$, $p=0.0078$); office1 routing validated at 8 seeds (routed \texttt{error\_only} $33.46$ vs fixed OURS $29.25$, $p=0.0078$).
+
+\begin{table}[tbp]
+\centering
+\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Scene} & \textbf{OURS} & \textbf{\texttt{error\_only}} & \textbf{$\Delta$} \\
+\midrule
+fr1\_xyz 150f$\times$8 & 23.47 & 21.09 & $+2.38$ $\checkmark$ \\
+office1 100f$\times$8 & 29.25 & 33.46 & $-4.21$ (routed) $\checkmark$ \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Confirmatory combined-policy comparisons.} The combined policy wins on TUM ($p=0.0078$); routing recovers the synthetic loss ($p=0.0078$). The separate factorial in Tab.~\ref{tab:factorial} isolates the coverage effect. \texttt{results/phase14\_multiscene150/}.}
+\label{tab:confirm2}
+\end{table}
+
+
+
+\begin{figure}[tbp]
+\centering
+\includegraphics[width=\columnwidth]{figs/fig6_budget.pdf}
+\caption{\textbf{Budget curve} (fr2\_xyz, 30 frames$\times$3, matched modeled budgets): policies are similar across the tested budget range at this short horizon. This experiment does not establish where the 150-frame policies separate as a function of budget.}
+\label{fig:budget}
+\end{figure}
+\textbf{Published-SOTA context} (Appendix, Tab.~\ref{tab:sota}): these reported results use different frames, resolution, and views, so they provide range context only.
+\textbf{Long horizons:} at 150 frames the combined policy leads on fr2\_xyz and fr1\_xyz, while other TUM scenes are ties or losses at exploratory sample sizes; it loses mean PSNR on all eight evaluated Replica scenes.
+\textbf{Per-scene breakdown (Tab.~\ref{tab:scenes}, exploratory $n=3$ except fr2\_xyz/office0/office1/fr1\_xyz at $n=8$):} the combined policy wins the two confirmatory TUM comparisons and loses both confirmatory Replica comparisons. Across all 14 sequences it loses mean PSNR to raw-error on 10; remaining comparisons are exploratory, and final-frame behavior varies by sequence.
+
+
+Supplementary video (\texttt{supp\_video.mp4}) shows both A/B directions.
+
+\begin{figure}[tbp]
+\centering
+\includegraphics[width=\columnwidth]{figs/fig2_main_deltas.pdf}
+\caption{\textbf{Paired mean-PSNR differences} on fr2\_xyz (150 frames, $n=8$). Points show OURS $-$ baseline; bars are 95\% paired-bootstrap CIs. Positive favors OURS. FULL is $0.21\,\mathrm{dB}$ higher; all six contrasts pass Holm correction ($p=0.0469$).}
+\label{fig:deltas}
+\end{figure}
+
+\begin{figure}[tbp]
+\centering
+\includegraphics[width=\columnwidth]{figs/fig3_kappa_ablation.pdf}
+\caption{\textbf{Replica office0 ablation} (30 frames, $n=3$). Disabling coverage throttling changes mean PSNR by $0.82\,\mathrm{dB}$; switching from temporal$\times$influence to raw-error changes it by a further $4.69\,\mathrm{dB}$. These are descriptive short-run differences without a reported significance test.}
+\label{fig:kappa}
+\end{figure}
+
+\begin{figure}[tbp]
+\centering
+\includegraphics[width=\columnwidth]{figs/fig4_pareto.pdf}
+\caption{\textbf{Quality--map-size trade-off} on fr2\_xyz (150 frames, $n=8$). Only OURS and FULL lie on the frontier; FULL gains $0.21\,\mathrm{dB}$ with a $3.8\times$ larger map. The three growing heuristics exceed $65\mathrm{k}$; no-op stays compact at lower quality.}
+\label{fig:pareto}
+\end{figure}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figs/fig5_qualitative.pdf}
+\caption{\textbf{Qualitative comparison across both evaluated substrates.} Top: an intermediate TUM \texttt{fr2\_xyz} view (90), where OURS has lower per-view error than \texttt{error\_only}; bottom: Replica \texttt{office0} view 98, where the ranking reverses. Columns show ground truth, OURS, \texttt{error\_only}, FULL, and signed RGB $L_1$ error gap (red: OURS has lower error). Insets mark the same crop in each row. PSNR labels are per-view values from seed 42, shown only to illustrate the visual comparison; they are not sequence means.}
+\label{fig:qual}
+\end{figure*}
+
+\section{Limitations}
+\label{sec:limitations}
+The principal mapping benchmark uses ground-truth poses (no ATE claim there). We additionally report a separate 100-frame dense RGB-D Gauss-Newton odometry sanity check (ATE $0.9$/$2.0\,\mathrm{cm}$, no keyframes/relocalization/loop closure --- a baseline VO, not a SLAM system). Evaluations cover at most 150 frames (about five seconds at 30 FPS), not long-running exploration. The corrected factorial and budget intervention identify a compute-allocation effect on two TUM scenes, but coverage throttling changes both spawn allowance and error thresholds; neither the fixed map caps nor the available traces isolate map size as the sole mediator. The 23k cap's RGB improvement on \texttt{fr1\_xyz} comes with a doubled depth error, while a 39k cap gives no RGB improvement. The measured $15\,\mathrm{ms}$ budget is modeled optimization time, not end-to-end frame latency; the integrated pipeline runs at about 8--11 FPS. Thresholds were calibrated on development scenes, and independent router calibration remains unavailable in the present scene collection.
+Statistically, $n=8$ seeds establish \textit{repeatability} under stochastic variation on fixed trajectories; they do not establish cross-scene generalization, whose unit is scenes, not seeds --- additional scenes are exploratory ($n=3$) until confirmed.
+The router separates the evaluated TUM and Replica groups by raw depth hole-rate (7/7 exploratory scene classifications), but domain identity is confounded with pose, rendering, and scene properties. Within-scene random holes on Replica and valid-depth smoothing on TUM do not reverse the fixed-policy ranking; the mixed-regime test also trails fixed raw-error selection by $0.85\,\mathrm{dB}$. The interventions cover two simplified noise models rather than a complete sensor-noise spectrum. A third sensor domain, independent threshold calibration, broader confirmatory multi-scene evaluation, corrected-label regeneration, and a true mixed-regime sequence remain open.
+
+\section{Conclusion}
+On the clean-source TUM \texttt{fr2\_xyz} trajectory, temporal-influence selection with coverage throttling reaches $27.64\,\mathrm{dB}$ and recovers $97.6\%$ of headroom above no-op ($92.5\%$ above the strongest budgeted baseline), with a $3.8\times$ smaller map than FULL. The two-scene factorial, fourfold-budget rescue, and age-group update logs support compute dilution under a fixed optimization budget; static map caps reveal additional geometry and trajectory effects. The hole-rate router selects the better measured policy on the original two substrates, but the depth interventions do not support a simple sensor-noise explanation of that split.
+
+\appendix
+\section{Historical and Cross-System Context}
+The following tables use different substrates or protocols from the corrected matched-budget benchmark.
+\textbf{Historical component ablation (Tab.~\ref{tab:ablation}, pose-bugged substrate, 150 frames, 5 seeds).} Relative to A0, A2 (coverage) differs by $+1.04\,\mathrm{dB}$ and A3 (coverage plus backlog) by $+1.08\,\mathrm{dB}$. The direct A3--A2 increment is $+0.04\,\mathrm{dB}$; no direct significance test is reported, and comparisons against A0 have Holm-adjusted $p=0.25$. These numbers are not transferred to the corrected benchmark.
+A native local SplaTAM run on the same sequence (144f, seed 42: final $27.20$ / mean $23.03\,\mathrm{dB}$, SSIM $0.974$, LPIPS $0.046$, depth $1.26\,\mathrm{cm}$, ATE $0.41\,\mathrm{cm}$) uses a different resolution and tracking setup; these figures are contextual only and do not test compute dilution.
+
+\begin{table}[tbp]
+\centering
+\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Condition} & \textbf{Mean} & \textbf{$\Delta$ vs A0} & \textbf{Map} & \textbf{Finding} \\
+\midrule
+A0 baseline & 16.07 & --- & 140,998 & bloated \\
+A1 + warmup & 15.32 & $-0.75$ & 140,038 & harmful \\
+A2 + coverage & 17.11 & $+1.04$ & 44,865 & ns vs A0 \\
+A3 + backlog & 17.15 & $+1.08$ & 43,824 & $+0.04$ vs A2 \\
+A4 + learned & 14.53 & $-1.54$ & 38,317 & harmful \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Historical component ablation on the pose-bugged substrate} (5 seeds). Values and tests are not evidence for effects on the corrected benchmark. \texttt{results/step1\_ablation\_5seeds/}.}
+\label{tab:ablation}
+\end{table}
+
+\begin{table*}[t]
+\centering
+\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Method} & \textbf{Replica} & \textbf{fr2\_xyz} & \textbf{Protocol} \\
+\midrule
+MonoGS & 37.50 & 16.17 & full seq + refine \\
+Point-SLAM & 35.17 & --- & full seq + refine \\
+RTG-SLAM & 32.79 & 17.08 & full seq + refine \\
+SplaTAM & --- & 24.50 & full seq + refine \\
+SplaTAM (local run, 144f) & --- & 27.20 final / 23.03 mean & SLAM 640$\times$480, no refine \\
+Photo-SLAM & --- & 21.07 & full seq + refine \\
+Ours (error\_only) & 20--33 & 24.07 & budgeted, 100--150f \\
+Ours (throttled) & 20--29 & \textbf{27.64} & budgeted, 100--150f \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Published-SOTA context (protocol-mismatched) and one local SplaTAM run.} Published results are shown for context, not as matched comparisons. The local run uses the same sequence but a different resolution and tracking setup; details are in the text.}
+\label{tab:sota}
+\end{table*}
+
+\section{Additional Evaluation}
+\begin{table}[tbp]
+\centering
+\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Method} & \textbf{fr2\_xyz} & \textbf{fr1\_xyz} & \textbf{Horizon} & \textbf{System?} \\
+\midrule
+Ours (GN VO) & 0.9 & 2.0 & 100f & no (baseline) \\
+MonoGS & 1.71 & --- & full & yes \\
+SplaTAM & 0.50 & --- & full & yes \\
+Photo-SLAM & 0.63 & --- & full & yes \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{ATE RMSE (cm).} Rows 2--4 are published full-system numbers; ours is a decoupled odometry sanity check on fixed horizons.}
+\label{tab:ate}
+\end{table}
+
+\begin{table*}[t]
+\centering
+\small
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Scene} & \textbf{Frames} & \textbf{OURS} & \textbf{\texttt{error\_only}} & \textbf{$\Delta$} & \textbf{Map (k)} & \textbf{$n$} \\
+\midrule
+fr2\_xyz (TUM) & 150 & 27.64 & 24.04 & $+3.59$ $\checkmark$ & 24 / 73 & 8 \\
+fr1\_xyz (TUM) & 150 & 23.47 & 21.09 & $+2.38$ $\checkmark$ & 39 / 81 & 8 \\
+fr1\_desk (TUM) & 150 & 22.55 & 22.34 & $+0.21$ & 27 / 56 & 3 \\
+fr1\_room (TUM) & 100 & 15.53 & 16.54 & $-1.01$ & 92 / 97 & 3 \\
+fr1\_rpy (TUM) & 100 & 19.92 & 21.06 & $-1.14$ & 45 / 62 & 3 \\
+fr3\_static (TUM) & 100 & 25.96 & 25.88 & $+0.08$ & 13 / 18 & 3 \\
+office0 (Rep.) & 150 & 26.85 & 30.17 & $-3.32$ $\checkmark$ & 79 / 116 & 8 \\
+office1 (Rep.) & 100 & 29.25 & 33.46 & $-4.21$ $\checkmark$ & 42 / 74 & 8 \\
+office2 (Rep.) & 99 & 22.08 & 24.67 & $-2.59$ & 70 / 117 & 3 \\
+office3 (Rep.) & 99 & 22.45 & 24.47 & $-2.02$ & 77 / 150 & 3 \\
+office4 (Rep.) & 99 & 23.58 & 25.93 & $-2.36$ & 81 / 141 & 3 \\
+room0 (Rep.) & 99 & 20.85 & 22.78 & $-1.93$ & 82 / 150 & 3 \\
+room1 (Rep.) & 100 & 20.42 & 24.29 & $-3.87$ & 47 / 59 & 3 \\
+room2 (Rep.) & 99 & 22.86 & 25.88 & $-3.03$ & 78 / 146 & 3 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Per-scene combined-policy breakdown, 14 sequences.} $\checkmark$ marks the reported significant comparisons at $n=8$; other entries are exploratory. The combined policy wins the two confirmatory TUM comparisons but loses on both confirmatory Replica comparisons; remaining scenes have exploratory sample sizes.}
+\label{tab:scenes}
+\end{table*}
+
+\section{Further Experiments}
+The following experiments would refine the mechanism and extend its scope.
+\textbf{Map-growth mediation:} vary continuous spawn rates and pruning strength while holding the candidate error threshold fixed; compare trajectories at matched map size and depth quality. A budget proportional to current map size would also test whether the fourfold rescue persists under a less coarse intervention.
+\textbf{Router generalization:} obtain a third sensor domain and scenes outside the reported set for threshold calibration; then test structured missing-depth artifacts and geometry-preserving TUM hole repair. The present random-hole and valid-depth-smoothing interventions did not reverse the preferred policy.
+\textbf{Longer mapping evaluation:} use sequences of at least 500 frames, multiple start windows, a real tracker, and depth or geometric metrics.
+\textbf{Corrected utility labels:} regenerate counterfactual labels on the corrected pose substrate before drawing conclusions about learned ranking.
+\textbf{Finer-grained adaptivity:} the 7-scene routing table shows motion/exploration regime matters within a sensor (fr1\_room, fr1\_rpy trail by $\approx -1.1\,\mathrm{dB}$); extending the observable cue beyond hole-rate (e.g.\ optical-flow magnitude, coverage velocity) could route rapid-motion frames to instantaneous error while keeping temporal smoothing elsewhere.
+
+
+{\footnotesize
+\bibliographystyle{ieee_fullname}
+\begin{thebibliography}{14}\itemsep=-4pt
+\bibitem{kerbl3Dgaussians} B.~Kerbl et al.\ 3D Gaussian Splatting for Real-Time Radiance Field Rendering.\ ACM TOG, 2023.
+\bibitem{keetha2023splatam} N.~Keetha et al.\ SplaTAM: Splat, Track \& Map 3D Gaussians for Dense RGB-D SLAM.\ CVPR, 2024.
+\bibitem{sandstrom2023pointslam} E.~Sandstrom et al.\ Point-SLAM: Dense Neural Point Clouds for Real-Time RGB-D SLAM.\ ICCV, 2023.
+\bibitem{matsuki2024gaussian} H.~Matsuki et al.\ Gaussian Splatting SLAM.\ CVPR, 2024.
+\bibitem{huang2024photoslam} H.~Huang et al.\ Photo-SLAM: Real-time Simultaneous Localization and Photorealistic Mapping.\ CVPR, 2024.
+\bibitem{peng2024rtgslam} Z.~Peng et al.\ RTG-SLAM: Real-time 3D Reconstruction at Scale using Gaussian Splatting.\ SIGGRAPH, 2024.
+\bibitem{nemhauser1978analysis} G.~Nemhauser, L.~Wolsey, and M.~Fisher.\ An analysis of approximations for maximizing submodular set functions.\ Mathematical Programming, 1978.
+\bibitem{wen2025segs} T.~Wen, Z.~Liu, and Y.~Fang.\ SEGS-SLAM: Structure-Enhanced 3D Gaussian Splatting SLAM with Appearance Embedding.\ ICCV, 2025, pp.\ 28103--28113.
+\bibitem{hu2025dygs} X.~Hu, C.~Zhang, M.~Zhao, Y.~Gui, X.~Zhang, and X.~Ji.\ DyGS-SLAM: Real-Time Accurate Localization and Gaussian Reconstruction for Dynamic Scenes.\ ICCV, 2025, pp.\ 9561--9571.
+\bibitem{hu2025vtgs} P.~Hu and Z.~Han.\ VTGaussian-SLAM: RGBD SLAM for Large Scale Scenes with Splatting View-Tied 3D Gaussians.\ In Proceedings of the 42nd International Conference on Machine Learning, PMLR 267, pp.\ 24347--24370, 2025.
+\bibitem{wang2025steepgs} P.~Wang et al.\ Steepest Descent Density Control for Compact 3D Gaussian Splatting.\ In CVPR, 2025.
+\bibitem{luu2026geometry} T.~Luu, Q.~Tran, H.~Phan, and T.~Dang.\ Geometry-Aware Online Mapping for 3D Gaussian Splatting SLAM.\ arXiv:2608.14902, 2026, preprint.
+\bibitem{sviridenko2004knapsack} M.~Sviridenko.\ A note on maximizing a submodular set function subject to a knapsack constraint.\ Operations Research Letters, 32(1):41--43, 2004.
+\end{thebibliography}
+}
+
+\end{document}

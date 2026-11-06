@@ -1,0 +1,113 @@
+\documentclass[10pt,twocolumn,letterpaper]{article}
+\usepackage[review]{cvpr}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{multirow}
+\definecolor{cvprblue}{rgb}{0.21,0.49,0.74}
+\usepackage[pagebackref,breaklinks,colorlinks,allcolors=cvprblue]{hyperref}
+\backrefparscanfalse
+\def\paperID{*****}
+\def\confName{ICCV}
+\def\confYear{2027}
+\title{\textbf{Supplementary Material: Map Growth and Policy Routing in Budgeted Online RGB-D 3DGS}}
+\author{Anonymous ICCV Submission\\Paper ID: *****}
+\renewcommand{\thetable}{S\arabic{table}}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\begin{document}
+\maketitle
+\appendix
+\section{Short-horizon ablations}
+\begin{figure}[tbp]
+\centering
+\includegraphics[width=\columnwidth]{figs/fig6_budget.pdf}
+\caption{\textbf{Budget curve} (fr2\_xyz, 30 frames$\times$3, matched modeled budgets): policies are similar across the tested budget range at this short horizon. This experiment does not establish where the 150-frame policies separate as a function of budget.}
+\label{fig:budget}
+\end{figure}
+\begin{figure}[tbp]
+\centering
+\includegraphics[width=\columnwidth]{figs/fig3_kappa_ablation.pdf}
+\caption{\textbf{Replica office0 ablation} (30 frames, $n=3$). Disabling coverage throttling changes mean PSNR by $0.82\,\mathrm{dB}$; switching from temporal$\times$influence to raw-error changes it by a further $4.69\,\mathrm{dB}$. These are descriptive short-run differences without a reported significance test.}
+\label{fig:kappa}
+\end{figure}
+
+\section{Historical and Cross-System Context}
+The following tables use different substrates or protocols from the corrected matched-budget benchmark.
+\textbf{Historical component ablation (Tab.~\ref{tab:ablation}, pose-bugged substrate, 150 frames, 5 seeds).} Relative to A0, A2 (coverage) differs by $+1.04\,\mathrm{dB}$ and A3 (coverage plus backlog) by $+1.08\,\mathrm{dB}$. The direct A3--A2 increment is $+0.04\,\mathrm{dB}$; no direct significance test is reported, and comparisons against A0 have Holm-adjusted $p=0.25$. These numbers are not transferred to the corrected benchmark.
+A native local SplaTAM run on the same sequence (144f, seed 42: final $27.20$ / mean $23.03\,\mathrm{dB}$, SSIM $0.974$, LPIPS $0.046$, depth $1.26\,\mathrm{cm}$, ATE $0.41\,\mathrm{cm}$) uses a different resolution and tracking setup; these figures are contextual only and do not test compute dilution.
+
+\begin{table}[tbp]
+\centering
+\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Condition} & \textbf{Mean} & \textbf{$\Delta$ vs A0} & \textbf{Map} & \textbf{Finding} \\
+\midrule
+A0 baseline & 16.07 & --- & 140,998 & bloated \\
+A1 + warmup & 15.32 & $-0.75$ & 140,038 & harmful \\
+A2 + coverage & 17.11 & $+1.04$ & 44,865 & ns vs A0 \\
+A3 + backlog & 17.15 & $+1.08$ & 43,824 & $+0.04$ vs A2 \\
+A4 + learned & 14.53 & $-1.54$ & 38,317 & harmful \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Historical component ablation on the pose-bugged substrate} (5 seeds). Values and tests are not evidence for effects on the corrected benchmark. \texttt{results/step1\_ablation\_5seeds/}.}
+\label{tab:ablation}
+\end{table}
+
+\begin{table*}[t]
+\centering
+\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Method} & \textbf{Replica} & \textbf{fr2\_xyz} & \textbf{Protocol} \\
+\midrule
+MonoGS & 37.50 & 16.17 & full seq + refine \\
+Point-SLAM & 35.17 & --- & full seq + refine \\
+RTG-SLAM & 32.79 & 17.08 & full seq + refine \\
+SplaTAM & --- & 24.50 & full seq + refine \\
+SplaTAM (local run, 144f) & --- & 27.20 final / 23.03 mean & SLAM 640$\times$480, no refine \\
+Photo-SLAM & --- & 21.07 & full seq + refine \\
+Ours (error\_only) & 20--33 & 24.07 & budgeted, 100--150f \\
+Ours (throttled) & 20--29 & \textbf{27.64} & budgeted, 100--150f \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Published-SOTA context (protocol-mismatched) and one local SplaTAM run.} Published results are shown for context, not as matched comparisons. The local run uses the same sequence but a different resolution and tracking setup; details are in the text.}
+\label{tab:sota}
+\end{table*}
+
+\section{Additional Evaluation}
+\begin{table}[tbp]
+\centering
+\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Method} & \textbf{fr2\_xyz} & \textbf{fr1\_xyz} & \textbf{Horizon} & \textbf{System?} \\
+\midrule
+Ours (GN VO) & 0.9 & 2.0 & 100f & no (baseline) \\
+MonoGS & 1.71 & --- & full & yes \\
+SplaTAM & 0.50 & --- & full & yes \\
+Photo-SLAM & 0.63 & --- & full & yes \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{ATE RMSE (cm).} Rows 2--4 are published full-system numbers; ours is a decoupled odometry sanity check on fixed horizons.}
+\label{tab:ate}
+\end{table}
+
+
+\section{Further Experiments}
+The following experiments would refine the mechanism and extend its scope.
+\textbf{Map-growth mediation:} vary continuous spawn rates and pruning strength while holding the candidate error threshold fixed; compare trajectories at matched map size and depth quality. A budget proportional to current map size would also test whether the fourfold rescue persists under a less coarse intervention.
+\textbf{Router generalization:} obtain a third sensor domain and scenes outside the reported set for threshold calibration; then test structured missing-depth artifacts and geometry-preserving TUM hole repair. The present random-hole and valid-depth-smoothing interventions did not reverse the preferred policy.
+\textbf{Longer mapping evaluation:} use sequences of at least 500 frames, multiple start windows, a real tracker, and depth or geometric metrics.
+\textbf{Corrected utility labels:} regenerate counterfactual labels on the corrected pose substrate before drawing conclusions about learned ranking.
+\textbf{Finer-grained adaptivity:} the 7-scene routing table shows motion/exploration regime matters within a sensor (fr1\_room, fr1\_rpy trail by $\approx -1.1\,\mathrm{dB}$); extending the observable cue beyond hole-rate (e.g.\ optical-flow magnitude, coverage velocity) could route rapid-motion frames to instantaneous error while keeping temporal smoothing elsewhere.
+
+
+
+
+\end{document}
