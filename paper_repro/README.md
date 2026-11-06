@@ -21,3 +21,10 @@ GPU runs are long (RTX 4050: tens of minutes per scene × seeds). The paper numb
 Remaining unpinned items: the two `*_8seed.json` merges, and Fig. 5 (`gen_qual_fig_v4.py`), which were not traced to a recorded command.
 
 Scripts moved out of `experiments/` into `research_archive/` during the cleanup are those that nothing in the paper, tests, or result manifests references; moving them does not change any frozen artifact.
+
+## Known provenance gap
+
+`results/phase14_projected_area_fix_clean_7policy_8seeds/manifest.json` records its run commits (`93791b1`, `c3484a6`) and writer commit (`75865c7`).
+None of these exist in this repository's history (the runs were made from a clean checkout under `/tmp`), and `research/pipeline.py` differs from the hash in the manifest
+(the other seven recorded source files match the current tree byte-for-byte). The paper therefore cites source-file hashes and worktree status rather than a commit hash.
+Before submission, either recover that checkout's commit and import it, or re-run `reproduce.sh main` from a tagged commit and re-freeze the bundle.
