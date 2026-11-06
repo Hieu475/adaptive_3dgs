@@ -86,6 +86,8 @@ def test_aggregate_policy_runs():
             "final_ssim": 0.82 + i * 0.01,
             "mean_depth_l1": 0.10 - i * 0.01,
             "final_depth_l1": 0.09 - i * 0.01,
+            "mean_depth_l1_pre": 0.11 - i * 0.01,
+            "final_depth_l1_pre": 0.10 - i * 0.01,
             "N_final": 5000 + i * 100,
             "mean_new_per_frame": 50.0,
             "mean_n_optimized": 300.0,
@@ -119,6 +121,7 @@ def test_generate_markdown_summary():
         "gpu": "NVIDIA GeForce RTX 4050 Laptop GPU",
         "vram_gb": 6.0,
         "cuda_version": "12.8",
+        "config_sha256": "0" * 64,
     }
     agg_runs = [
         {
@@ -139,4 +142,4 @@ def test_generate_markdown_summary():
     md = generate_markdown_summary(agg_runs, manifest, n_frames=150, budget_ms=15.0)
     assert "# Phase 13 Authoritative Frozen Benchmark Report" in md
     assert "Substrate Headroom" in md
-    assert "Provenance & Reproducibility Guarantees" in md
+    assert "Provenance & Repeatability Scope" in md

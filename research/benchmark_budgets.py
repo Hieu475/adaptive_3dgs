@@ -115,7 +115,8 @@ def format_budget_table(ablation_results: Dict[str, Any]) -> str:
         p95_t = f"{exp['p95_frame_time_ms']:.1f}"
         fps = f"{exp['avg_fps']:.1f}"
         min_fps = f"{exp['min_fps']:.1f}"
-        viol = f"{exp['budget_violation_rate']:.1%}"
+        viol_rate = exp.get('budget_violation_rate')
+        viol = "n/a" if viol_rate is None else f"{viol_rate:.1%}"
 
         lines.append(f"| {b_label} | {psnr} | {depth_l1} | {n_opt} | {mean_t} | {p95_t} | {fps} | {min_fps} | {viol} |")
 

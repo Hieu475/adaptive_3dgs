@@ -121,3 +121,8 @@ demo_output/
 !phase14_projected_area_fix_clean_8seeds/*.md
 !phase14_projected_area_fix_clean_7policy_8seeds/*.json
 !phase14_projected_area_fix_clean_7policy_8seeds/*.md
+
+# Model checkpoints and snapshots are large; never track them.
+*.pt
+*.pth
+*.ckpt

@@ -58,10 +58,10 @@ Environment: Python 3.12, PyTorch 2.11 + CUDA 12.8, `gsplat` 1.5.3 (production r
 ### Tests
 
 ```bash
-pytest tests -q   # 518 pass, 3 known failures (see below)
+pytest tests -q   # 521 passed
 ```
 
-Three tests fail at the current commit and also at `HEAD` before the cleanup: `test_budget_controller.py::…::test_budget_matrix_and_table` (a `None` format in `research/benchmark_budgets.py`) and two in `test_phase13_frozen_benchmark.py` (`mean_depth_l1_pre`, `config_sha256` keys added to results after the tests were written).
+Three tests that failed at the previous `HEAD` were fixed during the cleanup: `format_budget_table` now prints `n/a` when no violation rate was measured, and the two `test_phase13_frozen_benchmark.py` fixtures were updated for fields the production code now requires (`*_depth_l1_pre`, `config_sha256`) and a renamed report section.
 
 ## 4. Repository layout
 
