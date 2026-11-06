@@ -219,3 +219,11 @@ demo_output/
 /replica_room2_120/
 /replica_seed42/
 /tum_fr2_projected_area_fix_sensitivity.md
+
+# Dilution extension / dose-response bundles backing Tabs. 4-5 (JSON/MD only).
+!dilution_extension/**/*.json
+!dilution_extension/**/*.md
+!dilution_dose/**/*.json
+!dilution_dose/**/*.md
+!dilution_dose_replica_cap/**/*.json
+!dilution_dose_replica_cap/**/*.md

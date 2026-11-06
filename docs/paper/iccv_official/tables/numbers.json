@@ -1,0 +1,88 @@
+{
+ "tum_fr2_xyz": {
+  "error budget proportional to map": 3.73,
+  "error_off_psnr": 24.16
+ },
+ "tum_fr1_xyz": {
+  "error budget proportional to map": 2.99,
+  "error_off_psnr": 21.54
+ },
+ "replica_office0": {
+  "coverage on error": -0.68,
+  "coverage on temporal": -0.54,
+  "backlog on error": -2.55,
+  "backlog on temporal": -1.96,
+  "selector without throttle": -1.95,
+  "selector with coverage": -1.81,
+  "error budget x4": 2.81,
+  "error budget proportional to map": 2.88,
+  "proportional vs coverage (error)": 3.56,
+  "error_off_psnr": 30.63
+ },
+ "replica_office1": {
+  "coverage on error": -0.87,
+  "coverage on temporal": 0.21,
+  "backlog on error": -2.04,
+  "backlog on temporal": -1.93,
+  "selector without throttle": -2.33,
+  "selector with coverage": -1.25,
+  "error budget x4": 1.56,
+  "error budget proportional to map": 1.56,
+  "proportional vs coverage (error)": 2.44,
+  "error_off_psnr": 33.84
+ },
+ "dose": {
+  "tum_fr2_xyz": {
+   "cells": [
+    "24.24 (0.38)",
+    "26.49 (0.58)",
+    "27.82 (0.98)",
+    "26.90 (0.73)",
+    "27.85 (1.00)",
+    "27.85 (1.00)"
+   ],
+   "rho_all": 0.92,
+   "rho_free": 1.0,
+   "n_seeds": 8
+  },
+  "tum_fr1_xyz": {
+   "cells": [
+    "21.53 (0.29)",
+    "22.78 (0.55)",
+    "24.45 (0.89)",
+    "22.52 (0.65)",
+    "23.63 (1.00)",
+    "23.63 (1.00)"
+   ],
+   "rho_all": 0.75,
+   "rho_free": 1.0,
+   "n_seeds": 8
+  },
+  "replica_office0": {
+   "cells": [
+    "30.61 (0.17)",
+    "32.25 (0.34)",
+    "33.43 (0.72)",
+    "24.37 (0.24)",
+    "25.25 (0.49)",
+    "26.07 (1.00)"
+   ],
+   "rho_all": 0.2,
+   "rho_free": 1.0,
+   "n_seeds": 8
+  },
+  "replica_office1": {
+   "cells": [
+    "33.85 (0.18)",
+    "34.88 (0.33)",
+    "35.42 (0.68)",
+    "22.79 (0.38)",
+    "22.85 (0.75)",
+    "22.90 (1.00)"
+   ],
+   "rho_all": -0.26,
+   "rho_free": 1.0,
+   "n_seeds": 8
+  }
+ }
+}

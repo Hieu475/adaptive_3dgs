@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One command per paper table. See paper_repro/README.md.
-# Usage: bash paper_repro/reproduce.sh {list|check|main|factorial|depth|adaptive|scenes|counterfactual|holdout|tracking|figs}
+# Usage: bash paper_repro/reproduce.sh {list|check|main|factorial|depth|adaptive|scenes|counterfactual|extension|dose|tables|holdout|tracking|figs}
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY="${PYTHON:-python}"
@@ -8,7 +8,7 @@ export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 cmd="${1:-list}"
 case "$cmd" in
   list)
-    sed -n '2,3p' "$0"; echo "targets: check main factorial depth adaptive scenes counterfactual holdout tracking figs" ;;
+    sed -n '2,3p' "$0"; echo "targets: check main factorial depth adaptive scenes counterfactual extension dose tables holdout tracking figs" ;;
   check)
     $PY paper_repro/check_numbers.py ;;
   main)   # Tab. 1 (clean 7-policy bundle).
@@ -51,6 +51,17 @@ case "$cmd" in
   counterfactual)  # negative-utility strata (gate-1) and the random-selector reference rate
     $PY experiments/run_gate1_headroom.py
     $PY experiments/analyze_random_counterfactual.py ;;
+  extension)  # Replica factorial + map-proportional budget (+ TUM unthrottled/proportional pair)
+    $PY experiments/run_dilution_extension.py --scenes replica_office0 replica_office1
+    $PY experiments/run_dilution_extension.py --scenes tum_fr2_xyz tum_fr1_xyz --conditions error_off error_budget_prop
+    $PY experiments/analyze_dilution_extension.py ;;
+  dose)       # budget dose-response, free vs capped map (caps: 23k TUM, 60k office0, 40k office1)
+    $PY experiments/run_dilution_dose.py --scenes tum_fr2_xyz tum_fr1_xyz --cap 23000
+    $PY experiments/run_dilution_dose.py --scenes replica_office0 --cap 60000 --out_dir results/dilution_dose_replica_cap/office0_cap60k
+    $PY experiments/run_dilution_dose.py --scenes replica_office1 --cap 40000 --out_dir results/dilution_dose_replica_cap/office1_cap40k
+    $PY experiments/analyze_dilution_dose.py ;;
+  tables)     # regenerate LaTeX tables from frozen JSON (CPU)
+    $PY paper_repro/make_tables.py ;;
   holdout)    # every-8th-frame render-only proxy
     $PY experiments/run_holdout_benchmark.py --scene tum_fr2_xyz --n_frames 30 --seeds 42 43 44 --out_dir results/phase14_holdout ;;
   tracking)   # baseline VO sanity check

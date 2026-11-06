@@ -1,0 +1,17 @@
+\begin{table*}[t]
+\centering
+\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lccccccccc}
+\toprule
+& \multicolumn{3}{c}{Free map growth} & \multicolumn{3}{c}{Hard map cap} & & \\
+\textbf{Scene (cap)} & $\times1$ & $\times2$ & $\times4$ & $\times1$ & $\times2$ & $\times4$ & $\rho_{\mathrm{all}}$ & $\rho_{\mathrm{free}}$ \\
+\midrule
+\texttt{fr2\_xyz} (23k) & 24.24 (0.38) & 26.49 (0.58) & 27.82 (0.98) & 26.90 (0.73) & 27.85 (1.00) & 27.85 (1.00) & +0.92 & +1.00 \\
+\texttt{fr1\_xyz} (23k) & 21.53 (0.29) & 22.78 (0.55) & 24.45 (0.89) & 22.52 (0.65) & 23.63 (1.00) & 23.63 (1.00) & +0.75 & +1.00 \\
+\texttt{office0} (60k) & 30.61 (0.17) & 32.25 (0.34) & 33.43 (0.72) & 24.37 (0.24) & 25.25 (0.49) & 26.07 (1.00) & +0.20 & +1.00 \\
+\texttt{office1} (40k) & 33.85 (0.18) & 34.88 (0.33) & 35.42 (0.68) & 22.79 (0.38) & 22.85 (0.75) & 22.90 (1.00) & -0.26 & +1.00 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Dose-response in optimization budget, 8 seeds.} Raw-error selection, no throttling; entries are mean PSNR (dB) with the mature-update coverage in parentheses, for a budget of $15\times\{1,2,4\}\,\mathrm{ms}$ with the spawn allowance fixed at $15\,\mathrm{ms}$, with free growth or a hard Gaussian cap. $\rho$ is the per-seed Spearman correlation between PSNR and mature-update coverage over the cells (all six, or the three free-growth cells), averaged over seeds. Once coverage reaches $1.00$ extra budget is unused and PSNR saturates. On Replica the caps remove needed capacity (PSNR $6$--$11$\,dB lower at equal budget), so the cross-regime correlation does not hold there.}
+\label{tab:dose}
+\end{table*}

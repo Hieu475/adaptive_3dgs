@@ -53,6 +53,19 @@ def main():
         expected[f"{scene} coverage|error"] = f"{c['coverage on error']['mean_db']:.2f}"
         expected[f"{scene} budget x4"] = f"{c['error budget x4']['mean_db']:.2f}"
         expected[f"{scene} cap23k"] = f"{c['error cap 23k']['mean_db']:.2f}"
+    tabdir = ROOT / "docs/paper/iccv_official/tables"
+    nums = json.loads((tabdir / "numbers.json").read_text())
+    for sc in ("tum_fr2_xyz", "tum_fr1_xyz", "replica_office0", "replica_office1"):
+        expected[f"{sc} proportional budget"] = f"{nums[sc]['error budget proportional to map']:.2f}"
+    for sc in ("replica_office0", "replica_office1"):
+        expected[f"{sc} coverage on error"] = f"{abs(nums[sc]['coverage on error']):.2f}"
+        expected[f"{sc} budget x4"] = f"{nums[sc]['error budget x4']:.2f}"
+        expected[f"{sc} selector w/o throttle"] = f"{abs(nums[sc]['selector without throttle']):.2f}"
+    for sc, v in nums["dose"].items():
+        expected[f"{sc} rho_all"] = f"{abs(v['rho_all']):.2f}"
+        assert v["rho_free"] == 1.0 and v["n_seeds"] == 8, (sc, v)
+    expected["TUM baseline drift fr2"] = f"{nums['tum_fr2_xyz']['error_off_psnr']:.2f}"
+    expected["TUM baseline drift fr1"] = f"{nums['tum_fr1_xyz']['error_off_psnr']:.2f}"
     dep = json.loads(DEPTH.read_text())
     assert dep, "empty depth analysis"
 

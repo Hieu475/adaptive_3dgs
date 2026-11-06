@@ -1,0 +1,22 @@
+\begin{table*}[t]
+\centering
+\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcccccc}
+\toprule
+& \multicolumn{3}{c}{Replica \texttt{office0}} & \multicolumn{3}{c}{Replica \texttt{office1}} \\
+\textbf{Condition} & \textbf{PSNR} & \textbf{Depth L1} & \textbf{Map (k)} & \textbf{PSNR} & \textbf{Depth L1} & \textbf{Map (k)} \\
+\midrule
+Error, no throttle & 30.63 & .0403 & 112.7 & 33.84 & .0161 & 84.2 \\
+Error, coverage & 29.95 & .0556 & 65.2 & 32.97 & .0273 & 39.9 \\
+Error, coverage + backlog & 27.40 & .1720 & 45.7 & 30.93 & .0744 & 25.9 \\
+Temporal$\times$influence, no throttle & 28.68 & .0489 & 115.8 & 31.51 & .0202 & 85.8 \\
+Temporal$\times$influence, coverage & 28.14 & .0651 & 66.3 & 31.73 & .0329 & 42.0 \\
+Temporal$\times$influence, coverage + backlog & 26.18 & .2385 & 45.8 & 29.79 & .1093 & 24.1 \\
+\midrule
+Error, optimization budget $\times4$ & 33.44 & .0326 & 107.5 & 35.41 & .0106 & 82.8 \\
+Error, budget $\propto$ map size & 33.51 & .0327 & 107.5 & 35.41 & .0108 & 82.7 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Replica factorial and map-proportional budget, 150 frames $\times$ 8 seeds per scene.} Same cells as Tab.~\ref{tab:factorial}; all runs use the current code revision and a $15\,\mathrm{ms}$ modeled budget unless stated. The proportional cell sets the optimization budget to $15\,\mathrm{ms}\times N_t/N_{\mathrm{ref}}$ (mean scale $3.7$--$3.9\times$) with the spawn allowance fixed at $15\,\mathrm{ms}$. Coverage and backlog throttling lower PSNR on Replica, whereas more optimization budget raises it.}
+\label{tab:replica}
+\end{table*}

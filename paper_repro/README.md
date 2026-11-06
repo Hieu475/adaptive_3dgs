@@ -11,6 +11,7 @@ GPU runs are long (RTX 4050: tens of minutes per scene × seeds). The paper numb
 | Tab. 2 factorial + dilution controls, Fig. 1 | `results/dilution_factorial/` | `bash paper_repro/reproduce.sh factorial` | pinned |
 | Supp. Tab. S5 depth interventions | `results/depth_intervention/` | `bash paper_repro/reproduce.sh depth` | pinned |
 | Supp. Tabs. S4, S6 (router, 7-scene audit), mixed regime | `results/phase14_adaptive_perframe/` | `bash paper_repro/reproduce.sh adaptive` | pinned (script defaults) |
+| Tabs. 4–5 Replica factorial, map-proportional budget, dose-response | `results/dilution_extension/`, `results/dilution_dose/`, `results/dilution_dose_replica_cap/` | `bash paper_repro/reproduce.sh extension`, `dose`, then `tables` | executed during the 2026-11 extension (not re-run since); tables are generated from the JSON by `make_tables.py` |
 | Holdout proxy (§6) | `results/phase14_holdout/` | `bash paper_repro/reproduce.sh holdout` | pinned |
 | Baseline VO / ATE (Supp. Tab. S3) | `results/phase14_tracking100/` | `bash paper_repro/reproduce.sh tracking` | pinned |
 | Main Figs. 1–4 and Supp. Figs. S1–S3 (PDF) | `docs/paper/figs/` | `python docs/paper/gen_iccv_figs.py` | pinned; Fig. 5 uses `docs/paper/gen_qual_fig_v4.py` (unverified) |
