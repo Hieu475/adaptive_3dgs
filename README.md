@@ -68,8 +68,9 @@ Three tests that failed at the previous `HEAD` were fixed during the cleanup: `f
 | Path | Contents |
 |---|---|
 | `research/` | Library: scheduler, attribution, losses, pipeline, utility models |
-| `experiments/` | Runnable experiment drivers and analysis scripts referenced by the paper or by result manifests |
-| `research_archive/` | Exploratory analysis scripts not referenced by the paper, tests or manifests (see its README) |
+| `experiments/` | 127 experiment drivers/analysis scripts that the paper, tests, scripts or result manifests reference |
+| `research_archive/` | 86 exploratory or historical scripts (phases 6–12, diagnostics) referenced by nothing current; see its README |
+| `docs/archive/` | Superseded proposals, phase-6 report, early artifacts, project PDFs |
 | `paper_repro/` | Table/figure → command index and the number-consistency checker |
 | `results/` | Frozen result bundles (git-ignored except manifests and READMEs) |
 | `docs/paper/` | Paper source (`iccv_official/`), figure scripts, `legacy/` superseded drafts |
