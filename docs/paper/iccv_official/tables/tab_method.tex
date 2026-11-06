@@ -1,0 +1,19 @@
+\begin{table}[tbp]
+\centering
+\footnotesize\setlength{\tabcolsep}{2pt}
+\begin{tabular}{lccccccc}
+\toprule
+& \multicolumn{4}{c}{11 held-out scenes} & \multicolumn{3}{c}{5 fresh windows} \\
+\textbf{Method} & $>0$ & worst & mean & $\Delta$ms & $>0$ & mean & $\Delta$ms \\
+\midrule
+Fixed spawn cap $\times0.2$ & 4/11 & $-$1.67 & +0.04 & -8 & 3/5 & +0.55 & -8 \\
+Budget $\propto$ map (+38 ms) & 11/11 & +0.05 & +2.54 & +38 & 5/5 & +1.18 & -0 \\
+VGG alone & 6/11 & $-$0.08 & +0.25 & +2 &  & &  \\
+TT alone & 11/11 & +0.06 & +1.22 & +5 & 5/5 & +0.77 & -5 \\
+TT + fixed cap & 9/11 & $-$0.55 & +1.03 & -1 & 5/5 & +0.87 & -22 \\
+\textbf{TT + VGG (ours)} & 11/11 & +0.05 & +1.29 & +4 & 5/5 & +0.90 & -5 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Controllers versus the unthrottled baseline (modeled $15\,\mathrm{ms}$ budget), change in mean PSNR (dB).} Left: 11 scenes not used to set any constant (hyperparameters were frozen on four development scenes); right: five fresh 150-frame windows of long TUM sequences. $>0$: scenes improved; worst/mean over scenes; $\Delta$ms: mean change in end-to-end frame time. TT: time-targeted budget ($T=100$ ms); VGG: value-gated growth. Seed-paired, three or four seeds per scene.}
+\label{tab:method}
+\end{table}

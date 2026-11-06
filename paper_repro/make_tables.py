@@ -283,6 +283,92 @@ def tab_tracked(numbers):
     numbers["tracked"] = nums
 
 
+def tab_method(numbers):
+    t = ROOT / "results/vgg_test/analysis_tt.json"
+    f = ROOT / "results/vgg_fresh/analysis_tt.json"
+    if not (t.exists() and f.exists()):
+        return
+    a, b = json.loads(t.read_text()), json.loads(f.read_text())
+    rows = [("Fixed spawn cap $\\times0.2$", "spawn_cap_always20"), ("Budget $\\propto$ map (+%d ms)", "error_budget_prop"),
+            ("VGG alone", "vgg"), ("TT alone", "tt"), ("TT + fixed cap", "tt_cap"), ("\\textbf{TT + VGG (ours)}", "tt_vgg")]
+    fm = lambda x: f"{x:+.2f}".replace("-", "$-$")
+    L = [r"\begin{table}[tbp]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{2pt}",
+         r"\begin{tabular}{lccccccc}", r"\toprule",
+         r"& \multicolumn{4}{c}{11 held-out scenes} & \multicolumn{3}{c}{5 fresh windows} \\",
+         r"\textbf{Method} & $>0$ & worst & mean & $\Delta$ms & $>0$ & mean & $\Delta$ms \\", r"\midrule"]
+    nums = {}
+    for label, key in rows:
+        sa = a["summary"].get(key)
+        sb = b["summary"].get(key)
+        if label.startswith("Budget"):
+            label = label % round(sa["mean_time_delta_ms"])
+        ca = f"{sa['n_positive']}/{sa['n_scenes']} & {fm(sa['min'])} & {fm(sa['mean'])} & {sa['mean_time_delta_ms']:+.0f}" if sa else " & & & "
+        cb = f"{sb['n_positive']}/{sb['n_scenes']} & {fm(sb['mean'])} & {sb['mean_time_delta_ms']:+.0f}" if sb else " & & "
+        L.append(f"{label} & {ca} & {cb} \\\\")
+        nums[key] = {"test": None if not sa else {k: round(sa[k], 2) for k in ("min", "median", "mean", "max", "mean_time_delta_ms")} | {"pos": sa["n_positive"], "n": sa["n_scenes"]},
+                     "fresh": None if not sb else {k: round(sb[k], 2) for k in ("min", "median", "mean", "max", "mean_time_delta_ms")} | {"pos": sb["n_positive"], "n": sb["n_scenes"]}}
+    L += [r"\bottomrule", r"\end{tabular}",
+          r"\caption{\textbf{Controllers versus the unthrottled baseline (modeled $15\,\mathrm{ms}$ budget), change in mean PSNR (dB).} Left: 11 scenes not used to set any constant (hyperparameters were frozen on four development scenes); right: five fresh 150-frame windows of long TUM sequences. $>0$: scenes improved; worst/mean over scenes; $\Delta$ms: mean change in end-to-end frame time. TT: time-targeted budget ($T=100$ ms); VGG: value-gated growth. Seed-paired, three or four seeds per scene.}",
+          r"\label{tab:method}", r"\end{table}"]
+    (OUT / "tab_method.tex").write_text("\n".join(L) + "\n")
+    numbers["method"] = nums
+    numbers["method_vgg_over_tt"] = {"test": {k: round(v, 2) if isinstance(v, float) else v for k, v in a["summary"]["vgg_over_tt"].items()},
+                                     "fresh": {k: round(v, 2) if isinstance(v, float) else v for k, v in b["summary"]["vgg_over_tt"].items()}}
+    numbers["method_dominance"] = a["summary"]["tt_vgg_better_and_within_15pct_time"]
+    sc = a["scenes"]
+    numbers["method_scene"] = {k: {"tt": round(v["methods"]["tt"]["gain"], 2), "tt_vgg": round(v["methods"]["tt_vgg"]["gain"], 2),
+                                   "tt_cap": round(v["methods"]["tt_cap"]["gain"], 2), "cap": round(v["methods"]["spawn_cap_always20"]["gain"], 2),
+                                   "tt_vgg_ms": round(v["methods"]["tt_vgg"]["ms"]), "base_ms": round(v["base_ms"])} for k, v in sc.items()}
+    # per-scene supplementary table
+    def scene_rows(an, keys):
+        rows = []
+        for name, v in an["scenes"].items():
+            nm = "\\texttt{" + name.replace("tum_", "").replace("replica_", "").replace("_", "\\_") + "}"
+            rows.append(f"{nm} & {v['n']} & {v['base_psnr']:.2f} ({v['base_ms']:.0f}) & " + " & ".join(
+                f"{fm(v['methods'][k]['gain'])} ({v['methods'][k]['ms']:.0f})" for k in keys) + r" \\")
+        return rows
+    keys = ["spawn_cap_always20", "tt", "tt_cap", "tt_vgg"]
+    for fname, an, cap in (("tab_method_scenes", a, "11 held-out scenes"), ("tab_method_fresh", b, "five fresh frame windows")):
+        L = [r"\begin{table}[tbp]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{1.5pt}",
+             r"\begin{tabular}{lccccc}", r"\toprule",
+             r"\textbf{Scene} & $n$ & \textbf{Base} & \textbf{Cap} & \textbf{TT} & \textbf{TT+cap} & \textbf{TT+VGG} \\".replace("& \\textbf{TT+cap}", "& \\textbf{TT+cap}"),
+             r"\midrule"] if False else [r"\begin{table}[tbp]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{1.5pt}",
+             r"\begin{tabular}{llcccc}", r"\toprule",
+             r"\textbf{Scene} & $n$ & \textbf{Base} & \textbf{Cap} & \textbf{TT} & \textbf{TT+cap} & \textbf{TT+VGG} \\", r"\midrule"]
+        L = [l.replace("{llcccc}", "{lccccccc}".replace("ccccccc","cccccc")) for l in L]
+        L = [l.replace("\\textbf{Scene} & $n$ & \\textbf{Base} & \\textbf{Cap} & \\textbf{TT} & \\textbf{TT+cap} & \\textbf{TT+VGG}", "\\textbf{Scene} & $n$ & \\textbf{Base} & \\textbf{Cap} & \\textbf{TT} & \\textbf{TT+cap} & \\textbf{TT+VGG}") for l in L]
+        L += scene_rows(an, keys)
+        L += [r"\bottomrule", r"\end{tabular}",
+              r"\caption{\textbf{Per-scene results, %s.} Base: unthrottled PSNR (ms); other columns: change in PSNR (dB) with the mean frame time in ms in parentheses.}" % cap,
+              r"\label{tab:%s}" % fname.replace("tab_", ""), r"\end{table}"]
+        (OUT / (fname + ".tex")).write_text("\n".join(L) + "\n")
+    # Pareto table
+    pj = ROOT / "results/tt_pareto/analysis.json"
+    if pj.exists():
+        pa = json.loads(pj.read_text())
+        L = [r"\begin{table}[tbp]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{2pt}", r"\begin{tabular}{lccccc}", r"\toprule",
+             r"\textbf{Scene} & \textbf{Baseline $\times1/\times2/\times4$} & $T=70$ & $T=85$ & $T=100$ & $T=120$ & $T=140$ \\".replace("{lccccc}", "{lcccccc}"), r"\midrule"]
+        L[3] = r"\begin{tabular}{lcccccc}"
+        pn = {}
+        for sc, v in pa.items():
+            bl = " / ".join(f"{v['baseline'][m]['psnr']:.1f}@{v['baseline'][m]['ms']:.0f}" for m in ("1", "2", "4"))
+            cells = [f"{v['points'][T]['psnr']:.2f}@{v['points'][T]['ms']:.0f}" for T in ("70", "85", "100", "120", "140")]
+            nm = "\\texttt{" + sc.replace("tum_", "").replace("replica_", "").replace("_", "\\_") + "}"
+            L.append(f"{nm} & {bl} & " + " & ".join(cells) + r" \\")
+            pn[sc] = {T: [round(v["points"][T]["psnr"], 2), round(v["points"][T]["ms"])] for T in v["points"]}
+            pn[sc]["baseline"] = {m: [round(x["psnr"], 2), round(x["ms"])] for m, x in v["baseline"].items()}
+        L += [r"\bottomrule", r"\end{tabular}",
+              r"\caption{\textbf{TT+VGG at five time targets versus fixed budgets.} Mean PSNR (dB) @ mean end-to-end frame time (ms), four seeds. The baseline column gives free growth at modeled budgets $\times1$, $\times2$, $\times4$.}",
+              r"\label{tab:pareto}", r"\end{table}"]
+        (OUT / "tab_pareto.tex").write_text("\n".join(L) + "\n")
+        numbers["pareto"] = pn
+    hv = ROOT / "results/holdout_vgg/analysis.json"
+    if hv.exists():
+        h = json.loads(hv.read_text())
+        numbers["holdout_vgg"] = {sc: {k: round(v[k], 2) if v[k] is not None else None for k in ("train_delta", "holdout_delta", "retained")}
+                                  for sc, d in h.items() for v in [d["tt_vgg"]]}
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     numbers = {}
@@ -294,6 +380,7 @@ def main():
     tab_holdout(numbers)
     tab_compute(numbers)
     tab_tracked(numbers)
+    tab_method(numbers)
     (OUT / "numbers.json").write_text(json.dumps(numbers, indent=1))
     print(json.dumps(numbers, indent=1)[:1500])
 

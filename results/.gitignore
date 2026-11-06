@@ -252,3 +252,16 @@ demo_output/
 !compute_matched/**/*.md
 !tracked_poses/**/*.json
 !tracked_poses/**/*.md
+
+# Controller (TT / VGG) development, evaluation and diagnostics.
+!vgg_dev/**/*.json
+!vgg_dev/**/*.md
+!vgg_test/**/*.json
+!vgg_test/**/*.md
+!vgg_fresh/**/*.json
+!vgg_fresh/**/*.md
+!tt_dev/**/*.json
+!tt_pareto/**/*.json
+!tt_pareto/**/*.md
+!holdout_vgg/**/*.json
+!spawn_value_diag.json

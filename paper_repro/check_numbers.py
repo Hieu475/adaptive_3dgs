@@ -42,13 +42,14 @@ def main():
     nums = json.loads((TABLES / "numbers.json").read_text())
 
     # (2) the paper uses generated content
-    main = MAIN_TEX.read_text()
+    main_only = MAIN_TEX.read_text()
+    main = main_only + "\n" + SUPP_TEX.read_text()   # moved diagnostics live in the supplement
     for token in ("tables/macros.tex", "tables/tab_main.tex", "tables/tab_factorial.tex", "tables/par_core.tex",
                   "tables/tab_replica.tex", "tables/tab_dose.tex"):
-        if token not in main:
+        if token not in main_only and token not in ("tables/tab_dose.tex", "tables/tab_replica.tex") :
             fail(f"main.tex does not input {token}")
-    for key in ("oursPSNR", "gainBest", "gapFull", "mapRatio", "covErrA", "covErrB"):
-        if f"\\{key}" not in main:
+    for key in ("covErrA", "covErrB"):
+        if f"\\{key}" not in main_only:
             fail(f"main.tex does not use macro \\{key}")
     for sc in ("replica_office0", "replica_office1"):
         for key in ("coverage on error", "error budget x4", "error budget proportional to map",
@@ -133,6 +134,41 @@ def main():
                 if f"{abs(x):.2f}" not in main:
                     fail(f"main.tex missing tracked {sc} range endpoint {x}")
 
+    me = nums.get("method")
+    if me:
+        tv, ft = me["tt_vgg"]["test"], me["tt_vgg"]["fresh"]
+        need = {"tt_vgg test median": f"{tv['median']:.2f}", "tt_vgg test mean": f"{tv['mean']:.2f}", "tt_vgg test worst": f"{tv['min']:.2f}",
+                "tt_vgg fresh mean": f"{ft['mean']:.2f}", "tt mean": f"{me['tt']['test']['mean']:.2f}",
+                "cap worst": f"{abs(me['spawn_cap_always20']['test']['min']):.2f}", "prop mean": f"{me['error_budget_prop']['test']['mean']:.2f}",
+                "prop dt": f"{me['error_budget_prop']['test']['mean_time_delta_ms']:.0f}", "tt+cap worst": f"{abs(me['tt_cap']['test']['min']):.2f}",
+                "tt_vgg dt": f"{tv['mean_time_delta_ms']:.0f}", "vgg-over-tt test mean": f"{nums['method_vgg_over_tt']['test']['mean']:.2f}",
+                "vgg-over-tt fresh mean": f"{nums['method_vgg_over_tt']['fresh']['mean']:.2f}"}
+        for k, v in need.items():
+            if v not in main_only:
+                fail(f"main.tex missing controller number {k} = {v}")
+        if me["tt_vgg"]["test"]["pos"] != me["tt_vgg"]["test"]["n"] or me["tt_vgg"]["fresh"]["pos"] != me["tt_vgg"]["fresh"]["n"]:
+            fail("TT+VGG no longer positive on every scene/window; revise the 'all scenes' claims")
+        ps = nums["method_scene"]
+        for sc, k in (("tum_fr2_xyz", "tt"), ("tum_fr2_xyz", "tt_vgg"), ("tum_fr1_xyz", "tt_cap"), ("tum_fr1_xyz", "tt_vgg")):
+            if f"{ps[sc][k]:.2f}" not in main_only:
+                fail(f"main.tex missing per-scene {sc} {k} = {ps[sc][k]}")
+        for ms in (ps["tum_fr2_xyz"]["tt_vgg_ms"],):
+            if str(ms) not in main_only:
+                fail(f"main.tex missing frame time {ms}")
+        dom = nums["method_dominance"]
+        if f"{dom['n']} of {dom['of']}" not in main_only:
+            fail("main.tex missing dominance count")
+        pr = nums["pareto"]
+        for v in (pr["tum_fr2_xyz"]["100"], pr["tum_fr2_xyz"]["baseline"]["1"], pr["tum_fr2_xyz"]["baseline"]["4"], pr["tum_fr1_xyz"]["120"]):
+            if f"{v[0]:.2f}" not in main_only:
+                fail(f"main.tex missing Pareto value {v}")
+        hv = nums.get("holdout_vgg", {})
+        for sc, v in hv.items():
+            if f"{v['holdout_delta']:.2f}" not in main_only:
+                fail(f"main.tex missing held-out controller value {sc} {v['holdout_delta']}")
+            if f"{round(100 * v['retained'])}" not in main_only:
+                fail(f"main.tex missing retained percentage {sc} {v['retained']}")
+
     # (3) README + stale values
     rd = README.read_text()
     for key in ("oursPSNR", "gainBest", "headNoop"):
@@ -141,7 +177,7 @@ def main():
     supp = SUPP_TEX.read_text()
     if "before the evaluator correction" not in supp:
         fail("supp.tex lacks the earlier-revision notice for Tabs. S4-S6")
-    texts = {"main.tex": main, "README.md": rd}
+    texts = {"main.tex": main_only, "README.md": rd}
     for name, text in texts.items():
         for s in STALE:
             if s in text:

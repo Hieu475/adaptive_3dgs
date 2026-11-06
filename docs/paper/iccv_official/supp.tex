@@ -263,4 +263,26 @@ room2 (Rep.) & 99 & 22.86 & 25.88 & $-3.03$ & 78 / 146 & 3 \\
 \label{tab:scenes}
 \end{table*}
 
+\section{Further diagnostics}
+\textbf{Dose-response (Tab.~\ref{tab:dose}).}
+With free growth, PSNR rises monotonically with the budget multiplier on all four scenes (for example $24.24$, $26.49$, $27.82$ dB on \texttt{fr2\_xyz}), and the fraction of mature Gaussians updated per frame rises with it; their per-seed Spearman correlation over the three free-growth cells is $+1.00$ in every scene. Over all six cells it stays $+0.92$ and $+0.75$ on the TUM scenes, where a $23$k cap is close to the natural map size, but not on Replica ($+0.20$ and $-0.26$), where the caps ($60$k, $40$k) remove capacity and PSNR falls by $6$--$11$ dB regardless of budget. Under a cap, $\times2$ and $\times4$ coincide once coverage reaches $1.00$, because the budget exceeds what the capped map can use. Update coverage therefore tracks quality wherever capacity is not binding. These are within-scene interventions on raw-error selection. They show that the system is compute limited and that the limit tightens as the map grows, but more compute improves any compute-limited optimizer, so they do not by themselves show that growth causes the limitation; the cap cells address that only on TUM.
+\input{tables/tab_dose.tex}
+
+\textbf{Longer horizon (Tab.~\ref{tab:long}).}
+On the three TUM scenes whose sequences allow it (\texttt{fr2\_xyz}, \texttt{fr1\_xyz}, \texttt{fr1\_desk}; 500 frames, two seeds), the unthrottled raw-error baseline degrades with horizon (window-mean PSNR $24.22\to17.88$, $21.50\to19.32$ and $22.49\to16.95$ dB from frames 1--150 to 301--500) and its final map reaches $116$--$136$k Gaussians. The map-proportional budget (mean scale $5.4$--$6.7\times$) recovers $+3.65\to+8.48$, $+3.03\to+5.77$ and $+1.42\to+5.92$ dB over the same windows, whereas coverage throttling is not monotone ($+3.47\to+4.85$, $+1.71\to+0.72$, $+0.47\to+1.17$ dB). The gap to the unthrottled baseline therefore widens with horizon, consistent with dilution accumulating as the map grows, but with two seeds and three scenes this is descriptive, and the proportional budget spends several times more compute at 500 frames. Replica sequences are too short (99--119 frames) for this test.
+\input{tables/tab_long.tex}
+
+\textbf{Held-out views (Tab.~\ref{tab:holdout}).}
+Every eighth frame is rendered but never mapped or optimized. The sign of every effect is unchanged on these frames but its size shrinks: the proportional budget's gain is $+2.18$, $+1.69$, $+1.40$ and $+0.68$ dB held out versus $+2.85$, $+2.59$, $+2.58$ and $+1.44$ dB on mapped frames ($47$--$76\%$ retained), and the train-minus-held-out gap grows with the budget (for example $3.29\to4.47$ dB on \texttt{office0}). Throttling's held-out changes are $+2.13$ and $+1.04$ dB on TUM and $-0.27$ and $-0.57$ dB on Replica. Part of the gain from more optimization is therefore specific to the mapped views. The held-out frames lie on the mapped trajectory, so this proxy does not test generalization to new trajectories.
+\input{tables/tab_holdout.tex}
+
+\textbf{Estimated poses (Tab.~\ref{tab:tracked}).}
+We also map with poses from a frame-to-frame dense RGB-D Gauss-Newton tracker (ATE $1.24$ and $2.45$ cm; it does not use the map, so ATE is shared across conditions). PSNR at the tracked pose improves by $+4.09$ to $+4.44$ dB on \texttt{fr2\_xyz} and $+3.12$ to $+4.48$ dB on \texttt{fr1\_xyz}, more than with ground-truth poses. Rendering the same maps from the ground-truth pose removes almost all of this ($+0.02$ to $+0.03$ and $+0.15$ to $+0.22$ dB; baseline $21.88$ and $17.58$ dB versus $27.35$ and $23.75$ dB at the tracked pose), because pose error rather than optimization budget then limits the alignment. Gains in self-consistent quality therefore do not imply better alignment with the true camera. In a map-based SLAM system a better map could also improve tracking, which this map-independent tracker cannot show.
+\input{tables/tab_tracked.tex}
+
+\section{Controller details}
+\input{tables/tab_method_scenes.tex}
+\input{tables/tab_method_fresh.tex}
+\input{tables/tab_pareto.tex}
+
 \end{document}

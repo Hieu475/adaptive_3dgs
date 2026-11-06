@@ -1,0 +1,54 @@
+{
+  "replica_office0": {
+    "n": 4,
+    "tt": {
+      "train_delta": 1.2629878657987748,
+      "holdout_delta": 0.6812750895818072,
+      "retained": 0.5394153879308538
+    },
+    "tt_vgg": {
+      "train_delta": 1.2658930208491173,
+      "holdout_delta": 0.6908847490946446,
+      "retained": 0.5457686690074514
+    }
+  },
+  "replica_office1": {
+    "n": 4,
+    "tt": {
+      "train_delta": 0.7854599044436501,
+      "holdout_delta": 0.35198964391435883,
+      "retained": 0.44813190580832635
+    },
+    "tt_vgg": {
+      "train_delta": 0.7548690750485374,
+      "holdout_delta": 0.34169561522347536,
+      "retained": 0.4526554690315067
+    }
+  },
+  "tum_fr1_xyz": {
+    "n": 4,
+    "tt": {
+      "train_delta": 1.4982083132772734,
+      "holdout_delta": 1.1533807383643246,
+      "retained": 0.7698400336875373
+    },
+    "tt_vgg": {
+      "train_delta": 1.518519228154962,
+      "holdout_delta": 1.1599241627587205,
+      "retained": 0.7638521404619003
+    }
+  },
+  "tum_fr2_xyz": {
+    "n": 4,
+    "tt": {
+      "train_delta": 2.5276743137475224,
+      "holdout_delta": 2.028907484478421,
+      "retained": 0.8026775733897336
+    },
+    "tt_vgg": {
+      "train_delta": 2.703003406524659,
+      "holdout_delta": 2.1476725472344294,
+      "retained": 0.7945504404656903
+    }
+  }
+}

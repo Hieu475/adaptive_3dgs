@@ -1,0 +1,17 @@
+\begin{table}[tbp]
+\centering
+\footnotesize\setlength{\tabcolsep}{1.5pt}
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Scene} & $n$ & \textbf{Base} & \textbf{Cap} & \textbf{TT} & \textbf{TT+cap} & \textbf{TT+VGG} \\
+\midrule
+\texttt{fr1\_desk} & 3 & 23.09 (92) & $-$0.18 (90) & +1.02 (82) & +0.47 (65) & +1.04 (82) \\
+\texttt{fr1\_room} & 3 & 16.81 (97) & $-$0.11 (94) & +0.56 (93) & +0.42 (84) & +0.58 (94) \\
+\texttt{fr1\_xyz} & 3 & 22.88 (98) & +0.99 (90) & +0.74 (96) & +1.18 (69) & +0.87 (96) \\
+\texttt{fr2\_xyz} & 3 & 24.63 (90) & +1.58 (77) & +1.19 (87) & +1.80 (62) & +1.63 (85) \\
+\texttt{fr3\_sitting\_static} & 3 & 28.35 (63) & +0.50 (50) & +0.34 (55) & +0.47 (51) & +0.41 (56) \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Per-scene results, five fresh frame windows.} Base: unthrottled PSNR (ms); other columns: change in PSNR (dB) with the mean frame time in ms in parentheses.}
+\label{tab:method_fresh}
+\end{table}

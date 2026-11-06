@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One command per paper table. See paper_repro/README.md.
-# Usage: bash paper_repro/reproduce.sh {list|check|main|factorial|depth|adaptive|scenes|counterfactual|extension|dose|scenes_budget|long|ablation|holdout_ext|compute|tracked|tables|holdout|tracking|figs}
+# Usage: bash paper_repro/reproduce.sh {list|check|main|factorial|depth|adaptive|scenes|counterfactual|extension|dose|scenes_budget|long|ablation|holdout_ext|compute|tracked|controllers|tables|holdout|tracking|figs}
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY="${PYTHON:-python}"
@@ -8,7 +8,7 @@ export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 cmd="${1:-list}"
 case "$cmd" in
   list)
-    sed -n '2,3p' "$0"; echo "targets: check main factorial depth adaptive scenes counterfactual extension dose scenes_budget long ablation holdout_ext compute tracked tables holdout tracking figs" ;;
+    sed -n '2,3p' "$0"; echo "targets: check main factorial depth adaptive scenes counterfactual extension dose scenes_budget long ablation holdout_ext compute tracked controllers tables holdout tracking figs" ;;
   check)
     $PY paper_repro/check_numbers.py ;;
   main)   # Tab. 1 + Tab. 2 + Fig. 1: traceable rerun from a tagged commit (writes results/rerun_paper1/).
@@ -82,6 +82,26 @@ case "$cmd" in
   tracked)    # mapping with poses from the frame-to-frame GN tracker (TUM fr2/fr1, 3 seeds)
     $PY experiments/run_tracked_poses.py
     $PY experiments/analyze_tracked_poses.py ;;
+  controllers)  # TT / VGG evaluation. Constants were frozen on the development scenes first (run_vgg.py defaults).
+    DEV="tum_fr1_desk tum_fr3_structure_texture_near replica_room1 replica_office2"
+    $PY experiments/run_vgg.py --scenes $DEV --seeds 42 --n_frames 99 --conditions error_off spawn_cap_always20 --out_dir results/vgg_dev
+    $PY experiments/run_vgg.py --scenes tum_fr2_xyz tum_fr1_xyz replica_office0 replica_office1 --seeds 42 43 44 45 --n_frames 150 \
+        --conditions error_off spawn_cap_always20 error_budget_prop vgg vgg_prop tt tt_vgg tt_cap --out_dir results/vgg_test
+    $PY experiments/run_vgg.py --scenes replica_office3 replica_office4 replica_room0 replica_room2 tum_fr1_room tum_fr1_rpy tum_fr3_sitting_static \
+        --seeds 42 43 44 --n_frames 99 --conditions error_off spawn_cap_always20 error_budget_prop vgg vgg_prop tt tt_vgg tt_cap --out_dir results/vgg_test
+    for spec in tum_fr2_xyz:300 tum_fr1_xyz:200 tum_fr1_desk:200 tum_fr3_sitting_static:300 tum_fr1_room:200; do
+      sc=${spec%%:*}; off=${spec##*:}
+      $PY experiments/run_vgg.py --scenes $sc --offset $off --seeds 42 43 44 --n_frames 150 \
+          --conditions error_off spawn_cap_always20 error_budget_prop tt tt_vgg tt_cap --out_dir results/vgg_fresh/$sc
+    done
+    for T in 70 85 120 140; do
+      $PY experiments/run_vgg.py --scenes tum_fr2_xyz tum_fr1_xyz replica_office0 replica_office1 --seeds 42 43 44 45 --n_frames 150 \
+          --conditions tt_vgg --tag _T$T --T_ms $T --out_dir results/tt_pareto
+    done
+    $PY experiments/run_holdout_vgg.py && $PY experiments/analyze_holdout_vgg.py
+    $PY experiments/analyze_tt.py results/vgg_test
+    $PY experiments/analyze_tt.py results/vgg_fresh --fresh
+    $PY experiments/analyze_tt_pareto.py ;;
   tables)     # regenerate LaTeX tables, prose and macros from frozen JSON (CPU)
     $PY paper_repro/make_main_tables.py
     $PY paper_repro/make_tables.py ;;

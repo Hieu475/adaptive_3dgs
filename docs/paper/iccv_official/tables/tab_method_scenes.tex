@@ -1,0 +1,23 @@
+\begin{table}[tbp]
+\centering
+\footnotesize\setlength{\tabcolsep}{1.5pt}
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Scene} & $n$ & \textbf{Base} & \textbf{Cap} & \textbf{TT} & \textbf{TT+cap} & \textbf{TT+VGG} \\
+\midrule
+\texttt{office0} & 4 & 30.61 (86) & $-$0.72 (79) & +1.37 (99) & +0.79 (98) & +1.32 (99) \\
+\texttt{office1} & 4 & 33.87 (85) & $-$1.09 (80) & +0.84 (99) & $-$0.43 (99) & +0.77 (99) \\
+\texttt{office3} & 3 & 24.40 (88) & $-$0.46 (77) & +1.41 (100) & +0.86 (96) & +1.42 (100) \\
+\texttt{office4} & 3 & 25.44 (85) & $-$0.30 (76) & +1.42 (99) & +0.90 (95) & +1.42 (99) \\
+\texttt{room0} & 3 & 22.62 (87) & $-$0.38 (78) & +1.01 (99) & +0.75 (99) & +0.99 (99) \\
+\texttt{room2} & 3 & 25.55 (87) & $-$1.67 (77) & +1.40 (99) & $-$0.55 (99) & +1.33 (99) \\
+\texttt{fr1\_room} & 3 & 16.71 (99) & $-$0.17 (98) & +0.83 (101) & +1.01 (99) & +0.82 (102) \\
+\texttt{fr1\_rpy} & 3 & 21.10 (95) & +0.09 (93) & +1.07 (96) & +1.16 (84) & +1.02 (97) \\
+\texttt{fr1\_xyz} & 4 & 21.52 (101) & +1.59 (93) & +1.11 (94) & +2.90 (73) & +1.14 (95) \\
+\texttt{fr2\_xyz} & 4 & 24.06 (90) & +3.45 (81) & +2.94 (84) & +3.85 (60) & +3.88 (72) \\
+\texttt{fr3\_sitting\_static} & 3 & 26.40 (69) & +0.11 (55) & +0.06 (56) & +0.09 (55) & +0.05 (57) \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Per-scene results, 11 held-out scenes.} Base: unthrottled PSNR (ms); other columns: change in PSNR (dB) with the mean frame time in ms in parentheses.}
+\label{tab:method_scenes}
+\end{table}
