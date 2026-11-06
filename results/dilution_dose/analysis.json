@@ -1,0 +1,206 @@
+{
+  "replica_office0": {
+    "cells": {
+      "free_x1": {
+        "mean_psnr": 30.615882377431852,
+        "mean_depth_l1": 0.040411500713548085,
+        "N_final": 112702.625,
+        "mean_budget_per_gaussian_us": 0.24664493792590464,
+        "mature_update_coverage": 0.1699416767379865
+      },
+      "free_x2": {
+        "mean_psnr": 32.242976284990405,
+        "mean_depth_l1": 0.035030707511157166,
+        "N_final": 110289.75,
+        "mean_budget_per_gaussian_us": 0.49569273459041696,
+        "mature_update_coverage": 0.34262150868440167
+      },
+      "free_x4": {
+        "mean_psnr": 33.43517306115892,
+        "mean_depth_l1": 0.0326188681238552,
+        "N_final": 107451.0,
+        "mean_budget_per_gaussian_us": 0.9965608525099493,
+        "mature_update_coverage": 0.7226895757843799
+      },
+      "cap_x1": {
+        "mean_psnr": 13.295518507861129,
+        "mean_depth_l1": 1.491737390662581,
+        "N_final": 23000.0,
+        "mean_budget_per_gaussian_us": 0.6531670883177307,
+        "mature_update_coverage": 0.6512024752181608
+      },
+      "cap_x2": {
+        "mean_psnr": 13.507923156324058,
+        "mean_depth_l1": 1.4503935601425857,
+        "N_final": 23000.0,
+        "mean_budget_per_gaussian_us": 1.3063345568358247,
+        "mature_update_coverage": 1.0
+      },
+      "cap_x4": {
+        "mean_psnr": 13.507983943428655,
+        "mean_depth_l1": 1.4503897649948627,
+        "N_final": 23000.0,
+        "mean_budget_per_gaussian_us": 2.6126691136716493,
+        "mature_update_coverage": 1.0
+      }
+    },
+    "pooled_slope_db_per_decade": 2.5164421799720036,
+    "pooled_slope_ci95": [
+      2.504935929078073,
+      2.5296088114031066
+    ],
+    "cap_offset_db": -19.719766629586882,
+    "cap_offset_ci95": [
+      -19.73843390028424,
+      -19.701673781073534
+    ],
+    "free_slope_db_per_decade": 4.648915803712259,
+    "cap_slope_db_per_decade": 0.352897397435101,
+    "seeds": [
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49
+    ]
+  },
+  "tum_fr1_xyz": {
+    "cells": {
+      "free_x1": {
+        "mean_psnr": 21.53259843031565,
+        "mean_depth_l1": 0.03782797648260991,
+        "N_final": 79123.75,
+        "mean_budget_per_gaussian_us": 0.4326980799740079,
+        "mature_update_coverage": 0.2882868468734276
+      },
+      "free_x2": {
+        "mean_psnr": 22.775785074234008,
+        "mean_depth_l1": 0.03402257880894467,
+        "N_final": 78188.375,
+        "mean_budget_per_gaussian_us": 0.8706500335402889,
+        "mature_update_coverage": 0.5516363091301159
+      },
+      "free_x4": {
+        "mean_psnr": 24.45462503751119,
+        "mean_depth_l1": 0.030858522582954417,
+        "N_final": 78991.875,
+        "mean_budget_per_gaussian_us": 1.7308484478574644,
+        "mature_update_coverage": 0.8912206228923221
+      },
+      "cap_x1": {
+        "mean_psnr": 22.515817600886027,
+        "mean_depth_l1": 0.10764417922745148,
+        "N_final": 23000.0,
+        "mean_budget_per_gaussian_us": 0.6937503157077409,
+        "mature_update_coverage": 0.6543414069572174
+      },
+      "cap_x2": {
+        "mean_psnr": 23.626675709088644,
+        "mean_depth_l1": 0.07317827468078274,
+        "N_final": 23000.0,
+        "mean_budget_per_gaussian_us": 1.3878378047151192,
+        "mature_update_coverage": 1.0
+      },
+      "cap_x4": {
+        "mean_psnr": 23.62643910646439,
+        "mean_depth_l1": 0.07318068788154052,
+        "N_final": 23000.0,
+        "mean_budget_per_gaussian_us": 2.775781830731496,
+        "mature_update_coverage": 1.0
+      }
+    },
+    "pooled_slope_db_per_decade": 3.34746197452339,
+    "pooled_slope_ci95": [
+      3.313442776745561,
+      3.3948615847796826
+    ],
+    "cap_offset_db": -0.34829296316434827,
+    "cap_offset_ci95": [
+      -0.36011818474431595,
+      -0.3394351912448804
+    ],
+    "free_slope_db_per_decade": 4.851010878019735,
+    "cap_slope_db_per_decade": 1.844418733906268,
+    "seeds": [
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49
+    ]
+  },
+  "tum_fr2_xyz": {
+    "cells": {
+      "free_x1": {
+        "mean_psnr": 24.243387932777406,
+        "mean_depth_l1": 0.02047673432893741,
+        "N_final": 74521.5,
+        "mean_budget_per_gaussian_us": 0.6597879508091726,
+        "mature_update_coverage": 0.3787937782958506
+      },
+      "free_x2": {
+        "mean_psnr": 26.487037285168967,
+        "mean_depth_l1": 0.014872117722795035,
+        "N_final": 82143.25,
+        "mean_budget_per_gaussian_us": 1.303328733978877,
+        "mature_update_coverage": 0.5782613646021898
+      },
+      "free_x4": {
+        "mean_psnr": 27.824843293825786,
+        "mean_depth_l1": 0.01065370241451698,
+        "N_final": 70384.5,
+        "mean_budget_per_gaussian_us": 2.652924519156879,
+        "mature_update_coverage": 0.9752792812016486
+      },
+      "cap_x1": {
+        "mean_psnr": 26.90198449293772,
+        "mean_depth_l1": 0.021522046502601977,
+        "N_final": 23000.0,
+        "mean_budget_per_gaussian_us": 0.8365631262722932,
+        "mature_update_coverage": 0.7320026607413316
+      },
+      "cap_x2": {
+        "mean_psnr": 27.852461490631104,
+        "mean_depth_l1": 0.01640007987502031,
+        "N_final": 23000.0,
+        "mean_budget_per_gaussian_us": 1.6707701850956256,
+        "mature_update_coverage": 1.0
+      },
+      "cap_x4": {
+        "mean_psnr": 27.854202388127643,
+        "mean_depth_l1": 0.01614301113372979,
+        "N_final": 23000.0,
+        "mean_budget_per_gaussian_us": 3.3431142529351385,
+        "mature_update_coverage": 1.0
+      }
+    },
+    "pooled_slope_db_per_decade": 3.758640625340491,
+    "pooled_slope_ci95": [
+      3.6830710582251944,
+      3.8450555557205974
+    ],
+    "cap_offset_db": 0.9607074287567127,
+    "cap_offset_ci95": [
+      0.9254979426483914,
+      0.9931515044826897
+    ],
+    "free_slope_db_per_decade": 5.916269587215477,
+    "cap_slope_db_per_decade": 1.5819546352108254,
+    "seeds": [
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49
+    ]
+  }
+}

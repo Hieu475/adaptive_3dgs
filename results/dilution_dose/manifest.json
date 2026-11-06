@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-11-06T11:02:24",
+  "git_sha": "0f62ed1e67c1780ce0cc4a28b975425678048a51-dirty",
+  "git_branch": "research/compute-dilution-mechanism",
+  "config_sha256": "6b97b13f7795ebbcb734626d3f27bf7ef0d16d190d1d9c8ca2afd933c7d81970",
+  "dataset_name": "tum_fr2_xyz,tum_fr1_xyz,replica_office0",
+  "dataset_path": null,
+  "renderer_backend": "gsplat",
+  "cuda_extension": "available (prototype)",
+  "torch_version": "2.11.0+cu128",
+  "cuda_version": "12.8",
+  "gpu": "NVIDIA GeForce RTX 4050 Laptop GPU",
+  "vram_gb": 5.64,
+  "init_stride": null,
+  "scale_pixel_multiplier": null,
+  "initial_opacity": null,
+  "n_micro_steps": null,
+  "psnr_mask": "valid_depth",
+  "experiment": "dilution_dose",
+  "status": "exploratory",
+  "spawn_allowance": "fixed at budget_ms in every cell"
+}

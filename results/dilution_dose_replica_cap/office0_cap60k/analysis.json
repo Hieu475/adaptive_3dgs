@@ -1,0 +1,70 @@
+{
+  "replica_office0": {
+    "cells": {
+      "free_x1": {
+        "mean_psnr": 30.61106905551872,
+        "mean_depth_l1": 0.04037358413622103,
+        "N_final": 112732.625,
+        "mean_budget_per_gaussian_us": 0.24658880666033234,
+        "mature_update_coverage": 0.16996276427298102
+      },
+      "free_x2": {
+        "mean_psnr": 32.24698541862796,
+        "mean_depth_l1": 0.03504219753173829,
+        "N_final": 110261.375,
+        "mean_budget_per_gaussian_us": 0.49565847597035206,
+        "mature_update_coverage": 0.3426152329735528
+      },
+      "free_x4": {
+        "mean_psnr": 33.434427155388725,
+        "mean_depth_l1": 0.032624114305662893,
+        "N_final": 107476.125,
+        "mean_budget_per_gaussian_us": 0.9965277480771111,
+        "mature_update_coverage": 0.7226093202542572
+      },
+      "cap_x1": {
+        "mean_psnr": 24.37489021546913,
+        "mean_depth_l1": 0.3278099592749236,
+        "N_final": 60000.0,
+        "mean_budget_per_gaussian_us": 0.2955620739782549,
+        "mature_update_coverage": 0.2428125768478513
+      },
+      "cap_x2": {
+        "mean_psnr": 25.25380930876491,
+        "mean_depth_l1": 0.29369653825709274,
+        "N_final": 60000.0,
+        "mean_budget_per_gaussian_us": 0.5911200645710192,
+        "mature_update_coverage": 0.49308278573267855
+      },
+      "cap_x4": {
+        "mean_psnr": 26.066434275020253,
+        "mean_depth_l1": 0.2524574651068895,
+        "N_final": 60000.0,
+        "mean_budget_per_gaussian_us": 1.1822626676422188,
+        "mature_update_coverage": 1.0
+      }
+    },
+    "pooled_slope_db_per_decade": 3.7390781972736336,
+    "pooled_slope_ci95": [
+      3.7158216063315983,
+      3.7610230878774056
+    ],
+    "cap_offset_db": -7.15169136182763,
+    "cap_offset_ci95": [
+      -7.164325602348617,
+      -7.138428151222383
+    ],
+    "free_slope_db_per_decade": 4.655003228321853,
+    "cap_slope_db_per_decade": 2.809568618359344,
+    "seeds": [
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49
+    ]
+  }
+}
