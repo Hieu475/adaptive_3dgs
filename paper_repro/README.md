@@ -14,6 +14,7 @@ GPU runs are long (RTX 4050: tens of minutes per scene × seeds). The paper numb
 | Tabs. 4–5 Replica factorial, map-proportional budget, dose-response | `results/dilution_extension/`, `results/dilution_dose/`, `results/dilution_dose_replica_cap/` | `bash paper_repro/reproduce.sh extension`, `dose`, then `tables` | executed during the 2026-11 extension (not re-run since); tables are generated from the JSON by `make_tables.py` |
 | Tab. 6 scene-level (15 scenes), Tab. 7 long horizon | `results/dilution_scenes/`, `results/dilution_long/` | `bash paper_repro/reproduce.sh scenes_budget`, `long`, then `tables` | executed 2026-11; the `n_frames` argument is a request, and Replica copies only provide 99 (office0) and 119 (office1) frames |
 | Tab. 8 decomposition of coverage throttling | `results/throttle_ablation/` | `bash paper_repro/reproduce.sh ablation`, then `tables` | executed 2026-11 (4 seeds, 4 scenes) |
+| Tab. 9 held-out views | `results/holdout_extension/` | `bash paper_repro/reproduce.sh holdout_ext`, then `tables` | executed 2026-11 (4 seeds, 4 scenes) |
 | Holdout proxy (§6) | `results/phase14_holdout/` | `bash paper_repro/reproduce.sh holdout` | pinned |
 | Baseline VO / ATE (Supp. Tab. S3) | `results/phase14_tracking100/` | `bash paper_repro/reproduce.sh tracking` | pinned |
 | Main Figs. 1–4 and Supp. Figs. S1–S3 (PDF) | `docs/paper/figs/` | `python docs/paper/gen_iccv_figs.py` | pinned; Fig. 5 uses `docs/paper/gen_qual_fig_v4.py` (unverified) |

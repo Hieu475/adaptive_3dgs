@@ -1,0 +1,18 @@
+\begin{table}[tbp]
+\centering
+\footnotesize\setlength{\tabcolsep}{1pt}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Mapped / held-out} & \texttt{fr2\_xyz} & \texttt{fr1\_xyz} & \texttt{office0} & \texttt{office1} \\
+\midrule
+Coverage throttling & +2.73/+2.13 & +1.50/+1.04 & $-$0.62/$-$0.27 & $-$0.93/$-$0.57 \\
+Spawn cap $\times0.2$ & +2.68/+2.11 & +1.38/+0.96 & $-$0.77/$-$0.50 & $-$1.08/$-$0.54 \\
+Budget $\propto$ map & +2.85/+2.18 & +2.59/+1.69 & +2.58/+1.40 & +1.44/+0.68 \\
+\midrule
+Gap, unthrottled & 0.87 & 0.98 & 3.29 & 2.79 \\
+Gap, budget $\propto$ map & 1.53 & 1.87 & 4.47 & 3.55 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Mapped versus held-out views, change in mean PSNR (dB) relative to unthrottled raw-error selection, four seeds.} Every eighth frame is rendered but never mapped (a same-trajectory proxy, not an independent trajectory). The last rows give the train-minus-held-out PSNR gap.}
+\label{tab:holdout}
+\end{table}

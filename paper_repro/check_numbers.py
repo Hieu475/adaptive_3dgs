@@ -90,6 +90,22 @@ def main():
             if f"{abs(ab[cond][i]):.2f}" not in main:
                 fail(f"main.tex missing ablation {cond}[{i}] = {ab[cond][i]:.2f}")
 
+    ho = nums.get("holdout")
+    if ho:
+        prop = ho["deltas"]["error_budget_prop"]
+        for tr, h in prop:
+            for v in (tr, h):
+                if f"{abs(v):.2f}" not in main:
+                    fail(f"main.tex missing held-out proportional-budget value {v:.2f}")
+        for tr, h in ho["deltas"]["error_coverage"]:
+            if f"{abs(h):.2f}" not in main:
+                fail(f"main.tex missing held-out coverage value {h:.2f}")
+        ret = [h / tr for tr, h in prop]
+        if not (0.465 <= min(ret) and max(ret) <= 0.765):
+            fail(f"retained fraction range changed: {min(ret):.2f}-{max(ret):.2f}; update the 47-76% text")
+        if f"{ho['gap_base'][2]:.2f}" not in main or f"{ho['gap_prop'][2]:.2f}" not in main:
+            fail("main.tex missing office0 gap values")
+
     # (3) README + stale values
     rd = README.read_text()
     for key in ("oursPSNR", "gainBest", "headNoop"):

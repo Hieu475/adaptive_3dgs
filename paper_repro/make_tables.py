@@ -195,6 +195,36 @@ def tab_ablation(numbers):
     numbers["ablation"] = nums
 
 
+def tab_holdout(numbers):
+    path = ROOT / "results/holdout_extension/analysis.json"
+    if not path.exists():
+        return
+    a = json.loads(path.read_text())
+    scenes = ["tum_fr2_xyz", "tum_fr1_xyz", "replica_office0", "replica_office1"]
+    rows = [("Coverage throttling", "error_coverage"), ("Spawn cap $\\times0.2$", "spawn_cap_always20"),
+            ("Budget $\\propto$ map", "error_budget_prop")]
+    f = lambda x: f"{x:+.2f}".replace("-", "$-$")
+    L = [r"\begin{table}[tbp]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{1pt}",
+         r"\begin{tabular}{lcccc}", r"\toprule",
+         r"\textbf{Mapped / held-out} & \texttt{fr2\_xyz} & \texttt{fr1\_xyz} & \texttt{office0} & \texttt{office1} \\", r"\midrule"]
+    nums = {}
+    for label, c in rows:
+        cells = [f"{f(a[sc][c]['train_delta'])}/{f(a[sc][c]['holdout_delta'])}" for sc in scenes]
+        nums[c] = [[round(a[sc][c]["train_delta"], 2), round(a[sc][c]["holdout_delta"], 2)] for sc in scenes]
+        L.append(label + " & " + " & ".join(cells) + r" \\")
+    L.append(r"\midrule")
+    gaps = [f"{a[sc]['base_gap']:.2f}" for sc in scenes]
+    pgaps = [f"{a[sc]['error_budget_prop']['gap']:.2f}" for sc in scenes]
+    L.append("Gap, unthrottled & " + " & ".join(gaps) + r" \\")
+    L.append("Gap, budget $\\propto$ map & " + " & ".join(pgaps) + r" \\")
+    L += [r"\bottomrule", r"\end{tabular}",
+          r"\caption{\textbf{Mapped versus held-out views, change in mean PSNR (dB) relative to unthrottled raw-error selection, four seeds.} Every eighth frame is rendered but never mapped (a same-trajectory proxy, not an independent trajectory). The last rows give the train-minus-held-out PSNR gap.}",
+          r"\label{tab:holdout}", r"\end{table}"]
+    (OUT / "tab_holdout.tex").write_text("\n".join(L) + "\n")
+    numbers["holdout"] = {"deltas": nums, "gap_base": [round(a[sc]["base_gap"], 2) for sc in scenes],
+                          "gap_prop": [round(a[sc]["error_budget_prop"]["gap"], 2) for sc in scenes]}
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     numbers = {}
@@ -203,6 +233,7 @@ def main():
     tab_scenes(numbers)
     tab_long(numbers)
     tab_ablation(numbers)
+    tab_holdout(numbers)
     (OUT / "numbers.json").write_text(json.dumps(numbers, indent=1))
     print(json.dumps(numbers, indent=1)[:1500])
 
