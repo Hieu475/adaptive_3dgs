@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One command per paper table. See paper_repro/README.md.
-# Usage: bash paper_repro/reproduce.sh {list|check|main|factorial|depth|adaptive|scenes|counterfactual|extension|dose|scenes_budget|long|ablation|holdout_ext|tables|holdout|tracking|figs}
+# Usage: bash paper_repro/reproduce.sh {list|check|main|factorial|depth|adaptive|scenes|counterfactual|extension|dose|scenes_budget|long|ablation|holdout_ext|compute|tracked|tables|holdout|tracking|figs}
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY="${PYTHON:-python}"
@@ -8,7 +8,7 @@ export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 cmd="${1:-list}"
 case "$cmd" in
   list)
-    sed -n '2,3p' "$0"; echo "targets: check main factorial depth adaptive scenes counterfactual extension dose scenes_budget long ablation holdout_ext tables holdout tracking figs" ;;
+    sed -n '2,3p' "$0"; echo "targets: check main factorial depth adaptive scenes counterfactual extension dose scenes_budget long ablation holdout_ext compute tracked tables holdout tracking figs" ;;
   check)
     $PY paper_repro/check_numbers.py ;;
   main)   # Tab. 1 + Tab. 2 + Fig. 1: traceable rerun from a tagged commit (writes results/rerun_paper1/).
@@ -76,6 +76,12 @@ case "$cmd" in
   holdout_ext)  # held-out-view check of budget and throttling controls (4 scenes x 4 seeds)
     $PY experiments/run_holdout_extension.py
     $PY experiments/analyze_holdout_extension.py ;;
+  compute)    # quality at measured wall-clock: budget x {1,2,4} with free growth / spawn cap (4 scenes x 4 seeds)
+    $PY experiments/run_compute_matched.py
+    $PY experiments/analyze_compute_matched.py ;;
+  tracked)    # mapping with poses from the frame-to-frame GN tracker (TUM fr2/fr1, 3 seeds)
+    $PY experiments/run_tracked_poses.py
+    $PY experiments/analyze_tracked_poses.py ;;
   tables)     # regenerate LaTeX tables, prose and macros from frozen JSON (CPU)
     $PY paper_repro/make_main_tables.py
     $PY paper_repro/make_tables.py ;;

@@ -225,6 +225,64 @@ def tab_holdout(numbers):
                           "gap_prop": [round(a[sc]["error_budget_prop"]["gap"], 2) for sc in scenes]}
 
 
+def tab_compute(numbers):
+    path = ROOT / "results/compute_matched/analysis.json"
+    if not path.exists():
+        return
+    a = json.loads(path.read_text())
+    scenes = ["tum_fr2_xyz", "tum_fr1_xyz", "replica_office0", "replica_office1"]
+    cells = ["free_x1", "free_x2", "free_x4", "spawn_x1", "spawn_x2", "spawn_x4"]
+    L = [r"\begin{table*}[t]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{4pt}",
+         r"\begin{tabular}{lcccccc}", r"\toprule",
+         r"& \multicolumn{3}{c}{Free map growth} & \multicolumn{3}{c}{Spawn cap $\times0.2$} \\",
+         r"\textbf{Scene} & $\times1$ & $\times2$ & $\times4$ & $\times1$ & $\times2$ & $\times4$ \\", r"\midrule"]
+    nums = {}
+    for sc in scenes:
+        row = []
+        nums[sc] = {}
+        for c in cells:
+            v = a[sc]["cells"][c]
+            row.append(f"{v['mean_psnr']:.2f} ({v['mean_frame_ms']:.0f})")
+            nums[sc][c] = [round(v["mean_psnr"], 2), round(v["mean_frame_ms"])]
+        name = sc.replace("tum_", "").replace("replica_", "").replace("_", "\\_")
+        L.append(f"\\texttt{{{name}}} & " + " & ".join(row) + r" \\")
+    L += [r"\bottomrule", r"\end{tabular}",
+          r"\caption{\textbf{Quality at measured cost.} Mean PSNR (dB) with the mean end-to-end frame time in ms in parentheses, for a modeled optimization budget of $15\times\{1,2,4\}\,\mathrm{ms}$ (spawn allowance fixed) with free growth or a $\times0.2$ spawn cap; raw-error selection, four seeds. Timings come from one laptop GPU and indicate relative costs only.}",
+          r"\label{tab:compute}", r"\end{table*}"]
+    (OUT / "tab_compute.tex").write_text("\n".join(L) + "\n")
+    numbers["compute"] = nums
+    numbers["compute_matched"] = {sc: {k: (None if v["gain_vs_free_frame"] is None else round(v["gain_vs_free_frame"], 2))
+                                       for k, v in a[sc]["matched"].items()} for sc in scenes}
+
+
+def tab_tracked(numbers):
+    path = ROOT / "results/tracked_poses/analysis.json"
+    if not path.exists():
+        return
+    a = json.loads(path.read_text())
+    scenes = ["tum_fr2_xyz", "tum_fr1_xyz"]
+    f = lambda x: f"{x:+.2f}".replace("-", "$-$")
+    L = [r"\begin{table}[tbp]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{2pt}",
+         r"\begin{tabular}{llcc}", r"\toprule",
+         r"\textbf{Scene} & \textbf{Condition} & \textbf{Tracked pose} & \textbf{GT pose} \\", r"\midrule"]
+    nums = {}
+    for sc in scenes:
+        b = a[sc]["base"]
+        nums[sc] = {"base_tracked": round(b["psnr_tracked"], 2), "base_gt": round(b["psnr_at_gt_pose"], 2), "ate_cm": round(b["ate_cm"], 2)}
+        name = "\\texttt{" + sc.replace("tum_", "").replace("_", "\\_") + "} (ATE %.2f cm)" % b["ate_cm"]
+        L.append(f"{name} & unthrottled & {b['psnr_tracked']:.2f} & {b['psnr_at_gt_pose']:.2f} \\\\")
+        for lab, c in (("coverage", "error_coverage"), ("spawn cap $\\times0.2$", "spawn_cap_always20"), ("budget $\\propto$ map", "error_budget_prop")):
+            L.append(f" & {lab} & {f(a[sc][c]['tracked_delta'])} & {f(a[sc][c]['gt_delta'])} \\\\")
+            nums[sc][c] = [round(a[sc][c]["tracked_delta"], 2), round(a[sc][c]["gt_delta"], 2)]
+        if sc != scenes[-1]:
+            L.append(r"\midrule")
+    L += [r"\bottomrule", r"\end{tabular}",
+          r"\caption{\textbf{Mapping with estimated poses, three seeds.} PSNR (dB) of the unthrottled baseline and the change for each condition, evaluated at the tracker's pose and when the same map renders from the ground-truth pose. The tracker is a frame-to-frame RGB-D Gauss-Newton odometer that does not use the map.}",
+          r"\label{tab:tracked}", r"\end{table}"]
+    (OUT / "tab_tracked.tex").write_text("\n".join(L) + "\n")
+    numbers["tracked"] = nums
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     numbers = {}
@@ -234,6 +292,8 @@ def main():
     tab_long(numbers)
     tab_ablation(numbers)
     tab_holdout(numbers)
+    tab_compute(numbers)
+    tab_tracked(numbers)
     (OUT / "numbers.json").write_text(json.dumps(numbers, indent=1))
     print(json.dumps(numbers, indent=1)[:1500])
 

@@ -1,0 +1,10 @@
+{
+ "scene": "tum_fr1_xyz",
+ "seed": 44,
+ "condition": "spawn_cap_always20",
+ "ate_rmse_m": 0.02465451555309148,
+ "psnr_tracked": 26.885110448201498,
+ "psnr_at_gt_pose": 17.689403864542644,
+ "N_final": 36770,
+ "n_frames_loaded": 151
+}

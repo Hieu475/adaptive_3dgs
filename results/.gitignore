@@ -246,3 +246,9 @@ demo_output/
 # Held-out-view check (Tab. 9).
 !holdout_extension/**/*.json
 !holdout_extension/**/*.md
+
+# Quality at measured cost and estimated-pose runs (Tabs. 10-11).
+!compute_matched/**/*.json
+!compute_matched/**/*.md
+!tracked_poses/**/*.json
+!tracked_poses/**/*.md

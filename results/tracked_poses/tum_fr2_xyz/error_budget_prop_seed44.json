@@ -1,0 +1,10 @@
+{
+ "scene": "tum_fr2_xyz",
+ "seed": 44,
+ "condition": "error_budget_prop",
+ "ate_rmse_m": 0.013117266885991113,
+ "psnr_tracked": 31.795652338663736,
+ "psnr_at_gt_pose": 21.97973393758138,
+ "N_final": 58992,
+ "n_frames_loaded": 151
+}

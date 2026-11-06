@@ -265,5 +265,169 @@
    4.47,
    3.55
   ]
+ },
+ "compute": {
+  "tum_fr2_xyz": {
+   "free_x1": [
+    24.08,
+    88
+   ],
+   "free_x2": [
+    26.5,
+    96
+   ],
+   "free_x4": [
+    27.81,
+    96
+   ],
+   "spawn_x1": [
+    27.53,
+    79
+   ],
+   "spawn_x2": [
+    27.92,
+    62
+   ],
+   "spawn_x4": [
+    27.93,
+    63
+   ]
+  },
+  "tum_fr1_xyz": {
+   "free_x1": [
+    21.51,
+    100
+   ],
+   "free_x2": [
+    22.77,
+    108
+   ],
+   "free_x4": [
+    24.45,
+    119
+   ],
+   "spawn_x1": [
+    23.1,
+    92
+   ],
+   "spawn_x2": [
+    24.4,
+    87
+   ],
+   "spawn_x4": [
+    24.44,
+    76
+   ]
+  },
+  "replica_office0": {
+   "free_x1": [
+    30.62,
+    86
+   ],
+   "free_x2": [
+    32.26,
+    105
+   ],
+   "free_x4": [
+    33.44,
+    135
+   ],
+   "spawn_x1": [
+    29.89,
+    79
+   ],
+   "spawn_x2": [
+    31.31,
+    98
+   ],
+   "spawn_x4": [
+    31.77,
+    109
+   ]
+  },
+  "replica_office1": {
+   "free_x1": [
+    33.85,
+    86
+   ],
+   "free_x2": [
+    34.86,
+    107
+   ],
+   "free_x4": [
+    35.42,
+    138
+   ],
+   "spawn_x1": [
+    32.74,
+    80
+   ],
+   "spawn_x2": [
+    33.48,
+    98
+   ],
+   "spawn_x4": [
+    33.53,
+    107
+   ]
+  }
+ },
+ "compute_matched": {
+  "tum_fr2_xyz": {
+   "spawn_x1": null,
+   "spawn_x2": null,
+   "spawn_x4": null
+  },
+  "tum_fr1_xyz": {
+   "spawn_x1": null,
+   "spawn_x2": null,
+   "spawn_x4": null
+  },
+  "replica_office0": {
+   "spawn_x1": null,
+   "spawn_x2": -0.36,
+   "spawn_x4": -0.64
+  },
+  "replica_office1": {
+   "spawn_x1": null,
+   "spawn_x2": -0.96,
+   "spawn_x4": -1.35
+  }
+ },
+ "tracked": {
+  "tum_fr2_xyz": {
+   "base_tracked": 27.35,
+   "base_gt": 21.88,
+   "ate_cm": 1.24,
+   "error_coverage": [
+    4.31,
+    0.02
+   ],
+   "spawn_cap_always20": [
+    4.09,
+    0.03
+   ],
+   "error_budget_prop": [
+    4.44,
+    0.02
+   ]
+  },
+  "tum_fr1_xyz": {
+   "base_tracked": 23.75,
+   "base_gt": 17.58,
+   "ate_cm": 2.45,
+   "error_coverage": [
+    3.4,
+    0.15
+   ],
+   "spawn_cap_always20": [
+    3.12,
+    0.15
+   ],
+   "error_budget_prop": [
+    4.48,
+    0.22
+   ]
+  }
  }
 }

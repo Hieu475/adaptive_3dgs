@@ -106,6 +106,33 @@ def main():
         if f"{ho['gap_base'][2]:.2f}" not in main or f"{ho['gap_prop'][2]:.2f}" not in main:
             fail("main.tex missing office0 gap values")
 
+    for sc, cells in nums.get("compute", {}).items():
+        for k in ("free_x1", "free_x4", "spawn_x1", "spawn_x2"):
+            pass
+    comp = nums.get("compute", {})
+    need = [("tum_fr2_xyz", "spawn_x1", 0), ("tum_fr2_xyz", "spawn_x1", 1), ("tum_fr2_xyz", "free_x1", 0), ("tum_fr2_xyz", "free_x1", 1),
+            ("tum_fr2_xyz", "free_x4", 0), ("tum_fr2_xyz", "free_x4", 1), ("tum_fr1_xyz", "spawn_x2", 0), ("tum_fr1_xyz", "spawn_x2", 1),
+            ("tum_fr1_xyz", "free_x4", 0), ("tum_fr1_xyz", "free_x4", 1), ("replica_office0", "free_x1", 1), ("replica_office0", "free_x4", 1)]
+    for sc, cell, i in need:
+        v = comp[sc][cell][i]
+        if (f"{v:.2f}" if i == 0 else f"{v:d}") not in main:
+            fail(f"main.tex missing compute-matched {sc} {cell}[{i}] = {v}")
+    cm = nums.get("compute_matched", {})
+    for sc, keys in (("replica_office0", ("spawn_x2", "spawn_x4")), ("replica_office1", ("spawn_x2", "spawn_x4"))):
+        for k in keys:
+            if f"{abs(cm[sc][k]):.2f}" not in main:
+                fail(f"main.tex missing equal-time gain {sc} {k} = {cm[sc][k]}")
+    for sc, v in nums.get("tracked", {}).items():
+        for key in ("base_tracked", "base_gt"):
+            if f"{v[key]:.2f}" not in main:
+                fail(f"main.tex missing tracked {sc} {key} = {v[key]}")
+        conds = ("error_coverage", "spawn_cap_always20", "error_budget_prop")
+        for idx in (0, 1):  # 0: tracked-pose delta, 1: GT-pose delta; the text quotes the min and max
+            vals = [v[c][idx] for c in conds]
+            for x in (min(vals), max(vals)):
+                if f"{abs(x):.2f}" not in main:
+                    fail(f"main.tex missing tracked {sc} range endpoint {x}")
+
     # (3) README + stale values
     rd = README.read_text()
     for key in ("oursPSNR", "gainBest", "headNoop"):

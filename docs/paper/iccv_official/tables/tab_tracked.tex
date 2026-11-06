@@ -1,0 +1,21 @@
+\begin{table}[tbp]
+\centering
+\footnotesize\setlength{\tabcolsep}{2pt}
+\begin{tabular}{llcc}
+\toprule
+\textbf{Scene} & \textbf{Condition} & \textbf{Tracked pose} & \textbf{GT pose} \\
+\midrule
+\texttt{fr2\_xyz} (ATE 1.24 cm) & unthrottled & 27.35 & 21.88 \\
+ & coverage & +4.31 & +0.02 \\
+ & spawn cap $\times0.2$ & +4.09 & +0.03 \\
+ & budget $\propto$ map & +4.44 & +0.02 \\
+\midrule
+\texttt{fr1\_xyz} (ATE 2.45 cm) & unthrottled & 23.75 & 17.58 \\
+ & coverage & +3.40 & +0.15 \\
+ & spawn cap $\times0.2$ & +3.12 & +0.15 \\
+ & budget $\propto$ map & +4.48 & +0.22 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Mapping with estimated poses, three seeds.} PSNR (dB) of the unthrottled baseline and the change for each condition, evaluated at the tracker's pose and when the same map renders from the ground-truth pose. The tracker is a frame-to-frame RGB-D Gauss-Newton odometer that does not use the map.}
+\label{tab:tracked}
+\end{table}

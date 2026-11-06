@@ -235,4 +235,32 @@ Pose-fixed counterfactuals are negative in 29/75 flat, 16/75 texture, 14/75 edge
 \label{fig:qual}
 \end{figure*}
 
+\section{Per-scene breakdown of the combined policy (earlier code revision)}
+\begin{table*}[t]
+\centering
+\small
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Scene} & \textbf{Frames} & \textbf{OURS} & \textbf{\texttt{error\_only}} & \textbf{$\Delta$} & \textbf{Map (k)} & \textbf{$n$} \\
+\midrule
+fr2\_xyz (TUM) & 150 & \oursPSNR & \errPSNR & $+\gainErr$ $\checkmark$ & \oursMap / \errMap & 8 \\
+fr1\_xyz (TUM) & 150 & 23.47 & 21.09 & $+2.38$ $\checkmark$ & 39 / 81 & 8 \\
+fr1\_desk (TUM) & 150 & 22.55 & 22.34 & $+0.21$ & 27 / 56 & 3 \\
+fr1\_room (TUM) & 100 & 15.53 & 16.54 & $-1.01$ & 92 / 97 & 3 \\
+fr1\_rpy (TUM) & 100 & 19.92 & 21.06 & $-1.14$ & 45 / 62 & 3 \\
+fr3\_static (TUM) & 100 & 25.96 & 25.88 & $+0.08$ & 13 / 18 & 3 \\
+office0 (Rep.) & 99 & 26.85 & 30.17 & $-3.32$ $\checkmark$ & 79 / 116 & 8 \\
+office1 (Rep.) & 100 & 29.25 & 33.46 & $-4.21$ $\checkmark$ & 42 / 74 & 8 \\
+office2 (Rep.) & 99 & 22.08 & 24.67 & $-2.59$ & 70 / 117 & 3 \\
+office3 (Rep.) & 99 & 22.45 & 24.47 & $-2.02$ & 77 / 150 & 3 \\
+office4 (Rep.) & 99 & 23.58 & 25.93 & $-2.36$ & 81 / 141 & 3 \\
+room0 (Rep.) & 99 & 20.85 & 22.78 & $-1.93$ & 82 / 150 & 3 \\
+room1 (Rep.) & 100 & 20.42 & 24.29 & $-3.87$ & 47 / 59 & 3 \\
+room2 (Rep.) & 99 & 22.86 & 25.88 & $-3.03$ & 78 / 146 & 3 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Per-scene combined-policy breakdown, 14 sequences.} $\checkmark$ marks the reported significant comparisons at $n=8$; other entries are exploratory. The combined policy wins the two confirmatory TUM comparisons but loses on both confirmatory Replica comparisons; remaining scenes have exploratory sample sizes.}
+\label{tab:scenes}
+\end{table*}
+
 \end{document}

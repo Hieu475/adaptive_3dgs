@@ -1,0 +1,17 @@
+\begin{table*}[t]
+\centering
+\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcccccc}
+\toprule
+& \multicolumn{3}{c}{Free map growth} & \multicolumn{3}{c}{Spawn cap $\times0.2$} \\
+\textbf{Scene} & $\times1$ & $\times2$ & $\times4$ & $\times1$ & $\times2$ & $\times4$ \\
+\midrule
+\texttt{fr2\_xyz} & 24.08 (88) & 26.50 (96) & 27.81 (96) & 27.53 (79) & 27.92 (62) & 27.93 (63) \\
+\texttt{fr1\_xyz} & 21.51 (100) & 22.77 (108) & 24.45 (119) & 23.10 (92) & 24.40 (87) & 24.44 (76) \\
+\texttt{office0} & 30.62 (86) & 32.26 (105) & 33.44 (135) & 29.89 (79) & 31.31 (98) & 31.77 (109) \\
+\texttt{office1} & 33.85 (86) & 34.86 (107) & 35.42 (138) & 32.74 (80) & 33.48 (98) & 33.53 (107) \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Quality at measured cost.} Mean PSNR (dB) with the mean end-to-end frame time in ms in parentheses, for a modeled optimization budget of $15\times\{1,2,4\}\,\mathrm{ms}$ (spawn allowance fixed) with free growth or a $\times0.2$ spawn cap; raw-error selection, four seeds. Timings come from one laptop GPU and indicate relative costs only.}
+\label{tab:compute}
+\end{table*}
