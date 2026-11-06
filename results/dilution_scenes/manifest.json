@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-11-06T21:59:29",
+  "git_sha": "fe71bd4b5cda21a1f3bca9fccfe2c1415c94e54c-dirty",
+  "git_branch": "research/compute-dilution-mechanism",
+  "config_sha256": "d244805ad648ba302fbfd07a75321f396285d94e62757ff97fd8e26838769362",
+  "dataset_name": "replica_office2,replica_office3,replica_office4,replica_room0,replica_room1,replica_room2,tum_fr1_desk,tum_fr1_room,tum_fr1_rpy,tum_fr3_sitting_static,tum_fr3_structure_texture_near",
+  "dataset_path": null,
+  "renderer_backend": "gsplat",
+  "cuda_extension": "available (prototype)",
+  "torch_version": "2.11.0+cu128",
+  "cuda_version": "12.8",
+  "gpu": "NVIDIA GeForce RTX 4050 Laptop GPU",
+  "vram_gb": 5.64,
+  "init_stride": null,
+  "scale_pixel_multiplier": null,
+  "initial_opacity": null,
+  "n_micro_steps": null,
+  "psnr_mask": "valid_depth",
+  "experiment": "dilution_extension",
+  "status": "exploratory",
+  "pose_convention": "loader default (TUM C2W inverted; Replica extrinsics as stored)",
+  "seed_list": [
+    42,
+    43,
+    44
+  ],
+  "proportional_budget": "budget_ms * clamp(N_t/N_ref, 1, max_scale); spawn allowance fixed at budget_ms"
+}

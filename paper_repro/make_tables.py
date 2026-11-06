@@ -102,11 +102,52 @@ def tab_dose(numbers):
     (OUT / "tab_dose.tex").write_text("\n".join(lines) + "\n")
 
 
+def tab_scenes(numbers):
+    path = ROOT / "results/dilution_scenes/analysis.json"
+    if not path.exists():
+        return
+    a = json.loads(path.read_text())
+    order = ["tum_fr2_xyz", "tum_fr1_xyz", "tum_fr1_desk", "tum_fr1_room", "tum_fr1_rpy", "tum_fr3_sitting_static",
+             "tum_fr3_structure_texture_near", "replica_office0", "replica_office1", "replica_office2",
+             "replica_office3", "replica_office4", "replica_room0", "replica_room1", "replica_room2"]
+    nice = lambda s: s.replace("tum_", "").replace("replica_", "").replace("_", "\\_")
+    rows = []
+    for sc in order:
+        v = a["scenes"][sc]
+        rows.append((f"\\texttt{{{nice(sc)}}}" + (" (T)" if sc.startswith("tum") else " (R)"),
+                     f"{v['prop']['mean_db']:+.2f}".replace("-", "$-$"), f"{v['cov']['mean_db']:+.2f}".replace("-", "$-$"),
+                     f"{v['off_map'] / 1000:.0f}"))
+    half = (len(rows) + 1) // 2
+    L = [r"\begin{table*}[t]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{4pt}",
+         r"\begin{tabular}{lccclccc}", r"\toprule",
+         r"\textbf{Scene} & \textbf{Prop.} & \textbf{Cov.} & \textbf{Map (k)} & \textbf{Scene} & \textbf{Prop.} & \textbf{Cov.} & \textbf{Map (k)} \\",
+         r"\midrule"]
+    for i in range(half):
+        left = " & ".join(rows[i])
+        right = " & ".join(rows[i + half]) if i + half < len(rows) else " & & & "
+        L.append(left + " & " + right + r" \\")
+    sm, cm = a["summary"]["prop"], a["summary"]["cov"]
+    rho = a["summary"]["map_size_vs_prop_gain"]
+    L += [r"\bottomrule", r"\end{tabular}",
+          r"\caption{\textbf{Scene-level change in mean PSNR (dB) relative to unthrottled raw-error selection, 15 scenes.} Prop.: optimization budget proportional to map size; Cov.: coverage throttling; Map: final size of the unthrottled map. T: TUM, R: Replica. \texttt{fr2\_xyz}, \texttt{fr1\_xyz}, \texttt{office0} and \texttt{office1} use 150 frames and eight seeds; the others use 99 frames and three seeds. Proportional budget is positive on %d of %d scenes (median $%+.2f$, exact sign test $p<10^{-4}$); coverage throttling on %d of %d (median $%+.2f$, $p=%.2f$). Spearman correlation between map size and proportional-budget gain: $%+.2f$ ($p=%.3f$, exploratory).}"
+          % (sm["n_positive"], sm["n_scenes"], sm["median_db"], cm["n_positive"], cm["n_scenes"],
+             cm["median_db"], cm["sign_test_p"], rho["spearman"], rho["p"]),
+          r"\label{tab:scenelevel}", r"\end{table*}"]
+    (OUT / "tab_scenelevel.tex").write_text("\n".join(L) + "\n")
+    numbers["scene_level"] = {"prop_pos": sm["n_positive"], "n": sm["n_scenes"], "prop_median": round(sm["median_db"], 2),
+                              "prop_min": round(sm["min_db"], 2), "prop_max": round(sm["max_db"], 2),
+                              "cov_pos": cm["n_positive"], "cov_median": round(cm["median_db"], 2),
+                              "cov_min": round(cm["min_db"], 2), "cov_max": round(cm["max_db"], 2),
+                              "cov_p": round(cm["sign_test_p"], 2), "rho": round(rho["spearman"], 2),
+                              "rho_p": round(rho["p"], 3)}
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     numbers = {}
     tab_replica(numbers)
     tab_dose(numbers)
+    tab_scenes(numbers)
     (OUT / "numbers.json").write_text(json.dumps(numbers, indent=1))
     print(json.dumps(numbers, indent=1)[:1500])
 

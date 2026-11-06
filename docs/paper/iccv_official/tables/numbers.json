@@ -84,5 +84,19 @@
    "rho_free": 1.0,
    "n_seeds": 8
   }
+ },
+ "scene_level": {
+  "prop_pos": 15,
+  "n": 15,
+  "prop_median": 2.7,
+  "prop_min": 0.02,
+  "prop_max": 3.73,
+  "cov_pos": 5,
+  "cov_median": -0.13,
+  "cov_min": -1.64,
+  "cov_max": 3.53,
+  "cov_p": 0.3,
+  "rho": 0.52,
+  "rho_p": 0.048
  }
 }

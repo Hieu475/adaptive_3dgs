@@ -232,3 +232,9 @@ demo_output/
 !rerun_paper1/**/*.json
 !rerun_paper1/**/*.md
 !rerun_paper1/**/*.txt
+
+# Scene-level extension (15-scene analysis) and long-horizon runs.
+!dilution_scenes/**/*.json
+!dilution_scenes/**/*.md
+!dilution_long/**/*.json
+!dilution_long/**/*.md

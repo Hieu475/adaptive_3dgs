@@ -47,7 +47,7 @@ def main():
                   "tables/tab_replica.tex", "tables/tab_dose.tex"):
         if token not in main:
             fail(f"main.tex does not input {token}")
-    for key in ("oursPSNR", "gainBest", "gapFull", "mapRatio", "covErrA", "covErrB", "propMin", "propMax"):
+    for key in ("oursPSNR", "gainBest", "gapFull", "mapRatio", "covErrA", "covErrB"):
         if f"\\{key}" not in main:
             fail(f"main.tex does not use macro \\{key}")
     for sc in ("replica_office0", "replica_office1"):
@@ -63,6 +63,17 @@ def main():
             fail(f"main.tex missing {sc} rho_all = {v['rho_all']}")
         if v["rho_free"] != 1.0 or v["n_seeds"] != 8:
             fail(f"{sc}: rho_free/n_seeds changed ({v['rho_free']}, {v['n_seeds']}); revisit the +1.00 claim")
+
+    sl = nums["scene_level"]
+    for key, needle in (("prop_pos", f"all {sl['n']} scenes"), ("prop_median", f"{sl['prop_median']:.2f}"),
+                        ("prop_max", f"{sl['prop_max']:.2f}"), ("prop_min", f"{sl['prop_min']:.2f}"),
+                        ("cov_pos", f"{sl['cov_pos']} of {sl['n']}"), ("cov_median", f"{abs(sl['cov_median']):.2f}"),
+                        ("cov_min", f"{abs(sl['cov_min']):.2f}"), ("cov_max", f"{sl['cov_max']:.2f}"),
+                        ("rho", f"{sl['rho']:.2f}"), ("rho_p", f"{sl['rho_p']:.3f}")):
+        if needle not in main:
+            fail(f"main.tex missing scene-level {key}: {needle!r}")
+    if sl["prop_pos"] != sl["n"]:
+        fail("not all scenes positive for the proportional budget; revise the 'all 15 scenes' claims")
 
     # (3) README + stale values
     rd = README.read_text()

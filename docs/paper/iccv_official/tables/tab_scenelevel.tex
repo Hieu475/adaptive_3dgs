@@ -1,0 +1,20 @@
+\begin{table*}[t]
+\centering
+\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lccclccc}
+\toprule
+\textbf{Scene} & \textbf{Prop.} & \textbf{Cov.} & \textbf{Map (k)} & \textbf{Scene} & \textbf{Prop.} & \textbf{Cov.} & \textbf{Map (k)} \\
+\midrule
+\texttt{fr2\_xyz} (T) & +3.73 & +3.53 & 75 & \texttt{office1} (R) & +1.56 & $-$0.87 & 84 \\
+\texttt{fr1\_xyz} (T) & +2.99 & +1.71 & 79 & \texttt{office2} (R) & +2.76 & $-$0.08 & 115 \\
+\texttt{fr1\_desk} (T) & +0.92 & $-$0.16 & 60 & \texttt{office3} (R) & +3.55 & $-$0.26 & 148 \\
+\texttt{fr1\_room} (T) & +1.74 & $-$0.13 & 103 & \texttt{office4} (R) & +3.68 & $-$0.04 & 135 \\
+\texttt{fr1\_rpy} (T) & +2.06 & +0.04 & 72 & \texttt{room0} (R) & +2.54 & $-$0.19 & 149 \\
+\texttt{fr3\_sitting\_static} (T) & +0.02 & +0.08 & 17 & \texttt{room1} (R) & +2.12 & $-$0.25 & 102 \\
+\texttt{fr3\_structure\_texture\_near} (T) & +2.70 & +2.54 & 61 & \texttt{room2} (R) & +3.09 & $-$1.64 & 145 \\
+\texttt{office0} (R) & +2.88 & $-$0.68 & 113 &  & & &  \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Scene-level change in mean PSNR (dB) relative to unthrottled raw-error selection, 15 scenes.} Prop.: optimization budget proportional to map size; Cov.: coverage throttling; Map: final size of the unthrottled map. T: TUM, R: Replica. \texttt{fr2\_xyz}, \texttt{fr1\_xyz}, \texttt{office0} and \texttt{office1} use 150 frames and eight seeds; the others use 99 frames and three seeds. Proportional budget is positive on 15 of 15 scenes (median $+2.70$, exact sign test $p<10^{-4}$); coverage throttling on 5 of 15 (median $-0.13$, $p=0.30$). Spearman correlation between map size and proportional-budget gain: $+0.52$ ($p=0.048$, exploratory).}
+\label{tab:scenelevel}
+\end{table*}
