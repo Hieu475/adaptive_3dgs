@@ -1,0 +1,20 @@
+\begin{table}[tbp]
+\centering
+\footnotesize\setlength{\tabcolsep}{2pt}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Condition} & \texttt{fr2\_xyz} & \texttt{fr1\_xyz} & \texttt{office0} & \texttt{office1} \\
+\midrule
+Coverage throttling (full) & +3.36 & +1.70 & $-$0.67 & $-$0.88 \\
+\quad spawn cap only & +3.25 & +1.55 & $-$0.67 & $-$0.91 \\
+\quad threshold only & +1.12 & +0.18 & +0.02 & $-$0.01 \\
+Spawn cap $\times0.2$, ungated & +3.30 & +1.54 & $-$0.72 & $-$1.14 \\
+Spawn cap $\times0.5$, ungated & +1.56 & +0.54 & $-$0.11 & $-$0.11 \\
+\midrule
+Budget $\propto$ map size & +3.69 & +2.96 & +2.89 & +1.54 \\
+Throttling + budget $\propto$ map & +3.67 & +2.82 & +1.32 & $-$0.08 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Decomposition of coverage throttling, change in mean PSNR (dB) relative to unthrottled raw-error selection, four seeds.} Spawn-cap-only fixes the densification-threshold multiplier at 1; threshold-only disables the spawn cap; the ungated caps apply whenever the view is settled. Budget $\propto$ map size uses a mean $3.7$--$6\times$ larger optimization budget than the other rows.}
+\label{tab:ablation}
+\end{table}

@@ -238,3 +238,7 @@ demo_output/
 !dilution_scenes/**/*.md
 !dilution_long/**/*.json
 !dilution_long/**/*.md
+
+# Decomposition of coverage throttling (Tab. 8).
+!throttle_ablation/**/*.json
+!throttle_ablation/**/*.md

@@ -81,6 +81,15 @@ def main():
                 if f"{abs(v[k]):.2f}" not in main and not (w == "151-300"):
                     fail(f"main.tex missing long-horizon {sc} {w} {k} = {v[k]:.2f}")
 
+    ab = nums.get("ablation", {})
+    cited = {"error_coverage": [0, 1, 2], "cov_spawn_only": [0, 1, 2], "cov_thresh_only": [0, 1, 2],
+             "spawn_cap_always20": [0, 1, 2, 3], "spawn_cap_always50": [0, 1, 2, 3],
+             "cov_plus_prop": [0, 2, 3], "error_budget_prop": [0, 2, 3]}
+    for cond, idxs in cited.items():
+        for i in idxs:
+            if f"{abs(ab[cond][i]):.2f}" not in main:
+                fail(f"main.tex missing ablation {cond}[{i}] = {ab[cond][i]:.2f}")
+
     # (3) README + stale values
     rd = README.read_text()
     for key in ("oursPSNR", "gainBest", "headNoop"):

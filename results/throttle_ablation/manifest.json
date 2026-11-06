@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-11-06T22:48:08",
+  "git_sha": "1c7d8a1ab9c6c30730d2fce09e0634ba3b330be5-dirty",
+  "git_branch": "research/compute-dilution-mechanism",
+  "config_sha256": "b5516cbab74d0569836fc6a61662a10838385547a0afe4c414daf1571ca8e1d4",
+  "dataset_name": "tum_fr2_xyz,tum_fr1_xyz,replica_office0,replica_office1",
+  "dataset_path": null,
+  "renderer_backend": "gsplat",
+  "cuda_extension": "available (prototype)",
+  "torch_version": "2.11.0+cu128",
+  "cuda_version": "12.8",
+  "gpu": "NVIDIA GeForce RTX 4050 Laptop GPU",
+  "vram_gb": 5.64,
+  "init_stride": null,
+  "scale_pixel_multiplier": null,
+  "initial_opacity": null,
+  "n_micro_steps": null,
+  "psnr_mask": "valid_depth",
+  "experiment": "throttle_ablation",
+  "status": "exploratory"
+}

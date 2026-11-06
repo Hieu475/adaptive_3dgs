@@ -166,6 +166,35 @@ def tab_long(numbers):
                             for w, v in a[sc]["windows"].items()} for sc in order}
 
 
+def tab_ablation(numbers):
+    path = ROOT / "results/throttle_ablation/analysis.json"
+    if not path.exists():
+        return
+    a = json.loads(path.read_text())
+    scenes = ["tum_fr2_xyz", "tum_fr1_xyz", "replica_office0", "replica_office1"]
+    rows = [("Coverage throttling (full)", "error_coverage"), ("\\quad spawn cap only", "cov_spawn_only"),
+            ("\\quad threshold only", "cov_thresh_only"), ("Spawn cap $\\times0.2$, ungated", "spawn_cap_always20"),
+            ("Spawn cap $\\times0.5$, ungated", "spawn_cap_always50"), None,
+            ("Budget $\\propto$ map size", "error_budget_prop"), ("Throttling + budget $\\propto$ map", "cov_plus_prop")]
+    fmt = lambda x: f"{x:+.2f}".replace("-", "$-$")
+    L = [r"\begin{table}[tbp]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{2pt}",
+         r"\begin{tabular}{lcccc}", r"\toprule",
+         r"\textbf{Condition} & \texttt{fr2\_xyz} & \texttt{fr1\_xyz} & \texttt{office0} & \texttt{office1} \\", r"\midrule"]
+    nums = {}
+    for r in rows:
+        if r is None:
+            L.append(r"\midrule")
+            continue
+        vals = [a[sc]["contrasts"][r[1]]["mean_db"] for sc in scenes]
+        nums[r[1]] = [round(v, 2) for v in vals]
+        L.append(r[0] + " & " + " & ".join(fmt(v) for v in vals) + r" \\")
+    L += [r"\bottomrule", r"\end{tabular}",
+          r"\caption{\textbf{Decomposition of coverage throttling, change in mean PSNR (dB) relative to unthrottled raw-error selection, four seeds.} Spawn-cap-only fixes the densification-threshold multiplier at 1; threshold-only disables the spawn cap; the ungated caps apply whenever the view is settled. Budget $\propto$ map size uses a mean $3.7$--$6\times$ larger optimization budget than the other rows.}",
+          r"\label{tab:ablation}", r"\end{table}"]
+    (OUT / "tab_ablation.tex").write_text("\n".join(L) + "\n")
+    numbers["ablation"] = nums
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     numbers = {}
@@ -173,6 +202,7 @@ def main():
     tab_dose(numbers)
     tab_scenes(numbers)
     tab_long(numbers)
+    tab_ablation(numbers)
     (OUT / "numbers.json").write_text(json.dumps(numbers, indent=1))
     print(json.dumps(numbers, indent=1)[:1500])
 

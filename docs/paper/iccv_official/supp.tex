@@ -19,6 +19,7 @@
 \author{Anonymous ICCV Submission\\Paper ID: *****}
 \renewcommand{\thetable}{S\arabic{table}}
 \renewcommand{\thefigure}{S\arabic{figure}}
+\input{tables/macros.tex}
 \begin{document}
 \maketitle
 \appendix
@@ -211,5 +212,27 @@ Pose-fixed counterfactuals are negative in 29/75 flat, 16/75 texture, 14/75 edge
 \textbf{Negative results.}
 \textbf{Learned utility reverses closed-loop} ($-2.51\,\mathrm{dB}$ in the historical one-seed factorial on the pre-fix substrate; GradNorm beats the MLP pointwise $0.51 > 0.25$): offline labels ignore trajectory shift and inter-Gaussian coupling, so we ship no learned component. This result is separate from the corrected-pose factorial in Tab.~2 of the main paper.
 \textbf{Contextual re-ranking buys no online gain}: adaptive greedy shows no significant improvement over static pointwise selection in direct multi-seed budget sweeps (Wilcoxon n.s., CIs span zero) while incurring $424\times$ selection overhead ($76.36$ vs $0.18\,\mathrm{ms}$). Supporting rank-stability/oracle-gap numbers predate the fork-semantics fix and are withheld pending regen.
+
+\section{Additional main-benchmark figures}
+\begin{figure}[tbp]
+\centering
+\includegraphics[width=\columnwidth]{figs/fig2_main_deltas.pdf}
+\caption{\textbf{Paired mean-PSNR differences} on fr2\_xyz (150 frames, $n=8$). Points show OURS $-$ baseline; bars are 95\% paired-bootstrap CIs. Positive favors OURS. FULL is $\gapFull\,\mathrm{dB}$ higher; all six contrasts pass Holm correction ($p=0.0469$).}
+\label{fig:deltas}
+\end{figure}
+
+\begin{figure}[tbp]
+\centering
+\includegraphics[width=\columnwidth]{figs/fig4_pareto.pdf}
+\caption{\textbf{Quality--map-size trade-off} on fr2\_xyz (150 frames, $n=8$). Among policies that optimize, only OURS and FULL lie on the frontier; FULL gains $\gapFull\,\mathrm{dB}$ with a $\mapRatio\times$ larger map. The four growing baselines hold $\growMin$--$\growMax\mathrm{k}$ Gaussians; no-op stays compact at lower quality.}
+\label{fig:pareto}
+\end{figure}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figs/fig5_qualitative.pdf}
+\caption{\textbf{Qualitative comparison across both evaluated substrates.} Top: an intermediate TUM \texttt{fr2\_xyz} view (90), where OURS has lower per-view error than \texttt{error\_only}; bottom: Replica \texttt{office0} view 98, where the ranking reverses. Columns show ground truth, OURS, \texttt{error\_only}, FULL, and signed RGB $L_1$ error gap (red: OURS has lower error). Insets mark the same crop in each row. This figure comes from an earlier code revision. PSNR labels are per-view values from seed 42, shown only to illustrate the visual comparison; they are not sequence means.}
+\label{fig:qual}
+\end{figure*}
 
 \end{document}

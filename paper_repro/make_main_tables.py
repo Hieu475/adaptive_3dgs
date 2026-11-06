@@ -121,7 +121,7 @@ def par_core():
     c39a, c39b = con(a, "error cap 39k"), con(b, "error cap 39k")
     ratio = lambda sc, k: cond(sc, k)["mean_depth_l1"] / cond(sc, "error_off")["mean_depth_l1"]
     s = []
-    s.append(r"\textbf{Main result (Tab.~\ref{tab:main}, Fig.~\ref{fig:deltas}, Fig.~\ref{fig:pareto}).}")
+    s.append(r"\textbf{Main result (Tab.~\ref{tab:main}; Supp.\ Figs.~S4--S5).}")
     s.append(f"OURS reaches ${ours:.2f} \\pm {S['ours']['mean_psnr']['std']:.2f}\\,\\mathrm{{dB}}$: ${ours - best:+.2f}$ over the strongest budgeted baseline, "
              f"${cmp_['rtg_slam_reimpl']['delta_mean_psnr']:+.2f}$ over the RTG-SLAM-policy re-implementation, and ${cmp_['no_op']['delta_mean_psnr']:+.2f}$ over pass-through. "
              "These results evaluate the combined policy on this trajectory.\n")
@@ -143,7 +143,7 @@ def par_core():
              f"For raw-error selection on \\texttt{{fr2\\_xyz}}, coverage reduces the share of modeled update budget spent on Gaussians younger than ten frames from ${100 * off_a['young_budget_share']:.1f}\\%$ to ${100 * cov_a['young_budget_share']:.1f}\\%$, "
              f"while the per-frame selection rate among mature Gaussians rises from ${100 * off_a['old_selection_rate']:.1f}\\%$ to ${100 * cov_a['old_selection_rate']:.1f}\\%$. "
              f"The corresponding mature selection rate on \\texttt{{fr1\\_xyz}} rises from ${100 * off_b['old_selection_rate']:.1f}\\%$ to ${100 * cov_b['old_selection_rate']:.1f}\\%$. "
-             "Allocation shifts and the budget intervention support compute dilution under the tested protocol, but coverage also changes densification thresholds and the optimization trajectory. "
+             "Allocation shifts and the budget intervention support compute dilution under the tested protocol, but coverage throttling also changes the optimization trajectory (its spawn cap carries most of the effect; see the decomposition below). "
              "Map size alone is not identified as the unique cause.\n")
     (OUT / "par_core.tex").write_text("\n".join(s))
 
