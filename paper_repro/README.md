@@ -7,8 +7,8 @@ GPU runs are long (RTX 4050: tens of minutes per scene × seeds). The paper numb
 
 | Paper item | Result bundle | Command(s) (run from repo root) | Status |
 |---|---|---|---|
-| Tab. 1 main benchmark, Figs. 2–3 | `results/phase14_projected_area_fix_clean_7policy_8seeds/` | `bash paper_repro/reproduce.sh main` | pinned (from paper text) |
-| Tab. 2 factorial + dilution controls, Fig. 1 | `results/dilution_factorial/` | `bash paper_repro/reproduce.sh factorial` | pinned |
+| Tab. 1 main benchmark, Figs. 2–3 | `results/rerun_paper1/main/` | `bash paper_repro/reproduce.sh main` (from tag `paper-rerun-1`), then `tables`, `figs` | executed 2026-11 from the tagged commit; `SOURCE.txt` records the commit |
+| Tab. 2 factorial + dilution controls, Fig. 1 | `results/rerun_paper1/dilution_factorial/` | same command (`main` runs both); `figs` regenerates Fig. 1 | executed from the tagged commit |
 | Supp. Tab. S5 depth interventions | `results/depth_intervention/` | `bash paper_repro/reproduce.sh depth` | pinned |
 | Supp. Tabs. S4, S6 (router, 7-scene audit), mixed regime | `results/phase14_adaptive_perframe/` | `bash paper_repro/reproduce.sh adaptive` | pinned (script defaults) |
 | Tabs. 4–5 Replica factorial, map-proportional budget, dose-response | `results/dilution_extension/`, `results/dilution_dose/`, `results/dilution_dose_replica_cap/` | `bash paper_repro/reproduce.sh extension`, `dose`, then `tables` | executed during the 2026-11 extension (not re-run since); tables are generated from the JSON by `make_tables.py` |

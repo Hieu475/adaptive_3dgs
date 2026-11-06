@@ -1,0 +1,3 @@
+commit: fe71bd4b5cda21a1f3bca9fccfe2c1415c94e54c
+tag: paper-rerun-1
+worktree_clean_at_start: yes

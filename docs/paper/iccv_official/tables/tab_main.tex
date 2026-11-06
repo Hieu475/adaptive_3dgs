@@ -1,0 +1,19 @@
+\begin{table*}[t]
+\centering
+\small
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Policy} & \textbf{Mean PSNR} & \textbf{Final PSNR} & \textbf{SSIM} & \textbf{FPS} & \textbf{Map} & \textbf{$\Delta$ vs OURS} \\
+\midrule
+\texttt{no\_op} & 18.85 & 14.75 & 0.4655 & 67.2 & 21,128 & +8.89 $\checkmark$ \\
+\texttt{error\_only} & 24.21 & 20.20 & 0.7023 & 11.0 & 72,366 & +3.53 $\checkmark$ \\
+\texttt{error\_influence} & 25.38 & 22.35 & 0.7338 & 11.1 & 86,988 & +2.36 $\checkmark$ \\
+\texttt{error\_influence\_temporal} & 25.23 & 22.05 & 0.7315 & 10.9 & 86,187 & +2.51 $\checkmark$ \\
+\texttt{rtg\_slam\_reimpl} & 23.53 & 20.57 & 0.6833 & 10.1 & 60,050 & +4.21 $\checkmark$ \\
+\textbf{OURS} & \textbf{27.74} & \textbf{28.73} & \textbf{0.7978} & \textbf{12.1} & \textbf{21,642} & --- \\
+\textit{FULL} & \textit{27.89} & \textit{29.29} & \textit{0.8036} & \textit{11.3} & \textit{70,295} & -0.15 $\checkmark$ \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Main benchmark, TUM \texttt{fr2\_xyz}, 150 frames $\times$ 8 seeds.} All six controls differ significantly from OURS after Holm correction ($p_{\mathrm{Holm}} = 0.0469$). FULL is $0.15\,\mathrm{dB}$ higher. Headroom recovery is $98.3\%$ relative to no-op and $94.0\%$ relative to the strongest budgeted baseline, at a $3.2\times$ smaller map than FULL. Source: commit tag \texttt{paper-rerun-1}.}
+\label{tab:main}
+\end{table*}

@@ -1,0 +1,23 @@
+\begin{table*}[t]
+\centering
+\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcccccc}
+\toprule
+& \multicolumn{3}{c}{TUM \texttt{fr2\_xyz}} & \multicolumn{3}{c}{TUM \texttt{fr1\_xyz}} \\
+\textbf{Selector / map control} & \textbf{PSNR} & \textbf{Depth L1} & \textbf{Map (k)} & \textbf{PSNR} & \textbf{Depth L1} & \textbf{Map (k)} \\
+\midrule
+Error, no throttle & 24.13 & .0205 & 73.1 & 21.52 & .0378 & 79.1 \\
+Error, coverage & 27.66 & .0118 & 21.7 & 23.23 & .0335 & 37.1 \\
+Error, coverage + backlog & 27.67 & .0117 & 21.5 & 23.32 & .0334 & 35.1 \\
+Temporal$\times$influence, no throttle & 25.26 & .0134 & 86.2 & 22.28 & .0368 & 85.5 \\
+Temporal$\times$influence, coverage & 27.75 & .0108 & 21.5 & 23.78 & .0314 & 37.9 \\
+Temporal$\times$influence, coverage + backlog & 27.73 & .0109 & 21.8 & 23.89 & .0318 & 33.1 \\
+\midrule
+Error, optimization budget $\times4$ & 27.82 & .0107 & 71.3 & 24.46 & .0309 & 79.1 \\
+Error, hard map cap 23k & 26.89 & .0217 & 23.0 & 22.52 & .1075 & 23.0 \\
+Error, hard map cap 39k & 24.93 & .0237 & 39.0 & 21.56 & .1029 & 39.0 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Corrected-pose factorial and dilution controls, 150 frames $\times$ 8 seeds per scene.} All factorial cells use the same modeled $15\,\mathrm{ms}$ optimization budget. The $\times4$ control uses $60\,\mathrm{ms}$ for optimization while keeping the original $15\,\mathrm{ms}$ spawn allowance. Depth L1 is in meters. Backlog is enabled independently of warmup only in the last throttle level. Per-run traces and paired intervals are in \texttt{results/rerun\_paper1/dilution\_factorial/}.}
+\label{tab:factorial}
+\end{table*}

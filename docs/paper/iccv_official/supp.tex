@@ -72,8 +72,8 @@ RTG-SLAM & 32.79 & 17.08 & full seq + refine \\
 SplaTAM & --- & 24.50 & full seq + refine \\
 SplaTAM (local run, 144f) & --- & 27.20 final / 23.03 mean & SLAM 640$\times$480, no refine \\
 Photo-SLAM & --- & 21.07 & full seq + refine \\
-Ours (error\_only) & 20--33 & 24.07 & budgeted, 100--150f \\
-Ours (throttled) & 20--29 & \textbf{27.64} & budgeted, 100--150f \\
+Ours (error\_only) & 20--33 & 24.21 & budgeted, 100--150f \\
+Ours (throttled) & 20--29 & \textbf{27.74} & budgeted, 100--150f \\
 \bottomrule
 \end{tabular}
 \caption{\textbf{Published-SOTA context (protocol-mismatched) and one local SplaTAM run.} Published results are shown for context, not as matched comparisons. The local run uses the same sequence but a different resolution and tracking setup; details are in the text.}
@@ -111,6 +111,7 @@ The following experiments would refine the mechanism and extend its scope.
 
 
 \section{Hole-rate policy routing (auxiliary)}
+Tables~S4--S6 come from earlier code revisions, before the evaluator correction (standard windowed SSIM; alpha-normalized depth). Their SSIM and depth values are not comparable with the main-paper tables, and their PSNR may differ by a few tenths of a dB.
 Main-paper scene dependence motivates asking whether an observable cue can pick the better policy. We report this as an auxiliary analysis; it does not support a mechanism claim.
 \textbf{Hole-rate policy routing.}
 Raw depth hole-rate separates the evaluated TUM and Replica datasets: TUM $0.18$--$0.31$ vs Replica $\approx 0.000$ (300--500$\times$). Since the datasets also differ in rendering, pose quality, and scene content, this association does not establish that sensor noise causes the policy ranking to change.

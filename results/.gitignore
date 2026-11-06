@@ -227,3 +227,8 @@ demo_output/
 !dilution_dose/**/*.md
 !dilution_dose_replica_cap/**/*.json
 !dilution_dose_replica_cap/**/*.md
+
+# Traceable rerun (commit tag paper-rerun-1) backing Tabs. 1-2 and Fig. 1.
+!rerun_paper1/**/*.json
+!rerun_paper1/**/*.md
+!rerun_paper1/**/*.txt

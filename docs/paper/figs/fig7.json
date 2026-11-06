@@ -1,6 +1,35 @@
 {
- "ours_final": 29.583933353424072,
- "err_final": 19.870023727416992,
- "ours_N": 23.37,
- "err_N": 68.813
+ "source": "results/rerun_paper1/dilution_factorial",
+ "curves": {
+  "tum_fr2_xyz/error_off": {
+   "n_seeds": 8,
+   "final_map_k": 73.11462499999999,
+   "mean_psnr": 24.130039690335593
+  },
+  "tum_fr2_xyz/error_coverage": {
+   "n_seeds": 8,
+   "final_map_k": 21.6605,
+   "mean_psnr": 27.660650583902996
+  },
+  "tum_fr2_xyz/temporal_coverage": {
+   "n_seeds": 8,
+   "final_map_k": 21.469125,
+   "mean_psnr": 27.754369681676227
+  },
+  "tum_fr1_xyz/error_off": {
+   "n_seeds": 8,
+   "final_map_k": 79.098625,
+   "mean_psnr": 21.51953518708547
+  },
+  "tum_fr1_xyz/error_coverage": {
+   "n_seeds": 8,
+   "final_map_k": 37.131,
+   "mean_psnr": 23.23383186340332
+  },
+  "tum_fr1_xyz/temporal_coverage": {
+   "n_seeds": 8,
+   "final_map_k": 37.9245,
+   "mean_psnr": 23.775058787663777
+  }
+ }
 }

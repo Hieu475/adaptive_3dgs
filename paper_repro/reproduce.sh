@@ -11,18 +11,19 @@ case "$cmd" in
     sed -n '2,3p' "$0"; echo "targets: check main factorial depth adaptive scenes counterfactual extension dose tables holdout tracking figs" ;;
   check)
     $PY paper_repro/check_numbers.py ;;
-  main)   # Tab. 1 (clean 7-policy bundle).
-    if [ -d results/phase14_projected_area_fix_clean_7policy_8seeds ] && [ "${FORCE:-0}" != "1" ]; then
-      echo "Frozen bundle exists (results/phase14_projected_area_fix_clean_7policy_8seeds); refusing to regenerate."
-      echo "Move it aside and re-run, or set FORCE=1 to rerun the six-policy and RTG runs (the merge step still refuses to overwrite)."
-      exit 3
+  main)   # Tab. 1 + Tab. 2 + Fig. 1: traceable rerun from a tagged commit (writes results/rerun_paper1/).
+    # Check out the tag first:  git checkout paper-rerun-1   (worktree must be clean)
+    if [ -d results/rerun_paper1/main ] && [ "${FORCE:-0}" != "1" ]; then
+      echo "results/rerun_paper1/main exists; refusing to overwrite. Move it aside or set FORCE=1."; exit 3
     fi
+    mkdir -p results/rerun_paper1
+    printf "commit: %s\ntag: paper-rerun-1\nworktree_clean_at_start: %s\n" "$(git rev-parse HEAD)" \
+      "$( [ -z "$(git status --porcelain)" ] && echo yes || echo no)" > results/rerun_paper1/SOURCE.txt
     $PY experiments/run_final_confirmation.py --scene tum_fr2_xyz --n_frames 150 --seeds 42 43 44 45 46 47 48 49 \
-        --out_dir results/phase14_projected_area_fix_clean_8seeds
-    $PY experiments/run_final_confirmation.py --scene tum_fr2_xyz --n_frames 150 --seeds 42 43 44 45 46 47 48 49 \
-        --policies rtg_slam_reimpl --out_dir results/phase14_projected_area_fix_clean_rtg8
-    $PY experiments/merge_phase14_clean_rtg_results.py
-    $PY experiments/write_phase14_fix_sensitivity_manifest.py --out_dir results/phase14_projected_area_fix_clean_7policy_8seeds ;;
+        --policies no_op error_only error_influence error_influence_temporal rtg_slam_reimpl ours full \
+        --out_dir results/rerun_paper1/main
+    $PY experiments/run_dilution_factorial.py --out_dir results/rerun_paper1/dilution_factorial
+    $PY experiments/analyze_dilution_factorial.py --input results/rerun_paper1/dilution_factorial ;;
   factorial)  # Tab. 2
     $PY experiments/run_dilution_factorial.py
     $PY experiments/analyze_dilution_factorial.py ;;
@@ -60,13 +61,15 @@ case "$cmd" in
     $PY experiments/run_dilution_dose.py --scenes replica_office0 --cap 60000 --out_dir results/dilution_dose_replica_cap/office0_cap60k
     $PY experiments/run_dilution_dose.py --scenes replica_office1 --cap 40000 --out_dir results/dilution_dose_replica_cap/office1_cap40k
     $PY experiments/analyze_dilution_dose.py ;;
-  tables)     # regenerate LaTeX tables from frozen JSON (CPU)
+  tables)     # regenerate LaTeX tables, prose and macros from frozen JSON (CPU)
+    $PY paper_repro/make_main_tables.py
     $PY paper_repro/make_tables.py ;;
   holdout)    # every-8th-frame render-only proxy
     $PY experiments/run_holdout_benchmark.py --scene tum_fr2_xyz --n_frames 30 --seeds 42 43 44 --out_dir results/phase14_holdout ;;
   tracking)   # baseline VO sanity check
     $PY experiments/run_tracking_ate.py --scenes tum_fr2_xyz tum_fr1_xyz --n_frames 100 --seeds 42 43 44 --out_dir results/phase14_tracking100 ;;
   figs)
-    $PY docs/paper/gen_iccv_figs.py ;;
+    $PY docs/paper/gen_iccv_figs.py
+    $PY paper_repro/make_fig_dilution.py ;;
   *) echo "unknown target: $cmd"; exit 2 ;;
 esac

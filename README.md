@@ -11,26 +11,26 @@ The paper is organized around one claim (compute dilution); auxiliary analyses l
 
 | # | Claim | Evidence (frozen artifact) |
 |---|---|---|
-| 1 | **Compute dilution as a compute-allocation effect.** Raising the optimization budget in proportion to map size (spawn allowance fixed) improves raw-error selection on all four scenes tested (+1.56 to +3.73 dB); with free growth PSNR rises monotonically with budget and tracks the fraction of mature Gaussians updated per frame (Spearman +1.00 in every scene). Coverage throttling is scene dependent: +3.33 / +1.77 dB on TUM fr2_xyz / fr1_xyz but −0.68 / −0.87 dB on Replica office0 / office1. | [`results/dilution_factorial/`](results/dilution_factorial/), `results/dilution_extension/`, `results/dilution_dose*/` |
-| 2 | **Combined policy** (temporal×influence selection + coverage throttling) reaches **27.64 dB** on TUM fr2_xyz, +2.61 dB over the strongest budgeted baseline and +4.48 dB over the RTG-SLAM-policy re-implementation. It recovers 97.6% of headroom above no-op (92.5% above the strongest budgeted baseline); FULL is 0.21 dB higher with a 3.8× larger map. | [`results/phase14_projected_area_fix_clean_7policy_8seeds/`](results/phase14_projected_area_fix_clean_7policy_8seeds/) |
+| 1 | **Compute dilution as a compute-allocation effect.** Raising the optimization budget in proportion to map size (spawn allowance fixed) improves raw-error selection on all four scenes tested (+1.56 to +3.73 dB); with free growth PSNR rises monotonically with budget and tracks the fraction of mature Gaussians updated per frame (Spearman +1.00 in every scene). Coverage throttling is scene dependent: +3.53 / +1.71 dB on TUM fr2_xyz / fr1_xyz but −0.68 / −0.87 dB on Replica office0 / office1. | [`results/rerun_paper1/`](results/rerun_paper1/) (factorial), `results/dilution_extension/`, `results/dilution_dose*/` |
+| 2 | **Combined policy** (temporal×influence selection + coverage throttling) reaches **27.74 dB** on TUM fr2_xyz, +2.36 dB over the strongest budgeted baseline and +4.21 dB over the RTG-SLAM-policy re-implementation. It recovers 98.3% of headroom above no-op (94.0% above the strongest budgeted baseline); FULL is 0.15 dB higher with a 3.2× larger map. | [`results/rerun_paper1/main/`](results/rerun_paper1/main/) |
 | 3 | **Counterfactual utility.** Single-Gaussian interventions have negative measured utility in 2.7–38.7% of cases depending on geometry stratum (n = 75 per stratum); uniform-random selection on the same pools has an expected 20.3% negative rate. | `results/oracle*/` |
 | 4 | **Negative results.** A tested offline utility model degrades closed-loop PSNR by 2.51 dB (pre-fix labels, one protocol); contextual re-ranking gives no online gain at large overhead. | supplement §F |
 | 5 | **Router.** A frozen hole-rate router separates TUM from Replica, but within-scene depth interventions do **not** reverse the policy ranking, so hole rate is a dataset-associated cue, not an established sensor-noise mechanism. | `results/depth_intervention/` |
 
 **Known weaknesses (stated in the paper).** The combined policy loses mean PSNR to raw-error selection on 10 of 14 sequences, including all eight Replica scenes; coverage also changes densification thresholds and hard caps remove needed capacity on Replica, so map size is not isolated as the sole cause, and more budget helps any compute-limited optimizer; offline density-control methods and full SLAM integration are not compared.
 
-The single canonical result bundle is `phase14_projected_area_fix_clean_7policy_8seeds`. Older bundles (`phase14_corrected`, `phase13_frozen_benchmark`, `phase10_e2e`, `final_confirmation`) are historical; the pose-bugged numbers in `results/final_confirmation/DEPRECATED.md` must not be compared with current results.
+The canonical result bundles are those in `results/rerun_paper1/` (main benchmark and TUM factorial), `results/dilution_extension/` and `results/dilution_dose*/`, all produced from the commit tagged `paper-rerun-1` (see `results/rerun_paper1/SOURCE.txt`) with the corrected evaluator (standard Gaussian-window SSIM; alpha-normalized rendered depth). Older bundles (`phase14_projected_area_fix_clean_7policy_8seeds`, `phase14_corrected`, `phase13_frozen_benchmark`, `phase10_e2e`, `final_confirmation`) are historical and their SSIM/depth values are not comparable; the pose-bugged numbers in `results/final_confirmation/DEPRECATED.md` must not be compared with current results.
 
 ### Main benchmark (TUM fr2_xyz, 150 frames × 8 seeds, B = 15 ms modeled)
 
 | Policy | Mean PSNR | Final PSNR | SSIM | Map |
 |:--|--:|--:|--:|--:|
-| no_op | 19.06 | 14.88 | 0.6920 | 23,523 |
-| error_only | 24.04 | 20.12 | 0.8838 | 73,383 |
-| error_influence | 25.03 | 21.83 | 0.9083 | 105,438 |
-| rtg_slam_reimpl | 23.16 | 20.04 | 0.8669 | 65,960 |
-| **OURS** | **27.64** | **28.82** | **0.9231** | **23,765** |
-| FULL (unconstrained ceiling) | 27.85 | 29.34 | 0.9245 | 90,582 |
+| no_op | 18.85 | 14.75 | 0.4655 | 21,128 |
+| error_only | 24.21 | 20.20 | 0.7023 | 72,366 |
+| error_influence | 25.38 | 22.35 | 0.7338 | 86,988 |
+| rtg_slam_reimpl | 23.53 | 20.57 | 0.6833 | 60,050 |
+| **OURS** | **27.74** | **28.73** | **0.7978** | **21,642** |
+| FULL (unconstrained ceiling) | 27.89 | 29.29 | 0.8036 | 70,295 |
 
 Paired Wilcoxon over eight per-seed summaries; Holm-adjusted p = 0.0469 for every contrast (this is the minimum attainable with n = 8). Because trajectories and poses are fixed, treat seed-level effect sizes as repeatability, and scenes as the unit of generalization.
 
