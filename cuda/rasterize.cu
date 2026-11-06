@@ -13,6 +13,7 @@
  * - Warp-level synchronization for early termination
  */
 
+#include <__clang_cuda_builtin_vars.h>
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <torch/extension.h>

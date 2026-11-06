@@ -232,44 +232,87 @@ def load_ply_file(filepath: Path) -> Dict[str, Any]:
 
 
 def collect_ply_files(target_path: Path) -> List[Path]:
-    """Collect available PLY files, sorting 3DGS files to the top."""
+    """Collect available PLY files, prioritizing target and sorting 3DGS files to top."""
+    primary_files: List[Path] = []
     if target_path.is_file() and target_path.suffix.lower() == '.ply':
         folder = target_path.parent
         siblings = [p for p in folder.glob("*.ply") if p != target_path]
-        return [target_path] + sorted(siblings)
+        primary_files = [target_path] + sorted(siblings)
+    else:
+        folder = target_path if target_path.is_dir() else target_path.parent
+        ply_files = list(folder.glob("*.ply"))
+        if not ply_files:
+            ply_files = list(folder.glob("**/*.ply"))
+        primary_files = ply_files
 
-    folder = target_path if target_path.is_dir() else target_path.parent
-    ply_files = list(folder.glob("*.ply"))
-    if not ply_files:
-        ply_files = list(folder.glob("**/*.ply"))
+    # Also collect any other demo scenes in results/demo_output to populate the switcher
+    demo_root = REPO_ROOT / "results" / "demo_output"
+    all_other_plys: List[Path] = []
+    if demo_root.exists():
+        for p in demo_root.glob("**/*.ply"):
+            if p not in primary_files and p.is_file():
+                all_other_plys.append(p)
 
-    # Priority sorting:
-    # 0: Full-resolution centered 3DGS (100% sharpness, 1.41M splats, upright)
-    # 1: Full-resolution raw 3DGS (1.41M splats)
-    # 2: Downsampled web LOD (350k splats)
-    # 3: Point cloud
     def sort_key(p: Path):
         name = p.name.lower()
+        parent = p.parent.name.lower()
+        sharp_rank = 0 if "sharp" in parent else 1
         if "3dgs_centered" in name:
-            return (0, name)
+            return (sharp_rank, 0, parent, name)
         elif "3dgs" in name and "web" not in name:
-            return (1, name)
+            return (sharp_rank, 1, parent, name)
         elif "3dgs_web" in name:
-            return (2, name)
+            return (sharp_rank, 2, parent, name)
         elif "point_cloud" in name or "pcd" in name:
-            return (3, name)
-        return (4, name)
+            return (sharp_rank, 3, parent, name)
+        return (sharp_rank, 4, parent, name)
 
-    return sorted(ply_files, key=sort_key)
+    primary_sorted = sorted(primary_files, key=sort_key)
+    others_sorted = sorted(all_other_plys, key=sort_key)
+
+    seen = set()
+    combined: List[Path] = []
+    for p in primary_sorted + others_sorted:
+        rp = p.resolve()
+        if rp not in seen:
+            seen.add(rp)
+            combined.append(p)
+
+    return combined
+
+
+def format_ply_label(p: Path) -> str:
+    """Format human-readable label for scene selection dropdown."""
+    try:
+        rel = p.relative_to(REPO_ROOT / "results" / "demo_output")
+        parts = rel.parts
+        if len(parts) == 1:
+            return f"root / {parts[0]}"
+        scene_name = parts[0]
+        file_name = parts[1]
+        tag = ""
+        if "sharp" in scene_name:
+            tag = " [ Best Sharp 2.1M]"
+        elif "full_room" in scene_name:
+            tag = " [Baseline Full]"
+        elif "balanced" in scene_name:
+            tag = " [Balanced 1.4M]"
+        return f"{scene_name}{tag} / {file_name}"
+    except ValueError:
+        return f"{p.parent.name} / {p.name}"
 
 
 def main():
+    default_path = "results/demo_output/replica_room0_sharp"
+    if not (REPO_ROOT / default_path).exists():
+        default_path = "results/demo_output/replica_room0"
+
     parser = argparse.ArgumentParser(description="Interactive 3D Viewer for Reconstructed Scenes")
-    parser.add_argument("--path", type=str, default="results/demo_output/replica_room0",
+    parser.add_argument("--path", type=str, default=default_path,
                         help="Path to .ply file or demo_output scene directory")
     parser.add_argument("--port", type=int, default=8080, help="Web viewer port (default: 8080)")
     parser.add_argument("--point_size", type=float, default=0.015, help="Initial point cloud size (default: 0.015)")
-    parser.add_argument("--splat_scale", type=float, default=0.8, help="Initial Gaussian splat scale factor (default: 0.8 for crisp rendering)")
+    parser.add_argument("--splat_scale", type=float, default=1.4, help="Initial Gaussian splat scale factor (default: 1.4 for seamless overlap)")
     parser.add_argument("--no_browser", action="store_true", help="Don't auto-open web browser")
     args = parser.parse_args()
 
@@ -319,11 +362,13 @@ def main():
 
     # 1. UI Controls Setup
     with server.gui.add_folder("Scene Selection"):
-        file_options = [p.name for p in ply_files]
+        file_label_map = {format_ply_label(p): p for p in ply_files}
+        file_options = list(file_label_map.keys())
+        initial_label = format_ply_label(initial_ply)
         file_dropdown = server.gui.add_dropdown(
             "Select PLY File",
             options=file_options,
-            initial_value=initial_ply.name,
+            initial_value=initial_label,
         )
         info_markdown = server.gui.add_markdown("Loading scene...")
 
@@ -546,12 +591,30 @@ def main():
 
         # Update GUI Info
         size_mb = target_ply.stat().st_size / (1024 * 1024)
-        type_str = "✨ 3D Gaussian Splats" if scene_type == '3dgs' else "🔵 Point Cloud"
+        type_str = " 3D Gaussian Splats" if scene_type == '3dgs' else " Point Cloud"
+
+        summary_path = target_ply.parent / "demo_summary.json"
+        metrics_str = ""
+        if summary_path.exists():
+            try:
+                import json
+                with open(summary_path, "r") as sf:
+                    sdata = json.load(sf)
+                psnr = sdata.get("final_psnr_db") or sdata.get("mean_psnr_db")
+                ssim = sdata.get("final_ssim") or sdata.get("mean_ssim")
+                fps = sdata.get("mean_fps")
+                if psnr is not None and ssim is not None:
+                    metrics_str = f"\n\n**Quality**: PSNR `{psnr:.2f} dB` | SSIM `{ssim:.4f}` | `{fps:.1f} FPS`"
+            except Exception:
+                pass
+
         info_markdown.content = (
             f"**File**: `{target_ply.name}` ({size_mb:.1f} MB)\n\n"
+            f"**Scene**: `{target_ply.parent.name}`\n\n"
             f"**Format**: {type_str}\n\n"
             f"**Count**: **{N:,}** splats/points\n\n"
-            f"**Extents**: `{extent[0]:.2f}m × {extent[1]:.2f}m × {extent[2]:.2f}m`\n\n"
+            f"**Extents**: `{extent[0]:.2f}m × {extent[1]:.2f}m × {extent[2]:.2f}m`"
+            f"{metrics_str}\n\n"
             f"**Status**: Ready"
         )
 
@@ -563,11 +626,9 @@ def main():
     # Event Callbacks
     @file_dropdown.on_update
     def _(_):
-        chosen_name = file_dropdown.value
-        for p in ply_files:
-            if p.name == chosen_name:
-                load_and_render_file(p)
-                break
+        chosen_label = file_dropdown.value
+        if chosen_label in file_label_map:
+            load_and_render_file(file_label_map[chosen_label])
 
     @render_mode_dropdown.on_update
     def _(_):

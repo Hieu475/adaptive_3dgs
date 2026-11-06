@@ -12,6 +12,9 @@ import sys, json, argparse
 from pathlib import Path
 import numpy as np
 import torch
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
@@ -47,6 +50,8 @@ def main():
     ap.add_argument("--budget_ms", type=float, default=15.0)
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--out_dir", default="results/qualitative")
+    ap.add_argument("--depth_panel", action="store_true",
+                    help="Save GT RGB, rendered RGB, GT depth and depth-error panel for OURS.")
     a = ap.parse_args()
     out = REPO_ROOT / a.out_dir
     out.mkdir(parents=True, exist_ok=True)
@@ -66,7 +71,9 @@ def main():
             pipe.process_frame(rgb=f["rgb"], depth=f["depth"], gt_pose=f.get("pose"))
         for v in a.views:
             f = frames[v]
-            m = pipe.eval_frame(rgb=f["rgb"], depth=f["depth"], pose=f.get("pose"))
+            want_images = a.depth_panel and pol == "ours"
+            m = pipe.eval_frame(rgb=f["rgb"], depth=f["depth"], pose=f.get("pose"),
+                                return_images=want_images)
             # Re-render for pixels (eval_frame doesn't return image; render again cheaply)
             with torch.no_grad():
                 from research.rasterizer import render as rasterize_scene
@@ -81,6 +88,37 @@ def main():
                     backend=pipe.config.get("rendering", {}).get("backend", "gsplat"))
             p = out / f"{pol}_view{v:02d}.png"
             save_png(res["color"], p)
+            if want_images:
+                image_data = m["images"]
+                gt_rgb = image_data["rgb_ground_truth"].numpy()
+                pred_rgb = image_data["rgb_prediction"].numpy()
+                gt_depth = image_data["depth_ground_truth"].numpy()
+                depth_error = image_data["depth_absolute_error_gt_valid"].numpy()
+                valid_gt = np.isfinite(gt_depth) & (gt_depth > 0)
+                err_valid = np.isfinite(depth_error) & valid_gt
+                depth_vmin = float(np.nanpercentile(gt_depth[valid_gt], 2)) if valid_gt.any() else 0.0
+                depth_vmax = float(np.nanpercentile(gt_depth[valid_gt], 98)) if valid_gt.any() else 1.0
+                err_vmax = float(np.nanpercentile(depth_error[err_valid], 98)) if err_valid.any() else 1.0
+                fig, axes = plt.subplots(2, 2, figsize=(8.2, 5.2))
+                axes[0, 0].imshow(np.clip(gt_rgb, 0, 1))
+                axes[0, 0].set_title("GT RGB")
+                axes[0, 1].imshow(np.clip(pred_rgb, 0, 1))
+                axes[0, 1].set_title("Rendered RGB")
+                depth_im = axes[1, 0].imshow(np.ma.masked_where(~valid_gt, gt_depth),
+                                             cmap="viridis", vmin=depth_vmin, vmax=depth_vmax)
+                axes[1, 0].set_title("GT depth (m)")
+                fig.colorbar(depth_im, ax=axes[1, 0], fraction=.046, pad=.03)
+                err_im = axes[1, 1].imshow(np.ma.masked_where(~err_valid, depth_error),
+                                           cmap="magma", vmin=0, vmax=max(err_vmax, 1e-6))
+                axes[1, 1].set_title("Absolute depth error (m)")
+                fig.colorbar(err_im, ax=axes[1, 1], fraction=.046, pad=.03)
+                for ax in axes.flat:
+                    ax.set_xticks([])
+                    ax.set_yticks([])
+                fig.suptitle(f"TUM {a.scene}, frame {v}; OURS seed {a.seed}", fontsize=10)
+                fig.tight_layout(rect=(0, 0, 1, .95))
+                fig.savefig(out / f"rgbd_ours_view{v:02d}.pdf", bbox_inches="tight")
+                plt.close(fig)
             if pol == a.policies[0]:
                 save_png(f["rgb"], out / f"gt_view{v:02d}.png")
                 summary["views"].append({"view": v})

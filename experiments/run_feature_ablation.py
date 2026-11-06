@@ -74,6 +74,12 @@ def run_multi_seed_ablation(
         seed_dqs = []
 
         for seed in seeds:
+            # Seed before parameter initialization; the trainer assumes callers
+            # have already seeded before constructing the model.
+            torch.manual_seed(seed)
+            np.random.seed(seed)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed_all(seed)
             model = TwoHeadMLP(in_features=len(feat_names), hidden_dim=64)
             trainer.train_two_head_model(model, train_sub, val_ds=None, seed=seed)
 

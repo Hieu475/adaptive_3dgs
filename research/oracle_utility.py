@@ -179,6 +179,7 @@ class OracleUtilityExperiment:
             image_width=W,
             image_height=H,
             tile_size=self.pipeline.config.get('rendering', {}).get('tile_size', 16),
+            backend=self.pipeline.config.get('rendering', {}).get('backend'),
         )
 
     def _render_with_attribution(self, H: int, W: int) -> Dict:
@@ -339,6 +340,7 @@ class OracleUtilityExperiment:
                     intrinsics=self.pipeline.intrinsics,
                     image_width=W,
                     image_height=H,
+                    backend=self.pipeline.config.get('rendering', {}).get('backend'),
                 )
             
         if device.type == 'cuda':
@@ -358,6 +360,7 @@ class OracleUtilityExperiment:
                     intrinsics=self.pipeline.intrinsics,
                     image_width=W,
                     image_height=H,
+                    backend=self.pipeline.config.get('rendering', {}).get('backend'),
                 )
             
             # Loss formulation

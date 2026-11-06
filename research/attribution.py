@@ -553,6 +553,14 @@ def compute_fast_gaussian_statistics(
     # 3. 2D Covariance and exact geometric projected area
     cov2D = compute_2d_covariance(cov3D, means_cam, extrinsics, intrinsics)
     projected_area = compute_projected_area(cov2D)
+    # The projection Jacobian clamps z for numerical safety. Without this
+    # mask, points behind/near the camera can still produce enormous or
+    # non-finite projected areas, which then poison importance normalization
+    # and the model's confidence buffer even though those Gaussians are not
+    # visible to the renderer.
+    valid_projected_area = (means_cam[:, 2] > 0.1) & torch.isfinite(projected_area)
+    projected_area = torch.where(valid_projected_area, projected_area,
+                                 torch.zeros_like(projected_area))
 
     # 4. Pixel errors
     color_err = (rendered_color - gt_color).abs().mean(dim=-1)

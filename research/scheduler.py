@@ -771,7 +771,10 @@ class BudgetScheduler:
         Returns:
             max_new: maximum number of new Gaussians to create this frame
         """
-        budget_us = self.gpu_budget_ms * 1000 * self.budget_allocation['densify']
+        # The factorial's fixed-x4 optimization control holds this spawn budget
+        # at the original value, so extra compute cannot trivially buy more splats.
+        densify_budget_ms = getattr(self, 'densify_budget_override_ms', self.gpu_budget_ms)
+        budget_us = densify_budget_ms * 1000 * self.budget_allocation['densify']
         budget_cap = max(1, int(budget_us / self.cost_densify_us))
 
         if current_coverage is not None:

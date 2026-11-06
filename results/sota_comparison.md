@@ -26,14 +26,14 @@ MonoGS avg 37.50); RTG-SLAM per-scene (SEGS-SLAM ICCV'25 suppl. Tab.7: avg 32.79
 Honest reading: full SOTA systems with global optimization + full sequences score
 ~33-42 dB; our budgeted online mapping scores ~20-33 dB. The gap is expected
 (no global refinement, 15 ms budget, short horizons) and is NOT a defeat ---
-our claim is compute-allocation efficiency under budget (98% of *our* ceiling),
+our claim is compute-allocation efficiency under budget (97.6% of *our* ceiling),
 not absolute SOTA rendering.
 
 ## TUM fr2_xyz (PSNR)
 
 | Method | PSNR | Notes |
 |---|---|---|
-| OURS (ours) | 27.67 (150f x8, budgeted) | this work |
+| OURS (ours) | 27.64 (150f x8, budgeted) | clean-source Phase-14 rerun |
 | SplaTAM | 24.50 (full seq) | CaRtGS Tab.II / SplatMAP compilation |
 | Photo-SLAM | 21.07 (full seq) | SplatMAP Tab.3 |
 | MonoGS | 16.17 (full seq, monocular-ish eval) | SplatMAP Tab.3 |
@@ -42,6 +42,42 @@ not absolute SOTA rendering.
 On fr2_xyz our budgeted mapping PSNR exceeds published full-system numbers,
 but protocol differences (frames, resolution, train-vs-novel views) forbid a
 superiority claim --- report as "competitive range" only.
+
+## Locally-run SplaTAM H2H (same data, Oct 2026)
+
+Native SplaTAM repo run on the same `FR2_150` sequence (associates to 144
+frames after 32 fps filtering), seed 42, default paper config
+(`tracking_iters=200`, `mapping_iters=30`, isotropic Gaussians):
+`scripts/splatam.py /tmp/opencode/sota/splatam_h2h_fixed.py`
+(`num_frames=144`, run `freiburg2_xyz_144f_seed42_fixed`).
+
+| Metric | SplaTAM local run | OURS (Phase-14, for reference) |
+|---|---|---|
+| Frames | 144 (seed 42, single run) | 150 x 8 seeds |
+| Resolution | 640x480 | 320x240 |
+| Poses | estimated (full SLAM) | GT poses (mapping-only) |
+| ATE RMSE | 0.41 cm | ~0.8 cm (VO baseline, different protocol) |
+| PSNR mean | 23.03 dB | 27.64 dB |
+| PSNR final frame | 27.20 dB | 28.82 dB |
+| MS-SSIM / SSIM | 0.965 / 0.974 (final) | 0.9231 |
+| LPIPS (Alex) | 0.066 / 0.046 (final) | 0.211 |
+| Depth RMSE | 1.27 cm | — |
+| Map size | 334,776 Gaussians | 23,765 |
+| Speed | ~0.2 FPS (~5 s/frame) | ~11.1 FPS |
+
+Artifacts: `/tmp/opencode/sota/runs/TUM_H2H/freiburg2_xyz_144f_seed42_fixed/
+{params.npz (12.5 MB), eval/{psnr,ssim,lpips,rmse,l1}.txt, config.py}`,
+log `/tmp/opencode/sota/splatam_h2h_fixed.log`
+(`Final Average ATE RMSE: 0.41 cm / Average PSNR: 23.03`).
+
+Reading: SplaTAM's final-frame render (27.20 dB) nearly matches OURS
+(28.82 dB) and its tracking is excellent (0.41 cm), but mean PSNR trails by
+~4.6 dB while keeping a ~14x larger map at ~50x lower FPS. Same pattern as
+the thesis: uncontrolled map growth dilutes per-frame compute. Protocol
+still mismatched (full-res SLAM vs downsampled GT-pose mapping), so this is
+supporting context, not a superiority claim. MonoGS was attempted on the
+same data but only created 5/150 keyframes and crashed in evo plotting,
+so no MonoGS numbers are reported.
 
 ## TUM ATE (cm RMSE, published reference for our tracker baseline)
 

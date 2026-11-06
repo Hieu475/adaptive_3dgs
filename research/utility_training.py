@@ -51,9 +51,9 @@ class UtilityModelTrainer:
         seed: int = 42,
     ) -> Dict[str, Any]:
         """Train a two-head model (TwoHeadMLP or TwoHeadLinear) using TwoHeadUtilityLoss."""
-        torch.manual_seed(seed)
-        np.random.seed(seed)
-        
+        # Seed before constructing the model in the caller. Resetting it here
+        # would happen after parameter initialization and create misleading
+        # seed metadata, so this trainer deliberately does not reseed.
         model = model.to(self.device)
         optimizer = optim.Adam(
             model.parameters(),
@@ -134,9 +134,7 @@ class UtilityModelTrainer:
         seed: int = 42,
     ) -> Dict[str, Any]:
         """Train a direct linear utility model (B5) with SmoothL1 regression."""
-        torch.manual_seed(seed)
-        np.random.seed(seed)
-        
+        # As above, callers must seed before model construction.
         model = model.to(self.device)
         optimizer = optim.Adam(model.parameters(), lr=self.config.learning_rate, weight_decay=self.config.weight_decay)
         loss_fn = DirectUtilityRegressionLoss()

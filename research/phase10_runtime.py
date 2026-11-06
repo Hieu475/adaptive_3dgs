@@ -756,6 +756,8 @@ def load_phase10_sequence(
         "tum_fr1_rpy": ("datasets/TUM/rgbd_dataset_freiburg1_rpy", "freiburg1"),
         "tum_fr1_xyz": ("datasets/TUM/rgbd_dataset_freiburg1_xyz", "freiburg1"),
         "tum_fr3_sitting_static": ("datasets/TUM/rgbd_dataset_freiburg3_sitting_static", "freiburg3"),
+        "tum_fr3_structure_texture_near": ("datasets/TUM/rgbd_dataset_freiburg3_structure_texture_near", "freiburg3"),
+        "tum_fr3_walking_halfsphere": ("datasets/TUM/rgbd_dataset_freiburg3_walking_halfsphere", "freiburg3"),
     }
     if scene_name not in scene_map:
         raise ValueError(f"Unknown scene '{scene_name}'. Available: {list(scene_map.keys())} or replica_*")

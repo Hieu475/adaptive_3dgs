@@ -12,6 +12,8 @@ Implements Step 8 of Phase 4:
 import os
 import sys
 import json
+import random
+import platform
 import argparse
 import numpy as np
 import torch
@@ -38,6 +40,15 @@ from research.utility_training import (
     TrainingConfig,
 )
 from research.utility_metrics import safe_spearmanr
+
+
+def seed_everything(seed: int) -> None:
+    """Seed all training RNGs before constructing a model or optimizer."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
 
 def main():
@@ -108,6 +119,19 @@ def main():
             "lambda_q": args.lambda_q,
             "lambda_t": args.lambda_t,
         },
+        "training_config": {
+            "epochs": args.epochs,
+            "learning_rate": args.lr,
+            "hidden_dim": args.hidden_dim,
+            "weight_decay": config.weight_decay,
+            "loss_config": {
+                "lambda_rank": args.lambda_rank,
+                "lambda_q": args.lambda_q,
+                "lambda_t": args.lambda_t,
+            },
+            "python_version": platform.python_version(),
+            "torch_version": torch.__version__,
+        },
         "seed_results": {},
     }
 
@@ -119,6 +143,7 @@ def main():
         print(f"--- Training on Seed {seed} ---")
         
         # B7: Two-Head MLP
+        seed_everything(seed)
         mlp_model = TwoHeadMLP(in_features=len(train_ds.feature_names), hidden_dim=args.hidden_dim)
         res_mlp = trainer.train_two_head_model(mlp_model, train_ds, val_ds=val_ds, seed=seed)
         
@@ -134,16 +159,19 @@ def main():
             mlp_model,
             mlp_ckpt_path,
             feature_names=train_ds.feature_names,
-            metadata={"seed": seed, "val_spearman_rho": rho_mlp, "model_type": "TwoHeadMLP"},
+            metadata={"seed": seed, "val_spearman_rho": rho_mlp, "model_type": "TwoHeadMLP",
+                      "training_config": summary["training_config"]},
         )
         trainer.save_checkpoint(
             mlp_model,
             model_canonical_path,
             feature_names=train_ds.feature_names,
-            metadata={"seed": seed, "val_spearman_rho": rho_mlp, "model_type": "TwoHeadMLP"},
+            metadata={"seed": seed, "val_spearman_rho": rho_mlp, "model_type": "TwoHeadMLP",
+                      "training_config": summary["training_config"]},
         )
 
         # B6: Two-Head Linear
+        seed_everything(seed)
         lin_model = TwoHeadLinear(in_features=len(train_ds.feature_names))
         res_lin = trainer.train_two_head_model(lin_model, train_ds, val_ds=val_ds, seed=seed)
         with torch.no_grad():
@@ -157,10 +185,12 @@ def main():
             lin_model,
             lin_ckpt_path,
             feature_names=train_ds.feature_names,
-            metadata={"seed": seed, "val_spearman_rho": rho_lin, "model_type": "TwoHeadLinear"},
+            metadata={"seed": seed, "val_spearman_rho": rho_lin, "model_type": "TwoHeadLinear",
+                      "training_config": summary["training_config"]},
         )
 
         # B5: Direct Linear
+        seed_everything(seed)
         direct_model = LinearUtilityModel(in_features=len(train_ds.feature_names))
         res_dir = trainer.train_linear_utility_model(direct_model, train_ds, seed=seed)
         with torch.no_grad():
@@ -174,13 +204,15 @@ def main():
             direct_model,
             direct_ckpt_path,
             feature_names=train_ds.feature_names,
-            metadata={"seed": seed, "val_spearman_rho": rho_dir, "model_type": "LinearUtilityModel"},
+            metadata={"seed": seed, "val_spearman_rho": rho_dir, "model_type": "LinearUtilityModel",
+                      "training_config": summary["training_config"]},
         )
 
         print(f"   [Seed {seed}] Val rho: TwoHeadMLP = {rho_mlp:+.4f} | TwoHeadLinear = {rho_lin:+.4f} | DirectLinear = {rho_dir:+.4f}")
 
         summary["seed_results"][str(seed)] = {
-            "two_head_mlp": {"val_rho": float(rho_mlp), "checkpoint": mlp_ckpt_path},
+            "two_head_mlp": {"val_rho": float(rho_mlp), "checkpoint": mlp_ckpt_path,
+                              "history": res_mlp["history"]},
             "two_head_linear": {"val_rho": float(rho_lin), "checkpoint": lin_ckpt_path},
             "direct_linear": {"val_rho": float(rho_dir), "checkpoint": direct_ckpt_path},
         }

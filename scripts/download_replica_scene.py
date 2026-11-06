@@ -41,9 +41,19 @@ def download_single_frame(scene: str, frame_idx: int) -> dict:
     rgb_file = f"{scene}/results/frame{frame_idx:06d}.jpg"
     depth_file = f"{scene}/results/depth{frame_idx:06d}.png"
     
-    p_rgb = hf_hub_download(repo_id=REPO_ID, filename=rgb_file, repo_type="dataset")
-    p_depth = hf_hub_download(repo_id=REPO_ID, filename=depth_file, repo_type="dataset")
-    
+    p_rgb = None
+    p_depth = None
+    for attempt in range(6):
+        try:
+            p_rgb = hf_hub_download(repo_id=REPO_ID, filename=rgb_file, repo_type="dataset")
+            p_depth = hf_hub_download(repo_id=REPO_ID, filename=depth_file, repo_type="dataset")
+            break
+        except Exception as e:
+            if "429" in str(e) or attempt < 5:
+                time.sleep(2.0 * (attempt + 1))
+            else:
+                raise e
+
     return {
         "frame_idx": frame_idx,
         "rgb_path": p_rgb,

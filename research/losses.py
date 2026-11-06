@@ -35,6 +35,7 @@ def _gaussian(window_size: int, sigma: float) -> torch.Tensor:
 
 
 _WINDOW_CACHE = {}
+_SEPARABLE_WINDOW_CACHE = {}
 
 
 def create_window(window_size: int, channel: int, device: torch.device) -> torch.Tensor:
@@ -47,10 +48,35 @@ def create_window(window_size: int, channel: int, device: torch.device) -> torch
     return _WINDOW_CACHE[key]
 
 
+def create_separable_window(window_size: int, channel: int, device: torch.device):
+    """Return horizontal/vertical depthwise kernels for the same Gaussian window."""
+    key = (window_size, channel, device.type, device.index if device.index is not None else 0)
+    if key not in _SEPARABLE_WINDOW_CACHE:
+        one_d = _gaussian(window_size, 1.5).to(device=device, dtype=torch.float32)
+        horizontal = one_d.view(1, 1, 1, window_size).expand(channel, 1, 1, window_size).contiguous()
+        vertical = one_d.view(1, 1, window_size, 1).expand(channel, 1, window_size, 1).contiguous()
+        _SEPARABLE_WINDOW_CACHE[key] = (horizontal, vertical)
+    return _SEPARABLE_WINDOW_CACHE[key]
+
+
+def _ssim_blur(x: torch.Tensor, channel: int, window_size: int,
+               implementation: str) -> torch.Tensor:
+    padding = window_size // 2
+    if implementation == "direct":
+        return F.conv2d(x, create_window(window_size, channel, x.device),
+                        padding=padding, groups=channel)
+    if implementation == "separable":
+        horizontal, vertical = create_separable_window(window_size, channel, x.device)
+        x = F.conv2d(x, horizontal, padding=(0, padding), groups=channel)
+        return F.conv2d(x, vertical, padding=(padding, 0), groups=channel)
+    raise ValueError(f"Unknown SSIM implementation: {implementation!r}")
+
+
 def ssim_loss(
     pred: torch.Tensor,
     gt: torch.Tensor,
     window_size: int = 11,
+    implementation: str = "direct",
 ) -> torch.Tensor:
     """Differentiable structural similarity loss: L_ssim = 1 - SSIM(pred, gt).
     
@@ -69,18 +95,16 @@ def ssim_loss(
     x = pred.permute(2, 0, 1).unsqueeze(0)
     y = gt.permute(2, 0, 1).unsqueeze(0)
     
-    window = create_window(window_size, channel, device)
-    
-    mu1 = F.conv2d(x, window, padding=window_size // 2, groups=channel)
-    mu2 = F.conv2d(y, window, padding=window_size // 2, groups=channel)
+    mu1 = _ssim_blur(x, channel, window_size, implementation)
+    mu2 = _ssim_blur(y, channel, window_size, implementation)
     
     mu1_sq = mu1.pow(2)
     mu2_sq = mu2.pow(2)
     mu1_mu2 = mu1 * mu2
     
-    sigma1_sq = F.conv2d(x * x, window, padding=window_size // 2, groups=channel) - mu1_sq
-    sigma2_sq = F.conv2d(y * y, window, padding=window_size // 2, groups=channel) - mu2_sq
-    sigma12 = F.conv2d(x * y, window, padding=window_size // 2, groups=channel) - mu1_mu2
+    sigma1_sq = _ssim_blur(x * x, channel, window_size, implementation) - mu1_sq
+    sigma2_sq = _ssim_blur(y * y, channel, window_size, implementation) - mu2_sq
+    sigma12 = _ssim_blur(x * y, channel, window_size, implementation) - mu1_mu2
     
     c1 = 0.01 ** 2
     c2 = 0.03 ** 2
@@ -242,7 +266,10 @@ def total_loss(
     
     total = w_color * l_color + w_depth * l_depth
     if w_ssim > 0.0 and pred_color.shape[0] >= 11 and pred_color.shape[1] >= 11:
-        l_ssim = ssim_loss(pred_color, gt_color)
+        l_ssim = ssim_loss(
+            pred_color, gt_color,
+            implementation=weights.get("ssim_implementation", "direct"),
+        )
         losses['ssim'] = l_ssim
         total = total + w_ssim * l_ssim
     
