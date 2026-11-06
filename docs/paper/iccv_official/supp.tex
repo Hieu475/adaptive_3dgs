@@ -153,7 +153,7 @@ Routed (err) & 30.17 & 28.02 & 0.9584 & 115,964 \\
 $\Delta$ & +3.32 $\checkmark$ & +1.95 $\checkmark$ & +0.034 & --- \\
 \bottomrule
 \end{tabular}
-\caption{\textbf{Adaptive validation, Replica \texttt{office0}, 150f $\times$ 8 seeds.} Router picks \texttt{error\_only} (holes $\approx 0.02$): $p = 0.0078$, $d_z = 71.9$. No fixed policy wins both substrates.}
+\caption{\textbf{Adaptive validation, Replica \texttt{office0}, 99 frames $\times$ 8 seeds.} Router picks \texttt{error\_only} (holes $\approx 0.02$): $p = 0.0078$, $d_z = 71.9$. No fixed policy wins both substrates.}
 \label{tab:adaptive}
 \end{table}
 
@@ -173,7 +173,7 @@ TUM fr2\_xyz & 0 & 24.12 & 27.69 & $+3.57$ \\
  & 1.0 & 24.21 & 27.62 & $+3.41$ \\
 \bottomrule
 \end{tabular}
-\caption{\textbf{Within-scene depth interventions} (150 frames $\times$ 3 seeds). $\Delta$ is temporal$\times$influence with coverage minus unthrottled raw error, measured on identical perturbed frames. Replica also receives Gaussian depth noise with standard deviation $0.05$ times the hole fraction in meters. TUM smoothing acts only on valid depth after the standard hygiene stage; it does not remove remaining holes. No level reverses policy ordering. Full paired intervals: \texttt{results/depth\_intervention/analysis.json}.}
+\caption{\textbf{Within-scene depth interventions} (150 frames on TUM, 99 on Replica, $\times$ 3 seeds). $\Delta$ is temporal$\times$influence with coverage minus unthrottled raw error, measured on identical perturbed frames. Replica also receives Gaussian depth noise with standard deviation $0.05$ times the hole fraction in meters. TUM smoothing acts only on valid depth after the standard hygiene stage; it does not remove remaining holes. No level reverses policy ordering. Full paired intervals: \texttt{results/depth\_intervention/analysis.json}.}
 \label{tab:depth_intervention}
 \end{table}
 
@@ -185,7 +185,7 @@ TUM fr2\_xyz & 0 & 24.12 & 27.69 & $+3.57$ \\
 \textbf{Scene} & \textbf{Routed PSNR} & \textbf{Fixed reference} & \textbf{Route} \\
 \midrule
 fr2\_xyz 150f & 27.66 & 27.64 (ours) & temporal \\
-office0 150f & 30.36 & 30.17 (err) & error\_only \\
+office0 99f & 30.36 & 30.17 (err) & error\_only \\
 office1 100f & 33.11 & 33.48 (err) & error\_only \\
 room1 100f & 24.17 & 24.29 (err) & error\_only \\
 fr3\_static 100f & 25.95 & 25.96 (ours) & temporal \\

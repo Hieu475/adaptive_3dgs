@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One command per paper table. See paper_repro/README.md.
-# Usage: bash paper_repro/reproduce.sh {list|check|main|factorial|depth|adaptive|scenes|counterfactual|extension|dose|tables|holdout|tracking|figs}
+# Usage: bash paper_repro/reproduce.sh {list|check|main|factorial|depth|adaptive|scenes|counterfactual|extension|dose|scenes_budget|long|tables|holdout|tracking|figs}
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY="${PYTHON:-python}"
@@ -8,7 +8,7 @@ export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 cmd="${1:-list}"
 case "$cmd" in
   list)
-    sed -n '2,3p' "$0"; echo "targets: check main factorial depth adaptive scenes counterfactual extension dose tables holdout tracking figs" ;;
+    sed -n '2,3p' "$0"; echo "targets: check main factorial depth adaptive scenes counterfactual extension dose scenes_budget long tables holdout tracking figs" ;;
   check)
     $PY paper_repro/check_numbers.py ;;
   main)   # Tab. 1 + Tab. 2 + Fig. 1: traceable rerun from a tagged commit (writes results/rerun_paper1/).
@@ -61,6 +61,15 @@ case "$cmd" in
     $PY experiments/run_dilution_dose.py --scenes replica_office0 --cap 60000 --out_dir results/dilution_dose_replica_cap/office0_cap60k
     $PY experiments/run_dilution_dose.py --scenes replica_office1 --cap 40000 --out_dir results/dilution_dose_replica_cap/office1_cap40k
     $PY experiments/analyze_dilution_dose.py ;;
+  scenes_budget)  # 11 further scenes (99 frames, 3 seeds): unthrottled / coverage / proportional budget
+    $PY experiments/run_dilution_extension.py --scenes replica_office2 replica_office3 replica_office4 replica_room0 replica_room1 replica_room2 \
+        tum_fr1_desk tum_fr1_room tum_fr1_rpy tum_fr3_sitting_static tum_fr3_structure_texture_near \
+        --conditions error_off error_coverage error_budget_prop --seeds 42 43 44 --n_frames 99 --out_dir results/dilution_scenes
+    $PY experiments/analyze_dilution_scenes.py ;;
+  long)       # 500-frame TUM sequences, 2 seeds (Replica copies are only 100-120 frames)
+    $PY experiments/run_dilution_extension.py --scenes tum_fr2_xyz tum_fr1_xyz tum_fr1_desk \
+        --conditions error_off error_coverage error_budget_prop --seeds 42 43 --n_frames 500 --out_dir results/dilution_long
+    $PY experiments/analyze_dilution_long.py ;;
   tables)     # regenerate LaTeX tables, prose and macros from frozen JSON (CPU)
     $PY paper_repro/make_main_tables.py
     $PY paper_repro/make_tables.py ;;

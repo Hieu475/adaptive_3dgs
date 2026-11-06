@@ -50,7 +50,7 @@ def tab_replica(numbers):
             lines.append(r"\midrule" if key == "temporal_coverage_backlog" else "")
     lines = [ln for ln in lines if ln != ""]
     lines += [r"\bottomrule", r"\end{tabular}",
-              r"\caption{\textbf{Replica factorial and map-proportional budget, 150 frames $\times$ 8 seeds per scene.} Same cells as Tab.~\ref{tab:factorial}; all runs use the current code revision and a $15\,\mathrm{ms}$ modeled budget unless stated. The proportional cell sets the optimization budget to $15\,\mathrm{ms}\times N_t/N_{\mathrm{ref}}$ (mean scale $3.7$--$3.9\times$) with the spawn allowance fixed at $15\,\mathrm{ms}$. Coverage and backlog throttling lower PSNR on Replica, whereas more optimization budget raises it.}",
+              r"\caption{\textbf{Replica factorial and map-proportional budget, 99 (\texttt{office0}) and 119 (\texttt{office1}) frames $\times$ 8 seeds per scene.} Same cells as Tab.~\ref{tab:factorial}; all runs use the current code revision and a $15\,\mathrm{ms}$ modeled budget unless stated. The proportional cell sets the optimization budget to $15\,\mathrm{ms}\times N_t/N_{\mathrm{ref}}$ (mean scale $3.7$--$3.9\times$) with the spawn allowance fixed at $15\,\mathrm{ms}$. Coverage and backlog throttling lower PSNR on Replica, whereas more optimization budget raises it.}",
               r"\label{tab:replica}", r"\end{table*}"]
     for s in ("tum_fr2_xyz", "tum_fr1_xyz") + tuple(sc):
         cs = ext[s]["contrasts"]
@@ -129,7 +129,7 @@ def tab_scenes(numbers):
     sm, cm = a["summary"]["prop"], a["summary"]["cov"]
     rho = a["summary"]["map_size_vs_prop_gain"]
     L += [r"\bottomrule", r"\end{tabular}",
-          r"\caption{\textbf{Scene-level change in mean PSNR (dB) relative to unthrottled raw-error selection, 15 scenes.} Prop.: optimization budget proportional to map size; Cov.: coverage throttling; Map: final size of the unthrottled map. T: TUM, R: Replica. \texttt{fr2\_xyz}, \texttt{fr1\_xyz}, \texttt{office0} and \texttt{office1} use 150 frames and eight seeds; the others use 99 frames and three seeds. Proportional budget is positive on %d of %d scenes (median $%+.2f$, exact sign test $p<10^{-4}$); coverage throttling on %d of %d (median $%+.2f$, $p=%.2f$). Spearman correlation between map size and proportional-budget gain: $%+.2f$ ($p=%.3f$, exploratory).}"
+          r"\caption{\textbf{Scene-level change in mean PSNR (dB) relative to unthrottled raw-error selection, 15 scenes.} Prop.: optimization budget proportional to map size; Cov.: coverage throttling; Map: final size of the unthrottled map. T: TUM, R: Replica. \texttt{fr2\_xyz} and \texttt{fr1\_xyz} use 150 frames, \texttt{office0} and \texttt{office1} use 99 and 119 frames, all with eight seeds; the others use 99 frames and three seeds. Proportional budget is positive on %d of %d scenes (median $%+.2f$, exact sign test $p<10^{-4}$); coverage throttling on %d of %d (median $%+.2f$, $p=%.2f$). Spearman correlation between map size and proportional-budget gain: $%+.2f$ ($p=%.3f$, exploratory).}"
           % (sm["n_positive"], sm["n_scenes"], sm["median_db"], cm["n_positive"], cm["n_scenes"],
              cm["median_db"], cm["sign_test_p"], rho["spearman"], rho["p"]),
           r"\label{tab:scenelevel}", r"\end{table*}"]
@@ -142,12 +142,37 @@ def tab_scenes(numbers):
                               "rho_p": round(rho["p"], 3)}
 
 
+def tab_long(numbers):
+    path = ROOT / "results/dilution_long/analysis.json"
+    if not path.exists():
+        return
+    a = json.loads(path.read_text())
+    order = ["tum_fr2_xyz", "tum_fr1_xyz", "tum_fr1_desk"]
+    L = [r"\begin{table}[tbp]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{3pt}",
+         r"\begin{tabular}{llccc}", r"\toprule",
+         r"\textbf{Scene} & \textbf{Frames} & \textbf{Base} & \textbf{Cov.} & \textbf{Prop.} \\", r"\midrule"]
+    fmt = lambda x: f"{x:+.2f}".replace("-", "$-$")
+    for sc in order:
+        for i, (w, v) in enumerate(a[sc]["windows"].items()):
+            name = f"\\texttt{{{sc.replace('tum_', '').replace('_', chr(92) + '_')}}}" if i == 0 else ""
+            L.append(f"{name} & {w.replace('-', '--')} & {v['base']:.2f} & {fmt(v['cov'])} & {fmt(v['prop'])} \\\\")
+        if sc != order[-1]:
+            L.append(r"\midrule")
+    L += [r"\bottomrule", r"\end{tabular}",
+          r"\caption{\textbf{Long horizon (500 frames, two seeds).} Mean PSNR of the unthrottled raw-error baseline (Base) and the change from coverage throttling (Cov.) and the map-proportional budget (Prop., mean scale $5.4$--$6.7\times$) in three frame windows. The baseline degrades with horizon and the gains grow; coverage throttling is not monotone. Replica sequences are too short for this test.}",
+          r"\label{tab:long}", r"\end{table}"]
+    (OUT / "tab_long.tex").write_text("\n".join(L) + "\n")
+    numbers["long"] = {sc: {w: {k: round(x, 2) for k, x in v.items() if k in ("base", "cov", "prop")}
+                            for w, v in a[sc]["windows"].items()} for sc in order}
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     numbers = {}
     tab_replica(numbers)
     tab_dose(numbers)
     tab_scenes(numbers)
+    tab_long(numbers)
     (OUT / "numbers.json").write_text(json.dumps(numbers, indent=1))
     print(json.dumps(numbers, indent=1)[:1500])
 

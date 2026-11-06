@@ -1,0 +1,23 @@
+\begin{table}[tbp]
+\centering
+\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Scene} & \textbf{Frames} & \textbf{Base} & \textbf{Cov.} & \textbf{Prop.} \\
+\midrule
+\texttt{fr2\_xyz} & 1--150 & 24.22 & +3.47 & +3.65 \\
+ & 151--300 & 18.70 & +6.07 & +9.30 \\
+ & 301--500 & 17.88 & +4.85 & +8.48 \\
+\midrule
+\texttt{fr1\_xyz} & 1--150 & 21.50 & +1.71 & +3.03 \\
+ & 151--300 & 19.74 & +1.88 & +5.37 \\
+ & 301--500 & 19.32 & +0.72 & +5.77 \\
+\midrule
+\texttt{fr1\_desk} & 1--150 & 22.49 & +0.47 & +1.42 \\
+ & 151--300 & 18.98 & +2.52 & +5.05 \\
+ & 301--500 & 16.95 & +1.17 & +5.92 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Long horizon (500 frames, two seeds).} Mean PSNR of the unthrottled raw-error baseline (Base) and the change from coverage throttling (Cov.) and the map-proportional budget (Prop., mean scale $5.4$--$6.7\times$) in three frame windows. The baseline degrades with horizon and the gains grow; coverage throttling is not monotone. Replica sequences are too short for this test.}
+\label{tab:long}
+\end{table}

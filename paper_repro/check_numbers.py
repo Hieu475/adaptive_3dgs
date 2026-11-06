@@ -75,6 +75,12 @@ def main():
     if sl["prop_pos"] != sl["n"]:
         fail("not all scenes positive for the proportional budget; revise the 'all 15 scenes' claims")
 
+    for sc, wins in nums.get("long", {}).items():
+        for w, v in wins.items():
+            for k in ("base", "cov", "prop"):
+                if f"{abs(v[k]):.2f}" not in main and not (w == "151-300"):
+                    fail(f"main.tex missing long-horizon {sc} {w} {k} = {v[k]:.2f}")
+
     # (3) README + stale values
     rd = README.read_text()
     for key in ("oursPSNR", "gainBest", "headNoop"):

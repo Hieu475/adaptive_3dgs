@@ -3,7 +3,7 @@
 Research code and frozen result bundles for a controlled study of online RGB-D 3DGS under a **modeled 15 ms per-frame optimization budget**.
 The paper is organized around one claim (compute dilution); auxiliary analyses live in the supplement. Source is in [`docs/paper/iccv_official/`](docs/paper/iccv_official/) (`main.tex`, `supp.tex`, `refs.bib`).
 
-> **Scope.** This is a mapping study with ground-truth poses (tracking decoupled), 150-frame horizons at 320×240, on TUM RGB-D and Replica.
+> **Scope.** This is a mapping study with ground-truth poses (tracking decoupled), horizons of up to 150 frames at 320×240 (TUM: 150; local Replica copies: 99–119 frames), on TUM RGB-D and Replica.
 > The 15 ms figure is *modeled optimization time*, not end-to-end latency; measured throughput is about 10 FPS on an RTX 4050 Laptop GPU.
 > Seeds measure repeatability on fixed trajectories, not generalization across scenes.
 
