@@ -1,7 +1,7 @@
 # Map Growth and Policy Routing in Budgeted Online RGB-D 3D Gaussian Splatting
 
 Research code and frozen result bundles for a controlled study of online RGB-D 3DGS under a **modeled 15 ms per-frame optimization budget**.
-The paper source is in [`docs/paper/iccv_official/`](docs/paper/iccv_official/) (`main.tex`, `supp.tex`, `refs.bib`).
+The paper is organized around one claim (compute dilution); auxiliary analyses live in the supplement. Source is in [`docs/paper/iccv_official/`](docs/paper/iccv_official/) (`main.tex`, `supp.tex`, `refs.bib`).
 
 > **Scope.** This is a mapping study with ground-truth poses (tracking decoupled), 150-frame horizons at 320×240, on TUM RGB-D and Replica.
 > The 15 ms figure is *modeled optimization time*, not end-to-end latency; measured throughput is about 10 FPS on an RTX 4050 Laptop GPU.
@@ -14,7 +14,7 @@ The paper source is in [`docs/paper/iccv_official/`](docs/paper/iccv_official/) 
 | 1 | **Compute dilution.** As the map grows, established Gaussians receive a smaller share of a fixed optimization budget. Coverage throttling lifts raw-error selection by +3.33 / +1.77 dB (fr2_xyz / fr1_xyz); a 4× optimization budget with the original spawn allowance lifts it by +3.29 / +3.07 dB; mature-Gaussian selection rate on fr2_xyz rises from 0.36 to 0.82. | [`results/dilution_factorial/`](results/dilution_factorial/) |
 | 2 | **Combined policy** (temporal×influence selection + coverage throttling) reaches **27.64 dB** on TUM fr2_xyz, +2.61 dB over the strongest budgeted baseline and +4.48 dB over the RTG-SLAM-policy re-implementation. It recovers 97.6% of headroom above no-op (92.5% above the strongest budgeted baseline); FULL is 0.21 dB higher with a 3.8× larger map. | [`results/phase14_projected_area_fix_clean_7policy_8seeds/`](results/phase14_projected_area_fix_clean_7policy_8seeds/) |
 | 3 | **Counterfactual utility.** Single-Gaussian interventions have negative measured utility in 2.7–38.7% of cases depending on geometry stratum (n = 75 per stratum); uniform-random selection on the same pools has an expected 20.3% negative rate. | `results/oracle*/` |
-| 4 | **Negative results.** A tested offline utility model degrades closed-loop PSNR by 2.51 dB (pre-fix labels, one protocol); contextual re-ranking gives no online gain at large overhead. | see paper §5 |
+| 4 | **Negative results.** A tested offline utility model degrades closed-loop PSNR by 2.51 dB (pre-fix labels, one protocol); contextual re-ranking gives no online gain at large overhead. | supplement §F |
 | 5 | **Router.** A frozen hole-rate router separates TUM from Replica, but within-scene depth interventions do **not** reverse the policy ranking, so hole rate is a dataset-associated cue, not an established sensor-noise mechanism. | `results/depth_intervention/` |
 
 **Known weaknesses (stated in the paper).** The combined policy loses mean PSNR to raw-error selection on 10 of 14 sequences, including all eight Replica scenes; coverage also changes densification thresholds, so map size is not isolated as the sole cause; offline density-control methods and full SLAM integration are not compared.

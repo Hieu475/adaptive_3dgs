@@ -1,20 +1,20 @@
 # Paper reproduction index
 
-Maps every table/figure of `docs/paper/iccv_official/{main,supp}.tex` to the result bundle and the command that regenerates it.
+Maps every table/figure of `docs/paper/iccv_official/{main,supp}.tex` (main text is organized around one claim, compute dilution; router, counterfactual and negative results are in the supplement) to the result bundle and the command that regenerates it.
 GPU runs are long (RTX 4050: tens of minutes per scene × seeds). The paper numbers are already frozen in `results/`; most readers only need step 0.
 
 **Step 0 (CPU, seconds):** `python paper_repro/check_numbers.py` recomputes the headline numbers from the frozen JSON and checks that `main.tex` and `README.md` contain them (and none of the superseded values).
 
 | Paper item | Result bundle | Command(s) (run from repo root) | Status |
 |---|---|---|---|
-| Tab. 1 main benchmark, Fig. 2, Fig. 4 | `results/phase14_projected_area_fix_clean_7policy_8seeds/` | `bash paper_repro/reproduce.sh main` | pinned (from paper text) |
-| Tab. 2 factorial + dilution controls, Fig. 7 | `results/dilution_factorial/` | `bash paper_repro/reproduce.sh factorial` | pinned |
-| Tab. 4 depth interventions | `results/depth_intervention/` | `bash paper_repro/reproduce.sh depth` | pinned |
-| Tab. 3 / 7-scene routing, mixed regime | `results/phase14_adaptive_perframe/` | `bash paper_repro/reproduce.sh adaptive` | pinned (script defaults) |
+| Tab. 1 main benchmark, Figs. 2–3 | `results/phase14_projected_area_fix_clean_7policy_8seeds/` | `bash paper_repro/reproduce.sh main` | pinned (from paper text) |
+| Tab. 2 factorial + dilution controls, Fig. 1 | `results/dilution_factorial/` | `bash paper_repro/reproduce.sh factorial` | pinned |
+| Supp. Tab. S5 depth interventions | `results/depth_intervention/` | `bash paper_repro/reproduce.sh depth` | pinned |
+| Supp. Tabs. S4, S6 (router, 7-scene audit), mixed regime | `results/phase14_adaptive_perframe/` | `bash paper_repro/reproduce.sh adaptive` | pinned (script defaults) |
 | Holdout proxy (§6) | `results/phase14_holdout/` | `bash paper_repro/reproduce.sh holdout` | pinned |
 | Baseline VO / ATE (Supp. Tab. S3) | `results/phase14_tracking100/` | `bash paper_repro/reproduce.sh tracking` | pinned |
-| Figures 1–7 (PDF) | `docs/paper/figs/` | `python docs/paper/gen_iccv_figs.py` | pinned; Fig. 5 uses `docs/paper/gen_qual_fig_v4.py` (unverified) |
-| Tab. 5 per-scene breakdown, Tab. confirm2 | `results/phase14_multiscene150/` | `bash paper_repro/reproduce.sh scenes` | pinned from each bundle's recorded scene/frames/seeds/policies; the two 8-seed merge JSONs (`*_8seed.json`) have no recorded merge script |
+| Main Figs. 1–4 and Supp. Figs. S1–S3 (PDF) | `docs/paper/figs/` | `python docs/paper/gen_iccv_figs.py` | pinned; Fig. 5 uses `docs/paper/gen_qual_fig_v4.py` (unverified) |
+| Tab. 3 per-scene breakdown | `results/phase14_multiscene150/` | `bash paper_repro/reproduce.sh scenes` | pinned from each bundle's recorded scene/frames/seeds/policies; the two 8-seed merge JSONs (`*_8seed.json`) have no recorded merge script |
 | Counterfactual-utility numbers (§1) | `results/gate1_headroom/` | `bash paper_repro/reproduce.sh counterfactual` | pinned (scripts take no arguments); the pose-fixed regeneration protocol is described in the paper, and exact reproduction of the 75-per-stratum set was not re-verified |
 
 "Pinned" means the command line was taken from the script's own argument parser or the paper's reproducibility paragraph; it was **not** re-executed during the 2026-11-06 cleanup (GPU time).
