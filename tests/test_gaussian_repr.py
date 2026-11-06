@@ -7,7 +7,6 @@ Tests cover:
 4. Add/prune/compact operations
 5. Gradient flow through covariance computation
 """
-import pytest
 import torch
 import math
 import sys
@@ -18,7 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from research.gaussian_repr import (
     GaussianModel, GaussianState,
-    quaternion_to_rotation_matrix, build_scaling_matrix
+    quaternion_to_rotation_matrix
 )
 
 

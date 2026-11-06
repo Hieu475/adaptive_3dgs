@@ -14,7 +14,6 @@ import numpy as np
 import torch
 
 from research.phase6_selection import (
-    Phase6PolicyName,
     adaptive_greedy_select,
     static_context_select,
     select_phase6_subset,

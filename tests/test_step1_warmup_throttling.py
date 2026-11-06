@@ -1,9 +1,7 @@
 """Unit tests for Step 1: Age-Aware Guaranteed Warm-up & Coverage-based Densification Throttling."""
-import pytest
 import torch
-import math
 
-from research.scheduler import BudgetScheduler, OptimizationPolicy
+from research.scheduler import BudgetScheduler
 from research.gaussian_repr import GaussianModel
 from research.pipeline import OnlineReconstructionPipeline
 

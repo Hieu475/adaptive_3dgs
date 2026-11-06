@@ -16,18 +16,15 @@ This module also provides evaluate_policy() which dispatches any Phase 6
 policy (including Phase 5 baselines) through the same fair evaluation pipeline.
 """
 import time
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import torch
 
 from research.phase5_selection import (
-    PolicyName as Phase5PolicyName,
-    SelectionResult,
     map_candidate_to_active_index,
 )
 from research.phase6_selection import (
-    Phase6PolicyName,
     select_phase6_subset,
 )
 from research.phase6_model import FrozenContextPredictor

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Upscale all remaining Replica scenes to high-density (~1.2M+ Gaussians)."""
-import os
 import sys
 import subprocess
 from pathlib import Path

@@ -12,16 +12,14 @@ Generates:
 Usage:
     python scripts/benchmark_multiscene.py --scenes replica_office0 replica_room0 tum_fr2_xyz tum_fr1_desk --n_frames 50
 """
-import os
 import sys
 import time
 import json
 import argparse
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any
 
 import numpy as np
-import pandas as pd
 import torch
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -30,7 +28,6 @@ if str(REPO_ROOT) not in sys.path:
 
 from experiments.run_phase13_frozen_benchmark import (
     load_phase10_sequence,
-    build_pipeline_config,
     run_policy_trajectory,
 )
 

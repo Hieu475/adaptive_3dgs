@@ -1,10 +1,8 @@
 """Integration Tests for GaussianStateStore with GaussianModel and Oracle Isolation."""
 import pytest
 import torch
-import copy
 
 from research.gaussian_repr import GaussianModel, GaussianState
-from research.state_store import GaussianStateStore
 
 
 def test_model_lifecycle_pipeline():

@@ -10,13 +10,11 @@ Features:
       3. 3D point cloud & 3DGS PLY files for 3D viewers (MeshLab, SuperSplat, Blender)
       4. Quantitative metrics plot (PSNR, Gaussians, Latency) and summary JSON
 """
-import os
 import sys
 import time
 import json
 import argparse
 from pathlib import Path
-from typing import Dict, List, Any, Optional
 
 import numpy as np
 import torch
@@ -490,7 +488,7 @@ def main():
         panel_images.append(panel)
 
     # 4. Generate Animated GIF & Video
-    print(f"\n[4/5] Compiling visual demo animations and 3D models...")
+    print("\n[4/5] Compiling visual demo animations and 3D models...")
     if args.save_gif and len(panel_images) > 0:
         import imageio
         gif_path = out_dir / "demo_recon_progress.gif"
@@ -500,7 +498,7 @@ def main():
         print(f"      -> Animated GIF saved: {gif_path}")
 
     # 5. Export 3D Point Cloud & Gaussians
-    print(f"\n[5/5] Exporting 3D Gaussian maps to PLY...")
+    print("\n[5/5] Exporting 3D Gaussian maps to PLY...")
     with torch.no_grad():
         positions = pipeline.gaussian_model.positions.detach().cpu().numpy()
         scales = pipeline.gaussian_model.scales.detach().cpu().numpy()

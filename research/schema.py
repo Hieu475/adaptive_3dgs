@@ -6,7 +6,7 @@ Every result record encapsulates exact code version, configuration, dataset,
 scene, random seed, hardware specifications, and structured metrics.
 """
 from dataclasses import dataclass, field, asdict
-from typing import Dict, List, Optional, Tuple, Any, Union
+from typing import Dict, List, Tuple, Any
 import json
 import yaml
 import os

@@ -1,10 +1,8 @@
 """Unit tests for Phase 4 Utility Models, Baselines, and Losses."""
-import pytest
 import numpy as np
 import torch
 
 from research.utility_models import (
-    RandomScorer,
     RGBErrorScorer,
     RGBDepthErrorScorer,
     ErrorInfluenceScorer,
@@ -17,7 +15,6 @@ from research.utility_models import (
 from research.utility_losses import (
     quality_loss,
     cost_loss,
-    pairwise_utility_loss,
     two_head_loss,
     TwoHeadUtilityLoss,
     LossConfig,

@@ -43,14 +43,13 @@ import time
 import math
 import numpy as np
 import torch
-import torch.nn as nn
 from enum import Enum
 from typing import Dict, List, Optional, Tuple, Any
 from scipy.stats import spearmanr
 from copy import deepcopy
 
 from .rasterizer import render as rasterize_scene
-from .attribution import render_with_attribution, compute_gaussian_statistics, compute_projected_area
+from .attribution import render_with_attribution, compute_gaussian_statistics
 from .scheduler import estimate_gaussian_costs
 from .background_cache import FrozenBackgroundCache
 from .selective_optimizer import SelectiveAdam
@@ -103,7 +102,7 @@ class OracleUtilityExperiment:
         # Override defaults with protocol if provided
         if protocol is not None:
             try:
-                from research.protocol import get_oracle_config, validate_oracle_protocol
+                from research.protocol import get_oracle_config
                 ocfg = get_oracle_config(protocol)
                 n_opt_steps = int(ocfg.get('n_opt_steps', n_opt_steps))
                 w_rgb = float(ocfg.get('w_rgb', w_rgb))

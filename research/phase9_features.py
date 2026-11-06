@@ -30,7 +30,7 @@ Invariants & Constraints:
     - Strictly deterministic, finite (no NaN, no Inf, handles zero median).
     - Preserves input dimension R^11.
 """
-from typing import Dict, List, Optional, Tuple, Union, Any
+from typing import Dict, List, Optional, Union, Any
 import numpy as np
 import torch
 

@@ -1,5 +1,4 @@
 """Unit tests for Phase 9A Scale-Invariant Feature Representations."""
-import pytest
 import numpy as np
 import torch
 
@@ -15,7 +14,6 @@ from research.phase9_features import (
     A2_UNCHANGED_INDICES,
     compute_robust_population_scale,
     transform_features_array,
-    transform_grouped_features,
     transform_candidates,
     ScaleInvariantFeatureTransformer,
 )

@@ -7,7 +7,7 @@ Key math:
   where J is the Jacobian of the perspective projection.
 """
 import torch
-from typing import Tuple, Optional
+from typing import Tuple
 
 
 def world_to_camera(

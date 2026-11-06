@@ -11,9 +11,8 @@ Metrics measured:
     - Geometric Efficiency: Final # Gaussians, Densified per Frame
     - Timing & Latency: Densification Time (ms), Total Frame Time (ms)
 """
-import time
 import torch
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Any
 import numpy as np
 
 from .pipeline import OnlineReconstructionPipeline

@@ -1,5 +1,4 @@
 """Unit tests for Phase 5 Frozen Utility Predictor and Budgeted Selection Policies."""
-import os
 import pytest
 import numpy as np
 import torch

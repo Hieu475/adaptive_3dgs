@@ -9,9 +9,7 @@ Handles:
 """
 from dataclasses import dataclass, field
 import os
-import json
-from typing import Dict, List, Optional, Tuple, Any
-import numpy as np
+from typing import Dict, List, Optional, Any
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -21,7 +19,6 @@ from research.utility_losses import (
     LossConfig,
     TwoHeadUtilityLoss,
     DirectUtilityRegressionLoss,
-    PairwiseRankingLoss,
 )
 from research.utility_metrics import safe_spearmanr
 

@@ -1,23 +1,18 @@
 """Unit tests for Phase 4 utility models, baseline scorers, and loss functions."""
-import pytest
 import numpy as np
 import torch
 
 from research.utility_models import (
-    RandomScorer,
     RGBErrorScorer,
     RGBDepthErrorScorer,
     ErrorInfluenceScorer,
     BinaryThresholdScorer,
-    LinearUtilityModel,
     TwoHeadLinear,
     TwoHeadMLP,
 )
 from research.utility_losses import (
-    PointwiseTwoHeadLoss,
     PairwiseRankingLoss,
     JointRankingAndPointwiseLoss,
-    DirectUtilityRegressionLoss,
 )
 
 

@@ -8,9 +8,7 @@ Tests cover:
 5. Conic (inverse covariance) computation
 6. Gradient flow through the entire projection pipeline
 """
-import pytest
 import torch
-import math
 import sys
 import os
 

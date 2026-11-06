@@ -10,17 +10,10 @@ Generates:
     - Figure 4: Component Independence Correlation Matrix
     - Figure 5: Frame-by-Frame Quality & Framerate Stability Timeline
 """
-import time
 import torch
 from typing import Dict, List, Optional, Any, Tuple
-import numpy as np
 
 from .pipeline import OnlineReconstructionPipeline
-from .scheduler import OptimizationPolicy
-from .benchmark_policies import run_full_policy_ablation_matrix
-from .benchmark_densification import run_full_densification_ablation
-from .benchmark_budgets import run_full_budget_matrix
-from .importance_diagnostics import compute_full_diagnostics
 
 
 def generate_table_1_main_benchmark(

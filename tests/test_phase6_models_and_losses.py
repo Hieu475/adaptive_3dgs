@@ -7,12 +7,9 @@ Tests:
   4. FrozenContextPredictor inference interface and gradient freezing invariant.
 """
 import pytest
-import numpy as np
 import torch
-import torch.nn as nn
 
 from research.phase6_model import (
-    Phase6ModelConfig,
     ContextAwareTwoHeadMLP,
     ResidualContextModel,
     Phase6Loss,

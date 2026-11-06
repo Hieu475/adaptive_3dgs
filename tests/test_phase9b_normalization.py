@@ -16,7 +16,6 @@ import numpy as np
 import torch
 
 from research.phase9b_protocol import (
-    CANONICAL_FEATURE_SCHEMA,
     B2_EMA_BETA,
     EPS,
     NORMALIZATION_VARIANTS,

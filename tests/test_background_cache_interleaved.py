@@ -12,12 +12,10 @@ Verifies the mathematical properties of the Grouped Active/Frozen Compositing Ap
      proving consistent descent directions without gradient reversal.
    - Frozen parameter gradients remain strictly 0.0 (no tape leakage).
 """
-import pytest
 import torch
-import numpy as np
 
 from research.gaussian_repr import GaussianModel
-from research.rasterizer import render as rasterize_scene, render_full
+from research.rasterizer import render_full
 from research.background_cache import FrozenBackgroundCache
 
 

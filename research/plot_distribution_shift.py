@@ -7,10 +7,7 @@ Generates:
     - results/phase9a_scale_invariant/representation_metrics.csv
     - results/phase9a_scale_invariant/figures/fig19_distribution_shift.png
 """
-import os
 import json
-from pathlib import Path
-from typing import Dict, List, Tuple, Any
 
 import numpy as np
 import pandas as pd

@@ -1,7 +1,6 @@
 """Unit tests for Experiment Schema, Reproducibility, and Provenance Bundling."""
 import os
 import tempfile
-import pytest
 import numpy as np
 import torch
 
@@ -20,7 +19,6 @@ from research.reproducibility import (
     set_seed,
     bootstrap_ci,
     save_experiment_bundle,
-    DatasetManifest,
 )
 
 

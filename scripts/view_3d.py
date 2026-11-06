@@ -24,7 +24,7 @@ import socket
 import argparse
 import webbrowser
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Tuple
 import numpy as np
 import trimesh
 import logging

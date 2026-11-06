@@ -15,7 +15,6 @@ import pytest
 import numpy as np
 import torch
 
-from research.phase9_protocol import CANONICAL_FEATURE_SCHEMA
 from research.phase9b_protocol import EPS
 from research.phase9b_normalization import (
     StandardNormalizer,
@@ -23,7 +22,6 @@ from research.phase9b_normalization import (
 )
 from research.phase9c_protocol import (
     validate_protocol_integrity_9c,
-    BETA_VALUES,
     PERTURBATION_SCALES,
     PERTURBATION_OFFSETS,
 )
@@ -31,8 +29,6 @@ from research.phase9c_analysis import (
     B2StaticNormalizer,
     apply_feature_perturbation,
     verify_b0_b2_static_equivalence,
-    compute_per_frame_spearman,
-    assess_sensitivity_range,
 )
 from research.utility_models import TwoHeadMLP
 

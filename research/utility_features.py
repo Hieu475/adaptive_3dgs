@@ -19,7 +19,7 @@ Schema:
   ]
 """
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Tuple, Any
 import numpy as np
 import torch
 

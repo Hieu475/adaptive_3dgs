@@ -4,12 +4,11 @@ import unittest
 import torch
 import numpy as np
 
-from research.phase12_protocol import CANONICAL_LOCAL_FEATURES, CANONICAL_GLOBAL_FEATURES, SAFETY_FACTOR
+from research.phase12_protocol import CANONICAL_GLOBAL_FEATURES
 from research.phase12_model import (
     LocalEncoder,
     GlobalContextEncoder,
     PositiveUtilityHead,
-    QualityHead,
     CostHead,
     TwoStageUtilityModel,
     TwoStageModelConfig,
@@ -17,7 +16,7 @@ from research.phase12_model import (
     TwoStageLossConfig,
 )
 from research.pipeline import OnlineReconstructionPipeline
-from research.phase10_runtime import extract_global_context, Phase10ModelBundle, Phase10Selector
+from research.phase10_runtime import extract_global_context
 
 
 class TestPhase12Model(unittest.TestCase):

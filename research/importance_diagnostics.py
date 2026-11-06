@@ -17,8 +17,7 @@ Key metrics:
 - Tier separation quality (inter-tier vs intra-tier variance ratio)
 """
 import torch
-from typing import Dict, List, Tuple, Optional
-import math
+from typing import Dict
 
 
 def spearman_rank_correlation(
@@ -421,7 +420,7 @@ def format_diagnostics_report(diagnostics: Dict) -> str:
 
     # Basic stats
     bs = diagnostics['basic_stats']
-    lines.append(f"\n[Basic Statistics]")
+    lines.append("\n[Basic Statistics]")
     lines.append(f"  N Gaussians:      {bs['n_gaussians']}")
     lines.append(f"  N Visible:        {bs['n_visible']} ({bs['visibility_fraction']:.1%})")
     lines.append(f"  Importance:       {bs['importance_mean']:.4f} ± {bs['importance_std']:.4f}  "
@@ -431,7 +430,7 @@ def format_diagnostics_report(diagnostics: Dict) -> str:
 
     # Importance-error correlation
     iec = diagnostics['importance_error_correlation']
-    lines.append(f"\n[Importance ↔ Error Correlation]")
+    lines.append("\n[Importance ↔ Error Correlation]")
     lines.append(f"  vs Color Error:   Spearman={iec['importance_vs_color_err_spearman']:.4f}  "
                  f"Pearson={iec['importance_vs_color_err_pearson']:.4f}")
     lines.append(f"  vs Depth Error:   Spearman={iec['importance_vs_depth_err_spearman']:.4f}  "
@@ -453,7 +452,7 @@ def format_diagnostics_report(diagnostics: Dict) -> str:
 
     # Component correlations
     cc = diagnostics['component_correlations']
-    lines.append(f"\n[Component Independence (Spearman ρ)]")
+    lines.append("\n[Component Independence (Spearman ρ)]")
     for pair, rho in sorted(cc.items()):
         independence = "independent" if abs(rho) < 0.3 else (
             "weakly correlated" if abs(rho) < 0.6 else "highly correlated")
@@ -461,18 +460,18 @@ def format_diagnostics_report(diagnostics: Dict) -> str:
 
     # Calibration
     cal = diagnostics['calibration']
-    lines.append(f"\n[Calibration]")
+    lines.append("\n[Calibration]")
     lines.append(f"  Monotonicity Score: {cal['monotonicity_score']:.2f}")
     if cal['monotonicity_score'] > 0.8:
-        lines.append(f"  → Well calibrated: higher importance ≈ higher error ✓")
+        lines.append("  → Well calibrated: higher importance ≈ higher error ✓")
     elif cal['monotonicity_score'] > 0.5:
-        lines.append(f"  → Partially calibrated")
+        lines.append("  → Partially calibrated")
     else:
-        lines.append(f"  → Poorly calibrated: importance does not track error ✗")
+        lines.append("  → Poorly calibrated: importance does not track error ✗")
 
     # Tier quality
     tq = diagnostics['tier_quality']
-    lines.append(f"\n[Tier Separation]")
+    lines.append("\n[Tier Separation]")
     lines.append(f"  Fisher Ratio:     {tq['fisher_discriminant_ratio']:.4f}")
     lines.append(f"  Correct Ordering: {'Yes ✓' if tq['correct_tier_ordering'] else 'No ✗'} "
                  f"(Tier A error > Tier C error)")
@@ -483,7 +482,7 @@ def format_diagnostics_report(diagnostics: Dict) -> str:
 
     # Normalization comparison
     nc = diagnostics['normalization_comparison']
-    lines.append(f"\n[Normalization Comparison]")
+    lines.append("\n[Normalization Comparison]")
     for method, comp_stats in nc.items():
         lines.append(f"  {method}:")
         for comp_name, s in comp_stats.items():

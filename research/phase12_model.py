@@ -24,26 +24,19 @@ Design Constraints (Strict Protocol Adherence):
     - Compact MLP with shared fusion backbone (<15k parameters).
     - GPU inference latency < 0.5 ms.
 """
-import os
-import json
-import time
 from pathlib import Path
 from dataclasses import dataclass, asdict
-from typing import Dict, List, Optional, Tuple, Any, Union
+from typing import Dict, Optional, Tuple, Any, Union
 
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 from sklearn.metrics import roc_auc_score
 
 from research.phase12_protocol import (
     CANONICAL_LOCAL_FEATURES,
-    CANONICAL_GLOBAL_FEATURES,
-    SAFETY_FACTOR,
-    DEFAULT_BUDGET_MS,
 )
 from research.utility_metrics import safe_spearmanr, compute_ndcg_at_k
 

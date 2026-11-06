@@ -20,7 +20,6 @@ from research.phase6_context import (
     build_selected_context,
     build_full_context,
     build_full_context_batch,
-    ContextConfig,
     PHASE6_FEATURE_NAMES,
     PHASE6_FEATURE_DIM,
     NEIGHBOR_FEATURE_NAMES,

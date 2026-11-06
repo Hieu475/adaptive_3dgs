@@ -1,5 +1,4 @@
 """Unit and Integration Tests for Persistent Gaussian State Store and Normalization."""
-import pytest
 import torch
 
 from research.state_store import GaussianStateStore

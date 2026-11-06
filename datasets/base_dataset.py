@@ -1,7 +1,7 @@
 """Base dataset class for RGB-D sequences."""
 import torch
 from abc import ABC, abstractmethod
-from typing import Dict, Optional
+from typing import Dict
 from pathlib import Path
 
 

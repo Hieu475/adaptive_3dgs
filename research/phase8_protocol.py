@@ -19,7 +19,6 @@ Protocol Invariants:
     - n=5 seeds for statistical inference
     - Gate criteria are defined BEFORE experiments run
 """
-import os
 from pathlib import Path
 from typing import Dict, List, Tuple, Any
 

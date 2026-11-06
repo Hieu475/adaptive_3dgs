@@ -36,9 +36,8 @@ Protocol Invariants:
       Contextual relative features use current-frame unlabeled population statistics
       (never oracle U*, never future frames, never test labels).
 """
-import os
 from pathlib import Path
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Dict, List, Tuple, Any
 
 
 def get_repo_root() -> Path:

@@ -7,7 +7,6 @@ Verifies:
 4. Production gsplat backend numerical consistency vs reference rasterizer.
 5. Strict fail-fast backend resolution with zero silent fallbacks.
 """
-import os
 import pytest
 import torch
 from research.projection import world_to_camera, project_to_screen

@@ -25,17 +25,9 @@ Loss:
 import os
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from typing import Dict, List, Optional, Tuple, Any, Union
 
-from .phase6_context import (
-    PHASE6_FEATURE_DIM,
-    SELF_SLICE,
-    NEIGHBOR_SLICE,
-    OVERLAP_SLICE,
-    SELECTED_SLICE,
-)
 from research.utility_models import TwoHeadMLP
 
 
@@ -607,7 +599,6 @@ class FrozenContextPredictor:
             device: Device for inference.
             config: Model config (overridden by checkpoint if available).
         """
-        import time
         from .phase6_dataset import Phase6FeatureNormalizer
 
         if device is None:
@@ -673,7 +664,6 @@ class FrozenContextPredictor:
         Returns:
             Dict with 'delta_q', 'delta_t', 'utility' tensors, each (N,).
         """
-        import time
 
         if features.ndim == 1:
             features = features.unsqueeze(0)

@@ -9,10 +9,9 @@ Validates:
 import pytest
 import torch
 from research.pipeline import OnlineReconstructionPipeline
-from research.scheduler import BudgetScheduler, OptimizationPolicy
+from research.scheduler import BudgetScheduler
 from research.densification import prune_low_value
-from research.gaussian_repr import GaussianModel, GaussianState
-from research.importance import Tier
+from research.gaussian_repr import GaussianModel
 
 
 class TestAdaptiveThresholdOrdering:

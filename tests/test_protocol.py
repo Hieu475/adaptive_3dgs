@@ -1,5 +1,4 @@
 """Tests for Scientific Protocol v1 and configuration getters."""
-import pytest
 from research.protocol import (
     load_protocol,
     get_seeds,

@@ -26,12 +26,12 @@ Invariants:
     - Selected-set features depend on S_t and must be recomputed when S changes.
     - All computations use pre-intervention state only (no post-optimization leakage).
 """
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Any, Union
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Any
 import numpy as np
 import torch
 
-from .utility_features import CANONICAL_FEATURE_NAMES, extract_feature_vector
+from .utility_features import CANONICAL_FEATURE_NAMES
 
 
 # ─────────────────────────────────────────────────────────────────────────────

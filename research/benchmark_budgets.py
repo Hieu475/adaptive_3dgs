@@ -9,13 +9,11 @@ Metrics measured:
     - Budget Compliance: Violation Rate (% frames exceeding budget), Over-budget penalty
     - Compute Allocation: Average # Gaussians optimized per frame
 """
-import time
 import torch
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any
 import numpy as np
 
 from .pipeline import OnlineReconstructionPipeline
-from .scheduler import OptimizationPolicy
 
 
 def run_budget_experiment(

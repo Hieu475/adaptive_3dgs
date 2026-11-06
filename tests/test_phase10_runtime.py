@@ -10,7 +10,6 @@ Verifies:
     7. StateStore continuous update without state reset (S_t -> S_{t+1}).
 """
 import os
-import sys
 import unittest
 import numpy as np
 import torch
@@ -20,10 +19,6 @@ from research.phase10_protocol import (
     to_dict as protocol_to_dict,
     get_checkpoint_path_for_seed,
     get_normalizer_path_for_seed,
-    CANONICAL_FEATURE_SCHEMA,
-    DEFAULT_BUDGET_MS,
-    SAFETY_FACTOR,
-    B2_BETA,
 )
 from research.phase10_runtime import (
     Phase10ModelBundle,
@@ -33,7 +28,6 @@ from research.phase10_runtime import (
     get_pipeline_config,
 )
 from research.pipeline import OnlineReconstructionPipeline
-from research.gaussian_repr import GaussianModel
 
 
 class TestPhase10Runtime(unittest.TestCase):

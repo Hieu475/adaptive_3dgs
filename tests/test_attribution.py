@@ -1,7 +1,6 @@
 """Tests for per-Gaussian attribution module."""
 import torch
 import pytest
-import math
 
 
 class TestRasterizeWithAttribution:

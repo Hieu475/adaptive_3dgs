@@ -2,10 +2,8 @@
 import pytest
 import torch
 from research.densification import (
-    compute_error_masks,
     compute_sampling_probability_map,
     sample_candidates,
-    create_gaussians_from_candidates,
 )
 from research.scheduler import BudgetScheduler
 from research.pipeline import OnlineReconstructionPipeline

@@ -6,12 +6,9 @@ Implements Sections 16, 17, and 18 of the Adaptive 3DGS Research Upgrade Plan:
 - Section 18: Risk-Aware Extension (LCB scoring and abstention)
 """
 import time
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Any, Set
-import numpy as np
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Any, Set
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
 from .interaction_model import InteractionAwareModel
 from .conditional_dataset import H_S_DIM

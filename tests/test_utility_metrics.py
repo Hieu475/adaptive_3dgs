@@ -1,5 +1,4 @@
 """Unit tests for Phase 4 Utility Metrics (RQ1 & RQ2)."""
-import pytest
 import numpy as np
 import torch
 
@@ -8,14 +7,11 @@ from research.utility_metrics import (
     safe_spearmanr,
     safe_pearsonr,
     compute_ndcg_at_k,
-    compute_calibration_metrics,
     compute_confidence_interval_95,
-    rank_candidates,
     select_candidates,
     select_under_budget,
     evaluate_rq1_prediction,
     evaluate_rq2_selection,
-    evaluate_utility_complete,
 )
 
 

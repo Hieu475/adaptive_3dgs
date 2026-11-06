@@ -17,7 +17,6 @@ import torch
 
 from research.utility_features import (
     CANONICAL_FEATURE_NAMES,
-    UTILITY_FEATURES,
     extract_feature_vector,
 )
 from research.utility_dataset import FeatureNormalizer

@@ -4,7 +4,6 @@ Usage:
     python scripts/run_densification_ablation.py [--device cpu|cuda] [--frames 4]
 """
 import argparse
-import torch
 import sys
 import os
 

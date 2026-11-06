@@ -14,8 +14,7 @@ Key Features:
    - `prune_state(keep_mask)` compacts state tensors when low-value Gaussians are pruned.
 """
 import torch
-from typing import List, Dict, Union, Optional, Tuple, Any
-import math
+from typing import List, Dict, Optional, Tuple, Any
 
 
 class SelectiveAdam:

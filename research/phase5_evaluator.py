@@ -8,13 +8,12 @@ Encapsulates single-frame and multi-frame evaluation under hard compute budgets 
   5. Computation of OSE, absolute/relative regret, selection regret, and efficiency.
 """
 import time
-from typing import Dict, List, Optional, Tuple, Any, Union
+from typing import Dict, List, Optional, Any, Union
 import numpy as np
 import torch
 
 from research.phase5_selection import (
     PolicyName,
-    SelectionResult,
     select_budget_constrained_subset,
     map_candidate_to_active_index,
 )
@@ -24,7 +23,6 @@ from research.scheduler_metrics import (
     compute_selection_regret,
     compute_policy_efficiency,
     compute_cost_metrics,
-    compute_memory_overhead,
 )
 from research.utility_predictor import FrozenUtilityPredictor
 

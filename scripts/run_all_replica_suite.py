@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Run full Replica benchmark suite across all 8 canonical SLAM sequences."""
-import os
 import sys
 import json
 import time

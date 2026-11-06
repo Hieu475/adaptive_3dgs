@@ -9,12 +9,10 @@ Tests:
 """
 import pytest
 import torch
-import numpy as np
 
 from research.gaussian_repr import GaussianModel
-from research.rasterizer import render, render_full, render_frozen, render_active
+from research.rasterizer import render_full
 from research.background_cache import FrozenBackgroundCache
-from research.losses import total_loss
 
 
 def create_test_model(N: int = 100, device: str = 'cpu') -> GaussianModel:

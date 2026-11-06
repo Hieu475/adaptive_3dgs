@@ -7,12 +7,10 @@ from research.utility_features import (
     CANONICAL_FEATURE_NAMES,
     CANONICAL_FEATURE_SPECS,
     extract_feature_vector,
-    ABLATION_SUBSETS,
 )
 from research.utility_dataset import (
     FeatureNormalizer,
     UtilityDataset,
-    SampleMetadata,
     load_canonical_oracle_dataset,
     prepare_normalized_splits,
 )

@@ -12,7 +12,6 @@ Metrics measured:
     - Compute: # Optimized Gaussians, Optimization Time (ms), Total Frame Time (ms)
     - Tradeoff: Quality Retained (% of Full), Compute Saved (% of Full), Pareto Frontier
 """
-import time
 import torch
 from typing import Dict, List, Optional, Any, Union
 import numpy as np

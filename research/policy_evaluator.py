@@ -15,13 +15,11 @@ Guarantees:
   - Negative utility rejection and empty subset support (Points 11, 12).
 """
 import time
-from typing import Dict, List, Optional, Tuple, Any, Union
-import numpy as np
+from typing import Dict, List, Optional, Any, Union
 import torch
 
 from research.phase5_selection import (
     PolicyName,
-    SelectionResult,
     select_budget_constrained_subset,
 )
 from research.scheduler_metrics import (
@@ -29,8 +27,6 @@ from research.scheduler_metrics import (
     compute_regret,
     compute_policy_efficiency,
     compute_cost_metrics,
-    compute_selection_churn,
-    compute_memory_overhead,
 )
 from research.utility_predictor import FrozenUtilityPredictor
 

@@ -20,25 +20,20 @@ import tempfile
 import pytest
 import numpy as np
 import torch
-import torch.nn as nn
 
 from research.phase6_dataset import (
     GroupedBatchSampler,
-    Phase6UtilityDataset,
     prepare_phase6_splits,
 )
 from research.phase6_model import (
     Phase6ModelConfig,
     ResidualContextModel,
-    ContextAwareTwoHeadMLP,
     Phase6Loss,
     FrozenContextPredictor,
     create_ablation_variant,
 )
 from research.phase6_artifact import (
     validate_phase6_checkpoint,
-    create_phase6_manifest,
-    REQUIRED_CHECKPOINT_FIELDS,
 )
 from research.phase6_context import PHASE6_FEATURE_DIM
 from research.utility_models import TwoHeadMLP

@@ -12,10 +12,8 @@ Generates the 8 canonical publication-grade figures specified for the research p
   Figure 8: AI Systems Stage Runtime Breakdown & Adaptive Overhead
 """
 import os
-import sys
 import json
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
@@ -194,7 +192,7 @@ def generate_standardized_figures():
     # Fit line
     m, b = np.polyfit(u_true, u_pred, 1)
     x_line = np.linspace(u_true.min(), u_true.max(), 100)
-    plt.plot(x_line, m * x_line + b, color='#D93025', linewidth=1.8, label=f'Linear Fit ($\\rho = +0.2035$)')
+    plt.plot(x_line, m * x_line + b, color='#D93025', linewidth=1.8, label='Linear Fit ($\\rho = +0.2035$)')
     
     plt.axhline(0, color='gray', linestyle=':', linewidth=1.0)
     plt.axvline(0, color='gray', linestyle=':', linewidth=1.0)

@@ -33,28 +33,16 @@ GO/NO-GO Checkpoint (Section 11):
     GO if R_flip > 0.05, or R_Q varies strongly with overlap, or |I_ij| is significant.
     NO-GO if U(i|S) ≈ U(i|∅) and rank(i|S) ≈ rank(i|∅) for most candidates.
 """
-import os
-import json
-import time
-import math
 import numpy as np
 import torch
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Any
 from scipy.stats import spearmanr, kendalltau
-from copy import deepcopy
 
-from .oracle_utility import OracleUtilityExperiment
 from .phase6_oracle import ConditionalOracleExperiment, ConditionalOracleConfig
 from .phase6_context import (
-    build_full_context,
     _get_pixel_mask,
-    _get_knn_indices,
-    ContextConfig,
-    PHASE6_FEATURE_NAMES,
 )
-from .utility_features import CANONICAL_FEATURE_NAMES
-from .phase12_protocol import PHASE12_OUTPUT_DIR, SEEDS
 
 
 @dataclass

@@ -12,8 +12,7 @@ Architecture:
        and only active Gaussians compute gradients.
 """
 import torch
-import torch.nn as nn
-from typing import Dict, Optional, Tuple, List, Any
+from typing import Dict, Optional
 
 
 class FrozenBackgroundCache:

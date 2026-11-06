@@ -6,27 +6,20 @@ Each record contains:
 
 where h_S is a permutation-invariant representation of the selected set S.
 """
-import os
 import json
 import time
 import numpy as np
 import torch
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Any
 from pathlib import Path
 import csv
 
-from .oracle_utility import OracleUtilityExperiment
 from .phase6_oracle import ConditionalOracleExperiment, ConditionalOracleConfig
 from .phase6_context import (
-    build_full_context,
     _get_pixel_mask,
-    _get_knn_indices,
-    ContextConfig,
-    PHASE6_FEATURE_NAMES,
 )
-from .utility_features import CANONICAL_FEATURE_NAMES, extract_feature_vector
-from .phase12_protocol import PHASE12_OUTPUT_DIR, SEEDS
+from .phase12_protocol import PHASE12_OUTPUT_DIR
 
 H_S_DIM = 51  # Total dimension of h_S
 

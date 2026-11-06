@@ -7,10 +7,7 @@ Metrics:
 - System: FPS, frame time, VRAM usage
 """
 import numpy as np
-import torch
 from typing import Dict, Optional, List
-import json
-import time
 
 
 def compute_psnr(

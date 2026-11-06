@@ -13,7 +13,6 @@ with @pytest.mark.requires_pipeline and skip when no pipeline fixture is availab
 Unit tests that verify logic without GPU are always runnable.
 """
 import pytest
-import numpy as np
 import torch
 
 from research.phase6_oracle import (
@@ -21,7 +20,6 @@ from research.phase6_oracle import (
     ConditionalOracleExperiment,
 )
 from research.phase6_context import (
-    ContextConfig,
     PHASE6_FEATURE_DIM,
     _get_knn_indices,
 )

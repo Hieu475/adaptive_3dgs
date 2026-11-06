@@ -3,8 +3,6 @@ import pytest
 import numpy as np
 
 from research.utility_features import (
-    CANONICAL_FEATURE_NAMES,
-    CANONICAL_FEATURE_SPECS,
     UTILITY_FEATURES,
     ABLATION_SUBSETS,
     SchemaError,

@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """Generates Phase 2 state validation audit artifacts."""
-import os
 import json
 import torch
 from pathlib import Path
 
 from research.state_store import GaussianStateStore
-from research.gaussian_repr import GaussianModel
 from research.protocol import load_protocol, get_densification_policy, get_splits
 
 

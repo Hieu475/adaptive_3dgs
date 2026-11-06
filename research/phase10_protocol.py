@@ -45,16 +45,13 @@ Protocol Invariants (10.1):
        - Primary test scene: tum_fr2_xyz (zero-shot cross-scene transfer, unseen during training).
        - Reference train scene: tum_fr1_desk (for initial reference statistics).
 """
-import os
 from pathlib import Path
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Dict, List, Any
 
 from research.phase9_protocol import (
     CANONICAL_FEATURE_SCHEMA,
     SEEDS,
-    N_SEEDS,
     TRAIN_SCENE,
-    VAL_SCENE,
     TEST_SCENE,
     MODEL_IN_FEATURES,
     MODEL_HIDDEN_DIM,
@@ -63,7 +60,6 @@ from research.phase9_protocol import (
 )
 from research.phase9b_protocol import (
     BASE_REPRESENTATION,
-    B2_EMA_BETA as DEFAULT_B2_BETA,
 )
 
 

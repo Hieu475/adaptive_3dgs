@@ -11,7 +11,7 @@ Guarantees:
   - Normalization parameters (mean, std) strictly fit on the train split only.
   - Native PyTorch Dataset compatibility for training loops.
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import json
 import os
 from typing import Dict, List, Optional, Tuple, Any, Union
@@ -21,14 +21,11 @@ from torch.utils.data import Dataset
 
 from research.utility_features import (
     CANONICAL_FEATURE_NAMES,
-    UTILITY_FEATURES,
     SchemaError,
     DatasetSchemaError,
     extract_feature_vector,
 )
 from research.protocol import (
-    load_protocol,
-    get_splits,
     get_repo_root,
 )
 

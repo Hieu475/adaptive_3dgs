@@ -1,6 +1,5 @@
 """Tests for importance diagnostics module (R3 research validation)."""
 import torch
-import pytest
 
 
 class TestSpearmanCorrelation:

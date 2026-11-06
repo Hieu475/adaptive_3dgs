@@ -34,7 +34,6 @@ from research.benchmark_budgets import (
 )
 from research.importance_diagnostics import (
     compute_full_diagnostics,
-    format_diagnostics_report,
 )
 from research.pipeline import OnlineReconstructionPipeline
 from scripts.run_policy_ablation import generate_synthetic_benchmark_dataset

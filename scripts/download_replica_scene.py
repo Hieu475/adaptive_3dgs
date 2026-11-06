@@ -3,8 +3,6 @@
 
 Compatible with both OnlineReconstructionPipeline (phase10_runtime) and ReplicaDataset.
 """
-import os
-import sys
 import json
 import time
 import argparse

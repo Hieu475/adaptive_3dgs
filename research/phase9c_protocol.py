@@ -34,21 +34,16 @@ Protocol Invariants:
         Uses ONLY current-frame and past unlabeled feature statistics.
         Zero access to future frames, oracle U*, Delta Q, Delta T, or test labels.
 """
-import os
 from pathlib import Path
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Dict, List, Any
 
 from research.phase9_protocol import (
     CANONICAL_FEATURE_SCHEMA,
     SEEDS,
-    N_SEEDS,
     TRAIN_SCENE,
-    TRAIN_FRAME_RANGE,
     VAL_SCENE,
-    VAL_FRAME_RANGE,
     TEST_SCENE,
     BUDGETS,
-    TOP_K_FRACTIONS,
     MODEL_IN_FEATURES,
     MODEL_HIDDEN_DIM,
     MODEL_EPS_COST,
@@ -57,8 +52,6 @@ from research.phase9_protocol import (
     LOSS_LAMBDA_RANK,
     LOSS_LAMBDA_Q,
     LOSS_LAMBDA_T,
-    CONFIDENCE_LEVEL,
-    BOOTSTRAP_RESAMPLES,
 )
 from research.phase9b_protocol import (
     BASE_REPRESENTATION,

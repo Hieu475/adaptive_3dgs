@@ -15,8 +15,6 @@ import time
 import hashlib
 import torch
 import numpy as np
-import pandas as pd
-from typing import Dict, List, Any, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -29,7 +27,6 @@ from research.protocol import (
     get_resolution,
     get_dataset_config,
     get_oracle_config,
-    get_splits,
 )
 
 
@@ -116,9 +113,9 @@ def build_pipeline(H: int, W: int, device: str) -> OnlineReconstructionPipeline:
 
 def main():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f"================================================================================")
+    print("================================================================================")
     print(f"  PHASE 3 — GROUND-TRUTH MARGINAL UTILITY ORACLE GENERATION [Device: {device}]")
-    print(f"================================================================================")
+    print("================================================================================")
     
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     protocol = load_protocol()
@@ -159,9 +156,9 @@ def main():
     # MULTI-SEED GENERATOR: Iterate strictly across protocol seeds (3-FIX-2 & 3-FIX-3)
     # -------------------------------------------------------------------------
     for s_idx, current_seed in enumerate(seeds):
-        print(f"\n--------------------------------------------------------------------------------")
+        print("\n--------------------------------------------------------------------------------")
         print(f"  SEED {current_seed} ({s_idx + 1}/{len(seeds)})")
-        print(f"--------------------------------------------------------------------------------")
+        print("--------------------------------------------------------------------------------")
         torch.manual_seed(current_seed)
         np.random.seed(current_seed)
         
@@ -220,7 +217,7 @@ def main():
                         
                     if t == 25 and group_interaction_stats is None:
                         cand_group = list(range(min(32, pipeline_fr1.gaussian_model.num_gaussians)))
-                        print(f"   [Phase 3.10] Running Group Interaction check on sizes [1, 4, 16]...")
+                        print("   [Phase 3.10] Running Group Interaction check on sizes [1, 4, 16]...")
                         group_interaction_stats = oracle_fr1.evaluate_group_interaction(
                             fr1_frames[t]['rgb'], fr1_frames[t]['depth'],
                             candidate_indices=cand_group,
@@ -230,7 +227,7 @@ def main():
                         
                     if t == 25 and diminishing_returns_stats is None:
                         cand_dim = list(range(min(20, pipeline_fr1.gaussian_model.num_gaussians)))
-                        print(f"   [Phase 3.11] Running Diminishing Returns check (A subset B)...")
+                        print("   [Phase 3.11] Running Diminishing Returns check (A subset B)...")
                         diminishing_returns_stats = oracle_fr1.evaluate_diminishing_returns(
                             fr1_frames[t]['rgb'], fr1_frames[t]['depth'],
                             candidate_indices=cand_dim,

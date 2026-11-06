@@ -40,20 +40,15 @@ Invariants:
     - Cost T(·) uses wall-clock measured_trial_cost_ms.
     - Oracle reference name: "Oracle Conditional Marginal Reference" (NOT "optimal").
 """
-import time
-import math
 import numpy as np
 import torch
-from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Any
 
 from .oracle_utility import OracleUtilityExperiment
 from .phase6_context import (
     build_full_context,
-    build_full_context_batch,
     ContextConfig,
-    PHASE6_FEATURE_NAMES,
     _get_knn_indices,
 )
 

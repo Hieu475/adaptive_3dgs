@@ -1,5 +1,4 @@
 """Unit and regression tests for Phase 12 Upgrade (Phases 12-I, 12-J, 12-K, 12-L/M)."""
-import pytest
 import numpy as np
 import torch
 
@@ -9,13 +8,11 @@ from research.interaction_audit import (
 )
 from research.conditional_dataset import (
     ConditionalDatasetGenerator,
-    ConditionalDatasetConfig,
     H_S_DIM,
 )
 from research.interaction_model import (
     InteractionAwareModel,
     InteractionAwareLoss,
-    ConditionalUtilityDataset,
 )
 from research.sequential_scheduler import (
     SequentialInteractionScheduler,
