@@ -43,6 +43,7 @@ def main():
     ap.add_argument("--n_frames", type=int, default=150)
     ap.add_argument("--offset", type=int, default=0, help="start the sequence at this frame (fresh window)")
     ap.add_argument("--set", nargs="*", default=[], help="training overrides, e.g. replay.every=3 replay.size=8")
+    ap.add_argument("--cfg", nargs="*", default=[], help="overrides relative to the whole config, e.g. densification.disable_pruning=1")
     ap.add_argument("--tag", default="")
     ap.add_argument("--out_dir", type=Path, default=ROOT / "results" / "retention")
     a = ap.parse_args()
@@ -64,6 +65,15 @@ def main():
                 for kv in a.set:
                     path, val = kv.split("=")
                     node, keys = cfg["training"], path.split(".")
+                    for k in keys[:-1]:
+                        node = node.setdefault(k, {})
+                    try:
+                        node[keys[-1]] = float(val) if "." in val else int(val)
+                    except ValueError:
+                        node[keys[-1]] = val
+                for kv in a.cfg:
+                    path, val = kv.split("=")
+                    node, keys = cfg, path.split(".")
                     for k in keys[:-1]:
                         node = node.setdefault(k, {})
                     node[keys[-1]] = float(val) if "." in val else int(val)

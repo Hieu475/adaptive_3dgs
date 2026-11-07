@@ -288,6 +288,17 @@ def main():
     setm("engReplayTimeOverheadKThree", float(100 * (np.mean(tm["k3_rp"]) / np.mean(tm["k3"]) - 1)), "{:.0f}")
     setm("engReplayTimeOverheadKTen", float(100 * (np.mean(tm["k10_rp"]) / np.mean(tm["k10"]) - 1)), "{:.0f}")
 
+    # ---- replay design on the development scenes (final-map retention, GT poses, one seed)
+    DEVR = ["tum_fr1_desk", "tum_fr3_structure_texture_near", "replica_room1", "replica_office2"]
+    dr = {}
+    for f in (R / "retention_dev").glob("*/*_seed42.json"):
+        j = json.loads(f.read_text()); dr.setdefault(j["cond"], {})[j["scene"]] = j
+    for c in ("orig", "k3", "k3_rp3", "k3_r2", "k3_r4", "k3_s16", "k3_s64", "k3_t1", "k3_t3", "k3_noprune", "k3_rp_noprune", "k3_pe",
+              "k10", "k10_rp3", "k10_e2", "k10_e5", "k10_pe"):
+        if c in dr and all(s_ in dr[c] for s_ in DEVR):
+            setm("engDevRet" + cname(c) + "Final", float(np.mean([dr[c][s_]["heldout_final"] for s_ in DEVR])), "{:.2f}")
+            setm("engDevRet" + cname(c) + "Next", float(np.mean([dr[c][s_]["heldout_causal"] for s_ in DEVR])), "{:.2f}")
+
     # ---- MonoGS tracker + our mapper (hybrid) versus original MonoGS, MonoGS' own protocol
     hy = {}
     for f in (R / "monogs_hybrid").glob("*_seed*.json"):
