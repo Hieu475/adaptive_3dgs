@@ -17,7 +17,7 @@ GPU runs are long (RTX 4050: tens of minutes per scene × seeds). The paper numb
 | Tab. 9 held-out views | `results/holdout_extension/` | `bash paper_repro/reproduce.sh holdout_ext`, then `tables` | executed 2026-11 (4 seeds, 4 scenes) |
 | Tab. 10 quality at measured cost | `results/compute_matched/` | `bash paper_repro/reproduce.sh compute`, then `tables` | executed 2026-11; timings from one RTX 4050 laptop GPU |
 | Tab. 11 estimated poses | `results/tracked_poses/` | `bash paper_repro/reproduce.sh tracked`, then `tables` | executed 2026-11 (TUM only; tracker does not use the map) |
-| Tab. 8 (main) controllers; Supp. Tabs. S12-S14 | `results/vgg_test/`, `results/vgg_fresh/`, `results/tt_pareto/`, `results/holdout_vgg/` | `bash paper_repro/reproduce.sh controllers`, then `tables` | executed 2026-11; constants frozen on `results/vgg_dev/` and `results/tt_dev/` first; timings from one RTX 4050 laptop GPU |
+| Tab. 8 (main) controllers; Supp. Tabs. S14-S16 | `results/vgg_test/`, `results/vgg_fresh/`, `results/tt_pareto/`, `results/holdout_vgg/` | `bash paper_repro/reproduce.sh controllers`, then `tables` | executed 2026-11; constants frozen on `results/vgg_dev/` and `results/tt_dev/` first; timings from one RTX 4050 laptop GPU |
 | Holdout proxy (§6) | `results/phase14_holdout/` | `bash paper_repro/reproduce.sh holdout` | pinned |
 | Baseline VO / ATE (Supp. Tab. S3) | `results/phase14_tracking100/` | `bash paper_repro/reproduce.sh tracking` | pinned |
 | Main Figs. 1–4 and Supp. Figs. S1–S3 (PDF) | `docs/paper/figs/` | `python docs/paper/gen_iccv_figs.py` | pinned; Fig. 5 uses `docs/paper/gen_qual_fig_v4.py` (unverified) |
@@ -36,4 +36,4 @@ None of these exist in this repository's history (the runs were made from a clea
 (the other seven recorded source files match the current tree byte-for-byte). The paper therefore cites source-file hashes and worktree status rather than a commit hash.
 Before submission, either recover that checkout's commit and import it, or re-run `reproduce.sh main` from a tagged commit and re-freeze the bundle.
 
-- `closedloop` target: map-based tracking in the loop (`experiments/run_closed_loop.py`, `research/map_tracker.py`); table S15 (`tab_closedloop.tex`) from `results/closed_loop/`. TUM only (tracking fails on the local Replica sequences); tracker constants were set on fr2_xyz/fr1_xyz, which are also test scenes.
+- `closedloop` target: map-based tracking in the loop (`experiments/run_closed_loop.py`, `research/map_tracker.py`); table S12 (`tab_closedloop.tex`) from `results/closed_loop/`; table S13 (`tab_countcap.tex`, `run_count_cap.py`, `results/count_cap/`) compares TT+VGG with a size-matched hard Gaussian-count cap. TUM only (tracking fails on the local Replica sequences); tracker constants were set on the development scenes fr1_desk and fr3_structure_texture_near.

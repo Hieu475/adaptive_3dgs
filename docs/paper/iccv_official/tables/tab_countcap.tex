@@ -1,0 +1,25 @@
+\begin{table}[tbp]
+\centering
+\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Scene} & \textbf{TT+VGG} & \textbf{TT + count cap} & \textbf{Count cap} \\
+\midrule
+\texttt{replica\_office0} & +1.31 & +0.83 & $-$0.01 \\
+\texttt{replica\_office1} & +0.72 & $-$6.06 & $-$6.35 \\
+\texttt{replica\_office3} & +1.44 & +0.42 & $-$0.32 \\
+\texttt{replica\_office4} & +1.41 & +0.33 & $-$0.25 \\
+\texttt{replica\_room0} & +0.99 & +0.32 & $-$0.23 \\
+\texttt{replica\_room2} & +1.35 & +0.69 & $-$0.03 \\
+\texttt{tum\_fr1\_room} & +0.82 & $-$3.70 & $-$3.69 \\
+\texttt{tum\_fr1\_rpy} & +1.01 & $-$0.48 & $-$0.99 \\
+\texttt{tum\_fr1\_xyz} & +1.12 & +0.27 & $-$0.08 \\
+\texttt{tum\_fr2\_xyz} & +3.83 & +3.78 & +1.68 \\
+\texttt{tum\_fr3\_sitting\_static} & +0.06 & +0.81 & +0.72 \\
+\midrule
+mean & +1.28 & $-$0.25 & $-$0.87 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Value-gated growth versus a hard map-size budget of the same size.} PSNR change (dB) against the unthrottled baseline, two seeds per scene. The cap on the number of Gaussians equals TT+VGG's final map size on that scene and seed, so the cap is informed by the answer; ``TT + count cap'' also uses the time-targeted budget.}
+\label{tab:countcap}
+\end{table}

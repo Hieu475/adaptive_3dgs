@@ -432,37 +432,45 @@
  },
  "closedloop": {
   "tum_fr2_xyz": {
-   "base_ate_cm": 4.36,
-   "tt_vgg_dpsnr": 3.2,
-   "tt_vgg_date_cm": 0.14
+   "base_ate_cm": 7.5,
+   "tt_vgg_dpsnr": 2.83,
+   "tt_vgg_date_cm": -1.61
   },
   "tum_fr1_xyz": {
-   "base_ate_cm": 4.82,
-   "tt_vgg_dpsnr": 1.8,
-   "tt_vgg_date_cm": -0.63
+   "base_ate_cm": 6.39,
+   "tt_vgg_dpsnr": 1.89,
+   "tt_vgg_date_cm": -0.92
   },
   "tum_fr1_rpy": {
-   "base_ate_cm": 14.93,
-   "tt_vgg_dpsnr": 1.4,
-   "tt_vgg_date_cm": -0.59
+   "base_ate_cm": 12.57,
+   "tt_vgg_dpsnr": 1.42,
+   "tt_vgg_date_cm": 1.5
   },
   "tum_fr3_sitting_static": {
-   "base_ate_cm": 17.34,
-   "tt_vgg_dpsnr": 0.18,
-   "tt_vgg_date_cm": 0.18
+   "base_ate_cm": 14.01,
+   "tt_vgg_dpsnr": 0.1,
+   "tt_vgg_date_cm": -0.34
   },
   "tum_fr1_room": {
-   "base_ate_cm": 411.53,
-   "tt_vgg_dpsnr": 0.1,
-   "tt_vgg_date_cm": -91.16
+   "base_ate_cm": 96.73,
+   "tt_vgg_dpsnr": -0.1,
+   "tt_vgg_date_cm": 4.69
   },
   "summary": {
    "n_scenes": 4,
-   "mean_dpsnr": 1.65,
-   "median_date_cm": -0.22,
-   "max_abs_date_cm": 0.63,
+   "mean_dpsnr": 1.56,
+   "median_date_cm": -0.63,
+   "max_abs_date_cm": 1.61,
    "n_psnr_pos": 4
   }
+ },
+ "countcap": {
+  "n_scenes": 11,
+  "mean_tt_vgg": 1.28,
+  "mean_tt_countcap": -0.25,
+  "mean_countcap": -0.87,
+  "vgg_better_than_tcc": 10,
+  "median_vgg_minus_tcc": 0.85
  },
  "method": {
   "spawn_cap_always20": {

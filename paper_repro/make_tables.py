@@ -269,17 +269,39 @@ def tab_closedloop(numbers):
     nums = {}
     for sc in scenes:
         k, kp = a[f"{sc}/tt_vgg"], a[f"{sc}/error_budget_prop"]
-        div = k["base_ate_cm"] >= 100
+        div = k["base_ate_cm"] >= 50
         name = "\\texttt{" + sc.replace("tum_", "").replace("_", "\\_") + "}" + ("$^\\dagger$" if div else "")
         L.append(f"{name} & {k['base_ate_cm']:.1f} cm & {f(k['dpsnr'])} & {f(k['date_cm'])} cm & {f(kp['dpsnr'])} \\\\")
         nums[sc] = {"base_ate_cm": round(k["base_ate_cm"], 2), "tt_vgg_dpsnr": round(k["dpsnr"], 2), "tt_vgg_date_cm": round(k["date_cm"], 2)}
     sm = a["_summary"]["tt_vgg"]
     nums["summary"] = {k: round(v, 2) if isinstance(v, float) else v for k, v in sm.items()}
     L += [r"\bottomrule", r"\end{tabular}",
-          r"\caption{\textbf{Closed-loop mapping with map-based tracking, two seeds.} Poses come from aligning each frame to the current map (Supp.\ text); the same controllers then map with the estimated poses. $\Delta$PSNR (dB) is measured at the tracked pose, $\Delta$ATE is TT+VGG minus the unthrottled baseline. $^\dagger$Tracking diverged for every condition and the scene is excluded from the summary: over the four converged scenes TT+VGG changes PSNR by %s dB on average and ATE by a median of %s cm (largest $|\Delta|$ %.2f cm).}" % (f(sm["mean_dpsnr"]), f(sm["median_date_cm"]), sm["max_abs_date_cm"]),
+          r"\caption{\textbf{Closed-loop mapping with map-based tracking, three seeds.} Poses come from aligning each frame to the current map (Supp.\ text); the same controllers then map with the estimated poses. $\Delta$PSNR (dB) is measured at the tracked pose, $\Delta$ATE is TT+VGG minus the unthrottled baseline. $^\dagger$Tracking diverged for every condition and the scene is excluded from the summary: over the four converged scenes TT+VGG changes PSNR by %s dB on average and ATE by a median of %s cm (largest $|\Delta|$ %.2f cm).}" % (f(sm["mean_dpsnr"]), f(sm["median_date_cm"]), sm["max_abs_date_cm"]),
           r"\label{tab:closedloop}", r"\end{table}"]
     (OUT / "tab_closedloop.tex").write_text("\n".join(L) + "\n")
     numbers["closedloop"] = nums
+
+
+def tab_countcap(numbers):
+    path = ROOT / "results/count_cap/analysis.json"
+    if not path.exists():
+        return
+    a = json.loads(path.read_text())
+    sm = a["_summary"]
+    f = lambda x: f"{x:+.2f}".replace("-", "$-$")
+    L = [r"\begin{table}[tbp]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{4pt}",
+         r"\begin{tabular}{lrrr}", r"\toprule",
+         r"\textbf{Scene} & \textbf{TT+VGG} & \textbf{TT + count cap} & \textbf{Count cap} \\", r"\midrule"]
+    for sc, v in a.items():
+        if sc.startswith("_"):
+            continue
+        L.append("\\texttt{" + sc.replace("_", "\\_") + "} & " + f"{f(v['tt_vgg'])} & {f(v['tt_countcap'])} & {f(v['countcap'])} \\\\")
+    L += [r"\midrule", f"mean & {f(sm['mean_tt_vgg'])} & {f(sm['mean_tt_countcap'])} & {f(sm['mean_countcap'])} \\\\",
+          r"\bottomrule", r"\end{tabular}",
+          r"\caption{\textbf{Value-gated growth versus a hard map-size budget of the same size.} PSNR change (dB) against the unthrottled baseline, two seeds per scene. The cap on the number of Gaussians equals TT+VGG's final map size on that scene and seed, so the cap is informed by the answer; ``TT + count cap'' also uses the time-targeted budget.}",
+          r"\label{tab:countcap}", r"\end{table}"]
+    (OUT / "tab_countcap.tex").write_text("\n".join(L) + "\n")
+    numbers["countcap"] = {k: round(v, 2) if isinstance(v, float) else v for k, v in sm.items()}
 
 
 def tab_tracked(numbers):
@@ -408,6 +430,7 @@ def main():
     tab_compute(numbers)
     tab_tracked(numbers)
     tab_closedloop(numbers)
+    tab_countcap(numbers)
     tab_method(numbers)
     (OUT / "numbers.json").write_text(json.dumps(numbers, indent=1))
     print(json.dumps(numbers, indent=1)[:1500])

@@ -256,6 +256,10 @@ demo_output/
 !closed_loop/**/
 !closed_loop/**/*.json
 !closed_loop/**/*.md
+!count_cap/
+!count_cap/**/
+!count_cap/**/*.json
+!count_cap/**/*.md
 
 # Controller (TT / VGG) development, evaluation and diagnostics.
 !vgg_dev/**/*.json

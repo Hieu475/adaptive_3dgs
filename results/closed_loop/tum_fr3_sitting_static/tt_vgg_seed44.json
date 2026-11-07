@@ -1,0 +1,15 @@
+{
+ "scene": "tum_fr3_sitting_static",
+ "seed": 44,
+ "condition": "tt_vgg",
+ "offset": 0,
+ "ate_rmse_m": 0.13676431979950376,
+ "ate_max_m": 0.16460520029067993,
+ "psnr_tracked": 29.819529253641765,
+ "psnr_final_map_at_gt_last10": 12.374610900878906,
+ "track_ms": 132.51676082611084,
+ "map_ms": 63.25573603312175,
+ "N_final": 18569,
+ "tt_m_final": 16.0,
+ "n_frames": 151
+}

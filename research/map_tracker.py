@@ -8,6 +8,7 @@ into pose quality. Poses are World-to-Camera like the rest of the pipeline.
 from __future__ import annotations
 
 import torch
+import torch.nn.functional as F
 
 from .rasterizer import render as rasterize_scene
 
@@ -30,8 +31,14 @@ def _se3_exp(xi: torch.Tensor) -> torch.Tensor:
 
 
 class MapTracker:
-    def __init__(self, iters: int = 20, lr_rot: float = 2e-3, lr_trans: float = 2e-3, depth_w: float = 1.0):
-        self.iters, self.lr_rot, self.lr_trans, self.depth_w = iters, lr_rot, lr_trans, depth_w
+    """Coarse-to-fine render-and-align tracker.
+
+    ``levels``: downsampling factors (e.g. (4, 2, 1)); ``iters``: Adam steps per level; ``lr``: step size
+    for the translation/rotation parameters at the finest level (coarser levels use proportionally larger steps).
+    """
+
+    def __init__(self, levels=(4, 2, 1), iters=(20, 15, 10), lr: float = 1e-3, depth_w: float = 1.0):
+        self.levels, self.iters, self.lr, self.depth_w = tuple(levels), tuple(iters), lr, depth_w
         self.prev = None   # last W2C pose
         self.vel = None    # relative motion T_t @ T_{t-1}^-1
 
@@ -40,13 +47,9 @@ class MapTracker:
         self.vel = torch.eye(4, device=pose.device)
 
     def track(self, pipe, rgb, depth, init=None):
-        """``init``: optional W2C initial guess (e.g. from the frame-to-frame tracker); else constant velocity."""
+        """``init``: optional W2C initial guess; else constant velocity."""
         dev = rgb.device
-        H, W = depth.shape
         T0 = init.detach().float().to(dev) if init is not None else self.vel @ self.prev
-        xi = torch.zeros(6, device=dev, requires_grad=True)
-        opt = torch.optim.Adam([{"params": [xi]}], lr=self.lr_trans)
-        valid = torch.isfinite(depth) & (depth > 0)
         gm = pipe.gaussian_model
         with torch.no_grad():
             cov = gm.build_covariance()
@@ -57,26 +60,40 @@ class MapTracker:
             col = gm.get_colors(dirs)
             pos, op = gm.positions, gm.opacities.squeeze(-1)
         backend = pipe.config.get("rendering", {}).get("backend", "gsplat")
-        best, best_loss = T0, float("inf")
-        scale = torch.tensor([self.lr_rot / self.lr_trans] * 3 + [1.0] * 3, device=dev)
-        for _ in range(self.iters):
-            opt.zero_grad()
-            T = _se3_exp(xi * scale) @ T0
-            r = rasterize_scene(means3D=pos, cov3D=cov, colors=col, opacities=op, extrinsics=T,
-                                intrinsics=pipe.intrinsics, image_width=W, image_height=H,
-                                tile_size=pipe.config["rendering"]["tile_size"], backend=backend)
-            sup = valid & (r["alpha"] > 0.5)
-            if sup.sum() < 100:
-                break
-            l_c = (r["color"] - rgb).abs().mean(-1)[sup].mean()
-            l_d = (r["depth"] - depth).abs()[sup].mean()
-            loss = l_c + self.depth_w * l_d
-            lv = float(loss)
-            if lv < best_loss:
-                best_loss, best = lv, T.detach().clone()
-            loss.backward()
-            opt.step()
-        T_new = best
-        self.vel = T_new @ torch.linalg.inv(self.prev)
-        self.prev = T_new.clone()
-        return T_new
+        T_cur = T0
+        for lvl, n_it in zip(self.levels, self.iters):
+            H, W = depth.shape[0] // lvl, depth.shape[1] // lvl
+            if lvl > 1:
+                rgb_l = F.avg_pool2d(rgb.permute(2, 0, 1)[None], lvl)[0].permute(1, 2, 0)
+                valid_full = (torch.isfinite(depth) & (depth > 0)).float()
+                dz = torch.where(valid_full > 0, depth, torch.zeros_like(depth))
+                cnt = F.avg_pool2d(valid_full[None, None], lvl)[0, 0]
+                depth_l = F.avg_pool2d(dz[None, None], lvl)[0, 0] / cnt.clamp_min(1e-6)
+                valid = cnt > 0.99
+                K = pipe.intrinsics.clone().float()
+                K[0, :] /= lvl; K[1, :] /= lvl
+            else:
+                rgb_l, depth_l, K = rgb, depth, pipe.intrinsics
+                valid = torch.isfinite(depth) & (depth > 0)
+            xi = torch.zeros(6, device=dev, requires_grad=True)
+            opt = torch.optim.Adam([xi], lr=self.lr * (lvl ** 0.5))
+            best, best_loss = T_cur, float("inf")
+            base = T_cur
+            for _ in range(n_it):
+                opt.zero_grad()
+                T = _se3_exp(xi) @ base
+                r = rasterize_scene(means3D=pos, cov3D=cov, colors=col, opacities=op, extrinsics=T,
+                                    intrinsics=K, image_width=W, image_height=H,
+                                    tile_size=pipe.config["rendering"]["tile_size"], backend=backend)
+                sup = valid & (r["alpha"] > 0.5)
+                if sup.sum() < 50:
+                    break
+                loss = (r["color"] - rgb_l).abs().mean(-1)[sup].mean() + self.depth_w * (r["depth"] - depth_l).abs()[sup].mean()
+                if float(loss) < best_loss:
+                    best_loss, best = float(loss), T.detach().clone()
+                loss.backward()
+                opt.step()
+            T_cur = best
+        self.vel = T_cur @ torch.linalg.inv(self.prev)
+        self.prev = T_cur.clone()
+        return T_cur

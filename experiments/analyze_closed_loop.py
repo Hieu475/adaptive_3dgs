@@ -27,7 +27,7 @@ def main():
                      f"{np.mean([r[(c, s)]['track_ms'] for s in ss]):.0f} | {np.mean([r[(c, s)]['map_ms'] for s in ss]):.0f} |")
     summ = {}
     for c in ("tt_vgg", "tt", "error_budget_prop"):
-        v = [x for k, x in out.items() if k.endswith("/" + c) and x["base_ate_cm"] < 100]  # exclude diverged tracking
+        v = [x for k, x in out.items() if k.endswith("/" + c) and x["base_ate_cm"] < 50]  # exclude diverged tracking
         if v:
             summ[c] = {"n_scenes": len(v), "mean_dpsnr": float(np.mean([x["dpsnr"] for x in v])),
                        "median_date_cm": float(np.median([x["date_cm"] for x in v])),

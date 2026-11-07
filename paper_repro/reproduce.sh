@@ -8,7 +8,7 @@ export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 cmd="${1:-list}"
 case "$cmd" in
   list)
-    sed -n '2,3p' "$0"; echo "targets: check main factorial depth adaptive scenes counterfactual extension dose scenes_budget long ablation holdout_ext compute tracked closedloop controllers tables holdout tracking figs" ;;
+    sed -n '2,3p' "$0"; echo "targets: check main factorial depth adaptive scenes counterfactual extension dose scenes_budget long ablation holdout_ext compute tracked closedloop countcap controllers tables holdout tracking figs" ;;
   check)
     $PY paper_repro/check_numbers.py ;;
   main)   # Tab. 1 + Tab. 2 + Fig. 1: traceable rerun from a tagged commit (writes results/rerun_paper1/).
@@ -79,9 +79,12 @@ case "$cmd" in
   compute)    # quality at measured wall-clock: budget x {1,2,4} with free growth / spawn cap (4 scenes x 4 seeds)
     $PY experiments/run_compute_matched.py
     $PY experiments/analyze_compute_matched.py ;;
-  closedloop) # map-based tracking in the loop (TUM, 5 test scenes, 2 seeds)
-    $PY experiments/run_closed_loop.py --scenes tum_fr2_xyz tum_fr1_xyz tum_fr1_rpy tum_fr1_room tum_fr3_sitting_static --seeds 42 43
+  closedloop) # map-based tracking in the loop (TUM, 5 test scenes, 3 seeds)
+    $PY experiments/run_closed_loop.py --scenes tum_fr2_xyz tum_fr1_xyz tum_fr1_rpy tum_fr1_room tum_fr3_sitting_static --seeds 42 43 44
     $PY experiments/analyze_closed_loop.py ;;
+  countcap)   # TT+VGG vs size-matched hard count caps (needs results/vgg_test)
+    $PY experiments/run_count_cap.py --scenes tum_fr2_xyz tum_fr1_xyz tum_fr1_rpy tum_fr1_room tum_fr3_sitting_static replica_office0 replica_office1 replica_office3 replica_office4 replica_room0 replica_room2 --seeds 42 43
+    $PY experiments/analyze_count_cap.py ;;
   tracked)    # mapping with poses from the frame-to-frame GN tracker (TUM fr2/fr1, 3 seeds)
     $PY experiments/run_tracked_poses.py
     $PY experiments/analyze_tracked_poses.py ;;

@@ -36,7 +36,7 @@ def main():
     ap.add_argument("--conditions", nargs="+", choices=rv.CONDITIONS, default=list(CONDITIONS))
     ap.add_argument("--n_frames", type=int, default=150)
     ap.add_argument("--offset", type=int, default=0)
-    ap.add_argument("--iters", type=int, default=40)
+    ap.add_argument("--iters", type=int, nargs=3, default=[20, 15, 10])
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--T_ms", type=float, default=100.0)
     ap.add_argument("--out_dir", type=Path, default=ROOT / "results" / "closed_loop")
@@ -58,7 +58,7 @@ def main():
                 pipe = OnlineReconstructionPipeline(config=cfg, device="cuda")
                 f0 = frames[0]
                 pipe.initialize(rgb=f0["rgb"], depth=f0["depth"], intrinsics=intr, pose=f0["pose"])
-                mt = MapTracker(iters=a.iters, lr_rot=a.lr, lr_trans=a.lr)
+                mt = MapTracker(iters=a.iters, lr=a.lr)
                 mt.reset(f0["pose"].cuda().float())
                 est, gt, p_trk, t_trk, t_map = [f0["pose"].cpu()], [f0["pose"].cpu()], [], [], []
                 print(f"RUN {sc} {cond} seed={seed}", flush=True)

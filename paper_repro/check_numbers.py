@@ -134,6 +134,22 @@ def main():
                 if f"{abs(x):.2f}" not in main:
                     fail(f"main.tex missing tracked {sc} range endpoint {x}")
 
+    supp = SUPP_TEX.read_text()
+    cc = nums.get("countcap")
+    if cc:
+        for lab, txt in (("tt_vgg", main + supp), ("tt_countcap", main + supp)):
+            key = "mean_" + lab
+            if f"{abs(cc[key]):.2f}" not in txt:
+                fail(f"text missing count-cap {key} = {cc[key]}")
+        if f"{abs(cc['median_vgg_minus_tcc']):.2f}" not in supp or str(cc["vgg_better_than_tcc"]) not in main:
+            fail("count-cap median difference or win count missing")
+    cl = nums.get("closedloop")
+    if cl:
+        sm = cl["summary"]
+        for lab, v in (("mean_dpsnr", sm["mean_dpsnr"]), ("median_date_cm", sm["median_date_cm"])):
+            if f"{abs(v):.2f}" not in supp:
+                fail(f"supp.tex missing closed-loop {lab} = {v}")
+
     me = nums.get("method")
     if me:
         tv, ft = me["tt_vgg"]["test"], me["tt_vgg"]["fresh"]
