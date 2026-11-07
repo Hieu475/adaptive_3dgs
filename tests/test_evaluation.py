@@ -1,7 +1,7 @@
 """Tests for research evaluation and paper artifact generation (Milestone R7)."""
 import pytest
 import torch
-from research.evaluation import (
+from src.evaluation.evaluation import (
     generate_table_1_main_benchmark,
     generate_table_2_ablation_study,
     generate_ascii_pareto_curve,

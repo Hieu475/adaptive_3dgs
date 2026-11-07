@@ -33,14 +33,14 @@ from typing import Dict, List, Any, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.context_utility_model import (
+from src.utility.context_utility_model import (
     ContextAwareTwoHeadMLP,
     ResidualContextModel,
     Phase6ModelConfig,
     Phase6Loss,
     create_ablation_variant,
 )
-from research.context_utility_dataset import (
+from src.utility.context_utility_dataset import (
     load_phase6_dataset,
     prepare_phase6_splits,
     Phase6FeatureNormalizer,
@@ -319,7 +319,7 @@ def main():
             "then random 70/15/15 split) has been removed to prevent data leakage."
         )
 
-    from research.context_utility_dataset import GroupedBatchSampler
+    from src.utility.context_utility_dataset import GroupedBatchSampler
     train_sampler = GroupedBatchSampler(train_ds.group_ids, shuffle=True, seed=args.seed)
     val_sampler = GroupedBatchSampler(val_ds.group_ids, shuffle=False)
     test_sampler = GroupedBatchSampler(test_ds.group_ids, shuffle=False)
@@ -353,7 +353,7 @@ def main():
                 "Authoritative training strictly requires matched seed checkpoint."
             )
 
-        from research.utility_models import TwoHeadMLP
+        from src.utility.utility_models import TwoHeadMLP
         p4_net = TwoHeadMLP(in_features=11)
         ckpt_data = torch.load(p4_ckpt, map_location="cpu", weights_only=False)
         p4_net.load_state_dict(ckpt_data.get("model_state", ckpt_data))

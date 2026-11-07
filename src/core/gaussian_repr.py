@@ -1,0 +1,534 @@
+"""3D Gaussian Splatting representation.
+
+Each Gaussian G_i = (μ_i, Σ_i, α_i, SH_i) where:
+- μ ∈ R³: position
+- Σ = R·S·S^T·R^T: covariance (parameterized by scale s ∈ R³ and rotation q ∈ R⁴ quaternion)
+- α ∈ [0,1]: opacity  
+- SH: spherical harmonics coefficients for view-dependent color
+- n ∈ R³: surface normal
+- confidence ∈ [0,1]: importance score
+"""
+import torch
+import torch.nn as nn
+from typing import Dict, Optional, Tuple, Any, Union
+import math
+from src.core.state_store import GaussianStateStore
+
+
+class GaussianState:
+    """State tracking constants for Gaussian rendering & memory lifecycle.
+    
+    NOTE ON SEPARATION OF CONCERNS (Point D):
+    - GaussianModel._state: Controls low-level engine memory lifecycle and rasterizer
+      compaction flags (UNSTABLE=0, STABLE=1, FROZEN=2, PRUNED=3).
+    - GaussianStateStore: Controls research-level persistent identity, historical signals
+      (EMAs, drift, age, staleness, visibility_count), and adaptive scheduling priority tiers (0..3).
+    These two systems serve orthogonal purposes and remain strictly synchronized at lifecycle
+    boundaries (initialization, compaction, densification, and reordering).
+    """
+    UNSTABLE = 0
+    STABLE = 1
+    FROZEN = 2
+    PRUNED = 3
+
+
+def quaternion_to_rotation_matrix(q: torch.Tensor) -> torch.Tensor:
+    """Convert quaternion (w, x, y, z) to 3x3 rotation matrix.
+    
+    Args:
+        q: Quaternions of shape (..., 4), format (w, x, y, z)
+    
+    Returns:
+        Rotation matrices of shape (..., 3, 3)
+    """
+    # Normalize quaternion
+    q = q / (q.norm(dim=-1, keepdim=True) + 1e-8)
+    w, x, y, z = q.unbind(-1)
+    
+    R = torch.stack([
+        1 - 2*(y*y + z*z),  2*(x*y - w*z),      2*(x*z + w*y),
+        2*(x*y + w*z),      1 - 2*(x*x + z*z),  2*(y*z - w*x),
+        2*(x*z - w*y),      2*(y*z + w*x),      1 - 2*(x*x + y*y),
+    ], dim=-1).reshape(*q.shape[:-1], 3, 3)
+    
+    return R
+
+
+def build_scaling_matrix(scales: torch.Tensor) -> torch.Tensor:
+    """Build diagonal scaling matrix from scale vector.
+    
+    Args:
+        scales: Scale vectors of shape (..., 3)
+    
+    Returns:
+        Diagonal matrices of shape (..., 3, 3)
+    """
+    S = torch.zeros(*scales.shape[:-1], 3, 3, device=scales.device, dtype=scales.dtype)
+    S[..., 0, 0] = scales[..., 0]
+    S[..., 1, 1] = scales[..., 1]
+    S[..., 2, 2] = scales[..., 2]
+    return S
+
+
+class GaussianModel(nn.Module):
+    """3D Gaussian Splatting scene representation.
+    
+    Manages a collection of 3D Gaussians with differentiable parameters
+    for position, shape (via scale+rotation), opacity, appearance (SH),
+    normals, and confidence scores.
+    """
+    
+    def __init__(self, sh_degree: int = 3, device: str = 'cpu'):
+        super().__init__()
+        self.sh_degree = sh_degree
+        self.num_sh_coeffs = (sh_degree + 1) ** 2
+        self.device = device
+        self._num_gaussians = 0
+        
+        # Learnable parameters (registered as nn.Parameter for gradient tracking)
+        self._xyz = nn.Parameter(torch.empty(0, 3, device=device))
+        self._scaling = nn.Parameter(torch.empty(0, 3, device=device))  # log-scale
+        self._rotation = nn.Parameter(torch.empty(0, 4, device=device))  # quaternion (w,x,y,z)
+        self._opacity = nn.Parameter(torch.empty(0, 1, device=device))  # logit-space opacity
+        self._features_dc = nn.Parameter(torch.empty(0, 1, 3, device=device))  # DC component
+        self._features_rest = nn.Parameter(torch.empty(0, self.num_sh_coeffs - 1, 3, device=device))
+        self._normals = nn.Parameter(torch.empty(0, 3, device=device))
+        
+        # Non-differentiable state
+        self.register_buffer('_confidence', torch.empty(0, 1, device=device))
+        self.register_buffer('_state', torch.empty(0, dtype=torch.long, device=device))
+        
+        # Persistent Gaussian State Store (Points III & IV)
+        self.state_store = GaussianStateStore(device=device)
+
+    @property
+    def persistent_ids(self) -> torch.Tensor:
+        """Unique persistent IDs tracking Gaussian identity across lifecycle."""
+        return self.state_store.persistent_ids
+
+    @property
+    def update_counts(self) -> torch.Tensor:
+        """Number of times each Gaussian has been updated/optimized."""
+        if hasattr(self, 'state_store') and self.state_store is not None:
+            uc = self.state_store.update_counts
+            if uc.shape[0] == self.num_gaussians:
+                return uc
+            elif uc.shape[0] < self.num_gaussians:
+                pad = torch.zeros(self.num_gaussians - uc.shape[0], dtype=torch.long, device=self.device)
+                return torch.cat([uc, pad], dim=0)
+            else:
+                return uc[:self.num_gaussians]
+        return torch.zeros(self.num_gaussians, dtype=torch.long, device=self.device)
+
+    @property
+    def num_gaussians(self) -> int:
+        return self._xyz.shape[0]
+    
+    @property
+    def positions(self) -> torch.Tensor:
+        return self._xyz
+    
+    @property
+    def opacities(self) -> torch.Tensor:
+        """Sigmoid-activated opacities in [0, 1]."""
+        return torch.sigmoid(self._opacity)
+    
+    @property
+    def scales(self) -> torch.Tensor:
+        """Exp-activated scales (always positive)."""
+        return torch.exp(self._scaling)
+    
+    @property
+    def rotations(self) -> torch.Tensor:
+        """Normalized quaternions."""
+        return self._rotation / (self._rotation.norm(dim=-1, keepdim=True) + 1e-8)
+    
+    # Real Spherical Harmonics basis constants (standard closed-form real SH,
+    # same constants used throughout the 3DGS/NeRF literature — not
+    # implementation-specific, just the normalization coefficients of the
+    # real SH basis functions up to degree 3).
+    _SH_C0 = 0.28209479177387814
+    _SH_C1 = 0.4886025119029199
+    _SH_C2 = (
+        1.0925484305920792, -1.0925484305920792, 0.31539156525252005,
+        -1.0925484305920792, 0.5462742152960396,
+    )
+    _SH_C3 = (
+        -0.5900435899266435, 2.890611442640554, -0.4570457994644658,
+        0.3731763325901154, -0.4570457994644658, 1.445305721320277,
+        -0.5900435899266435,
+    )
+
+    @classmethod
+    def eval_sh(cls, dc: torch.Tensor, sh: torch.Tensor, directions: Optional[torch.Tensor], sh_degree: int) -> torch.Tensor:
+        """Evaluate real Spherical Harmonics color expansion up to degree 3."""
+        if directions is None or sh_degree == 0 or sh.numel() == 0:
+            return torch.sigmoid(dc)
+
+        result = cls._SH_C0 * dc
+
+        x, y, z = directions[:, 0:1], directions[:, 1:2], directions[:, 2:3]
+
+        if sh_degree >= 1:
+            result = (
+                result
+                - cls._SH_C1 * y * sh[:, 0, :]
+                + cls._SH_C1 * z * sh[:, 1, :]
+                - cls._SH_C1 * x * sh[:, 2, :]
+            )
+        if sh_degree >= 2:
+            xx, yy, zz = x * x, y * y, z * z
+            xy, yz, xz = x * y, y * z, x * z
+            c2 = cls._SH_C2
+            result = (
+                result
+                + c2[0] * xy * sh[:, 3, :]
+                + c2[1] * yz * sh[:, 4, :]
+                + c2[2] * (2.0 * zz - xx - yy) * sh[:, 5, :]
+                + c2[3] * xz * sh[:, 6, :]
+                + c2[4] * (xx - yy) * sh[:, 7, :]
+            )
+        if sh_degree >= 3:
+            xx, yy, zz = x * x, y * y, z * z
+            c3 = cls._SH_C3
+            result = (
+                result
+                + c3[0] * y * (3.0 * xx - yy) * sh[:, 8, :]
+                + c3[1] * xy * z * sh[:, 9, :]
+                + c3[2] * y * (4.0 * zz - xx - yy) * sh[:, 10, :]
+                + c3[3] * z * (2.0 * zz - 3.0 * xx - 3.0 * yy) * sh[:, 11, :]
+                + c3[4] * x * (4.0 * zz - xx - yy) * sh[:, 12, :]
+                + c3[5] * z * (xx - yy) * sh[:, 13, :]
+                + c3[6] * x * (xx - 3.0 * yy) * sh[:, 14, :]
+            )
+        return torch.sigmoid(result)
+
+    def get_colors(self, directions: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """Get colors. If directions provided and sh_degree > 0, evaluate the
+        real Spherical Harmonics expansion (view-dependent color); otherwise
+        return the DC (diffuse) component only.
+
+        Args:
+            directions: (N, 3) normalized viewing directions (camera -> point),
+                required to evaluate degree >= 1 terms.
+        Returns:
+            Colors (N, 3) in [0, 1]
+        """
+        dc = self._features_dc[:, 0, :]  # (N, 3)
+        return self.eval_sh(dc, self._features_rest, directions, self.sh_degree)
+    
+    def build_covariance(self) -> torch.Tensor:
+        """Build 3D covariance matrices: Σ = R·S·S^T·R^T.
+        
+        The decomposition ensures Σ is always symmetric positive semi-definite.
+        Scale is stored in log-space and exponentiated to ensure positivity.
+        Rotation is stored as quaternion and converted to rotation matrix.
+        
+        Returns:
+            Covariance matrices of shape (N, 3, 3)
+        """
+        R = quaternion_to_rotation_matrix(self._rotation)  # (N, 3, 3)
+        s = self.scales  # (N, 3) - always positive via exp
+        S = build_scaling_matrix(s)  # (N, 3, 3)
+        
+        # Σ = R @ S @ S^T @ R^T
+        RS = torch.bmm(R, S)  # (N, 3, 3)
+        cov = torch.bmm(RS, RS.transpose(1, 2))  # (N, 3, 3)
+        return cov
+    
+    def get_optimization_subset(
+        self,
+        optimize_mask: torch.Tensor,
+        extrinsics: Optional[torch.Tensor] = None,
+        directions: Optional[torch.Tensor] = None,
+    ) -> Dict[str, torch.Tensor]:
+        """Extract optimization subset containing only active Gaussians (M <= N).
+        
+        Eliminates O(N) full-size tensor copies. Active tensors are strictly of size (M, ...).
+        
+        Args:
+            optimize_mask: (N,) boolean tensor of Gaussians selected for optimization.
+            extrinsics: (4, 4) optional camera extrinsics to evaluate view directions for SH.
+            directions: (M, 3) optional precomputed viewing directions.
+            
+        Returns:
+            Dict containing active indices, active sliced parameters, and active 3D attributes.
+        """
+        N = self.num_gaussians
+        active_idx = torch.where(optimize_mask[:N])[0]
+        M = len(active_idx)
+        
+        if M == 0:
+            return {
+                'indices': active_idx,
+                'xyz': torch.empty(0, 3, device=self.device),
+                'scaling': torch.empty(0, 3, device=self.device),
+                'rotation': torch.empty(0, 4, device=self.device),
+                'opacity': torch.empty(0, 1, device=self.device),
+                'features_dc': torch.empty(0, 1, 3, device=self.device),
+                'features_rest': torch.empty(0, self.num_sh_coeffs - 1, 3, device=self.device),
+                'normals': torch.empty(0, 3, device=self.device),
+                'means3D': torch.empty(0, 3, device=self.device),
+                'cov3D': torch.empty(0, 3, 3, device=self.device),
+                'colors': torch.empty(0, 3, device=self.device),
+                'opacities': torch.empty(0, device=self.device),
+            }
+            
+        # Sliced active parameters
+        xyz = self._xyz[active_idx]
+        scaling = self._scaling[active_idx]
+        rotation = self._rotation[active_idx]
+        opacity = self._opacity[active_idx]
+        features_dc = self._features_dc[active_idx]
+        features_rest = self._features_rest[active_idx] if self._features_rest.numel() > 0 else torch.empty(0, device=self.device)
+        normals = self._normals[active_idx] if self._normals.numel() > 0 else torch.empty(0, 3, device=self.device)
+        
+        # Build active-only covariance (M, 3, 3)
+        R_act = quaternion_to_rotation_matrix(rotation / (rotation.norm(dim=-1, keepdim=True) + 1e-8))
+        S_act = build_scaling_matrix(torch.exp(scaling))
+        M_act = torch.bmm(R_act, S_act)
+        cov3D = torch.bmm(M_act, M_act.transpose(1, 2))
+        
+        if directions is None and extrinsics is not None and self.sh_degree > 0:
+            from src.core.rasterizer import _view_directions
+            directions = _view_directions(xyz, extrinsics)
+
+        colors = self.eval_sh(features_dc[:, 0, :], features_rest, directions, self.sh_degree)
+        opacities = torch.sigmoid(opacity).squeeze(-1)
+        
+        return {
+            'indices': active_idx,
+            'xyz': xyz,
+            'scaling': scaling,
+            'rotation': rotation,
+            'opacity': opacity,
+            'features_dc': features_dc,
+            'features_rest': features_rest,
+            'normals': normals,
+            'means3D': xyz,
+            'cov3D': cov3D,
+            'colors': colors,
+            'opacities': opacities,
+        }
+
+    def get_active_mask(self) -> torch.Tensor:
+        """Returns boolean mask of active (non-pruned) Gaussians."""
+        return self._state != GaussianState.PRUNED
+    
+    def get_active_gaussians(self) -> Dict[str, torch.Tensor]:
+        """Returns dict of properties for all active Gaussians."""
+        mask = self.get_active_mask()
+        return {
+            'xyz': self._xyz[mask],
+            'scaling': self._scaling[mask],
+            'rotation': self._rotation[mask],
+            'opacity': self._opacity[mask],
+            'features_dc': self._features_dc[mask],
+            'features_rest': self._features_rest[mask],
+            'normals': self._normals[mask],
+            'confidence': self._confidence[mask],
+            'state': self._state[mask],
+        }
+    
+    def initialize_from_points(
+        self,
+        points: torch.Tensor,
+        colors: Optional[torch.Tensor] = None,
+        normals: Optional[torch.Tensor] = None,
+        initial_scale: Union[float, torch.Tensor] = 0.01,
+        initial_opacity: float = 0.1,
+        initial_confidence: float = 0.5,
+    ):
+        """Initialize Gaussians from a 3D point cloud.
+        
+        Args:
+            points: (N, 3) positions
+            colors: (N, 3) RGB colors in [0,1], optional
+            normals: (N, 3) surface normals, optional
+            initial_scale: initial isotropic scale. Either a single float
+                (applied uniformly to every point — legacy behavior) or a
+                (N,) tensor of per-point scales (e.g. from
+                densification.compute_depth_adaptive_scale), which is strongly
+                recommended: a single global constant is geometrically wrong
+                for points at very different depths.
+            initial_opacity: initial opacity (before sigmoid)
+            initial_confidence: initial confidence score
+        """
+        N = points.shape[0]
+        device = points.device
+        
+        self._xyz = nn.Parameter(points.clone())
+        if torch.is_tensor(initial_scale):
+            assert initial_scale.shape[0] == N, (
+                f"initial_scale tensor length {initial_scale.shape[0]} must match N={N}"
+            )
+            log_scale = torch.log(initial_scale.to(device)).unsqueeze(-1).expand(N, 3).contiguous()
+        else:
+            log_scale = torch.full((N, 3), math.log(initial_scale), device=device)
+        self._scaling = nn.Parameter(log_scale)
+        # Identity quaternion (w=1, x=0, y=0, z=0)
+        rot = torch.zeros(N, 4, device=device)
+        rot[:, 0] = 1.0
+        self._rotation = nn.Parameter(rot)
+        # Inverse sigmoid for initial opacity
+        inv_sig = math.log(initial_opacity / (1.0 - initial_opacity + 1e-8))
+        self._opacity = nn.Parameter(torch.full((N, 1), inv_sig, device=device))
+        
+        if colors is not None:
+            # Store DC SH component (inverse sigmoid)
+            colors_clamped = colors.clamp(1e-4, 1.0 - 1e-4)
+            dc = torch.log(colors_clamped / (1.0 - colors_clamped)).unsqueeze(1)  # (N,1,3)
+        else:
+            dc = torch.zeros(N, 1, 3, device=device)
+        self._features_dc = nn.Parameter(dc)
+        self._features_rest = nn.Parameter(torch.zeros(N, self.num_sh_coeffs - 1, 3, device=device))
+        
+        if normals is not None:
+            self._normals = nn.Parameter(normals.clone())
+        else:
+            self._normals = nn.Parameter(torch.tensor([[0.0, 0.0, 1.0]], device=device).expand(N, -1).clone())
+        
+        self._confidence = torch.full((N, 1), initial_confidence, device=device)
+        self._state = torch.full((N,), GaussianState.UNSTABLE, dtype=torch.long, device=device)
+        self._num_gaussians = N
+        self.state_store = GaussianStateStore(device=device)
+        self.state_store.create(N, frame_idx=0)
+    
+    @torch.no_grad()
+    def add_gaussians(
+        self,
+        new_params: Dict[str, torch.Tensor],
+        parent_indices: Optional[torch.Tensor] = None,
+        n_children_per_parent: int = 1,
+        frame_idx: int = 0,
+    ):
+        """Add new Gaussians to the model and register persistent identities.
+        
+        Args:
+            new_params: Dict with keys matching parameter names.
+                Required: 'xyz'. Optional: 'scaling', 'rotation', 'opacity',
+                'features_dc', 'features_rest', 'normals', 'confidence'
+            parent_indices: optional (P,) parent indices for lineage tracking.
+                Must satisfy: len(parent_indices) * n_children_per_parent == N_new,
+                or len(parent_indices) == N_new (when one parent index per new Gaussian).
+            n_children_per_parent: number of children spawned per parent entry (default 1).
+            frame_idx: video frame index of creation
+        """
+        new_xyz = new_params['xyz']
+        N_new = new_xyz.shape[0]
+        device = new_xyz.device
+        
+        # Verify parent mapping alignment if parents provided (Point C)
+        effective_n_children = 1
+        if parent_indices is not None and len(parent_indices) > 0:
+            P = len(parent_indices)
+            if P * n_children_per_parent == N_new:
+                effective_n_children = n_children_per_parent
+            elif P == N_new:
+                effective_n_children = 1
+            else:
+                raise ValueError(
+                    f"Dimension mismatch in add_gaussians: new_xyz has {N_new} Gaussians, "
+                    f"but parent_indices has {P} with n_children_per_parent={n_children_per_parent} "
+                    f"(expected {P * n_children_per_parent} == {N_new} or {P} == {N_new})."
+                )
+        
+        def _cat(old, new):
+            return nn.Parameter(torch.cat([old.data, new], dim=0))
+        
+        self._xyz = _cat(self._xyz, new_xyz)
+        self._scaling = _cat(self._scaling, new_params.get(
+            'scaling', torch.full((N_new, 3), math.log(0.01), device=device)))
+        self._rotation = _cat(self._rotation, new_params.get(
+            'rotation', torch.tensor([[1.0, 0, 0, 0]], device=device).expand(N_new, -1).clone()))
+        inv_sig = math.log(0.1 / 0.9)
+        self._opacity = _cat(self._opacity, new_params.get(
+            'opacity', torch.full((N_new, 1), inv_sig, device=device)))
+        self._features_dc = _cat(self._features_dc, new_params.get(
+            'features_dc', torch.zeros(N_new, 1, 3, device=device)))
+        self._features_rest = _cat(self._features_rest, new_params.get(
+            'features_rest', torch.zeros(N_new, self.num_sh_coeffs - 1, 3, device=device)))
+        self._normals = _cat(self._normals, new_params.get(
+            'normals', torch.tensor([[0., 0., 1.]], device=device).expand(N_new, -1).clone()))
+        
+        self._confidence = torch.cat([
+            self._confidence, torch.full((N_new, 1), 0.5, device=device)], dim=0)
+        self._state = torch.cat([
+            self._state, torch.full((N_new,), GaussianState.UNSTABLE, dtype=torch.long, device=device)], dim=0)
+        self._num_gaussians = self._xyz.shape[0]
+        
+        # Register in persistent state store with lineage (Section IV)
+        if parent_indices is not None and len(parent_indices) > 0:
+            self.state_store.register_densification(
+                parent_indices, n_children_per_parent=effective_n_children, frame_idx=frame_idx
+            )
+        else:
+            self.state_store.create(N_new, frame_idx=frame_idx)
+            
+        assert self.num_gaussians == self.state_store.num_gaussians, (
+            f"StateStore size ({self.state_store.num_gaussians}) out of sync with "
+            f"GaussianModel size ({self.num_gaussians}) after add_gaussians."
+        )
+    
+    @torch.no_grad()
+    def prune_gaussians(self, mask: torch.Tensor):
+        """Mark Gaussians for pruning (soft delete via state flag).
+        
+        Args:
+            mask: Boolean tensor (N,) - True = prune this Gaussian
+        """
+        self._state[mask] = GaussianState.PRUNED
+    
+    @torch.no_grad()
+    def compact(self) -> torch.Tensor:
+        """Remove pruned Gaussians from memory (hard delete).
+        
+        Returns:
+            keep_mask: Boolean tensor indicating which Gaussians were kept.
+        """
+        keep = self._state != GaussianState.PRUNED
+        
+        self._xyz = nn.Parameter(self._xyz.data[keep])
+        self._scaling = nn.Parameter(self._scaling.data[keep])
+        self._rotation = nn.Parameter(self._rotation.data[keep])
+        self._opacity = nn.Parameter(self._opacity.data[keep])
+        self._features_dc = nn.Parameter(self._features_dc.data[keep])
+        self._features_rest = nn.Parameter(self._features_rest.data[keep])
+        self._normals = nn.Parameter(self._normals.data[keep])
+        self._confidence = self._confidence[keep]
+        self._state = self._state[keep]
+        self._num_gaussians = self._xyz.shape[0]
+        
+        # Remap state store after compaction to preserve persistent identities
+        self.state_store.remap_after_pruning(keep)
+        assert self.num_gaussians == self.state_store.num_gaussians, (
+            f"StateStore size ({self.state_store.num_gaussians}) out of sync with "
+            f"GaussianModel size ({self.num_gaussians}) after compact."
+        )
+        return keep
+
+    @torch.no_grad()
+    def reorder(self, permutation: torch.Tensor):
+        """Reorder active Gaussians according to a permutation tensor.
+        
+        Guarantees that parameter tensors and persistent state tensors
+        are permuted identically, preventing index aliasing.
+        """
+        perm = permutation.to(self.device)
+        self._xyz = nn.Parameter(self._xyz.data[perm])
+        self._scaling = nn.Parameter(self._scaling.data[perm])
+        self._rotation = nn.Parameter(self._rotation.data[perm])
+        self._opacity = nn.Parameter(self._opacity.data[perm])
+        self._features_dc = nn.Parameter(self._features_dc.data[perm])
+        if self._features_rest.numel() > 0:
+            self._features_rest = nn.Parameter(self._features_rest.data[perm])
+        if self._normals.numel() > 0:
+            self._normals = nn.Parameter(self._normals.data[perm])
+        self._confidence = self._confidence[perm]
+        self._state = self._state[perm]
+        self.state_store.reorder(perm)
+        assert self.num_gaussians == self.state_store.num_gaussians, (
+            f"StateStore size ({self.state_store.num_gaussians}) out of sync with "
+            f"GaussianModel size ({self.num_gaussians}) after reorder."
+        )
+

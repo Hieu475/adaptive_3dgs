@@ -29,7 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from research.evidence_protocol import get_phase12_output_dir
+from src.utility.evidence_protocol import get_phase12_output_dir
 
 
 def analyze_error_vs_utility(

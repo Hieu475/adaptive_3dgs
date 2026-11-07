@@ -11,7 +11,7 @@ SCENES = ("office0", "office1", "office2", "office3", "office4", "room0", "room1
 SOURCES = ("experiments/run_matched_dilution_controls.py", "experiments/run_dilution_factorial.py",
            "experiments/run_frozen_benchmark.py", "experiments/analyze_replica_e1_e2_suite.py",
            "experiments/compare_replica_e1_e2_seeds.py", "experiments/write_replica_suite_manifest.py",
-           "research/pipeline.py", "research/closed_loop_runtime.py")
+           "src/core/pipeline.py", "src/utility/closed_loop_runtime.py")
 
 
 def sha(path):

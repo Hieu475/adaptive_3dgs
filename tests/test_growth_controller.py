@@ -3,8 +3,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from research import growth_controller as gc
-from research import time_budget as tb
+from src.control import growth_controller as gc
+from src.control import time_budget as tb
 
 
 def _fake_pipe(frame_count=0):

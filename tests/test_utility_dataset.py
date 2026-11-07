@@ -3,12 +3,12 @@ import pytest
 import numpy as np
 import torch
 
-from research.utility_features import (
+from src.utility.utility_features import (
     CANONICAL_FEATURE_NAMES,
     CANONICAL_FEATURE_SPECS,
     extract_feature_vector,
 )
-from research.utility_dataset import (
+from src.utility.utility_dataset import (
     FeatureNormalizer,
     UtilityDataset,
     load_canonical_oracle_dataset,
@@ -106,7 +106,7 @@ def test_prepare_normalized_splits_train_only_leakage_check():
 
 
 def test_schema_error_on_missing_feature():
-    from research.utility_features import SchemaError
+    from src.utility.utility_features import SchemaError
     bad_row = {
         "features": {
             "rgb_error": 0.5,

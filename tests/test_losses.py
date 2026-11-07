@@ -1,4 +1,4 @@
-"""Unit tests for loss functions (research/losses.py).
+"""Unit tests for loss functions (src/core/losses.py).
 
 Tests cover:
 1. L1 loss correctness
@@ -17,7 +17,7 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from research.losses import (
+from src.core.losses import (
     color_loss, depth_loss, normal_consistency_loss,
     robust_loss, compact_loss, temporal_loss, total_loss
 )

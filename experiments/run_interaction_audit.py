@@ -31,8 +31,8 @@ from typing import Dict, List, Any, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from research.interaction_audit import InteractionAuditExperiment, InteractionAuditConfig
-from research.evidence_protocol import PHASE12_OUTPUT_DIR, SEEDS, TRAIN_SCENE
+from src.utility.interaction_audit import InteractionAuditExperiment, InteractionAuditConfig
+from src.utility.evidence_protocol import PHASE12_OUTPUT_DIR, SEEDS, TRAIN_SCENE
 
 def setup_argparse():
     parser = argparse.ArgumentParser(description="Phase 12-I: Interaction Audit Experiment Runner")

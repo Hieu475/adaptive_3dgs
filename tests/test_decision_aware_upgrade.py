@@ -2,19 +2,19 @@
 import numpy as np
 import torch
 
-from research.interaction_audit import (
+from src.utility.interaction_audit import (
     InteractionAuditExperiment,
     InteractionAuditConfig,
 )
-from research.conditional_dataset import (
+from src.utility.conditional_dataset import (
     ConditionalDatasetGenerator,
     H_S_DIM,
 )
-from research.interaction_model import (
+from src.utility.interaction_model import (
     InteractionAwareModel,
     InteractionAwareLoss,
 )
-from research.sequential_scheduler import (
+from src.core.sequential_scheduler import (
     SequentialInteractionScheduler,
     SequentialSchedulerConfig,
 )

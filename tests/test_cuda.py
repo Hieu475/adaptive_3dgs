@@ -9,8 +9,8 @@ Verifies:
 """
 import pytest
 import torch
-from research.projection import world_to_camera, project_to_screen
-from research.rasterizer import render, get_renderer_backend
+from src.core.projection import world_to_camera, project_to_screen
+from src.core.rasterizer import render, get_renderer_backend
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")

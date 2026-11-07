@@ -172,8 +172,8 @@ def main():
         "experiments/analyze_joint_spawn_refine_replay.py",
         "experiments/run_dilution_factorial.py",
         "experiments/run_frozen_benchmark.py",
-        "research/pipeline.py", "research/scheduler.py", "research/densification.py",
-        "research/gaussian_repr.py", "research/reproducibility.py",
+        "src/core/pipeline.py", "src/core/scheduler.py", "src/core/densification.py",
+        "src/core/gaussian_repr.py", "src/evaluation/reproducibility.py",
     ]
     source_hashes = {}
     for rel in source_paths:

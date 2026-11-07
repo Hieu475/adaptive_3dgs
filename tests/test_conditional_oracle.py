@@ -1,4 +1,4 @@
-"""Tests for Phase 6 Conditional Oracle (research/conditional_oracle.py).
+"""Tests for Phase 6 Conditional Oracle (src/utility/conditional_oracle.py).
 
 Test Categories:
     1. Oracle Identity: ΔQ(i|S) = Q(S∪{i}) - Q(S) exactly.
@@ -15,11 +15,11 @@ Unit tests that verify logic without GPU are always runnable.
 import pytest
 import torch
 
-from research.conditional_oracle import (
+from src.utility.conditional_oracle import (
     ConditionalOracleConfig,
     ConditionalOracleExperiment,
 )
-from research.candidate_context import (
+from src.utility.candidate_context import (
     PHASE6_FEATURE_DIM,
     _get_knn_indices,
 )
@@ -358,7 +358,7 @@ class TestSnapshotRestoreCryptographicInvariance:
 
     def test_conditional_oracle_snapshot_restore_exact_state_hash(self):
         """Assert cryptographic equality of model parameters before and after conditional measurement."""
-        from research.pipeline import OnlineReconstructionPipeline
+        from src.core.pipeline import OnlineReconstructionPipeline
         from tests.test_oracle_utility import hash_gaussian_state
 
         pipeline = OnlineReconstructionPipeline(device="cpu")

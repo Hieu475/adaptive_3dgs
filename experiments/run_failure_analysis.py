@@ -21,7 +21,7 @@ from typing import Dict, List, Any
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.reproducibility import bootstrap_ci
+from src.evaluation.reproducibility import bootstrap_ci
 
 
 def analyze_stratum(

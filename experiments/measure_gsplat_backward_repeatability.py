@@ -17,8 +17,8 @@ from experiments.run_full_sequence_benchmark import (
     build_experiment_configs,
     preload_tum_sequence_cpu,
 )
-from research.pipeline import OnlineReconstructionPipeline
-from research.reproducibility import get_git_commit, get_hardware_info, set_seed
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.evaluation.reproducibility import get_git_commit, get_hardware_info, set_seed
 
 
 def main():

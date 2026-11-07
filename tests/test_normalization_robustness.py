@@ -15,22 +15,22 @@ import pytest
 import numpy as np
 import torch
 
-from research.normalization_protocol import EPS
-from research.robust_normalization import (
+from src.utility.normalization_protocol import EPS
+from src.utility.robust_normalization import (
     StandardNormalizer,
     OnlineEMANormalizer,
 )
-from research.normalization_robustness_protocol import (
+from src.utility.normalization_robustness_protocol import (
     validate_protocol_integrity_9c,
     PERTURBATION_SCALES,
     PERTURBATION_OFFSETS,
 )
-from research.normalization_robustness_analysis import (
+from src.utility.normalization_robustness_analysis import (
     B2StaticNormalizer,
     apply_feature_perturbation,
     verify_b0_b2_static_equivalence,
 )
-from research.utility_models import TwoHeadMLP
+from src.utility.utility_models import TwoHeadMLP
 
 
 @pytest.fixture

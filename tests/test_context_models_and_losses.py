@@ -9,13 +9,13 @@ Tests:
 import pytest
 import torch
 
-from research.context_utility_model import (
+from src.utility.context_utility_model import (
     ContextAwareTwoHeadMLP,
     ResidualContextModel,
     Phase6Loss,
     create_ablation_variant,
 )
-from research.candidate_context import PHASE6_FEATURE_DIM
+from src.utility.candidate_context import PHASE6_FEATURE_DIM
 
 
 class TestContextAwareModels:
@@ -162,7 +162,7 @@ class TestP0Invariants:
     def test_phase4_backbone_is_frozen(self):
         """P0.2: Verify Phase 4 backbone weights are completely frozen and invariant during training."""
         import hashlib
-        from research.utility_models import TwoHeadMLP
+        from src.utility.utility_models import TwoHeadMLP
 
         p4_model = TwoHeadMLP(in_features=11, hidden_dim=64)
         config = create_ablation_variant("V11")

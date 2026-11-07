@@ -16,7 +16,7 @@ sys.path.insert(0, str(ROOT))
 
 from experiments.run_dilution_factorial import config_for
 from experiments.run_frozen_benchmark import load_benchmark_sequence, run_policy_trajectory
-from research.reproducibility import create_provenance_manifest
+from src.evaluation.reproducibility import create_provenance_manifest
 
 
 def run_arm(scene, seed, condition, cfg, frames, intrinsics, args,

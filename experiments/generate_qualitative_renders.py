@@ -21,8 +21,8 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from experiments.run_frozen_benchmark import load_benchmark_sequence, build_pipeline_config
-from research.pipeline import OnlineReconstructionPipeline
-from research.reproducibility import set_seed
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.evaluation.reproducibility import set_seed
 
 try:
     import cv2
@@ -76,7 +76,7 @@ def main():
                                 return_images=want_images)
             # Re-render for pixels (eval_frame doesn't return image; render again cheaply)
             with torch.no_grad():
-                from research.rasterizer import render as rasterize_scene
+                from src.core.rasterizer import render as rasterize_scene
                 cov = pipe.gaussian_model.build_covariance()
                 res = rasterize_scene(
                     means3D=pipe.gaussian_model.positions, cov3D=cov,

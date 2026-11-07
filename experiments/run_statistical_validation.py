@@ -24,7 +24,7 @@ import pandas as pd
 from scipy.stats import wilcoxon
 from typing import Dict, List, Tuple, Any, Optional
 
-from research.protocol import (
+from src.evaluation.protocol import (
     load_protocol,
     get_seeds,
     get_statistics_config,

@@ -26,8 +26,8 @@ from typing import Dict, List, Optional, Tuple, Any
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.pipeline import OnlineReconstructionPipeline
-from research.oracle_utility import OracleUtilityExperiment, SamplingPopulation
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.utility.oracle_utility import OracleUtilityExperiment, SamplingPopulation
 
 
 def create_structured_synthetic_frames(n_frames: int = 10, H: int = 64, W: int = 80, device: str = 'cpu'):

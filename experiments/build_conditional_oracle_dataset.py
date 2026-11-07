@@ -37,27 +37,27 @@ from typing import Dict, List, Any, Optional, Tuple
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datasets.tum_dataset import TUMDataset
-from research.pipeline import OnlineReconstructionPipeline
-from research.oracle_utility import OracleUtilityExperiment
-from research.candidate_context import (
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.utility.oracle_utility import OracleUtilityExperiment
+from src.utility.candidate_context import (
     build_full_context_batch,
     ContextConfig,
     PHASE6_FEATURE_NAMES,
     PHASE6_FEATURE_DIM,
 )
-from research.conditional_oracle import (
+from src.utility.conditional_oracle import (
     ConditionalOracleExperiment,
     ConditionalOracleConfig,
 )
-from research.utility_features import extract_feature_vector, CANONICAL_FEATURE_NAMES
-from research.protocol import (
+from src.utility.utility_features import extract_feature_vector, CANONICAL_FEATURE_NAMES
+from src.evaluation.protocol import (
     load_protocol,
     get_seeds,
     get_resolution,
     get_dataset_config,
     get_oracle_config,
 )
-from research.attribution import render_with_attribution, compute_gaussian_statistics
+from src.core.attribution import render_with_attribution, compute_gaussian_statistics
 
 
 # ─────────────────────────────────────────────────────────────────────────────

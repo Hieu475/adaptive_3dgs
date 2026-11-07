@@ -13,18 +13,18 @@ import pytest
 import numpy as np
 import torch
 
-from research.context_selection import (
+from src.utility.context_selection import (
     adaptive_greedy_select,
     static_context_select,
     select_phase6_subset,
 )
-from research.context_utility_model import (
+from src.utility.context_utility_model import (
     ContextAwareTwoHeadMLP,
     Phase6ModelConfig,
     FrozenContextPredictor,
 )
-from research.context_utility_dataset import Phase6FeatureNormalizer
-from research.candidate_context import PHASE6_FEATURE_DIM
+from src.utility.context_utility_dataset import Phase6FeatureNormalizer
+from src.utility.candidate_context import PHASE6_FEATURE_DIM
 
 
 @pytest.fixture

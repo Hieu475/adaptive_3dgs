@@ -35,17 +35,17 @@ import torch
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datasets.tum_dataset import TUMDataset
-from research.pipeline import OnlineReconstructionPipeline
-from research.candidate_context import ContextConfig
-from research.context_utility_model import FrozenContextPredictor
-from research.context_selection import (
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.utility.candidate_context import ContextConfig
+from src.utility.context_utility_model import FrozenContextPredictor
+from src.utility.context_selection import (
     select_phase6_subset,
     map_candidate_to_active_index,
     Phase6PolicyName,
 )
-from research.utility_predictor import FrozenUtilityPredictor
-from research.scheduler_metrics import compute_extended_churn
-from research.protocol import (
+from src.utility.utility_predictor import FrozenUtilityPredictor
+from src.core.scheduler_metrics import compute_extended_churn
+from src.evaluation.protocol import (
     load_protocol,
     get_resolution,
     get_dataset_config,
@@ -195,7 +195,7 @@ def run_policy_online_trajectory(
 
         # Extract REAL attribution for context computation (C3 FIX)
         model = pipeline_obj.gaussian_model
-        from research.attribution import render_with_attribution
+        from src.core.attribution import render_with_attribution
         attr_out = render_with_attribution(
             means3D=model.positions,
             cov3D=model.build_covariance(),

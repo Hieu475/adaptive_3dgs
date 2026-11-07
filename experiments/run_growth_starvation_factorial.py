@@ -23,15 +23,15 @@ sys.path.insert(0, str(ROOT))
 
 from experiments.run_dilution_factorial import config_for
 from experiments.run_frozen_benchmark import build_pipeline_config, load_benchmark_sequence
-from research import pipeline as pipeline_module
-from research.pipeline import OnlineReconstructionPipeline
-from research.reproducibility import create_provenance_manifest, set_seed
-from research.map_snapshots import validate_map_snapshot
-from research.pipeline_checkpoint import (
+from src.core import pipeline as pipeline_module
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.evaluation.reproducibility import create_provenance_manifest, set_seed
+from src.core.map_snapshots import validate_map_snapshot
+from src.core.pipeline_checkpoint import (
     load_pipeline_checkpoint, save_pipeline_checkpoint,
     gaussian_map_digest,
 )
-from research.attribution import render_with_attribution, compute_gaussian_statistics
+from src.core.attribution import render_with_attribution, compute_gaussian_statistics
 
 
 def digest_map(model):
@@ -167,7 +167,7 @@ def contribution_reference_eval(pipeline, view, persistent_ids, top_k=8):
     h, w = depth.shape
     cov3d = model.build_covariance()
     if model.sh_degree > 0:
-        from research.rasterizer import _view_directions
+        from src.core.rasterizer import _view_directions
         dirs = _view_directions(model.positions, pose)
     else:
         dirs = None

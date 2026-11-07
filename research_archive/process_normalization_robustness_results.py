@@ -30,7 +30,7 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.normalization_robustness_protocol import (
+from src.utility.normalization_robustness_protocol import (
     SEEDS,
     BUDGETS,
     BETA_VALUES,
@@ -42,7 +42,7 @@ from research.normalization_robustness_protocol import (
     get_output_dir_9c,
     to_dict as protocol_to_dict,
 )
-from research.normalization_robustness_analysis import assess_sensitivity_range
+from src.utility.normalization_robustness_analysis import assess_sensitivity_range
 
 
 def sha256_file(filepath: Path) -> str:

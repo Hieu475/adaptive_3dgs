@@ -244,7 +244,7 @@ def main() -> None:
         "frozen_checkout_clean_after_run": True,
         "source_manifest_sha256": sha256(RUN / "manifest.json"),
         "runner_sha256": sha256(ROOT / "experiments/run_joint_spawn_refine_replay.py"),
-        "pipeline_sha256": sha256(ROOT / "research/pipeline.py"),
+        "pipeline_sha256": sha256(ROOT / "src/core/pipeline.py"),
         "analysis_script_sha256": sha256(Path(__file__)),
         "preregistrations": preregistration_manifest,
         "cells": summary_cells,

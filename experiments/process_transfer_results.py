@@ -30,7 +30,7 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.transfer_protocol import (
+from src.utility.transfer_protocol import (
     SEEDS, BUDGETS, BASELINES, to_dict as protocol_to_dict,
     get_repo_root, OUTPUT_DIR, OUTPUT_FILES
 )

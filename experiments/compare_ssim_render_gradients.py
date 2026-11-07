@@ -17,11 +17,11 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from experiments.run_frozen_benchmark import build_pipeline_config, load_benchmark_sequence
-from research.losses import color_loss, depth_loss, ssim_loss
-from research.pipeline import OnlineReconstructionPipeline
-from research.pipeline_checkpoint import load_pipeline_checkpoint
-from research.rasterizer import render
-from research.reproducibility import get_git_commit
+from src.core.losses import color_loss, depth_loss, ssim_loss
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.core.pipeline_checkpoint import load_pipeline_checkpoint
+from src.core.rasterizer import render
+from src.evaluation.reproducibility import get_git_commit
 
 
 def tensor_digest(tensor):
@@ -107,7 +107,7 @@ def main():
     pipeline.current_pose = pose
     cov3d = model.build_covariance()
     if model.sh_degree > 0:
-        from research.rasterizer import _view_directions
+        from src.core.rasterizer import _view_directions
         directions = _view_directions(model.positions, pose)
     else:
         directions = None

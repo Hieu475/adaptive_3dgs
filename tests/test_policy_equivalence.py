@@ -9,7 +9,7 @@ Verifies that the optimization policies are strictly distinct:
 import pytest
 import torch
 
-from research.scheduler import BudgetScheduler, OptimizationPolicy
+from src.core.scheduler import BudgetScheduler, OptimizationPolicy
 
 
 def test_policies_are_strictly_distinct():

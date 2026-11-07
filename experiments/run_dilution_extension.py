@@ -25,8 +25,8 @@ from experiments.run_dilution_factorial import summarize  # noqa: E402
 from experiments.run_frozen_benchmark import (  # noqa: E402
     load_benchmark_sequence, run_policy_trajectory,
 )
-from research.pipeline import OnlineReconstructionPipeline  # noqa: E402
-from research.reproducibility import create_provenance_manifest  # noqa: E402
+from src.core.pipeline import OnlineReconstructionPipeline  # noqa: E402
+from src.evaluation.reproducibility import create_provenance_manifest  # noqa: E402
 
 CONDITIONS = ("error_off", "error_coverage", "error_coverage_backlog",
               "temporal_off", "temporal_coverage", "temporal_coverage_backlog",

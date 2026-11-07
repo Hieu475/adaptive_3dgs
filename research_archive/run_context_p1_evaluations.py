@@ -24,20 +24,20 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.candidate_context import build_selected_context, PHASE6_FEATURE_DIM
-from research.context_utility_model import (
+from src.utility.candidate_context import build_selected_context, PHASE6_FEATURE_DIM
+from src.utility.context_utility_model import (
     ResidualContextModel,
     Phase6ModelConfig,
     create_ablation_variant,
     FrozenContextPredictor,
 )
-from research.context_utility_dataset import (
+from src.utility.context_utility_dataset import (
     prepare_phase6_splits,
     Phase6FeatureNormalizer,
     _get_variant_mask,
     GroupedBatchSampler,
 )
-from research.utility_models import TwoHeadMLP
+from src.utility.utility_models import TwoHeadMLP
 from scipy.stats import spearmanr
 
 
@@ -90,7 +90,7 @@ def evaluate_p1_5_reduced_models(
 
         opt = torch.optim.Adam(model.context_parameters(), lr=2e-4, weight_decay=1e-4)
 
-        from research.context_utility_model import Phase6Loss
+        from src.utility.context_utility_model import Phase6Loss
         loss_fn = Phase6Loss(
             lambda_q=0.0, lambda_c=0.0,
             lambda_r=1.0, lambda_list=0.5,

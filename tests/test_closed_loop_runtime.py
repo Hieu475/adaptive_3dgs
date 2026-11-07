@@ -14,20 +14,20 @@ import unittest
 import numpy as np
 import torch
 
-from research.closed_loop_protocol import (
+from src.utility.closed_loop_protocol import (
     validate_protocol_integrity_10,
     to_dict as protocol_to_dict,
     get_checkpoint_path_for_seed,
     get_normalizer_path_for_seed,
 )
-from research.closed_loop_runtime import (
+from src.utility.closed_loop_runtime import (
     Phase10ModelBundle,
     Phase10Selector,
     extract_online_features,
     update_statestore_closed_loop,
     get_pipeline_config,
 )
-from research.pipeline import OnlineReconstructionPipeline
+from src.core.pipeline import OnlineReconstructionPipeline
 
 
 class TestPhase10Runtime(unittest.TestCase):

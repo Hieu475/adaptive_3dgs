@@ -42,10 +42,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from research.pipeline import OnlineReconstructionPipeline
-from research.scheduler import OptimizationPolicy
-from research.closed_loop_runtime import load_benchmark_sequence
-from research.reproducibility import (
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.core.scheduler import OptimizationPolicy
+from src.utility.closed_loop_runtime import load_benchmark_sequence
+from src.evaluation.reproducibility import (
     create_provenance_manifest,
     bootstrap_ci,
     set_seed,
@@ -53,7 +53,7 @@ from research.reproducibility import (
     get_git_commit,
     get_git_branch,
 )
-from research.rasterizer import get_renderer_backend
+from src.core.rasterizer import get_renderer_backend
 
 
 POLICIES_CANONICAL = [
@@ -263,7 +263,7 @@ def run_policy_trajectory(
     if final_gaussian_target is not None:
         # Compact naturally pruned tombstones first, then remove the lowest
         # opacity survivors so final evaluation uses the requested map size.
-        from research.gaussian_repr import GaussianState
+        from src.core.gaussian_repr import GaussianState
         model = pipeline.gaussian_model
         keep_existing = model._state != GaussianState.PRUNED
         if not bool(keep_existing.all()):

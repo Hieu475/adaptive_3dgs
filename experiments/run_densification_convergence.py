@@ -18,7 +18,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from research.benchmark_densification import run_full_densification_ablation, format_densification_table
+from src.evaluation.benchmark_densification import run_full_densification_ablation, format_densification_table
 from experiments.run_importance_validation import generate_synthetic_benchmark_dataset
 
 

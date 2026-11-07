@@ -29,7 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from research.evidence_protocol import get_phase12_output_dir
+from src.utility.evidence_protocol import get_phase12_output_dir
 
 
 def bootstrap_ci(arr: np.ndarray, n_boot: int = 2000, alpha: float = 0.05, seed: int = 42) -> Tuple[float, float]:

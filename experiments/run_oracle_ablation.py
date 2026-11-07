@@ -24,9 +24,9 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.pipeline import OnlineReconstructionPipeline
-from research.oracle_utility import OracleUtilityExperiment, SamplingPopulation
-from research.uncertainty import GaussianUncertaintyEstimator
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.utility.oracle_utility import OracleUtilityExperiment, SamplingPopulation
+from src.core.uncertainty import GaussianUncertaintyEstimator
 
 
 def create_ablation_frames(n_frames: int = 10, H: int = 64, W: int = 80):

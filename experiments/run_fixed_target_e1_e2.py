@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT))
 from experiments.run_dilution_factorial import config_for
 from experiments.run_matched_dilution_controls import run_arm, save_pair
 from experiments.run_frozen_benchmark import load_benchmark_sequence
-from research.reproducibility import create_provenance_manifest
+from src.evaluation.reproducibility import create_provenance_manifest
 
 
 TARGETS_PATH = ROOT / "results" / "matched_dilution_controls" / "fixed_targets.json"

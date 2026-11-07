@@ -2,7 +2,7 @@
 import pytest
 import torch
 
-from research.gaussian_repr import GaussianModel, GaussianState
+from src.core.gaussian_repr import GaussianModel, GaussianState
 
 
 def test_model_lifecycle_pipeline():
@@ -107,8 +107,8 @@ def test_model_reorder_integration():
 
 def test_oracle_snapshot_restore_isolation():
     """Scenario 2.23 & 2.24: Oracle trial does not contaminate persistent state store."""
-    from research.pipeline import OnlineReconstructionPipeline
-    from research.oracle_utility import OracleUtilityExperiment
+    from src.core.pipeline import OnlineReconstructionPipeline
+    from src.utility.oracle_utility import OracleUtilityExperiment
     
     config = {
         'gaussian': {'sh_degree': 0, 'initial_opacity': 0.5, 'max_gaussians': 1000},

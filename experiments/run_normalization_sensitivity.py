@@ -30,19 +30,19 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.robust_representation_protocol import CANONICAL_FEATURE_SCHEMA
-from research.scale_invariant_features import transform_grouped_features
-from research.normalization_protocol import (
+from src.utility.robust_representation_protocol import CANONICAL_FEATURE_SCHEMA
+from src.utility.scale_invariant_features import transform_grouped_features
+from src.utility.normalization_protocol import (
     BASE_REPRESENTATION,
     EPS,
     BUDGETS,
     SEEDS,
 )
-from research.robust_normalization import (
+from src.utility.robust_normalization import (
     StandardNormalizer,
     OnlineEMANormalizer,
 )
-from research.normalization_robustness_protocol import (
+from src.utility.normalization_robustness_protocol import (
     BETA_VALUES,
     ABLATION_VARIANTS,
     ABLATION_VARIANT_NAMES,
@@ -54,15 +54,15 @@ from research.normalization_robustness_protocol import (
     validate_protocol_integrity_9c,
     to_dict as protocol_to_dict,
 )
-from research.normalization_robustness_analysis import (
+from src.utility.normalization_robustness_analysis import (
     B2StaticNormalizer,
     apply_feature_perturbation,
     compute_per_frame_spearman,
     verify_b0_b2_static_equivalence,
 )
-from research.utility_dataset import load_canonical_oracle_dataset
-from research.utility_models import TwoHeadMLP
-from research.utility_metrics import (
+from src.utility.utility_dataset import load_canonical_oracle_dataset
+from src.utility.utility_models import TwoHeadMLP
+from src.utility.utility_metrics import (
     evaluate_rq1_prediction,
     evaluate_rq2_selection,
 )

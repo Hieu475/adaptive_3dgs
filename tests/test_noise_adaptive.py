@@ -1,8 +1,8 @@
 import numpy as np
-from research.noise_adaptive import (
+from src.control.noise_adaptive import (
     frame_noise_score, frame_noise_score_v3, NoiseAdaptiveController,
 )
-from research.holdout_eval import compute_ate, summarize_holdout
+from src.evaluation.holdout_eval import compute_ate, summarize_holdout
 import torch
 
 

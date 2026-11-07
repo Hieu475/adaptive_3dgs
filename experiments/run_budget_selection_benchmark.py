@@ -32,17 +32,17 @@ import torch
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datasets.tum_dataset import TUMDataset
-from research.pipeline import OnlineReconstructionPipeline
-from research.oracle_utility import OracleUtilityExperiment
-from research.utility_predictor import FrozenUtilityPredictor
-from research.budget_selection import (
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.utility.oracle_utility import OracleUtilityExperiment
+from src.utility.utility_predictor import FrozenUtilityPredictor
+from src.utility.budget_selection import (
     PolicyName,
     SelectionResult,
     select_budget_constrained_subset,
     map_candidate_to_active_index,
 )
-from research.budget_evaluator import Phase5Evaluator
-from research.scheduler_metrics import (
+from src.utility.budget_evaluator import Phase5Evaluator
+from src.core.scheduler_metrics import (
     compute_ose,
     compute_regret,
     compute_selection_regret,
@@ -56,7 +56,7 @@ from research.scheduler_metrics import (
     compute_cohens_d,
     paired_wilcoxon_test,
 )
-from research.protocol import (
+from src.evaluation.protocol import (
     load_protocol,
     get_seeds,
     get_resolution,

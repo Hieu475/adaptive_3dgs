@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
-from research.reproducibility import classify_experiment_manifest
+from src.evaluation.reproducibility import classify_experiment_manifest
 
 
 DEFAULT_PATHS = [

@@ -31,7 +31,7 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.robust_representation_protocol import (
+from src.utility.robust_representation_protocol import (
     SEEDS, BUDGETS, CANONICAL_FEATURE_SCHEMA,
     FEATURE_VARIANTS, VARIANT_ALIASES,
     to_dict as protocol_to_dict,

@@ -15,8 +15,8 @@ sys.path.insert(0, str(ROOT))
 
 from experiments.run_dilution_factorial import config_for
 from experiments.run_frozen_benchmark import load_benchmark_sequence
-from research.pipeline import OnlineReconstructionPipeline
-from research.reproducibility import create_provenance_manifest, set_seed
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.evaluation.reproducibility import create_provenance_manifest, set_seed
 
 
 def digest_map(model):

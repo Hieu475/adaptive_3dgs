@@ -1,7 +1,7 @@
 """Tests for scheduler optimization policies and cost modeling (Milestone R4)."""
 import pytest
 import torch
-from research.scheduler import (
+from src.core.scheduler import (
     BudgetScheduler,
     OptimizationPolicy,
     estimate_gaussian_costs,
@@ -184,7 +184,7 @@ class TestOptimizationPolicies:
 
     def test_allocate_adaptive_micro_steps(self, scheduler_setup):
         """Test Multi-choice Knapsack allocate_adaptive_micro_steps with decoupled costs."""
-        from research.scheduler import estimate_gaussian_cost_components
+        from src.core.scheduler import estimate_gaussian_cost_components
         scheduler, importance, tiers, confidence, costs, N = scheduler_setup
         max_k = 3
         base_costs, step_costs = estimate_gaussian_cost_components(n_gaussians=N)

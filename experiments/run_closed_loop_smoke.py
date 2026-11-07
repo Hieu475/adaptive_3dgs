@@ -26,21 +26,21 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from research.closed_loop_protocol import (
+from src.utility.closed_loop_protocol import (
     DEFAULT_BUDGET_MS,
     SAFETY_FACTOR,
     DEFAULT_IMAGE_WIDTH,
     DEFAULT_IMAGE_HEIGHT,
     TEST_SCENE,
 )
-from research.closed_loop_runtime import (
+from src.utility.closed_loop_runtime import (
     Phase10ModelBundle,
     Phase10Selector,
     update_statestore_closed_loop,
     load_benchmark_sequence,
     get_pipeline_config,
 )
-from research.pipeline import OnlineReconstructionPipeline
+from src.core.pipeline import OnlineReconstructionPipeline
 
 
 def run_smoke_test(

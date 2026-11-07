@@ -18,7 +18,7 @@ import numpy as np
 import torch
 import pandas as pd
 
-from research.pipeline import OnlineReconstructionPipeline
+from src.core.pipeline import OnlineReconstructionPipeline
 from experiments.run_frozen_benchmark import (
     load_benchmark_sequence,
     build_pipeline_config,

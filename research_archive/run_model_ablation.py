@@ -45,7 +45,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from research.evidence_protocol import (
+from src.utility.evidence_protocol import (
     SEEDS,
     DEFAULT_BUDGET_MS,
     SAFETY_FACTOR,
@@ -53,7 +53,7 @@ from research.evidence_protocol import (
     CANONICAL_GLOBAL_FEATURES,
     get_phase12_output_dir,
 )
-from research.decision_aware_model import (
+from src.utility.decision_aware_model import (
     TwoStageUtilityModel,
     TwoStageModelConfig,
     TwoStageModelTrainer,
@@ -61,7 +61,7 @@ from research.decision_aware_model import (
     extract_local_features_from_df,
     compute_global_features_from_df,
 )
-from research.utility_metrics import safe_spearmanr, compute_ndcg_at_k
+from src.utility.utility_metrics import safe_spearmanr, compute_ndcg_at_k
 
 
 def select_knapsack_subset(

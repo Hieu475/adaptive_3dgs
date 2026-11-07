@@ -11,9 +11,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from research.gaussian_repr import GaussianModel
-from research.rasterizer import render
-from research.reproducibility import get_git_commit, get_hardware_info
+from src.core.gaussian_repr import GaussianModel
+from src.core.rasterizer import render
+from src.evaluation.reproducibility import get_git_commit, get_hardware_info
 
 
 def tensor_comparison(values):

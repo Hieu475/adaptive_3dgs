@@ -21,8 +21,8 @@ if str(ROOT) not in sys.path:
 
 from experiments.run_frozen_benchmark import build_pipeline_config, load_benchmark_sequence
 from experiments.run_postfix_frame_diagnostics import scene_features
-from research.pipeline import OnlineReconstructionPipeline
-from research.reproducibility import set_seed
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.evaluation.reproducibility import set_seed
 
 W, H = 320, 240
 SCENES = ("replica_room2", "tum_fr1_desk")
@@ -194,11 +194,11 @@ def main():
             "runner_sha256": sha256(Path(__file__).resolve()),
             "source_file_sha256": {
                 rel: sha256(ROOT / rel) for rel in (
-                    "research/pipeline.py",
-                    "research/scheduler.py",
-                    "research/rasterizer.py",
+                    "src/core/pipeline.py",
+                    "src/core/scheduler.py",
+                    "src/core/rasterizer.py",
                     "experiments/run_frozen_benchmark.py",
-                    "research/closed_loop_runtime.py",
+                    "src/utility/closed_loop_runtime.py",
                     "experiments/run_postfix_frame_diagnostics.py",
                 )
             },

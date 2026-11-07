@@ -23,13 +23,13 @@ from typing import Dict, List, Any
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from research.pipeline import OnlineReconstructionPipeline
-from research.rasterizer import render as rasterize_scene
-from research.depth_render import render_depth_surface_aware
-from research.attribution import render_with_attribution, compute_gaussian_statistics
-from research.losses import total_loss
-from research.densification import compute_error_masks, sample_candidates, create_gaussians_from_candidates, prune_low_value
-from research.scheduler import estimate_gaussian_costs
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.core.rasterizer import render as rasterize_scene
+from src.core.depth_render import render_depth_surface_aware
+from src.core.attribution import render_with_attribution, compute_gaussian_statistics
+from src.core.losses import total_loss
+from src.core.densification import compute_error_masks, sample_candidates, create_gaussians_from_candidates, prune_low_value
+from src.core.scheduler import estimate_gaussian_costs
 from experiments.run_importance_validation import generate_synthetic_benchmark_dataset
 
 

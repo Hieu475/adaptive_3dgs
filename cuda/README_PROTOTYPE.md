@@ -1,7 +1,7 @@
 # CUDA prototypes — RESEARCH ONLY, NOT production path
 
 Production rasterization routes strictly through `gsplat v1.5.3`
-(see `research/closed_loop_runtime.py`, Phase 13 report).
+(see `src/utility/closed_loop_runtime.py`, Phase 13 report).
 
 Files in this directory (`rasterize.cu`, `radix_sort.cu`, `binning.cu`,
 `preprocess.cu`, `depth_render.cu`, `statistics.cu`) are isolated research

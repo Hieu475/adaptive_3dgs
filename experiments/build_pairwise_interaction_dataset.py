@@ -36,12 +36,12 @@ from collections import defaultdict
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datasets.tum_dataset import TUMDataset
-from research.pipeline import OnlineReconstructionPipeline
-from research.oracle_utility import OracleUtilityExperiment
-from research.conditional_oracle import ConditionalOracleExperiment, ConditionalOracleConfig
-from research.candidate_context import _get_pixel_mask, _get_knn_indices
-from research.attribution import render_with_attribution, compute_gaussian_statistics
-from research.protocol import (
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.utility.oracle_utility import OracleUtilityExperiment
+from src.utility.conditional_oracle import ConditionalOracleExperiment, ConditionalOracleConfig
+from src.utility.candidate_context import _get_pixel_mask, _get_knn_indices
+from src.core.attribution import render_with_attribution, compute_gaussian_statistics
+from src.evaluation.protocol import (
     load_protocol,
     get_seeds,
     get_resolution,

@@ -28,7 +28,7 @@ def main():
                     "experiments/summarize_long_horizon_chunks.py",
                     "experiments/compare_long_horizon_prefix_runs.py",
                     "experiments/write_long_horizon_manifest.py", "experiments/run_frozen_benchmark.py",
-                    "research/pipeline.py", "research/closed_loop_runtime.py", "datasets/tum_dataset.py")
+                    "src/core/pipeline.py", "src/utility/closed_loop_runtime.py", "datasets/tum_dataset.py")
     output_paths = [p.name for p in base.iterdir() if p.is_file() and p.name != "run_manifest.json"]
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     dirty = bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip())

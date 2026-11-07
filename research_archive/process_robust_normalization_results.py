@@ -31,20 +31,20 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.normalization_protocol import (
+from src.utility.normalization_protocol import (
     SEEDS, BUDGETS, CANONICAL_FEATURE_SCHEMA,
     NORMALIZATION_VARIANTS, VARIANT_ALIASES_9B,
     BASE_REPRESENTATION, B2_EMA_BETA,
     to_dict as protocol_to_dict,
     get_repo_root, get_output_dir_9b, OUTPUT_FILES_9B,
 )
-from research.scale_invariant_features import transform_grouped_features
-from research.robust_normalization import (
+from src.utility.scale_invariant_features import transform_grouped_features
+from src.utility.robust_normalization import (
     StandardNormalizer,
     RobustMADNormalizer,
     OnlineEMANormalizer,
 )
-from research.utility_dataset import load_canonical_oracle_dataset
+from src.utility.utility_dataset import load_canonical_oracle_dataset
 
 
 def sha256_file(filepath: Path) -> str:

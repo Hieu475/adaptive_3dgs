@@ -1,7 +1,7 @@
 """Unit tests verifying fidelity of Fast Approximate Attribution vs. Exact Attribution."""
 import torch
 import scipy.stats as stats
-from research.attribution import (
+from src.core.attribution import (
     render_with_attribution,
     compute_gaussian_statistics,
     compute_fast_gaussian_statistics,

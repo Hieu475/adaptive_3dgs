@@ -1,4 +1,4 @@
-"""Unit tests for Gaussian representation (research/gaussian_repr.py).
+"""Unit tests for Gaussian representation (src/core/gaussian_repr.py).
 
 Tests cover:
 1. Covariance Σ = R·S·Sᵀ·Rᵀ is positive semi-definite
@@ -15,7 +15,7 @@ import os
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from research.gaussian_repr import (
+from src.core.gaussian_repr import (
     GaussianModel, GaussianState,
     quaternion_to_rotation_matrix
 )

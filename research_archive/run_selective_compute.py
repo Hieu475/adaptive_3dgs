@@ -29,11 +29,11 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.gaussian_repr import GaussianModel
-from research.rasterizer import render as rasterize_scene, render_full
-from research.background_cache import FrozenBackgroundCache
-from research.selective_optimizer import SelectiveAdam
-from research.losses import total_loss
+from src.core.gaussian_repr import GaussianModel
+from src.core.rasterizer import render as rasterize_scene, render_full
+from src.core.background_cache import FrozenBackgroundCache
+from src.core.selective_optimizer import SelectiveAdam
+from src.core.losses import total_loss
 
 
 def build_synthetic_scene(N: int, H: int = 48, W: int = 64, device: str = 'cpu'):

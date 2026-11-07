@@ -19,7 +19,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 try:
-    from research.evidence_protocol import PHASE12_OUTPUT_DIR, SEEDS, TRAIN_SCENE, ZERO_SHOT_SCENES
+    from src.utility.evidence_protocol import PHASE12_OUTPUT_DIR, SEEDS, TRAIN_SCENE, ZERO_SHOT_SCENES
 except ImportError:
     PHASE12_OUTPUT_DIR = os.path.join(PROJECT_ROOT, "results", "phase12_paper_evidence")
     SEEDS = [42, 43, 44, 45, 46]
@@ -27,7 +27,7 @@ except ImportError:
     ZERO_SHOT_SCENES = ["test_scene1", "test_scene2"]
 
 try:
-    from research.conditional_dataset import ConditionalDatasetGenerator, ConditionalDatasetConfig
+    from src.utility.conditional_dataset import ConditionalDatasetGenerator, ConditionalDatasetConfig
 except ImportError:
     ConditionalDatasetGenerator = None
     ConditionalDatasetConfig = None
@@ -224,7 +224,7 @@ def summarize_dataset(data_dir: str):
 
 def run_live(args):
     if ConditionalDatasetGenerator is None:
-        logger.error("research.conditional_dataset not found. Run with --generate-synthetic")
+        logger.error("src.utility.conditional_dataset not found. Run with --generate-synthetic")
         sys.exit(1)
         
     logger.info("Initializing Live Mode for Conditional Dataset Generation")

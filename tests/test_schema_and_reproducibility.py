@@ -4,7 +4,7 @@ import tempfile
 import numpy as np
 import torch
 
-from research.schema import (
+from src.core.schema import (
     ExperimentMetadata,
     QualityMetrics,
     LatencyMetrics,
@@ -13,7 +13,7 @@ from research.schema import (
     ExperimentMetrics,
     ExperimentResult,
 )
-from research.reproducibility import (
+from src.evaluation.reproducibility import (
     get_git_commit,
     get_hardware_info,
     set_seed,

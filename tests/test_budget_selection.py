@@ -3,8 +3,8 @@ import pytest
 import numpy as np
 import torch
 
-from research.utility_predictor import FrozenUtilityPredictor
-from research.budget_selection import (
+from src.utility.utility_predictor import FrozenUtilityPredictor
+from src.utility.budget_selection import (
     PolicyName,
     SelectionResult,
     select_budget_constrained_subset,
@@ -163,7 +163,7 @@ def test_budget_violation_tracking():
     Phase 5 Reform (Item I): The evaluation must track actual_cost vs budget
     and report violations. C_actual(S_B) > B must be flagged as is_violation=True.
     """
-    from research.scheduler_metrics import compute_cost_metrics
+    from src.core.scheduler_metrics import compute_cost_metrics
 
     # Case 1: No violation (actual < budget)
     m1 = compute_cost_metrics(actual_cost_ms=15.0, predicted_cost_ms=12.0, budget_ms=20.0)
@@ -184,7 +184,7 @@ def test_budget_violation_tracking():
 
 def test_cost_calibration_metrics():
     """Verify MAE_C, MAPE_C, and R2_C computation for cost calibration (Item XIII)."""
-    from research.scheduler_metrics import compute_cost_calibration_metrics
+    from src.core.scheduler_metrics import compute_cost_calibration_metrics
 
     # Perfect calibration
     actual = np.array([10.0, 20.0, 30.0])

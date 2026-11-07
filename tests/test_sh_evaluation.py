@@ -8,7 +8,7 @@ recovers plain diffuse color when the rest-coefficients are all zero.
 import torch
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from research.gaussian_repr import GaussianModel
+from src.core.gaussian_repr import GaussianModel
 
 
 def _make_model(sh_degree, n=8):

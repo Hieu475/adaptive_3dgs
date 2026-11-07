@@ -21,9 +21,9 @@ from typing import Dict, List, Tuple, Any, Optional
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datasets.tum_dataset import TUMDataset
-from research.pipeline import OnlineReconstructionPipeline
-from research.oracle_utility import OracleUtilityExperiment, SamplingPopulation
-from research.protocol import (
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.utility.oracle_utility import OracleUtilityExperiment, SamplingPopulation
+from src.evaluation.protocol import (
     load_protocol,
     get_seeds,
     get_resolution,
@@ -64,7 +64,7 @@ def load_tum_sequence(data_path: str, n_frames: int = 25, H: Optional[int] = Non
         ).squeeze(0).squeeze(0)
         
         # TUM groundtruth.txt stores C2W; renderer requires W2C (same fix as
-        # research/closed_loop_runtime.py::load_benchmark_sequence — old Gate 1
+        # src/utility/closed_loop_runtime.py::load_benchmark_sequence — old Gate 1
         # numbers were rendered from the transposed viewpoint.
         w2c = torch.inverse(item['pose'])
         frames.append({

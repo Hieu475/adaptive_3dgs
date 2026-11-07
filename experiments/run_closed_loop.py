@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Closed-loop test: map-based tracking (research/map_tracker.py) feeds the mapper.
+"""Closed-loop test: map-based tracking (src/tracking/map_tracker.py) feeds the mapper.
 
 Poses come from rendering the *current map* and aligning to each new frame (GT only for frame 0), so
 mapping quality feeds back into tracking. Logs ATE RMSE, PSNR at the tracked pose, PSNR when the
@@ -21,10 +21,10 @@ sys.path.insert(0, str(ROOT))
 
 import experiments.run_vgg as rv  # noqa: E402
 from experiments.run_frozen_benchmark import load_benchmark_sequence  # noqa: E402
-from research.holdout_eval import compute_ate  # noqa: E402
-from research.map_tracker import MapTracker  # noqa: E402
-from research.pipeline import OnlineReconstructionPipeline  # noqa: E402
-from research.reproducibility import set_seed  # noqa: E402
+from src.evaluation.holdout_eval import compute_ate  # noqa: E402
+from src.tracking.map_tracker import MapTracker  # noqa: E402
+from src.core.pipeline import OnlineReconstructionPipeline  # noqa: E402
+from src.evaluation.reproducibility import set_seed  # noqa: E402
 
 CONDITIONS = ("error_off", "error_budget_prop", "tt_vgg", "tt")
 

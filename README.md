@@ -19,7 +19,7 @@ The paper is organized around one claim (compute dilution); auxiliary analyses l
 
 **Known weaknesses (stated in the paper).** The combined policy loses mean PSNR to raw-error selection on 10 of 14 sequences, including all eight Replica scenes; coverage also changes densification thresholds and hard caps remove needed capacity on Replica, so map size is not isolated as the sole cause, and more budget helps any compute-limited optimizer; offline density-control methods and full SLAM integration are not compared.
 
-**Method (new).** Two label-free controllers: a *time-targeted budget* (TT, `research/time_budget.py`) that scales the optimization budget to hold the measured frame time at a target, and *value-gated growth* (VGG, `research/growth_controller.py`, `research/growth_value.py`) that renders the incoming frame with and without recently spawned Gaussians and throttles spawning when they are not worth keeping. With constants frozen on four development scenes, TT+VGG improves PSNR on all 11 held-out scenes (median +1.14, mean +1.29, worst +0.05 dB) at +4 ms mean frame time and on five fresh frame windows (+0.90 dB, 5 ms faster). Gains retain 45-79% on held-out views and largely vanish when rendering from the true pose with estimated tracking. Evaluation: `bash paper_repro/reproduce.sh controllers`.
+**Method (new).** Two label-free controllers: a *time-targeted budget* (TT, `src/control/time_budget.py`) that scales the optimization budget to hold the measured frame time at a target, and *value-gated growth* (VGG, `src/control/growth_controller.py`, `src/control/growth_value.py`) that renders the incoming frame with and without recently spawned Gaussians and throttles spawning when they are not worth keeping. With constants frozen on four development scenes, TT+VGG improves PSNR on all 11 held-out scenes (median +1.14, mean +1.29, worst +0.05 dB) at +4 ms mean frame time and on five fresh frame windows (+0.90 dB, 5 ms faster). Gains retain 45-79% on held-out views and largely vanish when rendering from the true pose with estimated tracking. Evaluation: `bash paper_repro/reproduce.sh controllers`.
 
 The canonical result bundles are those in `results/rerun_paper1/` (main benchmark and TUM factorial), `results/dilution_extension/` and `results/dilution_dose*/`, all produced from the commit tagged `paper-rerun-1` (see `results/rerun_paper1/SOURCE.txt`) with the corrected evaluator (standard Gaussian-window SSIM; alpha-normalized rendered depth). Older bundles (`phase14_projected_area_fix_clean_7policy_8seeds`, `phase14_corrected`, `phase13_frozen_benchmark`, `phase10_e2e`, `final_confirmation`) are historical and their SSIM/depth values are not comparable; the pose-bugged numbers in `results/final_confirmation/DEPRECATED.md` must not be compared with current results.
 
@@ -69,7 +69,7 @@ Three tests that failed at the previous `HEAD` were fixed during the cleanup: `f
 
 | Path | Contents |
 |---|---|
-| `research/` | Library: scheduler, attribution, losses, pipeline, utility models |
+| `src/` | Library (package `src`): `core/` mapper, `tracking/`, `control/` (TT, VGG), `evaluation/`, `utility/` (earlier learned-utility line), `mechanism/`, `baselines/`; see `src/README.md` |
 | `experiments/` | 127 experiment drivers/analysis scripts that the paper, tests, scripts or result manifests reference |
 | `research_archive/` | 86 exploratory or historical scripts (phases 6–12, diagnostics) referenced by nothing current; see its README |
 | `docs/archive/` | Superseded proposals, phase-6 report, early artifacts, project PDFs |
@@ -81,7 +81,7 @@ Three tests that failed at the previous `HEAD` were fixed during the cleanup: `f
 
 ## 5. Development history
 
-The repository began as a learned-utility project (phases 1–11: oracle utility, TwoHeadMLP, closed-loop integration) and was reoriented after pose-convention and attribution bugs were found. Source files formerly named `phaseN_*` were renamed by function (mapping in `docs/RENAMES.json`; module map in `research/README.md`); result directories keep their original names because they are frozen data. The phase-labelled results and the tags `phase10-frozen`, `phase11-frozen`, `phase13-frozen` document that history only; they are **not** evidence for the causal claims above.
+The repository began as a learned-utility project (phases 1–11: oracle utility, TwoHeadMLP, closed-loop integration) and was reoriented after pose-convention and attribution bugs were found. Source files formerly named `phaseN_*` were renamed by function (mapping in `docs/RENAMES.json`; module map in `src/README.md`); result directories keep their original names because they are frozen data. The phase-labelled results and the tags `phase10-frozen`, `phase11-frozen`, `phase13-frozen` document that history only; they are **not** evidence for the causal claims above.
 
 ## 6. Citation
 

@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT))
 from experiments.run_frozen_benchmark import (
     build_pipeline_config, load_benchmark_sequence, run_policy_trajectory,
 )
-from research.reproducibility import create_provenance_manifest
+from src.evaluation.reproducibility import create_provenance_manifest
 
 SELECTORS = {"error": "error_only", "temporal": "error_influence_temporal"}
 THROTTLES = ("off", "coverage", "coverage_backlog")

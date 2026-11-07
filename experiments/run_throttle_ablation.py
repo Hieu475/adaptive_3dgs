@@ -32,7 +32,7 @@ from experiments.run_dilution_factorial import summarize  # noqa: E402
 from experiments.run_frozen_benchmark import (  # noqa: E402
     load_benchmark_sequence, run_policy_trajectory,
 )
-from research.reproducibility import create_provenance_manifest  # noqa: E402
+from src.evaluation.reproducibility import create_provenance_manifest  # noqa: E402
 
 CONDITIONS = ("error_off", "error_coverage", "cov_spawn_only", "cov_thresh_only",
               "spawn_cap_always20", "spawn_cap_always50", "error_budget_prop", "cov_plus_prop")

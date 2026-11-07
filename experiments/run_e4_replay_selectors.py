@@ -15,7 +15,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from research.reproducibility import create_provenance_manifest
+from src.evaluation.reproducibility import create_provenance_manifest
 
 DATA = ROOT / "results/oracle_dataset/oracle_dataset.json"
 OUT = ROOT / "results/matched_dilution_controls"

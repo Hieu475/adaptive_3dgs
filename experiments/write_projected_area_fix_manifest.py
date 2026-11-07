@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from experiments.run_frozen_benchmark import build_pipeline_config
-from research.reproducibility import compute_config_hash, get_git_branch, get_git_commit, get_hardware_info
+from src.evaluation.reproducibility import compute_config_hash, get_git_branch, get_git_commit, get_hardware_info
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICIES = ("no_op", "error_only", "error_influence", "error_influence_temporal", "rtg_slam_reimpl", "ours", "full")
@@ -20,10 +20,10 @@ RUN_SOURCE_COMMITS = (
 SOURCE_FILES = (
     "experiments/run_final_confirmation.py",
     "experiments/run_frozen_benchmark.py",
-    "research/attribution.py",
-    "research/pipeline.py",
-    "research/scheduler.py",
-    "research/reproducibility.py",
+    "src/core/attribution.py",
+    "src/core/pipeline.py",
+    "src/core/scheduler.py",
+    "src/evaluation/reproducibility.py",
     "experiments/write_projected_area_fix_manifest.py",
     "experiments/merge_clean_rtg_results.py",
 )

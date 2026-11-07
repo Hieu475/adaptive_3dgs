@@ -14,9 +14,9 @@ Verifies the mathematical properties of the Grouped Active/Frozen Compositing Ap
 """
 import torch
 
-from research.gaussian_repr import GaussianModel
-from research.rasterizer import render_full
-from research.background_cache import FrozenBackgroundCache
+from src.core.gaussian_repr import GaussianModel
+from src.core.rasterizer import render_full
+from src.core.background_cache import FrozenBackgroundCache
 
 
 def create_ordered_depth_model(

@@ -109,7 +109,7 @@ def run_warmup_ablation(n_frames: int = 40, scene_name: str = "tum_fr2_xyz", see
 
             # Custom runner using modified config
             set_seed = torch.manual_seed(seed)
-            from research.pipeline import OnlineReconstructionPipeline
+            from src.core.pipeline import OnlineReconstructionPipeline
             pipeline = OnlineReconstructionPipeline(config=cfg, device=device)
             pipeline.initialize(
                 rgb=frames[0]["rgb"],

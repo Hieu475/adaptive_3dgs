@@ -9,7 +9,7 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from research.benchmark_budgets import (
+from src.evaluation.benchmark_budgets import (
     run_full_budget_matrix,
     format_budget_table,
 )

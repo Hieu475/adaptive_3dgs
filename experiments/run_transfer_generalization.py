@@ -33,7 +33,7 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.transfer_protocol import (
+from src.utility.transfer_protocol import (
     SEEDS, TRAIN_SCENES, TEST_SCENES, TRAIN_FRAME_RANGE, VAL_FRAME_RANGE,
     BUDGETS, TOP_K_FRACTIONS, FEATURE_SCHEMA, BASELINES,
     MODEL_IN_FEATURES, MODEL_HIDDEN_DIM, MODEL_EPS_COST,
@@ -45,18 +45,18 @@ from research.transfer_protocol import (
     get_repo_root, get_checkpoint_path, get_normalizer_path, get_output_dir,
     validate_no_leakage, to_dict as protocol_to_dict,
 )
-from research.protocol import (
+from src.evaluation.protocol import (
     load_protocol, get_resolution, get_dataset_config, get_seeds,
 )
-from research.utility_predictor import FrozenUtilityPredictor
-from research.utility_metrics import (
+from src.utility.utility_predictor import FrozenUtilityPredictor
+from src.utility.utility_metrics import (
     evaluate_rq1_prediction, evaluate_rq2_selection, evaluate_utility_complete,
     safe_spearmanr, compute_ndcg_at_k, PROTOCOL_BUDGETS,
 )
-from research.utility_models import TwoHeadMLP
-from research.utility_dataset import FeatureNormalizer
-from research.oracle_utility import OracleUtilityExperiment, SamplingPopulation
-from research.pipeline import OnlineReconstructionPipeline
+from src.utility.utility_models import TwoHeadMLP
+from src.utility.utility_dataset import FeatureNormalizer
+from src.utility.oracle_utility import OracleUtilityExperiment, SamplingPopulation
+from src.core.pipeline import OnlineReconstructionPipeline
 from datasets.tum_dataset import TUMDataset
 
 

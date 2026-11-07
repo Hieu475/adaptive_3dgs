@@ -28,8 +28,8 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from experiments.run_closed_loop_e2e import run_trajectory_for_policy
-from research.closed_loop_runtime import load_benchmark_sequence
-from research.evidence_protocol import (
+from src.utility.closed_loop_runtime import load_benchmark_sequence
+from src.utility.evidence_protocol import (
     DEFAULT_BUDGET_MS,
     DEFAULT_IMAGE_HEIGHT,
     DEFAULT_IMAGE_WIDTH,

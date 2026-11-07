@@ -1,8 +1,8 @@
 """Tests for Closed-Loop Budget Controller & Latency Benchmarks (Milestone R6)."""
 import pytest
 import torch
-from research.scheduler import BudgetScheduler
-from research.benchmark_budgets import (
+from src.core.scheduler import BudgetScheduler
+from src.evaluation.benchmark_budgets import (
     run_full_budget_matrix,
     format_budget_table,
 )

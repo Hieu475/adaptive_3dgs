@@ -19,9 +19,9 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datasets.tum_dataset import TUMDataset
-from research.pipeline import OnlineReconstructionPipeline
-from research.oracle_utility import OracleUtilityExperiment, SamplingPopulation
-from research.protocol import (
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.utility.oracle_utility import OracleUtilityExperiment, SamplingPopulation
+from src.evaluation.protocol import (
     load_protocol,
     get_seeds,
     get_resolution,

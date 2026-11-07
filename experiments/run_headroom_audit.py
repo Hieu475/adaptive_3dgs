@@ -42,12 +42,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from research.pipeline import OnlineReconstructionPipeline
-from research.closed_loop_runtime import load_benchmark_sequence
-from research.attribution import render_with_attribution
-from research.rasterizer import render as rasterize_scene
-from research.densification import compute_depth_adaptive_scale
-from research.reproducibility import create_provenance_manifest
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.utility.closed_loop_runtime import load_benchmark_sequence
+from src.core.attribution import render_with_attribution
+from src.core.rasterizer import render as rasterize_scene
+from src.core.densification import compute_depth_adaptive_scale
+from src.evaluation.reproducibility import create_provenance_manifest
 
 # ---------------------------------------------------------------------------
 # Constants

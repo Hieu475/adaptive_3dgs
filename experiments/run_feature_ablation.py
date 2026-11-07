@@ -21,25 +21,25 @@ from scipy.stats import pearsonr
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.protocol import (
+from src.evaluation.protocol import (
     load_protocol,
     get_seeds,
     get_repo_root,
 )
-from research.utility_features import (
+from src.utility.utility_features import (
     ABLATION_SUBSETS,
     CANONICAL_FEATURE_NAMES,
 )
-from research.utility_dataset import (
+from src.utility.utility_dataset import (
     UtilityDataset,
     prepare_normalized_splits,
 )
-from research.utility_models import TwoHeadMLP
-from research.utility_training import (
+from src.utility.utility_models import TwoHeadMLP
+from src.utility.utility_training import (
     UtilityModelTrainer,
     TrainingConfig,
 )
-from research.utility_metrics import (
+from src.utility.utility_metrics import (
     safe_spearmanr,
     evaluate_utility_complete,
     compute_confidence_interval_95,

@@ -15,7 +15,7 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from research.rasterizer import (
+from src.core.rasterizer import (
     compute_gaussian_weight, tile_gaussians,
     sort_by_depth, rasterize_pixels
 )

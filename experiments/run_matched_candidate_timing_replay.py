@@ -24,10 +24,10 @@ sys.path.insert(0, str(ROOT))
 
 from experiments.run_dilution_factorial import config_for
 from experiments.run_frozen_benchmark import load_benchmark_sequence
-from research.densification import create_gaussians_from_candidates, sample_candidates
-from research.pipeline import OnlineReconstructionPipeline
-from research.pipeline_checkpoint import load_pipeline_checkpoint, save_pipeline_checkpoint
-from research.reproducibility import create_provenance_manifest, set_seed
+from src.core.densification import create_gaussians_from_candidates, sample_candidates
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.core.pipeline_checkpoint import load_pipeline_checkpoint, save_pipeline_checkpoint
+from src.evaluation.reproducibility import create_provenance_manifest, set_seed
 
 
 def _memoize_detached_nonleaf_tensors(value, memo, seen=None):

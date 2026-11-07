@@ -1,4 +1,4 @@
-"""Unit tests for projection math (research/projection.py).
+"""Unit tests for projection math (src/core/projection.py).
 
 Tests cover:
 1. World-to-camera transform correctness
@@ -14,7 +14,7 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from research.projection import (
+from src.core.projection import (
     world_to_camera, project_to_screen, compute_projection_jacobian,
     compute_2d_covariance, cov2d_to_conic, compute_bounding_boxes,
     compute_radii

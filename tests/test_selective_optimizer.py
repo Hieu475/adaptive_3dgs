@@ -10,7 +10,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from research.selective_optimizer import SelectiveAdam
+from src.core.selective_optimizer import SelectiveAdam
 
 
 def test_selective_step_updates_only_active():

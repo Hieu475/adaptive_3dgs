@@ -34,7 +34,7 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.robust_representation_protocol import (
+from src.utility.robust_representation_protocol import (
     SEEDS, TRAIN_SCENE, TEST_SCENE, VAL_SCENE,
     BUDGETS, TOP_K_FRACTIONS, CANONICAL_FEATURE_SCHEMA,
     FEATURE_VARIANTS, VARIANT_ALIASES, BASELINES,
@@ -44,29 +44,29 @@ from research.robust_representation_protocol import (
     get_repo_root, get_output_dir, validate_protocol_integrity,
     to_dict as protocol_to_dict,
 )
-from research.scale_invariant_features import (
+from src.utility.scale_invariant_features import (
     transform_features_array,
     transform_grouped_features,
 )
-from research.protocol import (
+from src.evaluation.protocol import (
     load_protocol, get_resolution, get_dataset_config,
 )
-from research.utility_dataset import (
+from src.utility.utility_dataset import (
     load_canonical_oracle_dataset,
     UtilityDataset,
     FeatureNormalizer,
 )
-from research.utility_models import TwoHeadMLP
-from research.utility_losses import LossConfig
-from research.utility_training import UtilityModelTrainer, TrainingConfig
-from research.utility_metrics import (
+from src.utility.utility_models import TwoHeadMLP
+from src.utility.utility_losses import LossConfig
+from src.utility.utility_training import UtilityModelTrainer, TrainingConfig
+from src.utility.utility_metrics import (
     evaluate_rq1_prediction,
     evaluate_rq2_selection,
     safe_spearmanr,
 )
 from datasets.tum_dataset import TUMDataset
-from research.oracle_utility import OracleUtilityExperiment, SamplingPopulation
-from research.pipeline import OnlineReconstructionPipeline
+from src.utility.oracle_utility import OracleUtilityExperiment, SamplingPopulation
+from src.core.pipeline import OnlineReconstructionPipeline
 
 
 # ═══════════════════════════════════════════════════════════════════════

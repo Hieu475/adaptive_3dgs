@@ -2,7 +2,7 @@
 """Does the counterfactual spawn value separate TUM-like from Replica-like scenes?
 
 Runs the unthrottled raw-error baseline and, every ``--every`` frames, measures the value of the
-Gaussians spawned in the last ``--window`` frames on the incoming frame (research.growth_value).
+Gaussians spawned in the last ``--window`` frames on the incoming frame (src.control.growth_value).
 """
 import argparse
 import json
@@ -16,8 +16,8 @@ sys.path.insert(0, str(ROOT))
 
 import experiments.run_throttle_ablation as abl  # noqa: E402
 from experiments.run_frozen_benchmark import load_benchmark_sequence, run_policy_trajectory  # noqa: E402
-from research.growth_value import spawn_value  # noqa: E402
-from research.pipeline import OnlineReconstructionPipeline  # noqa: E402
+from src.control.growth_value import spawn_value  # noqa: E402
+from src.core.pipeline import OnlineReconstructionPipeline  # noqa: E402
 
 LOG = []
 _orig = OnlineReconstructionPipeline.process_frame

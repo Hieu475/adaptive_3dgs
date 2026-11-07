@@ -1,4 +1,4 @@
-"""Tests for Phase 6 Context Representation (research/candidate_context.py).
+"""Tests for Phase 6 Context Representation (src/utility/candidate_context.py).
 
 Test Categories:
     1. Determinism: Same inputs → same outputs (no randomness in context extraction).
@@ -12,7 +12,7 @@ import pytest
 import numpy as np
 import torch
 
-from research.candidate_context import (
+from src.utility.candidate_context import (
     build_neighbor_context,
     build_neighbor_context_batch,
     build_overlap_context,
@@ -115,7 +115,7 @@ class TestFeatureSchema:
         assert len(set(PHASE6_FEATURE_NAMES)) == 32
 
     def test_self_features_are_canonical(self):
-        from research.utility_features import CANONICAL_FEATURE_NAMES
+        from src.utility.utility_features import CANONICAL_FEATURE_NAMES
         assert PHASE6_FEATURE_NAMES[:11] == CANONICAL_FEATURE_NAMES
 
     def test_neighbor_feature_names(self):

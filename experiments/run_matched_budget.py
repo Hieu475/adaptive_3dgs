@@ -26,9 +26,9 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.pipeline import OnlineReconstructionPipeline
-from research.matched_budget_benchmark import MatchedBudgetBenchmark, SchedulerMetrics
-from research.schema import (
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.evaluation.matched_budget_benchmark import MatchedBudgetBenchmark, SchedulerMetrics
+from src.core.schema import (
     ExperimentMetadata,
     QualityMetrics,
     LatencyMetrics,
@@ -37,7 +37,7 @@ from research.schema import (
     ExperimentMetrics,
     ExperimentResult,
 )
-from research.reproducibility import (
+from src.evaluation.reproducibility import (
     get_git_commit,
     get_hardware_info,
     set_seed,

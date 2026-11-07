@@ -131,8 +131,8 @@ def main():
 
     source_paths = ["experiments/run_growth_starvation_factorial.py",
                     "experiments/analyze_growth_starvation_factorial.py",
-                    "research/pipeline.py", "research/state_store.py",
-                    "research/gaussian_repr.py", "research/reproducibility.py"]
+                    "src/core/pipeline.py", "src/core/state_store.py",
+                    "src/core/gaussian_repr.py", "src/evaluation/reproducibility.py"]
     source_hashes = {rel: hashlib.sha256((ROOT / rel).read_bytes()).hexdigest()
                      for rel in source_paths}
     try:

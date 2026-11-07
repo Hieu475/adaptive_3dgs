@@ -1,0 +1,10 @@
+"""Phase 6 Batch Sampler: GroupedBatchSampler.
+
+Guarantees that candidates belonging to the same conditional decision problem
+g = (scene_id, frame_id, tuple(sorted(selected_gaussian_ids)))
+are NEVER split across training batches.
+"""
+
+from src.utility.context_utility_dataset import GroupedBatchSampler
+
+__all__ = ["GroupedBatchSampler"]

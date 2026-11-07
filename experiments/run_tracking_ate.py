@@ -2,7 +2,7 @@
 """Baseline visual-odometry ATE evaluation (GT-free tracking).
 
 Init on frame 0 with GT pose, then track WITHOUT any ground truth using
-research.tracker.DenseRGBDTracker (frame-to-frame dense photometric+depth
+src.tracking.tracker.DenseRGBDTracker (frame-to-frame dense photometric+depth
 Gauss-Newton; no keyframes/loop closure). Reports ATE RMSE vs GT trajectory
 plus mapping PSNR under tracked poses.
 
@@ -21,9 +21,9 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from experiments.run_frozen_benchmark import load_benchmark_sequence, build_pipeline_config
-from research.pipeline import OnlineReconstructionPipeline
-from research.holdout_eval import compute_ate
-from research.reproducibility import set_seed
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.evaluation.holdout_eval import compute_ate
+from src.evaluation.reproducibility import set_seed
 
 
 def main():

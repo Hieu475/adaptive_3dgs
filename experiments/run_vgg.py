@@ -17,9 +17,9 @@ sys.path.insert(0, str(ROOT))
 import experiments.run_throttle_ablation as abl  # noqa: E402  (installs the proportional-budget wrapper)
 from experiments.run_dilution_factorial import summarize  # noqa: E402
 from experiments.run_frozen_benchmark import load_benchmark_sequence, run_policy_trajectory  # noqa: E402
-from research.growth_controller import VGGParams, VGGState, step  # noqa: E402
-from research.pipeline import OnlineReconstructionPipeline  # noqa: E402
-from research import time_budget as tb  # noqa: E402
+from src.control.growth_controller import VGGParams, VGGState, step  # noqa: E402
+from src.core.pipeline import OnlineReconstructionPipeline  # noqa: E402
+from src.control import time_budget as tb  # noqa: E402
 
 CONDITIONS = ("error_off", "spawn_cap_always20", "error_budget_prop", "vgg", "vgg_prop", "tt", "tt_vgg", "tt_cap")
 STATES = []

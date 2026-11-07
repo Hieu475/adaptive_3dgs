@@ -1,8 +1,8 @@
 import torch
 
-from research.background_cache import FrozenBackgroundCache
-from research.gaussian_repr import GaussianModel
-from research.rasterizer import render
+from src.core.background_cache import FrozenBackgroundCache
+from src.core.gaussian_repr import GaussianModel
+from src.core.rasterizer import render
 
 
 def _single_gaussian(opacity=0.25):

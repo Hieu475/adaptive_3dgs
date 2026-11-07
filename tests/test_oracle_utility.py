@@ -9,7 +9,7 @@ import pytest
 import torch
 import numpy as np
 
-from research.pipeline import OnlineReconstructionPipeline
+from src.core.pipeline import OnlineReconstructionPipeline
 
 
 def test_oracle_evaluation_and_state_preservation():
@@ -76,7 +76,7 @@ def test_oracle_repeatability():
 
 def test_oracle_geometry_stratification_and_raw_metrics():
     """Test geometry-stratified sampling, raw metrics extraction, and stability verification."""
-    from research.oracle_utility import OracleUtilityExperiment, SamplingPopulation
+    from src.utility.oracle_utility import OracleUtilityExperiment, SamplingPopulation
     pipeline = OnlineReconstructionPipeline(device='cpu')
     
     H, W = 32, 40
@@ -124,7 +124,7 @@ def test_oracle_geometry_stratification_and_raw_metrics():
 
 def test_oracle_group_interaction():
     """Verify group utility evaluation and additivity error measurement (Section IX)."""
-    from research.oracle_utility import OracleUtilityExperiment
+    from src.utility.oracle_utility import OracleUtilityExperiment
     pipeline = OnlineReconstructionPipeline(device='cpu')
     
     H, W = 32, 40
@@ -170,7 +170,7 @@ def hash_gaussian_state(model, optimizer=None):
 
 def test_oracle_snapshot_restore_exact_state_hash():
     """Phase 2.1 Audit: Assert cryptographic equality of positions, scale, rotation, opacity, SH, and optimizer states."""
-    from research.oracle_utility import OracleUtilityExperiment, SamplingPopulation
+    from src.utility.oracle_utility import OracleUtilityExperiment, SamplingPopulation
     pipeline = OnlineReconstructionPipeline(device='cpu')
     
     H, W = 32, 40
@@ -224,7 +224,7 @@ def test_oracle_snapshot_restore_exact_state_hash():
 
 def test_no_oracle_leakage_in_features():
     """Phase 2.2 Audit: Ensure zero data leakage of post-optimization metrics into state feature inputs."""
-    from research.oracle_utility import OracleUtilityExperiment, SamplingPopulation
+    from src.utility.oracle_utility import OracleUtilityExperiment, SamplingPopulation
     pipeline = OnlineReconstructionPipeline(device='cpu')
     
     H, W = 32, 40
@@ -303,7 +303,7 @@ def test_oracle_negative_utility_preservation():
     intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
     pipeline.initialize(rgb, depth, intrinsics)
     
-    from research.oracle_utility import OracleUtilityExperiment
+    from src.utility.oracle_utility import OracleUtilityExperiment
     exp = OracleUtilityExperiment(pipeline=pipeline, n_samples=5, n_opt_steps=5, seed=42)
     
     # Intentionally degrade a Gaussian during mock trial to test negative utility
@@ -328,7 +328,7 @@ def test_oracle_influence_filtering():
     intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
     pipeline.initialize(rgb, depth, intrinsics)
     
-    from research.oracle_utility import OracleUtilityExperiment
+    from src.utility.oracle_utility import OracleUtilityExperiment
     # Set min_influence_pixels = 50
     exp = OracleUtilityExperiment(pipeline=pipeline, n_samples=5, n_opt_steps=2, min_influence_pixels=50, seed=42)
     results = exp.run_oracle_experiment(rgb, depth, sample_indices=[0, 1])
@@ -351,7 +351,7 @@ def test_oracle_dataset_schema_and_persistent_id():
     intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
     pipeline.initialize(rgb, depth, intrinsics)
     
-    from research.oracle_utility import OracleUtilityExperiment
+    from src.utility.oracle_utility import OracleUtilityExperiment
     exp = OracleUtilityExperiment(pipeline=pipeline, n_samples=5, n_opt_steps=2, seed=42)
     
     # Case 1: Train split (fr1, frame 10)
@@ -403,7 +403,7 @@ def test_oracle_diminishing_marginal_returns():
     intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
     pipeline.initialize(rgb, depth, intrinsics)
     
-    from research.oracle_utility import OracleUtilityExperiment
+    from src.utility.oracle_utility import OracleUtilityExperiment
     exp = OracleUtilityExperiment(pipeline=pipeline, n_samples=10, n_opt_steps=2, seed=42)
     candidates = list(range(min(10, pipeline.gaussian_model.num_gaussians)))
     
@@ -428,7 +428,7 @@ def test_oracle_repeatability_cv_positive_negative():
     intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
     pipeline.initialize(rgb, depth, intrinsics)
     
-    from research.oracle_utility import OracleUtilityExperiment
+    from src.utility.oracle_utility import OracleUtilityExperiment
     exp = OracleUtilityExperiment(pipeline=pipeline, n_samples=6, n_opt_steps=2, seed=42)
     candidates = [0, 1]
     
@@ -453,7 +453,7 @@ def test_greedy_contextual_oracle_and_exact_subset_search():
     intrinsics = torch.tensor([[fx, 0, W / 2], [0, fy, H / 2], [0, 0, 1]], dtype=torch.float32)
     pipeline.initialize(rgb, depth, intrinsics)
     
-    from research.oracle_utility import OracleUtilityExperiment
+    from src.utility.oracle_utility import OracleUtilityExperiment
     exp = OracleUtilityExperiment(pipeline=pipeline, n_samples=6, n_opt_steps=2, seed=42)
     candidates = [0, 1, 2, 3]
     

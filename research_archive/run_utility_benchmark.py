@@ -27,9 +27,9 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from research.evidence_protocol import PHASE12_OUTPUT_DIR, SEEDS
-from research.interaction_model import InteractionAwareModel
-from research.sequential_scheduler import (
+from src.utility.evidence_protocol import PHASE12_OUTPUT_DIR, SEEDS
+from src.utility.interaction_model import InteractionAwareModel
+from src.core.sequential_scheduler import (
     SequentialInteractionScheduler,
     SequentialSchedulerConfig,
 )

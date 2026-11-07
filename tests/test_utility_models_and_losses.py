@@ -2,7 +2,7 @@
 import numpy as np
 import torch
 
-from research.utility_models import (
+from src.utility.utility_models import (
     RGBErrorScorer,
     RGBDepthErrorScorer,
     ErrorInfluenceScorer,
@@ -10,7 +10,7 @@ from research.utility_models import (
     TwoHeadLinear,
     TwoHeadMLP,
 )
-from research.utility_losses import (
+from src.utility.utility_losses import (
     PairwiseRankingLoss,
     JointRankingAndPointwiseLoss,
 )
@@ -90,7 +90,7 @@ def test_losses_joint_and_pairwise():
 
 
 def test_two_head_utility_loss_config():
-    from research.utility_losses import LossConfig, TwoHeadUtilityLoss
+    from src.utility.utility_losses import LossConfig, TwoHeadUtilityLoss
     cfg = LossConfig(lambda_rank=2.0, lambda_q=0.5, lambda_t=0.25)
     loss_fn = TwoHeadUtilityLoss(config=cfg)
     assert loss_fn.config.lambda_rank == 2.0
@@ -99,7 +99,7 @@ def test_two_head_utility_loss_config():
 
 
 def test_selection_metrics_and_budget():
-    from research.utility_metrics import (
+    from src.utility.utility_metrics import (
         PROTOCOL_BUDGETS,
         rank_candidates,
         select_under_budget,

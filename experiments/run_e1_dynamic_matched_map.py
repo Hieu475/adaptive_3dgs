@@ -20,9 +20,9 @@ import torch
 
 from experiments.run_dilution_factorial import config_for
 from experiments.run_frozen_benchmark import load_benchmark_sequence
-from research.gaussian_repr import GaussianState
-from research.pipeline import OnlineReconstructionPipeline
-from research.reproducibility import create_provenance_manifest, set_seed
+from src.core.gaussian_repr import GaussianState
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.evaluation.reproducibility import create_provenance_manifest, set_seed
 
 ROOT = Path(__file__).resolve().parents[1]
 

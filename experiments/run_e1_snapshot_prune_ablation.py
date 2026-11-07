@@ -11,9 +11,9 @@ import torch
 
 from experiments.run_e1_dynamic_matched_map import capture_rng, compact, make_pipeline, restore_rng
 from experiments.run_frozen_benchmark import load_benchmark_sequence
-from research.projection import world_to_camera
-from research.rasterizer import render as rasterize_scene
-from research.reproducibility import create_provenance_manifest
+from src.core.projection import world_to_camera
+from src.core.rasterizer import render as rasterize_scene
+from src.evaluation.reproducibility import create_provenance_manifest
 
 ROOT = Path(__file__).resolve().parents[1]
 

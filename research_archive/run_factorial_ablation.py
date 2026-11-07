@@ -44,7 +44,7 @@ from experiments.run_frozen_benchmark import (
     build_pipeline_config,
     run_policy_trajectory,
 )
-from research.scheduler import OptimizationPolicy
+from src.core.scheduler import OptimizationPolicy
 
 
 FACTORIAL_CONDITIONS = [

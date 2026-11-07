@@ -1,8 +1,8 @@
 """End-to-end pipeline integration tests for R1, R2, R3 milestones."""
 import pytest
 import torch
-from research.pipeline import OnlineReconstructionPipeline
-from research.importance_diagnostics import compute_full_diagnostics, format_diagnostics_report
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.core.importance_diagnostics import compute_full_diagnostics, format_diagnostics_report
 
 
 class TestPipelineEndToEnd:

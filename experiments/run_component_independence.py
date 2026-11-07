@@ -13,8 +13,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from research.pipeline import OnlineReconstructionPipeline
-from research.importance_diagnostics import component_correlation_matrix, spearman_rank_correlation
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.core.importance_diagnostics import component_correlation_matrix, spearman_rank_correlation
 from experiments.run_importance_validation import generate_synthetic_benchmark_dataset
 
 

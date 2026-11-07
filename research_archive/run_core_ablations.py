@@ -22,7 +22,7 @@ from typing import Dict, List, Any
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.pipeline import OnlineReconstructionPipeline
+from src.core.pipeline import OnlineReconstructionPipeline
 
 
 def run_pipeline_experiment(config: Dict[str, Any], frames: List[Dict], intrinsics: torch.Tensor, device: str) -> Dict[str, Any]:

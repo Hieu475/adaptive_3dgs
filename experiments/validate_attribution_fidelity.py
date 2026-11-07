@@ -27,13 +27,13 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from datasets.tum_dataset import TUMDataset
-from research.pipeline import OnlineReconstructionPipeline
-from research.attribution import (
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.core.attribution import (
     render_with_attribution,
     compute_gaussian_statistics,
     compute_fast_gaussian_statistics,
 )
-from research.reproducibility import create_provenance_manifest
+from src.evaluation.reproducibility import create_provenance_manifest
 
 
 def run_attribution_fidelity_validation(

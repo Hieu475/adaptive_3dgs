@@ -26,7 +26,7 @@ import numpy as np
 
 def create_benchmark_scene(n_gaussians: int, device: str = 'cpu'):
     """Create a synthetic scene for benchmarking."""
-    from research.gaussian_repr import GaussianModel
+    from src.core.gaussian_repr import GaussianModel
     
     model = GaussianModel(sh_degree=0, device=device)
     points = torch.randn(n_gaussians, 3, device=device) * 2.0
@@ -48,7 +48,7 @@ def create_benchmark_scene(n_gaussians: int, device: str = 'cpu'):
 def benchmark_python_rasterizer(n_gaussians: int, n_warmup: int = 3, n_runs: int = 10,
                                   image_w: int = 320, image_h: int = 240):
     """Benchmark Python reference rasterizer."""
-    from research.rasterizer import render as rasterize_scene
+    from src.core.rasterizer import render as rasterize_scene
     
     model, intrinsics, extrinsics = create_benchmark_scene(n_gaussians)
     cov3D = model.build_covariance()

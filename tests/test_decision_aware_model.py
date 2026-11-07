@@ -4,8 +4,8 @@ import unittest
 import torch
 import numpy as np
 
-from research.evidence_protocol import CANONICAL_GLOBAL_FEATURES
-from research.decision_aware_model import (
+from src.utility.evidence_protocol import CANONICAL_GLOBAL_FEATURES
+from src.utility.decision_aware_model import (
     LocalEncoder,
     GlobalContextEncoder,
     PositiveUtilityHead,
@@ -15,8 +15,8 @@ from research.decision_aware_model import (
     TwoStageLoss,
     TwoStageLossConfig,
 )
-from research.pipeline import OnlineReconstructionPipeline
-from research.closed_loop_runtime import extract_global_context
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.utility.closed_loop_runtime import extract_global_context
 
 
 class TestPhase12Model(unittest.TestCase):

@@ -12,7 +12,7 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from research.depth_render import ray_plane_intersection
+from src.core.depth_render import ray_plane_intersection
 
 
 class TestRayPlaneIntersection:
@@ -157,7 +157,7 @@ class TestRenderDepthSurfaceAware:
         return means3D, normals, opacities, cov3D, extrinsics, intrinsics
 
     def test_output_shapes_and_types(self):
-        from research.depth_render import render_depth_surface_aware
+        from src.core.depth_render import render_depth_surface_aware
         means3D, normals, opacities, cov3D, extrinsics, intrinsics = self._make_scene()
         H, W = 32, 32
         
@@ -174,7 +174,7 @@ class TestRenderDepthSurfaceAware:
         assert res['gaussian_index'].dtype == torch.long
 
     def test_gradient_flow_to_positions_and_normals(self):
-        from research.depth_render import render_depth_surface_aware
+        from src.core.depth_render import render_depth_surface_aware
         means3D, normals, opacities, cov3D, extrinsics, intrinsics = self._make_scene()
         H, W = 32, 32
         

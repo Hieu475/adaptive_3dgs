@@ -1,5 +1,5 @@
 """Tests for Scientific Protocol v1 and configuration getters."""
-from research.protocol import (
+from src.evaluation.protocol import (
     load_protocol,
     get_seeds,
     get_resolution,

@@ -4,8 +4,8 @@ import json
 import torch
 from pathlib import Path
 
-from research.state_store import GaussianStateStore
-from research.protocol import load_protocol, get_densification_policy, get_splits
+from src.core.state_store import GaussianStateStore
+from src.evaluation.protocol import load_protocol, get_densification_policy, get_splits
 
 
 def generate_audits():

@@ -19,9 +19,9 @@ sys.path.insert(0, str(ROOT))
 
 import experiments.run_throttle_ablation as abl  # noqa: E402
 from experiments.run_frozen_benchmark import load_benchmark_sequence  # noqa: E402
-from research.holdout_eval import compute_ate  # noqa: E402
-from research.pipeline import OnlineReconstructionPipeline  # noqa: E402
-from research.reproducibility import set_seed  # noqa: E402
+from src.evaluation.holdout_eval import compute_ate  # noqa: E402
+from src.core.pipeline import OnlineReconstructionPipeline  # noqa: E402
+from src.evaluation.reproducibility import set_seed  # noqa: E402
 
 CONDITIONS = ("error_off", "error_coverage", "spawn_cap_always20", "error_budget_prop")
 

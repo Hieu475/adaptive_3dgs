@@ -35,7 +35,7 @@ import numpy as np
 import torch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
-from research.pipeline import OnlineReconstructionPipeline  # noqa: E402
+from src.core.pipeline import OnlineReconstructionPipeline  # noqa: E402
 
 
 def summarize_update_counts(update_counts: torch.Tensor) -> dict:
@@ -66,7 +66,7 @@ def run(args):
         cfg["gaussian"]["sh_degree"] = args.sh_degree
         # sh_degree controls num_sh_coeffs at GaussianModel construction time,
         # OnlineReconstructionPipeline must be able to read this from config.gaussian.sh_degree
-        # (see research/pipeline.py _default_config / initialize()).
+        # (see src/core/pipeline.py _default_config / initialize()).
     pipeline = OnlineReconstructionPipeline(config=cfg, device=args.device)
     pipeline.initialize(rgb=frames[0]["rgb"], depth=frames[0]["depth"],
                          intrinsics=intrinsics, pose=frames[0].get("pose", torch.eye(4)))

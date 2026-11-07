@@ -23,9 +23,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from research.pipeline import OnlineReconstructionPipeline
-from research.closed_loop_runtime import load_benchmark_sequence
-from research.reproducibility import create_provenance_manifest, get_hardware_info
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.utility.closed_loop_runtime import load_benchmark_sequence
+from src.evaluation.reproducibility import create_provenance_manifest, get_hardware_info
 
 
 def run_single_k_benchmark(

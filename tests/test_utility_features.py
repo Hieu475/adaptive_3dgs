@@ -2,7 +2,7 @@
 import pytest
 import numpy as np
 
-from research.utility_features import (
+from src.utility.utility_features import (
     UTILITY_FEATURES,
     ABLATION_SUBSETS,
     SchemaError,

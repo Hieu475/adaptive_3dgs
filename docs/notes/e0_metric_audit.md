@@ -44,7 +44,7 @@ The four arms each perform 565,000 logical updates, but their measured mean CUDA
 
 ## Code and artifacts
 
-Metric definitions and renderer behavior are in `research/mechanism/metrics.py`, `research/rasterizer.py`, and `research/background_cache.py`. The replay emits fixed-view RGB/depth/error/alpha arrays and timing fields. Unit tests cover standard SSIM, valid/overlap depth, expected versus accumulated depth, and cache compositing.
+Metric definitions and renderer behavior are in `src/mechanism/metrics.py`, `src/core/rasterizer.py`, and `src/core/background_cache.py`. The replay emits fixed-view RGB/depth/error/alpha arrays and timing fields. Unit tests cover standard SSIM, valid/overlap depth, expected versus accumulated depth, and cache compositing.
 
 Reproduce the audit from the repository root:
 

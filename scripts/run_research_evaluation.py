@@ -17,25 +17,25 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from research.evaluation import (
+from src.evaluation.evaluation import (
     generate_table_1_main_benchmark,
     generate_table_2_ablation_study,
     generate_ascii_pareto_curve,
     generate_tier_distribution_chart,
     generate_hypothesis_verification_summary,
 )
-from research.benchmark_policies import (
+from src.evaluation.benchmark_policies import (
     run_full_policy_ablation_matrix,
     format_benchmark_table,
 )
-from research.benchmark_budgets import (
+from src.evaluation.benchmark_budgets import (
     run_full_budget_matrix,
     format_budget_table,
 )
-from research.importance_diagnostics import (
+from src.core.importance_diagnostics import (
     compute_full_diagnostics,
 )
-from research.pipeline import OnlineReconstructionPipeline
+from src.core.pipeline import OnlineReconstructionPipeline
 from scripts.run_policy_ablation import generate_synthetic_benchmark_dataset
 
 

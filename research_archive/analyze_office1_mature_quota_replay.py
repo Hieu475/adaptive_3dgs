@@ -197,7 +197,7 @@ def main() -> None:
         "experiments/run_joint_spawn_refine_replay.py",
         "experiments/run_dilution_factorial.py",
         "experiments/run_frozen_benchmark.py",
-        "research/pipeline.py", "research/scheduler.py", "research/reproducibility.py",
+        "src/core/pipeline.py", "src/core/scheduler.py", "src/evaluation/reproducibility.py",
     ]
     source_hashes = {p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest()
                      for p in source_paths}

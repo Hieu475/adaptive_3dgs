@@ -2,7 +2,7 @@
 import numpy as np
 import torch
 
-from research.utility_metrics import (
+from src.utility.utility_metrics import (
     PROTOCOL_BUDGETS,
     safe_spearmanr,
     safe_pearsonr,
@@ -128,7 +128,7 @@ def test_rq2_selection_evaluation_all_budgets():
 
 
 def test_analyze_utility_prediction_failures():
-    from research.utility_metrics import analyze_utility_prediction_failures
+    from src.utility.utility_metrics import analyze_utility_prediction_failures
     n = 50
     rng = np.random.default_rng(123)
     u_true = rng.uniform(0.01, 1.0, size=n)

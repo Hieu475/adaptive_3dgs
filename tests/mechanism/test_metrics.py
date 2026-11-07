@@ -2,7 +2,7 @@ import pytest
 import torch
 from torchmetrics.functional.image import structural_similarity_index_measure
 
-from research.mechanism.metrics import (
+from src.mechanism.metrics import (
     depth_metric_bundle,
     rgb_metric_bundle,
     ssim_legacy_global,

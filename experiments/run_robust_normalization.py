@@ -32,7 +32,7 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.normalization_protocol import (
+from src.utility.normalization_protocol import (
     SEEDS,
     TRAIN_SCENE,
     VAL_SCENE,
@@ -60,22 +60,22 @@ from research.normalization_protocol import (
     validate_protocol_integrity_9b,
     to_dict as protocol_to_dict,
 )
-from research.robust_representation_protocol import CANONICAL_FEATURE_SCHEMA
-from research.scale_invariant_features import transform_grouped_features
-from research.robust_normalization import (
+from src.utility.robust_representation_protocol import CANONICAL_FEATURE_SCHEMA
+from src.utility.scale_invariant_features import transform_grouped_features
+from src.utility.robust_normalization import (
     StandardNormalizer,
     RobustMADNormalizer,
     OnlineEMANormalizer,
     create_normalizer,
 )
-from research.utility_dataset import (
+from src.utility.utility_dataset import (
     load_canonical_oracle_dataset,
     UtilityDataset,
 )
-from research.utility_models import TwoHeadMLP
-from research.utility_losses import LossConfig
-from research.utility_training import UtilityModelTrainer, TrainingConfig
-from research.utility_metrics import (
+from src.utility.utility_models import TwoHeadMLP
+from src.utility.utility_losses import LossConfig
+from src.utility.utility_training import UtilityModelTrainer, TrainingConfig
+from src.utility.utility_metrics import (
     evaluate_rq1_prediction,
     evaluate_rq2_selection,
     safe_spearmanr,

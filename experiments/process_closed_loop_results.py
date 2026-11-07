@@ -34,7 +34,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from research.closed_loop_protocol import (
+from src.utility.closed_loop_protocol import (
     get_output_dir_10,
     GATE_CRITERIA_10,
     DEFAULT_BUDGET_MS,

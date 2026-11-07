@@ -24,9 +24,9 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datasets.tum_dataset import TUMDataset
-from research.pipeline import OnlineReconstructionPipeline
-from research.scheduler import OptimizationPolicy
-from research.reproducibility import create_provenance_manifest
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.core.scheduler import OptimizationPolicy
+from src.evaluation.reproducibility import create_provenance_manifest
 
 
 def load_tum_frames(data_path: str, max_frames: int = 10, H: int = 48, W: int = 64, device: str = 'cpu'):

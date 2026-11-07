@@ -43,14 +43,14 @@ import torch
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datasets.tum_dataset import TUMDataset
-from research.pipeline import OnlineReconstructionPipeline
-from research.oracle_utility import OracleUtilityExperiment
-from research.attribution import render_with_attribution, compute_gaussian_statistics
-from research.candidate_context import ContextConfig
-from research.context_utility_model import FrozenContextPredictor
-from research.joint_group_evaluator import Phase6Evaluator, evaluate_selected_group
-from research.utility_predictor import FrozenUtilityPredictor
-from research.protocol import (
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.utility.oracle_utility import OracleUtilityExperiment
+from src.core.attribution import render_with_attribution, compute_gaussian_statistics
+from src.utility.candidate_context import ContextConfig
+from src.utility.context_utility_model import FrozenContextPredictor
+from src.utility.joint_group_evaluator import Phase6Evaluator, evaluate_selected_group
+from src.utility.utility_predictor import FrozenUtilityPredictor
+from src.evaluation.protocol import (
     load_protocol,
     get_seeds,
     get_resolution,

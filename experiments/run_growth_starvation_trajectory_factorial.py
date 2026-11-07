@@ -18,9 +18,9 @@ sys.path.insert(0, str(ROOT))
 
 from experiments.run_dilution_factorial import config_for
 from experiments.run_frozen_benchmark import load_benchmark_sequence
-from research.pipeline import OnlineReconstructionPipeline
-from research.reproducibility import create_provenance_manifest, set_seed
-from research.gaussian_repr import GaussianState
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.evaluation.reproducibility import create_provenance_manifest, set_seed
+from src.core.gaussian_repr import GaussianState
 
 def run_arm(scene, seed, growth, allocation, frames, intrinsics, args):
     set_seed(seed)
@@ -189,8 +189,8 @@ def main():
     source_paths = ["experiments/run_growth_starvation_trajectory_factorial.py",
                     "experiments/run_dilution_factorial.py",
                     "experiments/run_frozen_benchmark.py",
-                    "research/pipeline.py", "research/state_store.py",
-                    "research/gaussian_repr.py", "research/reproducibility.py"]
+                    "src/core/pipeline.py", "src/core/state_store.py",
+                    "src/core/gaussian_repr.py", "src/evaluation/reproducibility.py"]
     source_hashes = {rel: hashlib.sha256((ROOT / rel).read_bytes()).hexdigest()
                      for rel in source_paths}
     try:

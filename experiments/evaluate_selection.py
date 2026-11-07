@@ -22,16 +22,16 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.protocol import (
+from src.evaluation.protocol import (
     load_protocol,
     get_seeds,
     get_repo_root,
 )
-from research.utility_dataset import (
+from src.utility.utility_dataset import (
     UtilityDataset,
     prepare_normalized_splits,
 )
-from research.utility_models import (
+from src.utility.utility_models import (
     RandomScorer,
     RGBErrorScorer,
     RGBDepthErrorScorer,
@@ -41,8 +41,8 @@ from research.utility_models import (
     TwoHeadLinear,
     TwoHeadMLP,
 )
-from research.utility_training import UtilityModelTrainer
-from research.utility_metrics import (
+from src.utility.utility_training import UtilityModelTrainer
+from src.utility.utility_metrics import (
     PROTOCOL_BUDGETS,
     compute_confidence_interval_95,
     compute_ndcg_at_k,

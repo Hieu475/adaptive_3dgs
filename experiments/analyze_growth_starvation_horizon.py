@@ -222,8 +222,8 @@ def main():
                     "experiments/analyze_sequence_pose_motion.py",
                     "experiments/run_frozen_benchmark.py",
                     "experiments/run_dilution_factorial.py",
-                    "research/pipeline.py", "research/state_store.py",
-                    "research/gaussian_repr.py", "research/reproducibility.py"]
+                    "src/core/pipeline.py", "src/core/state_store.py",
+                    "src/core/gaussian_repr.py", "src/evaluation/reproducibility.py"]
     try:
         head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
         status = subprocess.check_output(["git", "status", "--short"], cwd=root, text=True).strip().splitlines()

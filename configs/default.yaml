@@ -1,5 +1,5 @@
 # Default configuration for Adaptive 3D Gaussian Splatting
-# CANONICAL SOURCE: research/pipeline.py::OnlineReconstructionPipeline._default_config()
+# CANONICAL SOURCE: src/core/pipeline.py::OnlineReconstructionPipeline._default_config()
 # configs/default.yaml must mirror it. Canonical benchmark overrides:
 # sh_degree=0/1 (see run_final_confirmation.py), gpu_budget_ms=15.0, max_gaussians=500000.
 # Do NOT set sh_degree=3 / max_gaussians=5M here — those are legacy values kept only for offline rendering.

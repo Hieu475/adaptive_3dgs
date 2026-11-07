@@ -23,9 +23,9 @@ from typing import List, Dict, Any
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from research.pipeline import OnlineReconstructionPipeline
-from research.scheduler import OptimizationPolicy
-from research.benchmark_policies import run_policy_experiment
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.core.scheduler import OptimizationPolicy
+from src.evaluation.benchmark_policies import run_policy_experiment
 from experiments.run_importance_validation import generate_synthetic_benchmark_dataset
 
 

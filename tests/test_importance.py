@@ -6,8 +6,8 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from research.importance import GaussianImportanceEstimator, Tier
-from research.scheduler import BudgetScheduler, RunningStats
+from src.core.importance import GaussianImportanceEstimator, Tier
+from src.core.scheduler import BudgetScheduler, RunningStats
 
 
 class TestImportanceEstimator:

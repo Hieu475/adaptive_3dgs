@@ -25,7 +25,7 @@ from experiments.run_dilution_factorial import summarize  # noqa: E402
 from experiments.run_frozen_benchmark import (  # noqa: E402
     load_benchmark_sequence, run_policy_trajectory,
 )
-from research.reproducibility import create_provenance_manifest  # noqa: E402
+from src.evaluation.reproducibility import create_provenance_manifest  # noqa: E402
 
 MULTIPLIERS = (1, 2, 4)
 REGIMES = {"free": None, "cap": 23000}

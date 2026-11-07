@@ -17,8 +17,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from experiments.run_frozen_benchmark import build_pipeline_config, load_benchmark_sequence
-from research.pipeline import OnlineReconstructionPipeline
-from research.reproducibility import set_seed
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.evaluation.reproducibility import set_seed
 
 
 def as_numpy(value):

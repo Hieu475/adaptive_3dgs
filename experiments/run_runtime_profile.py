@@ -18,13 +18,13 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datasets.tum_dataset import TUMDataset
-from research.pipeline import OnlineReconstructionPipeline
-from research.attribution import render_with_attribution, compute_gaussian_statistics
-from research.candidate_context import build_full_context_batch, ContextConfig
-from research.context_utility_model import ResidualContextModel, Phase6ModelConfig, FrozenContextPredictor
-from research.utility_models import TwoHeadMLP
-from research.context_selection import select_phase6_subset
-from research.protocol import load_protocol, get_resolution, get_dataset_config
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.core.attribution import render_with_attribution, compute_gaussian_statistics
+from src.utility.candidate_context import build_full_context_batch, ContextConfig
+from src.utility.context_utility_model import ResidualContextModel, Phase6ModelConfig, FrozenContextPredictor
+from src.utility.utility_models import TwoHeadMLP
+from src.utility.context_selection import select_phase6_subset
+from src.evaluation.protocol import load_protocol, get_resolution, get_dataset_config
 
 
 def run_runtime_profile():

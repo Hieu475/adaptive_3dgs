@@ -22,8 +22,8 @@ class TestRasterizeWithAttribution:
 
     def test_matches_original_rasterizer(self):
         """Attribution rasterizer should produce identical color/depth to original."""
-        from research.rasterizer import rasterize_pixels
-        from research.attribution import rasterize_pixels_with_attribution
+        from src.core.rasterizer import rasterize_pixels
+        from src.core.attribution import rasterize_pixels_with_attribution
 
         means2D, conics, colors, opacities, depths, bg_color, sorted_indices = (
             self._make_simple_scene()
@@ -48,7 +48,7 @@ class TestRasterizeWithAttribution:
 
     def test_contribution_weights_sum(self):
         """Top-K contribution weights should approximately sum to (1 - final_T)."""
-        from research.attribution import rasterize_pixels_with_attribution
+        from src.core.attribution import rasterize_pixels_with_attribution
 
         means2D, conics, colors, opacities, depths, bg_color, sorted_indices = (
             self._make_simple_scene()
@@ -68,7 +68,7 @@ class TestRasterizeWithAttribution:
 
     def test_dominant_index_is_max_weight(self):
         """Dominant index should correspond to the Gaussian with highest weight."""
-        from research.attribution import rasterize_pixels_with_attribution
+        from src.core.attribution import rasterize_pixels_with_attribution
 
         means2D, conics, colors, opacities, depths, bg_color, sorted_indices = (
             self._make_simple_scene()
@@ -86,7 +86,7 @@ class TestRasterizeWithAttribution:
 
     def test_empty_scene(self):
         """Empty scene should return bg color and empty attribution."""
-        from research.attribution import rasterize_pixels_with_attribution
+        from src.core.attribution import rasterize_pixels_with_attribution
 
         pixel_coords = torch.tensor([[8.0, 8.0]])
         sorted_indices = torch.empty(0, dtype=torch.long)
@@ -112,7 +112,7 @@ class TestComputeGaussianStatistics:
 
     def test_single_gaussian_single_pixel(self):
         """One Gaussian covering one pixel: error should be the pixel error."""
-        from research.attribution import compute_gaussian_statistics
+        from src.core.attribution import compute_gaussian_statistics
 
         H, W = 2, 2
         rendered_color = torch.zeros(H, W, 3)
@@ -140,7 +140,7 @@ class TestComputeGaussianStatistics:
 
     def test_invisible_gaussian(self):
         """Gaussian not contributing to any pixel should have zero stats."""
-        from research.attribution import compute_gaussian_statistics
+        from src.core.attribution import compute_gaussian_statistics
 
         H, W = 4, 4
         rendered_color = torch.rand(H, W, 3)
@@ -164,7 +164,7 @@ class TestComputeGaussianStatistics:
 
     def test_multiple_gaussians_different_errors(self):
         """Different Gaussians covering different error regions should get different scores."""
-        from research.attribution import compute_gaussian_statistics
+        from src.core.attribution import compute_gaussian_statistics
 
         H, W = 4, 4
         rendered_color = torch.zeros(H, W, 3)
@@ -202,14 +202,14 @@ class TestNormalization:
     """Test importance component normalization."""
 
     def test_raw_passthrough(self):
-        from research.attribution import normalize_importance_components
+        from src.core.attribution import normalize_importance_components
 
         components = {'a': torch.tensor([1.0, 2.0, 3.0])}
         result = normalize_importance_components(components, method='raw')
         torch.testing.assert_close(result['a'], components['a'])
 
     def test_zscore_zero_mean_unit_var(self):
-        from research.attribution import normalize_importance_components
+        from src.core.attribution import normalize_importance_components
 
         values = torch.randn(100) * 5 + 10
         components = {'test': values}
@@ -220,7 +220,7 @@ class TestNormalization:
         assert abs(normalized.std().item() - 1.0) < 0.1
 
     def test_robust_uses_median(self):
-        from research.attribution import normalize_importance_components
+        from src.core.attribution import normalize_importance_components
 
         # With outliers: robust should handle better
         values = torch.tensor([1.0, 1.1, 1.0, 0.9, 1.0, 100.0])
@@ -235,7 +235,7 @@ class TestNormalization:
         assert robust['test'].shape == values.shape
 
     def test_unknown_method_raises(self):
-        from research.attribution import normalize_importance_components
+        from src.core.attribution import normalize_importance_components
 
         with pytest.raises(ValueError):
             normalize_importance_components({'a': torch.tensor([1.0])}, method='unknown')
@@ -270,7 +270,7 @@ class TestRenderWithAttribution:
         return means3D, cov3D, colors, opacities, extrinsics, intrinsics
 
     def test_output_shapes(self):
-        from research.attribution import render_with_attribution
+        from src.core.attribution import render_with_attribution
 
         means3D, cov3D, colors, opacities, extrinsics, intrinsics = self._make_scene()
         H, W = 32, 32
@@ -289,7 +289,7 @@ class TestRenderWithAttribution:
         assert result['contrib_indices'].shape == (H, W, top_k)
 
     def test_dominant_indices_valid_range(self):
-        from research.attribution import render_with_attribution
+        from src.core.attribution import render_with_attribution
 
         n = 5
         means3D, cov3D, colors, opacities, extrinsics, intrinsics = self._make_scene(n=n)
@@ -307,7 +307,7 @@ class TestRenderWithAttribution:
 
     def test_attribution_statistics_integration(self):
         """Full integration: render → attribute → statistics."""
-        from research.attribution import render_with_attribution, compute_gaussian_statistics
+        from src.core.attribution import render_with_attribution, compute_gaussian_statistics
 
         n = 5
         means3D, cov3D, colors, opacities, extrinsics, intrinsics = self._make_scene(n=n)
@@ -345,7 +345,7 @@ class TestFastGaussianStatistics:
     """Test fast vectorized Gaussian attribution."""
 
     def test_fast_statistics_shapes_and_validity(self):
-        from research.attribution import compute_fast_gaussian_statistics
+        from src.core.attribution import compute_fast_gaussian_statistics
 
         n = 10
         means3D = torch.randn(n, 3)
@@ -388,7 +388,7 @@ class TestFastGaussianStatistics:
         assert (stats['projected_area'] >= 0).all()
 
     def test_fast_statistics_empty_gaussians(self):
-        from research.attribution import compute_fast_gaussian_statistics
+        from src.core.attribution import compute_fast_gaussian_statistics
 
         means3D = torch.zeros(0, 3)
         cov3D = torch.zeros(0, 3, 3)

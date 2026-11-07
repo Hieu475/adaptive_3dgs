@@ -35,19 +35,19 @@ from scipy.stats import wilcoxon
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datasets.tum_dataset import TUMDataset
-from research.pipeline import OnlineReconstructionPipeline
-from research.oracle_utility import OracleUtilityExperiment
-from research.utility_predictor import FrozenUtilityPredictor
-from research.budget_selection import (
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.utility.oracle_utility import OracleUtilityExperiment
+from src.utility.utility_predictor import FrozenUtilityPredictor
+from src.utility.budget_selection import (
     PolicyName,
     SelectionResult,
     select_budget_constrained_subset,
 )
-from research.utility_metrics import (
+from src.utility.utility_metrics import (
     PROTOCOL_BUDGETS,
     compute_confidence_interval_95,
 )
-from research.protocol import (
+from src.evaluation.protocol import (
     load_protocol,
     get_seeds,
     get_resolution,

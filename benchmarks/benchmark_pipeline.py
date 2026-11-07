@@ -24,7 +24,7 @@ import numpy as np
 
 def benchmark_pipeline(n_frames: int = 30, device: str = 'cpu', H: int = 120, W: int = 160):
     """Run synthetic pipeline benchmark."""
-    from research.pipeline import OnlineReconstructionPipeline
+    from src.core.pipeline import OnlineReconstructionPipeline
     
     config = {
         'gaussian': {'sh_degree': 0, 'initial_opacity': 0.5, 'max_gaussians': 50000},

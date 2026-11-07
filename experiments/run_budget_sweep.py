@@ -19,9 +19,9 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from research.benchmark_budgets import run_full_budget_matrix, format_budget_table
+from src.evaluation.benchmark_budgets import run_full_budget_matrix, format_budget_table
 from experiments.run_importance_validation import generate_synthetic_benchmark_dataset
-from research.protocol import load_protocol, get_seeds, get_budget_config
+from src.evaluation.protocol import load_protocol, get_seeds, get_budget_config
 
 
 def main():

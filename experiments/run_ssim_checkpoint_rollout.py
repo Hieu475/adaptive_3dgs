@@ -22,9 +22,9 @@ sys.path.insert(0, str(ROOT))
 
 from experiments.run_joint_spawn_refine_replay import _memoize_detached_nonleaf_tensors
 from experiments.run_frozen_benchmark import build_pipeline_config, load_benchmark_sequence
-from research.pipeline import OnlineReconstructionPipeline
-from research.pipeline_checkpoint import load_pipeline_checkpoint, gaussian_map_digest
-from research.reproducibility import get_git_commit
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.core.pipeline_checkpoint import load_pipeline_checkpoint, gaussian_map_digest
+from src.evaluation.reproducibility import get_git_commit
 
 
 def capture_rng(device):

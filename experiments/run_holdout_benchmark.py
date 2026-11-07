@@ -20,9 +20,9 @@ if str(REPO_ROOT) not in sys.path:
 from experiments.run_frozen_benchmark import (
     load_benchmark_sequence, build_pipeline_config, run_policy_trajectory as _unused,
 )
-from research.pipeline import OnlineReconstructionPipeline
-from research.holdout_eval import compute_ate, summarize_holdout
-from research.reproducibility import set_seed
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.evaluation.holdout_eval import compute_ate, summarize_holdout
+from src.evaluation.reproducibility import set_seed
 
 
 def run_holdout_trajectory(policy, seed, frames, intrinsics, budget_ms=15.0,

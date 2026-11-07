@@ -2,7 +2,7 @@
 """Phase 4: Train Learned Utility Models across Multiple Seeds.
 
 Implements Step 8 of Phase 4:
-  - Canonical dataset parsing via research.utility_dataset.
+  - Canonical dataset parsing via src.utility.utility_dataset.
   - Normalization parameters fit strictly on train split only.
   - Trains TwoHeadMLP (B7), TwoHeadLinear (B6), and LinearUtilityModel (B5).
   - Multi-seed execution across protocol seeds [42, 43, 44, 45, 46].
@@ -20,26 +20,26 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.protocol import (
+from src.evaluation.protocol import (
     load_protocol,
     get_seeds,
     get_repo_root,
 )
-from research.utility_dataset import (
+from src.utility.utility_dataset import (
     load_canonical_oracle_dataset,
     prepare_normalized_splits,
 )
-from research.utility_losses import LossConfig
-from research.utility_models import (
+from src.utility.utility_losses import LossConfig
+from src.utility.utility_models import (
     TwoHeadMLP,
     TwoHeadLinear,
     LinearUtilityModel,
 )
-from research.utility_training import (
+from src.utility.utility_training import (
     UtilityModelTrainer,
     TrainingConfig,
 )
-from research.utility_metrics import safe_spearmanr
+from src.utility.utility_metrics import safe_spearmanr
 
 
 def seed_everything(seed: int) -> None:

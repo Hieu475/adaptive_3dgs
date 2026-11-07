@@ -1,6 +1,6 @@
 import torch
 
-from research.mechanism.selection import combined_residual_percentile
+from src.mechanism.selection import combined_residual_percentile
 
 
 def test_combined_residual_percentile_ranks_each_modality_before_combining():

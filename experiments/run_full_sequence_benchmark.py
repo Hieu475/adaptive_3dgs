@@ -34,10 +34,10 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from datasets.tum_dataset import TUMDataset
-from research.pipeline import OnlineReconstructionPipeline
-from research.reproducibility import set_seed, get_hardware_info, get_git_commit
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.evaluation.reproducibility import set_seed, get_hardware_info, get_git_commit
 from experiments.run_frozen_benchmark import build_pipeline_config
-from research.closed_loop_runtime import load_benchmark_sequence
+from src.utility.closed_loop_runtime import load_benchmark_sequence
 
 
 # Literature reference results on TUM fr2_xyz full sequence

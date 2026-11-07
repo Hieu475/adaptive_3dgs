@@ -210,7 +210,7 @@ def main() -> None:
         "manifest_sha256": sha256(manifest_path),
         "preregistration_sha256": sha256(prereg_path),
         "runner_sha256": sha256(ROOT / "experiments/run_joint_spawn_refine_replay.py"),
-        "pipeline_sha256": sha256(ROOT / "research/pipeline.py"),
+        "pipeline_sha256": sha256(ROOT / "src/core/pipeline.py"),
         "analysis_script_sha256": sha256(Path(__file__)),
         "cells": cells,
         "inference_policy": "No confirmatory p-values are reported because half the preregistered scene-frame cells were not estimable; the eight-test family is incomplete.",

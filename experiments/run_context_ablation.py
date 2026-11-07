@@ -32,14 +32,14 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.candidate_context import (
+from src.utility.candidate_context import (
     PHASE6_FEATURE_DIM,
     SELF_SLICE,
     NEIGHBOR_SLICE,
     OVERLAP_SLICE,
     SELECTED_SLICE,
 )
-from research.context_utility_model import (
+from src.utility.context_utility_model import (
     ContextAwareTwoHeadMLP,
     ResidualContextModel,
     Phase6ModelConfig,
@@ -47,7 +47,7 @@ from research.context_utility_model import (
     create_ablation_variant,
     FrozenContextPredictor,
 )
-from research.context_utility_dataset import (
+from src.utility.context_utility_dataset import (
     load_phase6_dataset,
     prepare_phase6_splits,
     Phase6UtilityDataset,
@@ -55,12 +55,12 @@ from research.context_utility_dataset import (
     GroupedBatchSampler,
     _get_variant_mask,
 )
-from research.context_selection import (
+from src.utility.context_selection import (
     select_phase6_subset,
     adaptive_greedy_select,
     static_context_select,
 )
-from research.utility_metrics import (
+from src.utility.utility_metrics import (
     safe_spearmanr,
     safe_pearsonr,
     compute_ndcg_at_k,
@@ -187,7 +187,7 @@ def train_and_eval_variant(
                 "Ablation strictly requires matched seed checkpoint without fallback."
             )
 
-        from research.utility_models import TwoHeadMLP
+        from src.utility.utility_models import TwoHeadMLP
         p4_net = TwoHeadMLP(in_features=11)
         ckpt_data = torch.load(p4_ckpt, map_location="cpu", weights_only=False)
         p4_net.load_state_dict(ckpt_data.get("model_state", ckpt_data))
@@ -581,7 +581,7 @@ def main():
                 raise FileNotFoundError(
                     f"P0.2 REQUIREMENT: Matched Phase 4 checkpoint required at '{p4_ckpt}' for seed {args.seed}."
                 )
-            from research.utility_models import TwoHeadMLP
+            from src.utility.utility_models import TwoHeadMLP
             p4_net = TwoHeadMLP(in_features=11)
             ckpt_data = torch.load(p4_ckpt, map_location="cpu", weights_only=False)
             p4_net.load_state_dict(ckpt_data.get("model_state", ckpt_data))

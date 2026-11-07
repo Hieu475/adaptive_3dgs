@@ -7,7 +7,7 @@ Protocol Split Enforcement:
   - Final Test: tum_fr2_xyz (N=250) [Zero-shot cross-scene generalization]
 
 Guarantees:
-  - Single source of truth: research.utility_dataset.UtilityDataset.from_oracle()
+  - Single source of truth: src.utility.utility_dataset.UtilityDataset.from_oracle()
   - Strictly no variable named 'test_idx' containing validation frames.
   - Pre-fusion normalization parameters fit strictly on Train split only.
   - Multi-seed execution across 5 protocol seeds: [42, 43, 44, 45, 46].
@@ -27,12 +27,12 @@ import subprocess
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.protocol import (
+from src.evaluation.protocol import (
     load_protocol,
     get_seeds,
     get_repo_root,
 )
-from research.utility_dataset import (
+from src.utility.utility_dataset import (
     UtilityDataset,
     prepare_normalized_splits,
 )

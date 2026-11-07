@@ -30,8 +30,8 @@ from scipy.stats import spearmanr
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.pipeline import OnlineReconstructionPipeline
-from research.scheduler import (
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.core.scheduler import (
     OptimizationPolicy,
     BudgetScheduler
 )

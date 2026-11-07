@@ -57,7 +57,7 @@ echo ""
 echo ">> [2/8] Dataset Verification..."
 $PY_BIN -c "
 from pathlib import Path
-from research.closed_loop_runtime import load_benchmark_sequence
+from src.utility.closed_loop_runtime import load_benchmark_sequence
 print('   Checking test sequence tum_fr2_xyz...')
 frames, _ = load_benchmark_sequence('tum_fr2_xyz', n_frames=2, device='cpu')
 assert len(frames) == 2, 'Failed to load test sequence'
@@ -70,7 +70,7 @@ echo ">> [3/8] Frozen Checkpoint Integrity Check..."
 $PY_BIN -c "
 import hashlib
 from pathlib import Path
-from research.closed_loop_protocol import get_checkpoint_path_for_seed, get_normalizer_path_for_seed, SEEDS
+from src.utility.closed_loop_protocol import get_checkpoint_path_for_seed, get_normalizer_path_for_seed, SEEDS
 
 for seed in SEEDS:
     ckpt = get_checkpoint_path_for_seed(seed)

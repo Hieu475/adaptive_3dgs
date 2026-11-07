@@ -1,5 +1,5 @@
 import numpy as np
-from research.baselines import RTGSLAMPolicy
+from src.baselines import RTGSLAMPolicy
 
 
 def test_rtg_slam_respects_budget():

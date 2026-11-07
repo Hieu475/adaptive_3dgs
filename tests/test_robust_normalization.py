@@ -15,12 +15,12 @@ import pytest
 import numpy as np
 import torch
 
-from research.normalization_protocol import (
+from src.utility.normalization_protocol import (
     B2_EMA_BETA,
     EPS,
     NORMALIZATION_VARIANTS,
 )
-from research.robust_normalization import (
+from src.utility.robust_normalization import (
     StandardNormalizer,
     RobustMADNormalizer,
     OnlineEMANormalizer,
@@ -246,7 +246,7 @@ def test_reset_to_train_stats(sample_features):
 def test_frozen_weights(sample_features):
     """Verify that TwoHeadMLP model weights remain strictly frozen during online normalization and inference."""
     import copy
-    from research.utility_models import TwoHeadMLP
+    from src.utility.utility_models import TwoHeadMLP
 
     torch.manual_seed(42)
     model = TwoHeadMLP(in_features=11, hidden_dim=64)

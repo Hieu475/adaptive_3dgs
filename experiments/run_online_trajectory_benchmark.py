@@ -31,10 +31,10 @@ from scipy.stats import wilcoxon
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datasets.tum_dataset import TUMDataset
-from research.pipeline import OnlineReconstructionPipeline
-from research.utility_predictor import FrozenUtilityPredictor
-from research.scheduler import estimate_gaussian_costs, OptimizationPolicy
-from research.protocol import (
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.utility.utility_predictor import FrozenUtilityPredictor
+from src.core.scheduler import estimate_gaussian_costs, OptimizationPolicy
+from src.evaluation.protocol import (
     load_protocol,
     get_seeds,
     get_resolution,

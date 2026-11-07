@@ -51,13 +51,13 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 from datasets.tum_dataset import TUMDataset
-from research.pipeline import OnlineReconstructionPipeline
-from research.utility_predictor import FrozenUtilityPredictor
-from research.budget_selection import (
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.utility.utility_predictor import FrozenUtilityPredictor
+from src.utility.budget_selection import (
     select_budget_constrained_subset,
     map_candidate_to_active_index,
 )
-from research.protocol import (
+from src.evaluation.protocol import (
     load_protocol,
     get_seeds,
     get_resolution,

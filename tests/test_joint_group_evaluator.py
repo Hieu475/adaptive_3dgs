@@ -19,7 +19,7 @@ import torch
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.joint_group_evaluator import (
+from src.utility.joint_group_evaluator import (
     evaluate_selected_group,
     evaluate_pairwise_interaction,
     Phase6Evaluator,

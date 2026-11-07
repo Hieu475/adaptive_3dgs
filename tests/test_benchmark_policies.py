@@ -1,8 +1,8 @@
 """Tests for policy benchmark harness (Milestone R4)."""
 import pytest
 import torch
-from research.scheduler import OptimizationPolicy
-from research.benchmark_policies import (
+from src.core.scheduler import OptimizationPolicy
+from src.evaluation.benchmark_policies import (
     run_policy_experiment,
     run_full_policy_ablation_matrix,
     format_benchmark_table,

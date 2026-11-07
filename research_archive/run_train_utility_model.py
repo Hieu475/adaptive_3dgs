@@ -17,7 +17,7 @@ from sklearn.metrics import roc_auc_score, ndcg_score
 # Add parent directory to sys.path for absolute imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from research.interaction_model import (
+from src.utility.interaction_model import (
     InteractionAwareModel,
     InteractionAwareLoss,
     InteractionModelTrainer,
@@ -26,7 +26,7 @@ from research.interaction_model import (
 
 # Optional imports if available, otherwise fallback
 try:
-    from research.evidence_protocol import PHASE12_OUTPUT_DIR, SEEDS
+    from src.utility.evidence_protocol import PHASE12_OUTPUT_DIR, SEEDS
 except ImportError:
     PHASE12_OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "results", "phase12_paper_evidence")
     SEEDS = [42]

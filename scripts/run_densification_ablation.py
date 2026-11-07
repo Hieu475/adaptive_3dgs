@@ -9,7 +9,7 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from research.benchmark_densification import (
+from src.evaluation.benchmark_densification import (
     run_full_densification_ablation,
     format_densification_table,
 )

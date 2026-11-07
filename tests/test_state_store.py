@@ -1,8 +1,8 @@
 """Unit and Integration Tests for Persistent Gaussian State Store and Normalization."""
 import torch
 
-from research.state_store import GaussianStateStore
-from research.importance import robust_normalize, GaussianImportanceEstimator
+from src.core.state_store import GaussianStateStore
+from src.core.importance import robust_normalize, GaussianImportanceEstimator
 
 
 def test_create_and_persistent_identity():
@@ -113,7 +113,7 @@ def test_robust_normalization_freezing():
 
 def test_state_identity_survives_densification():
     """Verify that existing Gaussians retain their persistent_id and state signals after densification."""
-    from research.gaussian_repr import GaussianModel
+    from src.core.gaussian_repr import GaussianModel
     model = GaussianModel(sh_degree=0, device='cpu')
     points = torch.tensor([[float(i), float(i), float(i)] for i in range(5)])
     model.initialize_from_points(points)
@@ -143,7 +143,7 @@ def test_state_identity_survives_densification():
 
 def test_state_identity_survives_pruning():
     """Verify that when tensor indices shift due to pruning/compaction, persistent_id and state track the survivor."""
-    from research.gaussian_repr import GaussianModel
+    from src.core.gaussian_repr import GaussianModel
     model = GaussianModel(sh_degree=0, device='cpu')
     points = torch.tensor([[float(i), float(i), float(i)] for i in range(5)])
     model.initialize_from_points(points)
@@ -177,8 +177,8 @@ def test_state_identity_survives_pruning():
 
 def test_state_identity_survives_clone():
     """Verify that cloned Gaussians inherit parent lineage without modifying parent persistent state."""
-    from research.gaussian_repr import GaussianModel
-    from research.densification import importance_driven_densification
+    from src.core.gaussian_repr import GaussianModel
+    from src.core.densification import importance_driven_densification
     model = GaussianModel(sh_degree=0, device='cpu')
     points = torch.tensor([[float(i), float(i), float(i)] for i in range(4)])
     model.initialize_from_points(points)
@@ -208,7 +208,7 @@ def test_state_identity_survives_clone():
 
 def test_temporal_features_follow_identity():
     """Verify that multi-frame temporal signals track persistent identities even across index-shifting compaction."""
-    from research.gaussian_repr import GaussianModel
+    from src.core.gaussian_repr import GaussianModel
     model = GaussianModel(sh_degree=0, device='cpu')
     points = torch.tensor([[float(i), float(i), float(i)] for i in range(4)])
     model.initialize_from_points(points)
@@ -263,7 +263,7 @@ def test_temporal_state_follows_persistent_id():
         persistent_id is still 512
         position_drift must continue from 0.03, NOT reset to zero.
     """
-    from research.gaussian_repr import GaussianModel
+    from src.core.gaussian_repr import GaussianModel
     model = GaussianModel(sh_degree=0, device='cpu')
     points = torch.tensor([[float(i), float(i), float(i)] for i in range(10)])
     model.initialize_from_points(points)

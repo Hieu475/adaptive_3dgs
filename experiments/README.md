@@ -28,9 +28,9 @@ Canonical (use these; everything else is legacy/provenance):
 - `validate_attribution_fidelity.py` / `validate_frozen_significance.py` — fidelity + Holm stats
 
 Baselines (same budget interface):
-- internal: `research/benchmark_policies.py` (NO_OP, ERROR_ONLY, ERROR_INFLUENCE, FULL)
-- external: `research/baselines/rtg_slam_policy.py` (numpy reference, unit-tested)
-  + `research/scheduler.py::RTG_SLAM_REIMPL` (torch mirror, used in harness)
+- internal: `src/evaluation/benchmark_policies.py` (NO_OP, ERROR_ONLY, ERROR_INFLUENCE, FULL)
+- external: `src/baselines/rtg_slam_policy.py` (numpy reference, unit-tested)
+  + `src/core/scheduler.py::RTG_SLAM_REIMPL` (torch mirror, used in harness)
   Post projected-area-fix clean-source 150f x 8 seeds, `results/phase14_projected_area_fix_clean_7policy_8seeds/`:
   OURS 27.64±0.04 vs RTG-SLAM 23.16 (+4.48), error_only +3.59,
   error_influence +2.61, temporal +2.70, FULL -0.21 dB; all six paired
@@ -45,7 +45,7 @@ Legacy: `run_phase6_*.py`, `run_phase5_*.py`, `run_phase9*.py`, `process_phase*.
 `run_oracle_*.py`, `run_budget_sweep.py`, etc. — kept for provenance, do NOT extend.
 New work goes through the 6 canonical scripts above.
 
-Configs: single source is `research/pipeline.py::_default_config()`;
+Configs: single source is `src/core/pipeline.py::_default_config()`;
 `configs/default.yaml` mirrors it. Benchmark overrides: `budget=15ms, sh_degree=0/1`.
 
 ## Provenance gate

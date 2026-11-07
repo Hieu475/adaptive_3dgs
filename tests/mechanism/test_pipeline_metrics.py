@@ -1,6 +1,6 @@
 import torch
 
-from research.pipeline import OnlineReconstructionPipeline
+from src.core.pipeline import OnlineReconstructionPipeline
 
 
 def _tiny_scene():

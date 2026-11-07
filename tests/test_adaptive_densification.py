@@ -1,12 +1,12 @@
 """Tests for Adaptive Importance-Driven Densification (Milestone R5)."""
 import pytest
 import torch
-from research.densification import (
+from src.core.densification import (
     compute_sampling_probability_map,
     sample_candidates,
 )
-from research.scheduler import BudgetScheduler
-from research.pipeline import OnlineReconstructionPipeline
+from src.core.scheduler import BudgetScheduler
+from src.core.pipeline import OnlineReconstructionPipeline
 
 
 class TestSamplingProbabilityMap:

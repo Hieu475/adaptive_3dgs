@@ -32,8 +32,8 @@ Scripts moved out of `experiments/` into `research_archive/` during the cleanup 
 ## Known provenance gap
 
 `results/phase14_projected_area_fix_clean_7policy_8seeds/manifest.json` records its run commits (`93791b1`, `c3484a6`) and writer commit (`75865c7`).
-None of these exist in this repository's history (the runs were made from a clean checkout under `/tmp`), and `research/pipeline.py` differs from the hash in the manifest
+None of these exist in this repository's history (the runs were made from a clean checkout under `/tmp`), and `src/core/pipeline.py` differs from the hash in the manifest
 (the other seven recorded source files match the current tree byte-for-byte). The paper therefore cites source-file hashes and worktree status rather than a commit hash.
 Before submission, either recover that checkout's commit and import it, or re-run `reproduce.sh main` from a tagged commit and re-freeze the bundle.
 
-- `closedloop` target: map-based tracking in the loop (`experiments/run_closed_loop.py`, `research/map_tracker.py`); table S12 (`tab_closedloop.tex`) from `results/closed_loop/`; table S13 (`tab_countcap.tex`, `run_count_cap.py`, `results/count_cap/`) compares TT+VGG with a size-matched hard Gaussian-count cap. TUM only (tracking fails on the local Replica sequences); tracker constants were set on the development scenes fr1_desk and fr3_structure_texture_near.
+- `closedloop` target: map-based tracking in the loop (`experiments/run_closed_loop.py`, `src/tracking/map_tracker.py`); table S12 (`tab_closedloop.tex`) from `results/closed_loop/`; table S13 (`tab_countcap.tex`, `run_count_cap.py`, `results/count_cap/`) compares TT+VGG with a size-matched hard Gaussian-count cap. TUM only (tracking fails on the local Replica sequences); tracker constants were set on the development scenes fr1_desk and fr3_structure_texture_near.

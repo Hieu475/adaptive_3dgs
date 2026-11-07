@@ -24,7 +24,7 @@ if str(REPO_ROOT) not in sys.path:
 from experiments.run_frozen_benchmark import (
     load_benchmark_sequence, build_pipeline_config, run_policy_trajectory,
 )
-from research.reproducibility import set_seed  # noqa: F401 (seed protocol parity)
+from src.evaluation.reproducibility import set_seed  # noqa: F401 (seed protocol parity)
 
 
 def main():

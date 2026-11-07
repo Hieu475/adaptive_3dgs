@@ -18,7 +18,7 @@ import pytest
 import numpy as np
 from typing import Dict, List, Tuple, Any
 
-from research.context_utility_dataset import prepare_phase6_splits
+from src.utility.context_utility_dataset import prepare_phase6_splits
 
 
 @pytest.fixture(scope="module")

@@ -21,22 +21,22 @@ import pytest
 import numpy as np
 import torch
 
-from research.context_utility_dataset import (
+from src.utility.context_utility_dataset import (
     GroupedBatchSampler,
     prepare_phase6_splits,
 )
-from research.context_utility_model import (
+from src.utility.context_utility_model import (
     Phase6ModelConfig,
     ResidualContextModel,
     Phase6Loss,
     FrozenContextPredictor,
     create_ablation_variant,
 )
-from research.context_utility_artifact import (
+from src.utility.context_utility_artifact import (
     validate_phase6_checkpoint,
 )
-from research.candidate_context import PHASE6_FEATURE_DIM
-from research.utility_models import TwoHeadMLP
+from src.utility.candidate_context import PHASE6_FEATURE_DIM
+from src.utility.utility_models import TwoHeadMLP
 
 
 # ==============================================================================
@@ -374,7 +374,7 @@ class TestPredictorAndReloadReproducibility:
     def test_frozen_context_predictor_requires_p4(self):
         """VIỆC 9: FrozenContextPredictor fails loudly if P4 checkpoint missing for residual model."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            from research.context_utility_dataset import Phase6FeatureNormalizer
+            from src.utility.context_utility_dataset import Phase6FeatureNormalizer
             norm_path = os.path.join(tmp_dir, "norm.json")
             Phase6FeatureNormalizer().fit(np.zeros((2, 32))).save_json(norm_path)
 

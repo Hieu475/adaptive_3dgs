@@ -92,7 +92,7 @@ def main():
     # Unrelated worktree changes (e.g. viewer/paper drafts) do not invalidate
     # the frozen experiment, but are listed explicitly instead of claiming a
     # literally clean tree.
-    relevant_prefixes = ("research/", "experiments/", "datasets/", "configs/",
+    relevant_prefixes = ("src/", "experiments/", "datasets/", "configs/",
                          "tests/", "README.md", "docs/",
                          "results/phase14", "results/rtg_slam", "results/final_confirmation",
                          "results/gate1_headroom", "results/seeds/", "scripts/build_phase14")

@@ -18,7 +18,7 @@ import torch
 import yaml
 import numpy as np
 
-from research.pipeline import OnlineReconstructionPipeline
+from src.core.pipeline import OnlineReconstructionPipeline
 
 
 def create_synthetic_dataset(n_frames: int = 50, H: int = 120, W: int = 160):

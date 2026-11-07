@@ -2,12 +2,12 @@
 import numpy as np
 import torch
 
-from research.robust_representation_protocol import (
+from src.utility.robust_representation_protocol import (
     CANONICAL_FEATURE_SCHEMA,
     FEATURE_VARIANTS,
     EPS,
 )
-from research.scale_invariant_features import (
+from src.utility.scale_invariant_features import (
     FEAT_IDX,
     A1_TRANSFORMED_INDICES,
     A2_TRANSFORMED_INDICES,

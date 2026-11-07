@@ -16,8 +16,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from research.pipeline import OnlineReconstructionPipeline
-from research.importance_diagnostics import (
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.core.importance_diagnostics import (
     spearman_rank_correlation,
     pearson_correlation,
     compute_full_diagnostics,

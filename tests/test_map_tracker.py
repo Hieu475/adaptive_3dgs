@@ -1,6 +1,6 @@
 import torch
 
-from research.map_tracker import _se3_exp
+from src.tracking.map_tracker import _se3_exp
 
 
 def test_exp_identity_and_nonzero_rotation_gradient_at_zero():

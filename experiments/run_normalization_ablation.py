@@ -19,13 +19,13 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from research.pipeline import OnlineReconstructionPipeline
-from research.importance_diagnostics import (
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.core.importance_diagnostics import (
     spearman_rank_correlation,
     importance_calibration,
     pearson_correlation,
 )
-from research.attribution import normalize_importance_components
+from src.core.attribution import normalize_importance_components
 from experiments.run_importance_validation import generate_synthetic_benchmark_dataset
 
 

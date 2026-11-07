@@ -35,7 +35,7 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from research.candidate_context import (
+from src.utility.candidate_context import (
     PHASE6_FEATURE_NAMES,
     PHASE6_FEATURE_DIM,
     SELF_SLICE,
@@ -43,13 +43,13 @@ from research.candidate_context import (
     OVERLAP_SLICE,
     SELECTED_SLICE,
 )
-from research.context_utility_model import (
+from src.utility.context_utility_model import (
     ContextAwareTwoHeadMLP,
     Phase6ModelConfig,
     FrozenContextPredictor,
 )
-from research.utility_predictor import FrozenUtilityPredictor
-from research.utility_metrics import (
+from src.utility.utility_predictor import FrozenUtilityPredictor
+from src.utility.utility_metrics import (
     safe_spearmanr,
     safe_pearsonr,
     compute_ndcg_at_k,

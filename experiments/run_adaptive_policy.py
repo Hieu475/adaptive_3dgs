@@ -23,9 +23,9 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from experiments.run_frozen_benchmark import load_benchmark_sequence, build_pipeline_config
-from research.pipeline import OnlineReconstructionPipeline
-from research.noise_adaptive import frame_noise_score_v3
-from research.reproducibility import set_seed
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.control.noise_adaptive import frame_noise_score_v3
+from src.evaluation.reproducibility import set_seed
 
 
 def run_adaptive(policy_base, seed, frames, intr, budget_ms=15.0, device="cuda",

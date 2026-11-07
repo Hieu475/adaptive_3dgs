@@ -25,9 +25,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from research.pipeline import OnlineReconstructionPipeline
-from research.rasterizer import render as rasterize_scene
-from research.closed_loop_runtime import load_benchmark_sequence
+from src.core.pipeline import OnlineReconstructionPipeline
+from src.core.rasterizer import render as rasterize_scene
+from src.utility.closed_loop_runtime import load_benchmark_sequence
 from experiments.run_frozen_benchmark import build_pipeline_config
 
 
