@@ -10,7 +10,7 @@ import torch
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from experiments.run_phase13_frozen_benchmark import load_phase10_sequence
+from experiments.run_frozen_benchmark import load_benchmark_sequence
 
 
 def main():
@@ -20,7 +20,7 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
-    frames, _ = load_phase10_sequence(scene_name=args.scene,
+    frames, _ = load_benchmark_sequence(scene_name=args.scene,
         n_frames=args.n_frames, H=240, W=320, device="cpu")
     poses_w2c = torch.stack([frame["pose"].float() for frame in frames])
     # Convert to camera-to-world, then compute consecutive camera motion.

@@ -39,8 +39,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from experiments.run_phase13_frozen_benchmark import (
-    load_phase10_sequence,
+from experiments.run_frozen_benchmark import (
+    load_benchmark_sequence,
     build_pipeline_config,
     run_policy_trajectory,
 )
@@ -91,7 +91,7 @@ def run_factorial_experiment(
 
     # 1. Preload scene
     print(f"\n>> Loading {scene} ({n_frames + 1} frames)...")
-    frames, intrinsics = load_phase10_sequence(
+    frames, intrinsics = load_benchmark_sequence(
         scene_name=scene, n_frames=n_frames + 1, H=H, W=W, device=device
     )
     print(f">> Loaded {len(frames)} frames successfully.\n")

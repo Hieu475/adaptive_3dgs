@@ -11,7 +11,7 @@ OUT = ROOT / "results/phase14_generalization_postfix"
 SOURCE_COMMIT = "75865c7921b5db9d5e8998fc94957935c798f1d6"
 SOURCE_HASHES = {
     "experiments/run_final_confirmation.py": "ad685fca7dcced1278579497800d96f23917185dd4c3911f8324f231709483f6",
-    "experiments/run_phase13_frozen_benchmark.py": "ced3f339df2c77537b7c0238bb965f7e8907aeede2c15edfc19b150d171beb44",
+    "experiments/run_frozen_benchmark.py": "ced3f339df2c77537b7c0238bb965f7e8907aeede2c15edfc19b150d171beb44",
     "research/attribution.py": "e415f83276d5938b41770888dbe559af575c141ef477288bf15ef263cada7af8",
     "research/pipeline.py": "7f2fc76a883150136ff23b7ecd483b920c2d70ba6463ac325765d85f993db6da",
     "research/scheduler.py": "93a87f7b471f3b561e13ebb9962402631fc3cc49f6252631f40b792584a4b5d3",

@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from experiments.run_phase13_frozen_benchmark import load_phase10_sequence
+from experiments.run_frozen_benchmark import load_benchmark_sequence
 from experiments.run_postfix_frame_diagnostics import scene_features
 
 def sha256(path: Path) -> str:
@@ -38,7 +38,7 @@ def main():
     prereg = json.loads((out / "preregistration.json").read_text())
     manifest = json.loads((out / "manifest.json").read_text())
     frame_id = prereg["snapshot_frames"][0]
-    frames, intrinsics = load_phase10_sequence(scene_name=prereg["scene"], n_frames=frame_id + 1,
+    frames, intrinsics = load_benchmark_sequence(scene_name=prereg["scene"], n_frames=frame_id + 1,
                                                 H=240, W=320, device=args.device)
     input_features = scene_features(frames, intrinsics)[frame_id]
     seed_rows, diagnostics, source_hashes = [], [], {}

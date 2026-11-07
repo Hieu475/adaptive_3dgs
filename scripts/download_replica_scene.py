@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Download and preprocess Replica scenes directly from Hugging Face (voviktyl/Replica-SLAM).
 
-Compatible with both OnlineReconstructionPipeline (phase10_runtime) and ReplicaDataset.
+Compatible with both OnlineReconstructionPipeline (closed_loop_runtime) and ReplicaDataset.
 """
 import json
 import time

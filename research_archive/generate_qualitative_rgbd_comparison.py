@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from experiments.run_phase13_frozen_benchmark import build_pipeline_config, load_phase10_sequence
+from experiments.run_frozen_benchmark import build_pipeline_config, load_benchmark_sequence
 from research.pipeline import OnlineReconstructionPipeline
 from research.reproducibility import set_seed
 
@@ -148,7 +148,7 @@ def main():
         torch.set_num_threads(args.threads)
     device = args.device
     W, H = 320, 240
-    frames, intrinsics = load_phase10_sequence("tum_fr2_xyz", args.n_frames,
+    frames, intrinsics = load_benchmark_sequence("tum_fr2_xyz", args.n_frames,
                                                 H=H, W=W, device=device)
     frame = frames[args.view]
     outputs = {}

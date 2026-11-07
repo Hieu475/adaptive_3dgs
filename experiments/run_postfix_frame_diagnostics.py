@@ -22,9 +22,9 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from experiments.run_phase13_frozen_benchmark import (
+from experiments.run_frozen_benchmark import (
     build_pipeline_config,
-    load_phase10_sequence,
+    load_benchmark_sequence,
     run_policy_trajectory,
 )
 
@@ -123,7 +123,7 @@ def main() -> None:
         "runs": [],
     }
     for scene in args.scenes:
-        scene_frames, intrinsics = load_phase10_sequence(
+        scene_frames, intrinsics = load_benchmark_sequence(
             scene_name=scene, n_frames=args.n_frames + 1, H=H, W=W, device=args.device
         )
         static_features = scene_features(scene_frames, intrinsics)

@@ -16,7 +16,7 @@ import torch
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from experiments.run_phase13_frozen_benchmark import build_pipeline_config, load_phase10_sequence
+from experiments.run_frozen_benchmark import build_pipeline_config, load_benchmark_sequence
 from research.losses import color_loss, depth_loss, ssim_loss
 from research.pipeline import OnlineReconstructionPipeline
 from research.pipeline_checkpoint import load_pipeline_checkpoint
@@ -81,7 +81,7 @@ def main():
     if not args.device.startswith("cuda"):
         raise ValueError("This probe requires the production CUDA/gsplat path")
 
-    frames, intrinsics = load_phase10_sequence(
+    frames, intrinsics = load_benchmark_sequence(
         scene_name=args.scene, n_frames=args.eval_frame + 1, H=240, W=320,
         device=args.device)
     if args.eval_frame >= len(frames):

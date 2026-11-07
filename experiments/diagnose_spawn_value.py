@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 import experiments.run_throttle_ablation as abl  # noqa: E402
-from experiments.run_phase13_frozen_benchmark import load_phase10_sequence, run_policy_trajectory  # noqa: E402
+from experiments.run_frozen_benchmark import load_benchmark_sequence, run_policy_trajectory  # noqa: E402
 from research.growth_value import spawn_value  # noqa: E402
 from research.pipeline import OnlineReconstructionPipeline  # noqa: E402
 
@@ -55,7 +55,7 @@ def main():
         self._diag = {"start": 10, "every": a.every, "window": a.window}
     OnlineReconstructionPipeline.__init__ = init
     for sc in a.scenes:
-        frames, intr = load_phase10_sequence(scene_name=sc, n_frames=a.n_frames + 1, H=240, W=320, device="cuda")
+        frames, intr = load_benchmark_sequence(scene_name=sc, n_frames=a.n_frames + 1, H=240, W=320, device="cuda")
         policy, cfg = abl.config_for(a.condition, a.seed, 15.0, "cuda")
         LOG.clear()
         run_policy_trajectory(policy=policy, seed=a.seed, frames=frames, intrinsics=intr, budget_ms=15.0,

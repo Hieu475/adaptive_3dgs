@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from experiments.run_dilution_factorial import config_for
-from experiments.run_phase13_frozen_benchmark import load_phase10_sequence
+from experiments.run_frozen_benchmark import load_benchmark_sequence
 from research.pipeline import OnlineReconstructionPipeline
 from research.reproducibility import create_provenance_manifest, set_seed
 from research.gaussian_repr import GaussianState
@@ -164,7 +164,7 @@ def main():
         manifest_path.write_text(json.dumps(manifest, indent=2))
 
     for scene in args.scenes:
-        frames, intrinsics = load_phase10_sequence(scene_name=scene,
+        frames, intrinsics = load_benchmark_sequence(scene_name=scene,
             n_frames=args.n_frames + 1, H=240, W=320, device=args.device)
         for seed in args.seeds:
             for growth in ("unthrottled", "throttled"):
@@ -188,7 +188,7 @@ def main():
 
     source_paths = ["experiments/run_growth_starvation_trajectory_factorial.py",
                     "experiments/run_dilution_factorial.py",
-                    "experiments/run_phase13_frozen_benchmark.py",
+                    "experiments/run_frozen_benchmark.py",
                     "research/pipeline.py", "research/state_store.py",
                     "research/gaussian_repr.py", "research/reproducibility.py"]
     source_hashes = {rel: hashlib.sha256((ROOT / rel).read_bytes()).hexdigest()

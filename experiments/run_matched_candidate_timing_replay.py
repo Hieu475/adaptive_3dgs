@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from experiments.run_dilution_factorial import config_for
-from experiments.run_phase13_frozen_benchmark import load_phase10_sequence
+from experiments.run_frozen_benchmark import load_benchmark_sequence
 from research.densification import create_gaussians_from_candidates, sample_candidates
 from research.pipeline import OnlineReconstructionPipeline
 from research.pipeline_checkpoint import load_pipeline_checkpoint, save_pipeline_checkpoint
@@ -549,14 +549,14 @@ def main():
                     ROOT / "research" / "pipeline_checkpoint.py",
                     ROOT / "research" / "densification.py",
                     ROOT / "experiments" / "run_dilution_factorial.py",
-                    ROOT / "experiments" / "run_phase13_frozen_benchmark.py",
+                    ROOT / "experiments" / "run_frozen_benchmark.py",
                     ROOT / "requirements.txt"]
     source_hashes = {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
                      for path in source_paths}
     (args.out_dir / "source_hashes.json").write_text(json.dumps(source_hashes, indent=2) + "\n")
 
     for scene in args.scenes:
-        frames, intrinsics = load_phase10_sequence(scene_name=scene,
+        frames, intrinsics = load_benchmark_sequence(scene_name=scene,
             n_frames=args.n_frames + 1, H=240, W=320, device=args.device)
         if len(frames) <= args.n_frames:
             raise RuntimeError(f"{scene} has only {len(frames)} loaded frames")

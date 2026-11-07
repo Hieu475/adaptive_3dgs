@@ -27,8 +27,8 @@ def main():
     source_paths = ("experiments/run_full_sequence_benchmark.py", "experiments/analyze_long_horizon.py",
                     "experiments/summarize_long_horizon_chunks.py",
                     "experiments/compare_long_horizon_prefix_runs.py",
-                    "experiments/write_long_horizon_manifest.py", "experiments/run_phase13_frozen_benchmark.py",
-                    "research/pipeline.py", "research/phase10_runtime.py", "datasets/tum_dataset.py")
+                    "experiments/write_long_horizon_manifest.py", "experiments/run_frozen_benchmark.py",
+                    "research/pipeline.py", "research/closed_loop_runtime.py", "datasets/tum_dataset.py")
     output_paths = [p.name for p in base.iterdir() if p.is_file() and p.name != "run_manifest.json"]
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     dirty = bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip())

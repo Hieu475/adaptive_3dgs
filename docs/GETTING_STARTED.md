@@ -43,20 +43,20 @@ python3 experiments/eval_utility_model.py
 python3 experiments/eval_selection.py
 
 # 3. Phase 5: Controlled Budget Benchmark & Online Trajectory
-python3 experiments/run_phase5_budget_benchmark.py --seeds 42 43 44 45 46
-python3 experiments/run_phase5_online_trajectory.py --n-frames 25 --budget-ms 15.0
+python3 experiments/run_budget_sweep_benchmark.py --seeds 42 43 44 45 46
+python3 experiments/run_online_trajectory_benchmark.py --n-frames 25 --budget-ms 15.0
 
 # 4. Phase 6: Candidate Pool Coverage Audit & Rank Stability (Case B Proof)
-python3 experiments/run_phase6_rank_stability.py
+python3 experiments/run_rank_stability.py
 
 # 5. Phase 6: 8-Variant Architecture Ladder Ablation
-python3 experiments/run_phase6_ablation.py --seed 42
+python3 experiments/run_context_ablation.py --seed 42
 
 # 6. Phase 6: 5-Policy Oracle Decomposition & Normalized Regret
-python3 experiments/run_phase6_oracle_gap.py
+python3 experiments/run_oracle_gap.py
 
 # 7. Phase 6: Runtime Profiling Breakdown (T_P6 Pipeline Stages)
-python3 experiments/run_phase6_runtime_profile.py
+python3 experiments/run_runtime_profile.py
 ```
 
 ---

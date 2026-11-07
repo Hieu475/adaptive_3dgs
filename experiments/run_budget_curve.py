@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Matched-budget curve (Gate-3 question, corrected substrate).
 
-Supersedes experiments/run_phase6_budget_sweep.py (header: unfair non-unified
+Supersedes experiments/run_context_budget_sweep.py (header: unfair non-unified
 budgets, historical reference only). Here EVERY policy shares the same modeled
 per-frame optimization budget; only the budget value varies.
 
@@ -21,8 +21,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from experiments.run_phase13_frozen_benchmark import (
-    load_phase10_sequence, build_pipeline_config, run_policy_trajectory,
+from experiments.run_frozen_benchmark import (
+    load_benchmark_sequence, build_pipeline_config, run_policy_trajectory,
 )
 from research.reproducibility import set_seed  # noqa: F401 (seed protocol parity)
 
@@ -45,7 +45,7 @@ def main():
     out = REPO_ROOT / a.out_dir
     out.mkdir(parents=True, exist_ok=True)
     W, H = 320, 240
-    frames, intr = load_phase10_sequence(scene_name=a.scene, n_frames=a.n_frames + 1,
+    frames, intr = load_benchmark_sequence(scene_name=a.scene, n_frames=a.n_frames + 1,
                                          H=H, W=W, device=a.device)
     rows = []
     for b in a.budgets:

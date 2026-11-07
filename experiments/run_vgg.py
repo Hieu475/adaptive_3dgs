@@ -16,7 +16,7 @@ sys.path.insert(0, str(ROOT))
 
 import experiments.run_throttle_ablation as abl  # noqa: E402  (installs the proportional-budget wrapper)
 from experiments.run_dilution_factorial import summarize  # noqa: E402
-from experiments.run_phase13_frozen_benchmark import load_phase10_sequence, run_policy_trajectory  # noqa: E402
+from experiments.run_frozen_benchmark import load_benchmark_sequence, run_policy_trajectory  # noqa: E402
 from research.growth_controller import VGGParams, VGGState, step  # noqa: E402
 from research.pipeline import OnlineReconstructionPipeline  # noqa: E402
 from research import time_budget as tb  # noqa: E402
@@ -99,7 +99,7 @@ def main():
     ov = {"theta_lo": a.theta_lo, "theta_hi": a.theta_hi, "g_min": a.g_min, "every": a.every, "ema": a.ema,
           "down": a.down, "up": a.up, "min_recent": a.min_recent, "backoff_max": a.backoff_max}
     for sc in a.scenes:
-        frames, intr = load_phase10_sequence(scene_name=sc, n_frames=a.offset + a.n_frames + 1, H=240, W=320, device="cuda")
+        frames, intr = load_benchmark_sequence(scene_name=sc, n_frames=a.offset + a.n_frames + 1, H=240, W=320, device="cuda")
         frames = frames[a.offset:]
         for seed in a.seeds:
             for cond in a.conditions:

@@ -19,8 +19,8 @@ import torch
 import pandas as pd
 
 from research.pipeline import OnlineReconstructionPipeline
-from experiments.run_phase13_frozen_benchmark import (
-    load_phase10_sequence,
+from experiments.run_frozen_benchmark import (
+    load_benchmark_sequence,
     build_pipeline_config,
     run_policy_trajectory,
 )
@@ -63,7 +63,7 @@ def main():
     # 1. Load sequence
     print(f"\n>> Loading {n_frames + 1} frames from {scene_name}...")
     t0 = time.time()
-    frames, intrinsics = load_phase10_sequence(
+    frames, intrinsics = load_benchmark_sequence(
         scene_name=scene_name,
         n_frames=n_frames + 1,
         H=H,

@@ -171,7 +171,7 @@ def main():
         "experiments/run_joint_spawn_refine_replay.py",
         "experiments/analyze_joint_spawn_refine_replay.py",
         "experiments/run_dilution_factorial.py",
-        "experiments/run_phase13_frozen_benchmark.py",
+        "experiments/run_frozen_benchmark.py",
         "research/pipeline.py", "research/scheduler.py", "research/densification.py",
         "research/gaussian_repr.py", "research/reproducibility.py",
     ]

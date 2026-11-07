@@ -10,7 +10,7 @@ import numpy as np
 import torch
 
 from experiments.run_e1_dynamic_matched_map import capture_rng, compact, make_pipeline, restore_rng
-from experiments.run_phase13_frozen_benchmark import load_phase10_sequence
+from experiments.run_frozen_benchmark import load_benchmark_sequence
 from research.projection import world_to_camera
 from research.rasterizer import render as rasterize_scene
 from research.reproducibility import create_provenance_manifest
@@ -163,7 +163,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     if str(args.device).startswith("cuda"):
         torch.cuda.set_per_process_memory_fraction(0.70, 0)
-    frames, intrinsics = load_phase10_sequence(
+    frames, intrinsics = load_benchmark_sequence(
         scene_name=args.scene, n_frames=args.n_frames + 1, H=240, W=320, device=args.device)
     online = min(args.n_frames, len(frames) - 1)
     no, cfg_no = make_pipeline("error_off", args.seed, args.budget_ms,

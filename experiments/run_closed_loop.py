@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 import experiments.run_vgg as rv  # noqa: E402
-from experiments.run_phase13_frozen_benchmark import load_phase10_sequence  # noqa: E402
+from experiments.run_frozen_benchmark import load_benchmark_sequence  # noqa: E402
 from research.holdout_eval import compute_ate  # noqa: E402
 from research.map_tracker import MapTracker  # noqa: E402
 from research.pipeline import OnlineReconstructionPipeline  # noqa: E402
@@ -44,7 +44,7 @@ def main():
     torch.cuda.set_per_process_memory_fraction(0.70, 0)
     ov = {}
     for sc in a.scenes:
-        frames, intr = load_phase10_sequence(scene_name=sc, n_frames=a.offset + a.n_frames + 1, H=240, W=320, device="cuda")
+        frames, intr = load_benchmark_sequence(scene_name=sc, n_frames=a.offset + a.n_frames + 1, H=240, W=320, device="cuda")
         frames = frames[a.offset:]
         for seed in a.seeds:
             for cond in a.conditions:

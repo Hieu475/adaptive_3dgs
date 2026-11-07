@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from experiments.run_dilution_factorial import config_for
-from experiments.run_phase13_frozen_benchmark import load_phase10_sequence
+from experiments.run_frozen_benchmark import load_benchmark_sequence
 from research.pipeline import OnlineReconstructionPipeline
 from research.reproducibility import create_provenance_manifest, set_seed
 
@@ -64,7 +64,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     if args.device.startswith("cuda") and torch.cuda.is_available():
         torch.cuda.set_per_process_memory_fraction(0.70, 0)
-    frames, intrinsics = load_phase10_sequence(
+    frames, intrinsics = load_benchmark_sequence(
         scene_name=args.scene, n_frames=args.n_frames + 1,
         H=240, W=320, device=args.device)
     if len(frames) <= args.snapshot_frame:

@@ -22,7 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 import experiments.run_vgg as rv  # noqa: E402
 from experiments.run_dilution_factorial import summarize  # noqa: E402
-from experiments.run_phase13_frozen_benchmark import load_phase10_sequence, run_policy_trajectory  # noqa: E402
+from experiments.run_frozen_benchmark import load_benchmark_sequence, run_policy_trajectory  # noqa: E402
 
 
 def main():
@@ -36,7 +36,7 @@ def main():
     a = ap.parse_args()
     torch.cuda.set_per_process_memory_fraction(0.70, 0)
     for sc in a.scenes:
-        frames, intr = load_phase10_sequence(scene_name=sc, n_frames=a.offset + a.n_frames + 1, H=240, W=320, device="cuda")
+        frames, intr = load_benchmark_sequence(scene_name=sc, n_frames=a.offset + a.n_frames + 1, H=240, W=320, device="cuda")
         frames = frames[a.offset:]
         for seed in a.seeds:
             ref = a.ref / sc / f"tt_vgg_seed{seed}.json"

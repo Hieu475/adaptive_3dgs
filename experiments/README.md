@@ -20,12 +20,12 @@ ground-truth pose is more than 50 ms away by default; use `--start_frame` to
 select a contiguous valid window and record its source-frame interval.
 
 Canonical (use these; everything else is legacy/provenance):
-- `run_phase13_frozen_benchmark.py` — authoritative 6-policy x seeds benchmark (gsplat backend)
+- `run_frozen_benchmark.py` — authoritative 6-policy x seeds benchmark (gsplat backend)
 - `run_final_confirmation.py` — 8-seed confirmation harness; the post projected-area-fix frozen bundle is `results/phase14_projected_area_fix_clean_7policy_8seeds/`.
 - `run_multiscene_benchmark.py` — cross-scene (tum_fr1_xyz, tum_fr2_xyz, replica_office0)
-- `run_phase12i_interaction_audit.py` — GO/NO-GO interaction audit (do before any new model)
-- `run_phase10_smoke.py` — <30s smoke (checkpoint+A1+B2+knapsack+StateStore)
-- `validate_attribution_fidelity.py` / `validate_phase13_significance.py` — fidelity + Holm stats
+- `run_interaction_audit.py` — GO/NO-GO interaction audit (do before any new model)
+- `run_closed_loop_smoke.py` — <30s smoke (checkpoint+A1+B2+knapsack+StateStore)
+- `validate_attribution_fidelity.py` / `validate_frozen_significance.py` — fidelity + Holm stats
 
 Baselines (same budget interface):
 - internal: `research/benchmark_policies.py` (NO_OP, ERROR_ONLY, ERROR_INFLUENCE, FULL)

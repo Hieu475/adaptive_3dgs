@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT))
 
 import experiments.run_throttle_ablation as abl  # noqa: E402
 from experiments.run_dilution_factorial import summarize  # noqa: E402
-from experiments.run_phase13_frozen_benchmark import load_phase10_sequence, run_policy_trajectory  # noqa: E402
+from experiments.run_frozen_benchmark import load_benchmark_sequence, run_policy_trajectory  # noqa: E402
 
 REGIMES = {"free": "error_off", "spawn": "spawn_cap_always20"}
 MULTS = (1, 2, 4)
@@ -37,7 +37,7 @@ def main():
     if args.device.startswith("cuda"):
         torch.cuda.set_per_process_memory_fraction(0.70, 0)
     for scene in args.scenes:
-        frames, intr = load_phase10_sequence(scene_name=scene, n_frames=args.n_frames + 1, H=240, W=320, device=args.device)
+        frames, intr = load_benchmark_sequence(scene_name=scene, n_frames=args.n_frames + 1, H=240, W=320, device=args.device)
         for seed in args.seeds:
             for regime, base in REGIMES.items():
                 for m in MULTS:

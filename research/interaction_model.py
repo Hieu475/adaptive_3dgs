@@ -9,7 +9,7 @@ from sklearn.metrics import roc_auc_score, ndcg_score
 
 # Relative imports as per conventions
 # from .utility_features import CANONICAL_FEATURE_NAMES
-# from .phase12_protocol import ... 
+# from .evidence_protocol import ... 
 
 class LocalEncoder(torch_nn.Module):
     """

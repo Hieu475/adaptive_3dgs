@@ -42,3 +42,6 @@ scratch/
 
 # Personal thesis report (build intermediates and sources); not part of the paper repo.
 bao_cao/
+
+# Per-run completion sentinels
+results/*.DONE

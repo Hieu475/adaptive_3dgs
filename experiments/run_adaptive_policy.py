@@ -22,7 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from experiments.run_phase13_frozen_benchmark import load_phase10_sequence, build_pipeline_config
+from experiments.run_frozen_benchmark import load_benchmark_sequence, build_pipeline_config
 from research.pipeline import OnlineReconstructionPipeline
 from research.noise_adaptive import frame_noise_score_v3
 from research.reproducibility import set_seed
@@ -70,7 +70,7 @@ def main():
     rows = []
     for sc in a.scenes:
         nf = min(a.n_frames, 99) if sc.startswith("replica_") else a.n_frames
-        frames, intr = load_phase10_sequence(scene_name=sc, n_frames=nf + 1,
+        frames, intr = load_benchmark_sequence(scene_name=sc, n_frames=nf + 1,
                                              H=H, W=W, device=a.device)
         for seed in a.seeds:
             s = run_adaptive("ours", seed, frames, intr, a.budget_ms, a.device, W, H)

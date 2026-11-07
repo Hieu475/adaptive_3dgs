@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from experiments.run_phase13_frozen_benchmark import load_phase10_sequence
+from experiments.run_frozen_benchmark import load_benchmark_sequence
 from experiments.run_postfix_frame_diagnostics import scene_features
 
 
@@ -56,7 +56,7 @@ def interval_stats(rows, lo, hi):
 
 
 def main():
-    frames, intrinsics = load_phase10_sequence(
+    frames, intrinsics = load_benchmark_sequence(
         scene_name=SCENE, n_frames=120, H=H, W=W, device="cpu"
     )
     static = scene_features(frames, intrinsics)

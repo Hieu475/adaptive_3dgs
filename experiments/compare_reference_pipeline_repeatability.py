@@ -14,7 +14,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from experiments.run_full_sequence_benchmark import preload_tum_sequence_cpu
-from experiments.run_phase13_frozen_benchmark import build_pipeline_config
+from experiments.run_frozen_benchmark import build_pipeline_config
 from research.pipeline import OnlineReconstructionPipeline
 from research.reproducibility import get_git_commit, get_hardware_info, set_seed
 

@@ -19,7 +19,7 @@ import numpy as np
 import torch
 
 from experiments.run_dilution_factorial import config_for
-from experiments.run_phase13_frozen_benchmark import load_phase10_sequence
+from experiments.run_frozen_benchmark import load_benchmark_sequence
 from research.gaussian_repr import GaussianState
 from research.pipeline import OnlineReconstructionPipeline
 from research.reproducibility import create_provenance_manifest, set_seed
@@ -125,7 +125,7 @@ def main():
     if str(args.device).startswith("cuda"):
         torch.cuda.set_per_process_memory_fraction(0.70, 0)
 
-    frames, intrinsics = load_phase10_sequence(scene_name=args.scene,
+    frames, intrinsics = load_benchmark_sequence(scene_name=args.scene,
         n_frames=args.n_frames + 1, H=240, W=320, device=args.device)
     if len(frames) < 2:
         raise ValueError("Need at least an initialization frame and one online frame")

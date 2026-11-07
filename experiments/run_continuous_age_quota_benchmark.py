@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from experiments.run_phase13_frozen_benchmark import build_pipeline_config, load_phase10_sequence
+from experiments.run_frozen_benchmark import build_pipeline_config, load_benchmark_sequence
 from experiments.run_postfix_frame_diagnostics import scene_features
 from research.pipeline import OnlineReconstructionPipeline
 from research.reproducibility import set_seed
@@ -197,8 +197,8 @@ def main():
                     "research/pipeline.py",
                     "research/scheduler.py",
                     "research/rasterizer.py",
-                    "experiments/run_phase13_frozen_benchmark.py",
-                    "research/phase10_runtime.py",
+                    "experiments/run_frozen_benchmark.py",
+                    "research/closed_loop_runtime.py",
                     "experiments/run_postfix_frame_diagnostics.py",
                 )
             },
@@ -229,7 +229,7 @@ def main():
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     manifest = json.loads(manifest_path.read_text())
     for scene in a.scenes:
-        frames, intrinsics = load_phase10_sequence(scene_name=scene, n_frames=a.n_frames,
+        frames, intrinsics = load_benchmark_sequence(scene_name=scene, n_frames=a.n_frames,
                                                    H=H, W=W, device=a.device)
         input_features = scene_features(frames, intrinsics) if (
             a.capture_age_diagnostics or "novelty_rule" in a.arms) else None

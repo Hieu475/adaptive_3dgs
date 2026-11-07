@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from experiments.run_dilution_factorial import config_for
-from experiments.run_phase13_frozen_benchmark import build_pipeline_config, load_phase10_sequence
+from experiments.run_frozen_benchmark import build_pipeline_config, load_benchmark_sequence
 from research import pipeline as pipeline_module
 from research.pipeline import OnlineReconstructionPipeline
 from research.reproducibility import create_provenance_manifest, set_seed
@@ -610,7 +610,7 @@ def main():
         atexit.register(args._gpu_telemetry.stop)
 
     for scene in args.scenes:
-        frames, intrinsics = load_phase10_sequence(scene_name=scene,
+        frames, intrinsics = load_benchmark_sequence(scene_name=scene,
             n_frames=args.n_frames + 1, H=240, W=320, device=args.device)
         if any(frame_idx < 0 or frame_idx >= len(frames) for frame_idx in args.eval_frames):
             raise ValueError(f"--eval_frames must be in [0, {len(frames) - 1}]")

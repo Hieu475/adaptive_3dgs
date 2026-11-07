@@ -21,7 +21,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from experiments.run_phase13_frozen_benchmark import load_phase10_sequence, build_pipeline_config
+from experiments.run_frozen_benchmark import load_benchmark_sequence, build_pipeline_config
 from research.pipeline import OnlineReconstructionPipeline
 from research.noise_adaptive import frame_noise_score_v3
 from research.reproducibility import set_seed
@@ -72,7 +72,7 @@ def main():
     out = REPO_ROOT / a.out_dir
     out.mkdir(parents=True, exist_ok=True)
     W, H = 320, 240
-    frames, intr = load_phase10_sequence(scene_name="replica_office0",
+    frames, intr = load_benchmark_sequence(scene_name="replica_office0",
                                          n_frames=a.n_frames + 1, H=H, W=W,
                                          device=a.device)
     # Inject holes into second half only (regime shift mid-trajectory).

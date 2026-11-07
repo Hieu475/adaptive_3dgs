@@ -16,7 +16,7 @@ our continuous utility / throttling must beat at MATCHED compute.
 
 Interface matches research/benchmark_policies.py:
     select(state, budget_ms) -> selected_ids, info
-so it can be dropped into run_final_confirmation.py / run_phase13_frozen_benchmark.py
+so it can be dropped into run_final_confirmation.py / run_frozen_benchmark.py
 without changing harness. No learned weights. No oracle access.
 
 Differences from original CUDA SLAM system (disclosed):

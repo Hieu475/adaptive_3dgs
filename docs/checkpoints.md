@@ -72,7 +72,7 @@ Features undergo a two-step stabilization pipeline before feeding into the TwoHe
 ## 4. Model Loading & Immutability Verification
 
 ```python
-from research.phase10_runtime import Phase10ModelBundle
+from research.closed_loop_runtime import Phase10ModelBundle
 
 # Load frozen bundle
 bundle = Phase10ModelBundle(seed=42, device="cuda")

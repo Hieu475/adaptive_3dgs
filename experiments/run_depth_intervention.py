@@ -15,8 +15,8 @@ import torch
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from experiments.run_phase13_frozen_benchmark import (
-    build_pipeline_config, load_phase10_sequence, run_policy_trajectory,
+from experiments.run_frozen_benchmark import (
+    build_pipeline_config, load_benchmark_sequence, run_policy_trajectory,
 )
 
 
@@ -56,7 +56,7 @@ def main():
     args.out_dir.mkdir(parents=True, exist_ok=True)
     torch.cuda.set_per_process_memory_fraction(0.70, 0)
     for scene in args.scenes:
-        frames, intr = load_phase10_sequence(scene, args.n_frames + 1, 240, 320, "cuda")
+        frames, intr = load_benchmark_sequence(scene, args.n_frames + 1, 240, 320, "cuda")
         levels = (0.0, 0.15, 0.30) if scene.startswith("replica_") else (0.0, 0.5, 1.0)
         for level in levels:
             for seed in args.seeds:

@@ -16,12 +16,12 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from research.phase9_protocol import (
+from research.robust_representation_protocol import (
     CANONICAL_FEATURE_SCHEMA,
     get_output_dir,
     get_repo_root,
 )
-from research.phase9_features import (
+from research.scale_invariant_features import (
     FEAT_IDX,
     transform_grouped_features,
 )

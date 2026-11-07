@@ -39,8 +39,8 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Any
 from scipy.stats import spearmanr, kendalltau
 
-from .phase6_oracle import ConditionalOracleExperiment, ConditionalOracleConfig
-from .phase6_context import (
+from .conditional_oracle import ConditionalOracleExperiment, ConditionalOracleConfig
+from .candidate_context import (
     _get_pixel_mask,
 )
 

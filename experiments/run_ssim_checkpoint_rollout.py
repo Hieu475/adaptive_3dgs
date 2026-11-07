@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from experiments.run_joint_spawn_refine_replay import _memoize_detached_nonleaf_tensors
-from experiments.run_phase13_frozen_benchmark import build_pipeline_config, load_phase10_sequence
+from experiments.run_frozen_benchmark import build_pipeline_config, load_benchmark_sequence
 from research.pipeline import OnlineReconstructionPipeline
 from research.pipeline_checkpoint import load_pipeline_checkpoint, gaussian_map_digest
 from research.reproducibility import get_git_commit
@@ -79,7 +79,7 @@ def main():
         raise ValueError("rollout_frames must be positive and repeats_per_implementation >= 2")
 
     args.out_dir = args.out_dir if args.out_dir.is_absolute() else ROOT / args.out_dir
-    frames, intrinsics = load_phase10_sequence(
+    frames, intrinsics = load_benchmark_sequence(
         scene_name=args.scene,
         n_frames=args.snapshot_frame + args.rollout_frames + 1,
         H=240, W=320, device=args.device)

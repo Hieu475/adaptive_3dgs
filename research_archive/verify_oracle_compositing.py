@@ -30,8 +30,8 @@ if str(REPO_ROOT) not in sys.path:
 from research.pipeline import OnlineReconstructionPipeline
 from research.background_cache import FrozenBackgroundCache
 from research.rasterizer import render as rasterize_scene
-from research.phase10_runtime import load_phase10_sequence
-from experiments.run_phase13_frozen_benchmark import build_pipeline_config
+from research.closed_loop_runtime import load_benchmark_sequence
+from experiments.run_frozen_benchmark import build_pipeline_config
 
 
 def run_oracle_compositing_verification(
@@ -57,7 +57,7 @@ def run_oracle_compositing_verification(
     print("=" * 90)
 
     # 1. Load sequence
-    frames, intrinsics = load_phase10_sequence(
+    frames, intrinsics = load_benchmark_sequence(
         scene_name=scene, n_frames=n_frames, H=H, W=W, device=device
     )
 

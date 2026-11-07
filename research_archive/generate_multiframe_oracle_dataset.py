@@ -11,7 +11,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.generate_phase3_oracle_dataset import main
+from scripts.generate_oracle_dataset import main
 
 if __name__ == '__main__':
     main()

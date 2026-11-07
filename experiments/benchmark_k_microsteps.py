@@ -24,7 +24,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from research.pipeline import OnlineReconstructionPipeline
-from research.phase10_runtime import load_phase10_sequence
+from research.closed_loop_runtime import load_benchmark_sequence
 from research.reproducibility import create_provenance_manifest, get_hardware_info
 
 
@@ -215,7 +215,7 @@ def main():
     print(f"=== Multi-step Micro-convergence Benchmark: K in [1, 2, 3, 5] & Adaptive K ===")
     print(f"Scene: {args.scene} | Frames: {args.n_frames} | Policy: {args.policy} | Device: {args.device} | Budget: {args.budget_ms} ms")
 
-    frames, intrinsics = load_phase10_sequence(
+    frames, intrinsics = load_benchmark_sequence(
         scene_name=args.scene,
         n_frames=args.n_frames,
         H=240,

@@ -85,7 +85,7 @@ def run_scene_benchmark(
 
     cmd = [
         sys.executable,
-        str(REPO_ROOT / "experiments" / "run_phase12_headroom.py"),
+        str(REPO_ROOT / "experiments" / "run_headroom_audit.py"),
         "--stage", "R4",
         "--scene", scene,
         "--seed", str(seed),

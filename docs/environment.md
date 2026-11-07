@@ -100,10 +100,10 @@ print('✓ Matplotlib:', matplotlib.__version__)
 "
 
 # Run the runtime unit test suite
-pytest tests/test_phase10_runtime.py -v
+pytest tests/test_closed_loop_runtime.py -v
 
 # Run the 30-second closed-loop smoke test
-python experiments/run_phase10_smoke.py
+python experiments/run_closed_loop_smoke.py
 ```
 
 ---

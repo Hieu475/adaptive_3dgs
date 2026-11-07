@@ -54,10 +54,10 @@ def summarize_update_counts(update_counts: torch.Tensor) -> dict:
 
 
 def run(args):
-    from experiments.run_phase13_frozen_benchmark import build_pipeline_config, load_phase10_sequence
+    from experiments.run_frozen_benchmark import build_pipeline_config, load_benchmark_sequence
 
     n_load = args.n_frames + 1
-    frames, intrinsics = load_phase10_sequence(
+    frames, intrinsics = load_benchmark_sequence(
         scene_name=args.scene, n_frames=n_load, H=240, W=320, device="cpu",
     )
 

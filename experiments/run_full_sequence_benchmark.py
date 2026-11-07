@@ -36,8 +36,8 @@ if str(REPO_ROOT) not in sys.path:
 from datasets.tum_dataset import TUMDataset
 from research.pipeline import OnlineReconstructionPipeline
 from research.reproducibility import set_seed, get_hardware_info, get_git_commit
-from experiments.run_phase13_frozen_benchmark import build_pipeline_config
-from research.phase10_runtime import load_phase10_sequence
+from experiments.run_frozen_benchmark import build_pipeline_config
+from research.closed_loop_runtime import load_benchmark_sequence
 
 
 # Literature reference results on TUM fr2_xyz full sequence
@@ -395,7 +395,7 @@ def main():
     # 1. Preload sequence into CPU RAM
     if args.replica_scene:
         n_load = args.max_frames or 500
-        frames, intrinsics = load_phase10_sequence(
+        frames, intrinsics = load_benchmark_sequence(
             scene_name=f"replica_{args.replica_scene}", n_frames=n_load,
             H=H, W=W, device="cpu",
         )

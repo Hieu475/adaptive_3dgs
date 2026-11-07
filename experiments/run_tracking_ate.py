@@ -20,7 +20,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from experiments.run_phase13_frozen_benchmark import load_phase10_sequence, build_pipeline_config
+from experiments.run_frozen_benchmark import load_benchmark_sequence, build_pipeline_config
 from research.pipeline import OnlineReconstructionPipeline
 from research.holdout_eval import compute_ate
 from research.reproducibility import set_seed
@@ -46,7 +46,7 @@ def main():
     W, H = 320, 240
     rows = []
     for sc in a.scenes:
-        frames, intr = load_phase10_sequence(scene_name=sc, n_frames=a.n_frames + 1,
+        frames, intr = load_benchmark_sequence(scene_name=sc, n_frames=a.n_frames + 1,
                                              H=H, W=W, device=a.device)
         for seed in a.seeds:
             set_seed(seed)

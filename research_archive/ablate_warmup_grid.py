@@ -11,8 +11,8 @@ import torch
 import pandas as pd
 import numpy as np
 
-from experiments.run_phase13_frozen_benchmark import (
-    load_phase10_sequence,
+from experiments.run_frozen_benchmark import (
+    load_benchmark_sequence,
     build_pipeline_config,
     run_policy_trajectory,
 )
@@ -32,7 +32,7 @@ def run_warmup_ablation(n_frames: int = 40, scene_name: str = "tum_fr2_xyz", see
     print("=" * 80)
 
     # 1. Preload sequence
-    frames, intrinsics = load_phase10_sequence(
+    frames, intrinsics = load_benchmark_sequence(
         scene_name=scene_name,
         n_frames=n_frames + 1,
         H=H,

@@ -63,7 +63,7 @@ Environment: Python 3.12, PyTorch 2.11 + CUDA 12.8, `gsplat` 1.5.3 (production r
 pytest tests -q   # 521 passed
 ```
 
-Three tests that failed at the previous `HEAD` were fixed during the cleanup: `format_budget_table` now prints `n/a` when no violation rate was measured, and the two `test_phase13_frozen_benchmark.py` fixtures were updated for fields the production code now requires (`*_depth_l1_pre`, `config_sha256`) and a renamed report section.
+Three tests that failed at the previous `HEAD` were fixed during the cleanup: `format_budget_table` now prints `n/a` when no violation rate was measured, and the two `test_frozen_benchmark.py` fixtures were updated for fields the production code now requires (`*_depth_l1_pre`, `config_sha256`) and a renamed report section.
 
 ## 4. Repository layout
 
@@ -81,7 +81,7 @@ Three tests that failed at the previous `HEAD` were fixed during the cleanup: `f
 
 ## 5. Development history
 
-The repository began as a learned-utility project (phases 1–11: oracle utility, TwoHeadMLP, closed-loop integration) and was reoriented after pose-convention and attribution bugs were found. The phase-labelled results and the tags `phase10-frozen`, `phase11-frozen`, `phase13-frozen` document that history only; they are **not** evidence for the causal claims above.
+The repository began as a learned-utility project (phases 1–11: oracle utility, TwoHeadMLP, closed-loop integration) and was reoriented after pose-convention and attribution bugs were found. Source files formerly named `phaseN_*` were renamed by function (mapping in `docs/RENAMES.json`; module map in `research/README.md`); result directories keep their original names because they are frozen data. The phase-labelled results and the tags `phase10-frozen`, `phase11-frozen`, `phase13-frozen` document that history only; they are **not** evidence for the causal claims above.
 
 ## 6. Citation
 

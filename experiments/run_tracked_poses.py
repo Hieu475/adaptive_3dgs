@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 import experiments.run_throttle_ablation as abl  # noqa: E402
-from experiments.run_phase13_frozen_benchmark import load_phase10_sequence  # noqa: E402
+from experiments.run_frozen_benchmark import load_benchmark_sequence  # noqa: E402
 from research.holdout_eval import compute_ate  # noqa: E402
 from research.pipeline import OnlineReconstructionPipeline  # noqa: E402
 from research.reproducibility import set_seed  # noqa: E402
@@ -40,7 +40,7 @@ def main():
     if args.device.startswith("cuda"):
         torch.cuda.set_per_process_memory_fraction(0.70, 0)
     for scene in args.scenes:
-        frames, intr = load_phase10_sequence(scene_name=scene, n_frames=args.n_frames + 1, H=240, W=320, device=args.device)
+        frames, intr = load_benchmark_sequence(scene_name=scene, n_frames=args.n_frames + 1, H=240, W=320, device=args.device)
         for seed in args.seeds:
             for cond in args.conditions:
                 target = args.out_dir / scene / f"{cond}_seed{seed}.json"

@@ -220,7 +220,7 @@ def main():
     source_paths = ["experiments/run_growth_starvation_factorial.py",
                     "experiments/analyze_growth_starvation_horizon.py",
                     "experiments/analyze_sequence_pose_motion.py",
-                    "experiments/run_phase13_frozen_benchmark.py",
+                    "experiments/run_frozen_benchmark.py",
                     "experiments/run_dilution_factorial.py",
                     "research/pipeline.py", "research/state_store.py",
                     "research/gaussian_repr.py", "research/reproducibility.py"]
