@@ -21,7 +21,7 @@ from src.control.growth_controller import VGGParams, VGGState, step  # noqa: E40
 from src.core.pipeline import OnlineReconstructionPipeline  # noqa: E402
 from src.control import time_budget as tb  # noqa: E402
 
-CONDITIONS = ("error_off", "spawn_cap_always20", "error_budget_prop", "vgg", "vgg_prop", "tt", "tt_vgg", "tt_cap")
+CONDITIONS = ("error_off", "spawn_cap_always20", "error_budget_prop", "vgg", "vgg_prop", "tt", "tt_vgg", "tt_cap", "tts", "tts_vgg")
 STATES = []
 TT_STATES = []
 _prev = OnlineReconstructionPipeline.process_frame
@@ -54,6 +54,11 @@ OnlineReconstructionPipeline.process_frame = _process
 def config_for(cond, seed, budget_ms, device, vgg_overrides=None, tt_overrides=None):
     if cond in ("error_off", "spawn_cap_always20", "error_budget_prop"):
         return abl.config_for(cond, seed, budget_ms, device)
+    if cond in ("tts", "tts_vgg"):
+        policy, cfg = config_for("vgg" if cond == "tts_vgg" else "error_off", seed, budget_ms, device, vgg_overrides)
+        cfg["scheduler"]["densify_budget_override_ms"] = budget_ms
+        cfg["time_target"] = {**(tt_overrides or {}), "mode": "steps"}
+        return policy, cfg
     if cond in ("tt", "tt_cap"):
         policy, cfg = abl.config_for("error_off" if cond == "tt" else "spawn_cap_always20", seed, budget_ms, device)
         cfg["scheduler"]["densify_budget_override_ms"] = budget_ms
@@ -91,6 +96,15 @@ def main():
     ap.add_argument("--T_ms", type=float, default=100.0)
     ap.add_argument("--gamma", type=float, default=0.5)
     ap.add_argument("--m_max", type=float, default=16.0)
+    ap.add_argument("--n_micro", type=int, default=None, help="override training.n_micro_steps (max optimization steps per Gaussian per frame)")
+    ap.add_argument("--n_max", type=float, default=24.0, help="steps mode: maximum optimization steps per frame")
+    ap.add_argument("--lr_mult", type=float, default=1.0, help="multiply all learning rates")
+    ap.add_argument("--tag_all", action="store_true", help="append --tag to every condition name")
+    ap.add_argument("--n_min", type=float, default=2.0)
+    ap.add_argument("--n_init", type=float, default=5.0)
+    ap.add_argument("--lr_groups", default="", help="per-group multipliers on top of --lr_mult, e.g. position:2,sh:0.5")
+    ap.add_argument("--loss_w", default="", help="loss weight overrides, e.g. ssim:0.4,depth:1")
+    ap.add_argument("--set", nargs="*", default=[], help="config overrides, e.g. densification.max_new_per_frame=1000")
     ap.add_argument("--offset", type=int, default=0, help="start the sequence at this frame (fresh window)")
     ap.add_argument("--tag", default="")
     ap.add_argument("--out_dir", type=Path, default=ROOT / "results" / "vgg")
@@ -103,12 +117,33 @@ def main():
         frames = frames[a.offset:]
         for seed in a.seeds:
             for cond in a.conditions:
-                name = cond + (a.tag if (cond.startswith("vgg") or cond.startswith("tt")) else "")
+                name = cond + (a.tag if (cond.startswith("vgg") or cond.startswith("tt") or a.tag_all) else "")
                 target = a.out_dir / sc / f"{name}_seed{seed}.json"
                 if target.exists():
                     continue
                 target.parent.mkdir(parents=True, exist_ok=True)
-                policy, cfg = config_for(cond, seed, 15.0, "cuda", ov, {"T_ms": a.T_ms, "gamma": a.gamma, "m_max": a.m_max})
+                policy, cfg = config_for(cond, seed, 15.0, "cuda", ov, {"T_ms": a.T_ms, "gamma": a.gamma, "m_max": a.m_max, "n_max": a.n_max, "n_min": a.n_min, "n_init": a.n_init})
+                if a.lr_mult != 1.0:
+                    lr = cfg["training"].setdefault("learning_rate", {"position": 4.0e-4, "scale": 5e-3, "rotation": 1e-3, "opacity": 5e-2, "sh": 1.0e-2})
+                    cfg["training"]["learning_rate"] = {k: v * a.lr_mult for k, v in lr.items()}
+                if a.lr_groups:
+                    for kv in a.lr_groups.split(","):
+                        g, v = kv.split(":")
+                        cfg["training"]["learning_rate"][g] *= float(v)
+                if a.loss_w:
+                    cfg.setdefault("losses", {})
+                    for kv in a.loss_w.split(","):
+                        g, v = kv.split(":")
+                        cfg["losses"]["weight_" + g] = float(v)
+                for kv in a.set:
+                    path, val = kv.split("=")
+                    node = cfg
+                    keys = path.split(".")
+                    for k in keys[:-1]:
+                        node = node.setdefault(k, {})
+                    node[keys[-1]] = type(node.get(keys[-1], 0.0))(float(val)) if not isinstance(node.get(keys[-1]), bool) else bool(float(val))
+                if a.n_micro is not None:
+                    cfg["training"]["n_micro_steps"] = a.n_micro
                 abl.ext.BUDGET_SCALES.clear()
                 STATES.clear()
                 TT_STATES.clear()

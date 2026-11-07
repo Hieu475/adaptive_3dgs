@@ -329,7 +329,7 @@ class OnlineReconstructionPipeline:
             {'params': [self.gaussian_model._features_rest], 'lr': lr.get('sh', 2.5e-3)},
             {'params': [self.gaussian_model._normals], 'lr': lr.get('position', 1.6e-4)},
         ]
-        self.optimizer = SelectiveAdam(params)
+        self.optimizer = SelectiveAdam(params, fused=bool(self.config.get('training', {}).get('fused_adam', False)))
     
     def _reregister_optimizer_params(self):
         """Re-register model parameters with the optimizer after compaction.
@@ -461,7 +461,7 @@ class OnlineReconstructionPipeline:
                 'color': self.config.get('losses', {}).get('weight_color', 0.8),
                 'depth': self.config.get('losses', {}).get('weight_depth', 0.5),
                 'ssim': self.config.get('losses', {}).get('weight_ssim', 0.2),
-                'ssim_implementation': self.config.get('losses', {}).get('ssim_implementation', 'direct'),
+                'ssim_implementation': self.config.get('losses', {}).get('ssim_implementation', 'separable'),
             }
             tile_size = self.config.get('rendering', {}).get('tile_size', 16)
             for init_step in range(init_refine_steps):
@@ -1586,7 +1586,7 @@ class OnlineReconstructionPipeline:
                 'color': self.config.get('losses', {}).get('weight_color', 0.8),
                 'depth': self.config.get('losses', {}).get('weight_depth', 0.5),
                 'ssim': self.config.get('losses', {}).get('weight_ssim', 0.2),
-                'ssim_implementation': self.config.get('losses', {}).get('ssim_implementation', 'direct'),
+                'ssim_implementation': self.config.get('losses', {}).get('ssim_implementation', 'separable'),
             }
             
             n_optimized = 0
@@ -1683,7 +1683,7 @@ class OnlineReconstructionPipeline:
                     if sync_stage_timing and str(self.device).startswith('cuda') and torch.cuda.is_available():
                         optimizer_step_event_start = torch.cuda.Event(enable_timing=True)
                         optimizer_step_event_start.record()
-                    self.optimizer.step(active_idx=active_subset['indices'])
+                    self.optimizer.step(active_idx=active_subset['indices'], dense=bool(active_subset.get('dense', False)))
                     if optimizer_step_event_start is not None:
                         optimizer_step_event_end = torch.cuda.Event(enable_timing=True)
                         optimizer_step_event_end.record()

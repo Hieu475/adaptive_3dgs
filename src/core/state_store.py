@@ -137,8 +137,9 @@ class GaussianStateStore:
             self.last_rgb_errors = torch.cat([self.last_rgb_errors, zeros], dim=0)
             
         # Log metadata
+        parent_list = [-1] * count if parent_ids is None else parents.tolist()  # one transfer, not one sync per Gaussian
         for idx, g_id in enumerate(new_ids_list):
-            p_id = int(parents[idx].item())
+            p_id = int(parent_list[idx])
             self._id_to_metadata[g_id] = {
                 'persistent_id': g_id,
                 'parent_id': p_id,

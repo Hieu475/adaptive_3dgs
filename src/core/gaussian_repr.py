@@ -54,6 +54,16 @@ def quaternion_to_rotation_matrix(q: torch.Tensor) -> torch.Tensor:
     return R
 
 
+def covariance_from_rotation_scale(R: torch.Tensor, s: torch.Tensor) -> torch.Tensor:
+    """Sigma = R diag(s)^2 R^T as an elementwise product (no batched 3x3 GEMM).
+
+    cuBLAS batched GEMM on millions of 3x3 matrices is slow in both directions; this equivalent
+    broadcast form is memory-bound and several times faster on the optimization-subset sizes used here.
+    """
+    M = R * s.unsqueeze(-2)                               # columns of R scaled by s
+    return (M.unsqueeze(-2) * M.unsqueeze(-3)).sum(-1)   # sum_k M_ik M_jk
+
+
 def build_scaling_matrix(scales: torch.Tensor) -> torch.Tensor:
     """Build diagonal scaling matrix from scale vector.
     
@@ -229,12 +239,8 @@ class GaussianModel(nn.Module):
         """
         R = quaternion_to_rotation_matrix(self._rotation)  # (N, 3, 3)
         s = self.scales  # (N, 3) - always positive via exp
-        S = build_scaling_matrix(s)  # (N, 3, 3)
-        
         # Σ = R @ S @ S^T @ R^T
-        RS = torch.bmm(R, S)  # (N, 3, 3)
-        cov = torch.bmm(RS, RS.transpose(1, 2))  # (N, 3, 3)
-        return cov
+        return covariance_from_rotation_scale(R, s)
     
     def get_optimization_subset(
         self,
@@ -274,20 +280,26 @@ class GaussianModel(nn.Module):
                 'opacities': torch.empty(0, device=self.device),
             }
             
-        # Sliced active parameters
-        xyz = self._xyz[active_idx]
-        scaling = self._scaling[active_idx]
-        rotation = self._rotation[active_idx]
-        opacity = self._opacity[active_idx]
-        features_dc = self._features_dc[active_idx]
-        features_rest = self._features_rest[active_idx] if self._features_rest.numel() > 0 else torch.empty(0, device=self.device)
-        normals = self._normals[active_idx] if self._normals.numel() > 0 else torch.empty(0, 3, device=self.device)
+        # Dense fast path: when every Gaussian is active the "subset" is the whole model, so the
+        # gather here and the matching scatters in the optimizer are pure overhead.
+        dense = (M == N)
+        if dense:
+            xyz, scaling, rotation, opacity = self._xyz, self._scaling, self._rotation, self._opacity
+            features_dc = self._features_dc
+            features_rest = self._features_rest if self._features_rest.numel() > 0 else torch.empty(0, device=self.device)
+            normals = self._normals if self._normals.numel() > 0 else torch.empty(0, 3, device=self.device)
+        else:
+            xyz = self._xyz[active_idx]
+            scaling = self._scaling[active_idx]
+            rotation = self._rotation[active_idx]
+            opacity = self._opacity[active_idx]
+            features_dc = self._features_dc[active_idx]
+            features_rest = self._features_rest[active_idx] if self._features_rest.numel() > 0 else torch.empty(0, device=self.device)
+            normals = self._normals[active_idx] if self._normals.numel() > 0 else torch.empty(0, 3, device=self.device)
         
         # Build active-only covariance (M, 3, 3)
         R_act = quaternion_to_rotation_matrix(rotation / (rotation.norm(dim=-1, keepdim=True) + 1e-8))
-        S_act = build_scaling_matrix(torch.exp(scaling))
-        M_act = torch.bmm(R_act, S_act)
-        cov3D = torch.bmm(M_act, M_act.transpose(1, 2))
+        cov3D = covariance_from_rotation_scale(R_act, torch.exp(scaling))
         
         if directions is None and extrinsics is not None and self.sh_degree > 0:
             from src.core.rasterizer import _view_directions
@@ -298,6 +310,7 @@ class GaussianModel(nn.Module):
         
         return {
             'indices': active_idx,
+            'dense': dense,
             'xyz': xyz,
             'scaling': scaling,
             'rotation': rotation,

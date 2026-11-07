@@ -17,6 +17,34 @@ import torch
 from typing import List, Dict, Optional, Tuple, Any
 
 
+def _adam_slice(g, m, v, steps, lr: float, beta1: float, beta2: float, eps: float):
+    """Elementwise Adam update on gathered slices; returns (new_m, new_v, delta). Fusable."""
+    m = beta1 * m + (1.0 - beta1) * g
+    v = beta2 * v + (1.0 - beta2) * (g * g)
+    step_f = steps.to(g.dtype)
+    while step_f.ndim < g.ndim:
+        step_f = step_f.unsqueeze(-1)
+    bc1 = 1.0 - beta1 ** step_f
+    bc2 = 1.0 - beta2 ** step_f
+    delta = (lr / bc1) * (m / (torch.sqrt(v) / torch.sqrt(bc2) + eps))
+    return m, v, delta
+
+
+_FUSED = {"fn": None, "tried": False}
+
+
+def _get_adam_fn(use_compile: bool):
+    if not use_compile:
+        return _adam_slice
+    if not _FUSED["tried"]:
+        _FUSED["tried"] = True
+        try:
+            _FUSED["fn"] = torch.compile(_adam_slice, dynamic=True)
+        except Exception:
+            _FUSED["fn"] = None
+    return _FUSED["fn"] or _adam_slice
+
+
 class SelectiveAdam:
     """Selective Adam optimizer that updates only active parameter slices."""
     
@@ -25,7 +53,9 @@ class SelectiveAdam:
         param_groups: List[Dict[str, Any]],
         betas: Tuple[float, float] = (0.9, 0.999),
         eps: float = 1e-8,
+        fused: bool = False,
     ):
+        self.fused = fused  # torch.compile the elementwise update (fewer kernel launches)
         self.param_groups = param_groups
         self.betas = betas
         self.eps = eps
@@ -56,7 +86,8 @@ class SelectiveAdam:
                     p.grad.zero_()
 
     @torch.no_grad()
-    def step(self, mask: Optional[torch.Tensor] = None, active_idx: Optional[torch.Tensor] = None):
+    def step(self, mask: Optional[torch.Tensor] = None, active_idx: Optional[torch.Tensor] = None,
+             dense: bool = False):
         """Perform selective Adam update step on active indices only.
         
         Args:
@@ -77,6 +108,21 @@ class SelectiveAdam:
                     self._init_param_state(p)
                     
                 state = self.state[p]
+
+                if dense:
+                    # All Gaussians active: in-place update, no gather/scatter.
+                    g = p.grad
+                    m, v, steps = state['exp_avg'], state['exp_avg_sq'], state['step']
+                    steps += 1
+                    m.mul_(beta1).add_(g, alpha=1.0 - beta1)
+                    v.mul_(beta2).addcmul_(g, g, value=1.0 - beta2)
+                    step_f = steps.to(g.dtype)
+                    while step_f.ndim < g.ndim:
+                        step_f = step_f.unsqueeze(-1)
+                    bc1 = 1.0 - beta1 ** step_f
+                    bc2 = 1.0 - beta2 ** step_f
+                    p.data.sub_((lr / bc1) * (m / (torch.sqrt(v) / torch.sqrt(bc2) + self.eps)))
+                    continue
                 
                 # Resolve active indices
                 if active_idx is not None:
@@ -97,29 +143,11 @@ class SelectiveAdam:
                 v = state['exp_avg_sq'][indices]
                 steps = state['step'][indices] + 1
                 state['step'][indices] = steps
-                
-                # Sliced Adam momentum update: O(M)
-                m = beta1 * m + (1.0 - beta1) * g
-                v = beta2 * v + (1.0 - beta2) * (g * g)
-                
-                state['exp_avg'][indices] = m
-                state['exp_avg_sq'][indices] = v
-                
-                # Bias correction per Gaussian step
-                # Step tensor shape broadcast
-                step_f = steps.float()
-                # Expand dims to match parameter rank
-                while step_f.ndim < p.ndim:
-                    step_f = step_f.unsqueeze(-1)
-                    
-                bias_correction1 = 1.0 - beta1 ** step_f
-                bias_correction2 = 1.0 - beta2 ** step_f
-                
-                step_size = lr / bias_correction1
-                denom = (torch.sqrt(v) / torch.sqrt(bias_correction2)) + self.eps
-                
-                # Update parameter data strictly for active slice
-                p.data[indices] -= step_size * (m / denom)
+                fn = _get_adam_fn(self.fused)
+                m_new, v_new, delta = fn(g, m, v, steps, float(lr), beta1, beta2, self.eps)
+                state['exp_avg'][indices] = m_new
+                state['exp_avg_sq'][indices] = v_new
+                p.data[indices] -= delta
 
     def extend_state(self, n_new: int, device: Optional[torch.device] = None):
         """Extend optimizer momentum and variance state for n_new added Gaussians without reset."""
