@@ -1,0 +1,15 @@
+{
+ "scene": "fr1_xyz",
+ "cond": "orig",
+ "seed": 42,
+ "n_frames": 150,
+ "track_iters": 100,
+ "ate_all_m": 0.010318084150451922,
+ "ate_every5_m": 0.010633241601124745,
+ "mapped_psnr": 20.438029951721656,
+ "heldout_psnr": 19.940761884053547,
+ "track_ms": 542.7115507581702,
+ "map_ms": 66.19242952338455,
+ "N_final": 124371,
+ "n_heldout": 18
+}

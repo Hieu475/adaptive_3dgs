@@ -244,6 +244,34 @@ def main():
     setm("engClosedDAteMin", min(d_a), "{:.1f}"); setm("engClosedDAteMax", max(d_a), "{:.1f}")
     setm("engClosedAteWorse", int(sum(x > 0 for x in d_a)), "{:d}")
 
+    # ---- MonoGS tracker + our mapper (hybrid) versus original MonoGS
+    hy = {}
+    for f in (R / "monogs_hybrid").glob("*_seed*.json"):
+        j = json.loads(f.read_text()); hy.setdefault(j["scene"], {})[j["cond"]] = j
+    mb = json.loads((R / "monogs_hybrid/monogs_baseline.json").read_text())["runs"]
+    L = [r"\begin{table}[t]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{3pt}", r"\begin{tabular}{llrrr}", r"\toprule",
+         r"\textbf{Scene} & \textbf{System} & PSNR & ATE & ms/frame \\", r"\midrule"]
+    dps, dat, spd = [], [], []
+    for sc in ("fr1_desk", "fr2_xyz", "fr1_xyz"):
+        m = mb[sc]; mms = 1000 * m["total_s"] / m["n_frames"]
+        L.append("\\texttt{" + sc.replace("_", "\\_") + f"}} & MonoGS & {m['psnr']:.1f} & {m['ate_cm']:.2f} cm & {mms:.0f} \\\\")
+        for c, lab in (("orig", "MonoGS tracker + original mapper"), ("k3", "MonoGS tracker + ours, $K{=}3$"), ("k10", "MonoGS tracker + ours, $K{=}10$")):
+            j = hy[sc][c]; ms = j["track_ms"] + j["map_ms"]
+            L.append(f" & {lab} & {j['heldout_psnr']:.1f} & {100 * j['ate_every5_m']:.2f} cm & {ms:.0f} \\\\")
+            if c == "k3":
+                dps.append(j["heldout_psnr"] - m["psnr"]); dat.append(100 * j["ate_every5_m"] - m["ate_cm"]); spd.append(mms / ms)
+        L.append(r"\midrule")
+    L[-1] = r"\bottomrule"
+    L += [r"\end{tabular}", r"\caption{\textbf{MonoGS tracking with our mapper.} Original MonoGS (RGB-D, single thread) versus MonoGS's tracker run against the map built by our mapper, first 150 frames of each sequence at $640{\times}480$, one run each. PSNR: MonoGS on non-keyframes, ours on every eighth frame, which is tracked but never mapped (both rendered at the estimated pose). ATE: Umeyama-aligned RMSE, MonoGS on its keyframes, ours on every fifth frame. Time: MonoGS total per frame; ours tracking plus mapping.}",
+          r"\label{tab:hybrid}", r"\end{table}"]
+    (OUT / "tab_engine_hybrid.tex").write_text("\n".join(L) + "\n")
+    setm("engHybPsnrGainMin", min(dps), "{:.1f}"); setm("engHybPsnrGainMax", max(dps), "{:.1f}")
+    setm("engHybAteMin", min(dat), "{:.2f}"); setm("engHybAteMax", max(dat), "{:.2f}")
+    setm("engHybSpeedMin", min(spd), "{:.1f}"); setm("engHybSpeedMax", max(spd), "{:.1f}")
+    setm("engHybTrackShare", float(np.mean([hy[sc][c]["track_ms"] / (hy[sc][c]["track_ms"] + hy[sc][c]["map_ms"]) for sc in hy for c in ("k3", "k10")]) * 100), "{:.0f}")
+    setm("engHybOrigPsnrMin", min(hy[sc]["orig"]["heldout_psnr"] - mb[sc]["psnr"] for sc in hy), "{:.1f}")
+    setm("engHybOrigPsnrMax", max(hy[sc]["orig"]["heldout_psnr"] - mb[sc]["psnr"] for sc in hy), "{:.1f}")
+
     # ---- Pareto figure
     import matplotlib
     matplotlib.use("Agg")

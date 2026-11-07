@@ -321,5 +321,14 @@
  "engClosedDPsnrMax": 13.973215943442447,
  "engClosedDAteMin": -1.289038445616809,
  "engClosedDAteMax": 6.711737610917093,
- "engClosedAteWorse": 2
+ "engClosedAteWorse": 2,
+ "engHybPsnrGainMin": 3.0130333755955547,
+ "engHybPsnrGainMax": 10.937637752956814,
+ "engHybAteMin": -0.2748924908564993,
+ "engHybAteMax": 0.4597931555447945,
+ "engHybSpeedMin": 1.1194091968228586,
+ "engHybSpeedMax": 1.4222482617219332,
+ "engHybTrackShare": 87.72339488287591,
+ "engHybOrigPsnrMin": -1.3086306254069022,
+ "engHybOrigPsnrMax": 3.8328628540039062
 }

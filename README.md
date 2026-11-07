@@ -16,6 +16,8 @@ With a fast GPU rasterizer a frame costs about 16 ms plus 5.2 ms per optimizatio
 | Optimizer ablation at K=10 (all three parts removed) | −6.98 dB | `results/engine_ablation/` |
 | Time target met | within 3.7% (45–90 ms) | `results/engine/` |
 
+MonoGS integration (`results/monogs_hybrid/`, `experiments/run_monogs_hybrid.py`): MonoGS's own tracker run against our map on three TUM sequences gives held-out PSNR +3.0 to +10.9 dB over original MonoGS at 1.1–1.4× speed, ATE change −0.27 to +0.46 cm (one run each, protocols differ, see the paper).
+
 Negative results (do not beat uniform steps at equal time): value-gated growth, early stopping, error-proportional step allocation, keyframe replay (`results/engine_dev/`, `results/holdout_dev/`). Commands: `bash paper_repro/reproduce.sh engine`. Older analysis of the original budgeted system (compute dilution, throttling, earlier controllers) is kept below and in the supplement.
 
 ---

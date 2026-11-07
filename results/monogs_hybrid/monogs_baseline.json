@@ -1,0 +1,23 @@
+{
+ "system": "MonoGS (muskie82) original RGB-D, single thread, first 150 frames, 640x480, no final refinement; keyframe ATE (aligned), PSNR on non-keyframes at estimated poses; one run each",
+ "runs": {
+  "fr1_desk": {
+   "psnr": 18.903841018676758,
+   "ate_cm": 1.5735120578475352,
+   "total_s": 135.77434375,
+   "n_frames": 150
+  },
+  "fr2_xyz": {
+   "psnr": 20.34102047814263,
+   "ate_cm": 0.5939079743062627,
+   "total_s": 88.7493203125,
+   "n_frames": 150
+  },
+  "fr1_xyz": {
+   "psnr": 20.330162221735176,
+   "ate_cm": 1.0747063162829706,
+   "total_s": 139.1990625,
+   "n_frames": 150
+  }
+ }
+}

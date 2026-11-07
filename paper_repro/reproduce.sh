@@ -8,7 +8,7 @@ export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 cmd="${1:-list}"
 case "$cmd" in
   list)
-    sed -n '2,3p' "$0"; echo "targets: check main factorial depth adaptive scenes counterfactual extension dose scenes_budget long ablation holdout_ext engine compute tracked closedloop countcap controllers tables holdout tracking figs" ;;
+    sed -n '2,3p' "$0"; echo "targets: check main factorial depth adaptive scenes counterfactual extension dose scenes_budget long ablation holdout_ext engine monogs compute tracked closedloop countcap controllers tables holdout tracking figs" ;;
   check)
     $PY paper_repro/check_numbers.py ;;
   main)   # Tab. 1 + Tab. 2 + Fig. 1: traceable rerun from a tagged commit (writes results/rerun_paper1/).
@@ -96,6 +96,11 @@ case "$cmd" in
     $PY experiments/render_qualitative_engine.py --scenes tum_fr1_xyz --out docs/paper/iccv_official/figs/fig_engine_qualitative.pdf
     $PY experiments/render_qualitative_engine.py --scenes tum_fr3_sitting_static --out docs/paper/iccv_official/figs/fig_engine_qualitative2.pdf
     $PY paper_repro/make_engine.py ;;
+  monogs)     # MonoGS tracker + our mapper (needs a MonoGS checkout built in its own env, see results/monogs_check/README.md)
+    for c in fr1_desk fr2_xyz fr1_xyz; do
+      $PY experiments/run_monogs_hybrid.py --monogs "$MONOGS" --config configs/rgbd/tum/${c}_local.yaml --conds orig k3 k6 k10 --n_frames 150
+    done
+    echo "original MonoGS: run slam.py with MONOGS_MAX_FRAMES=150 MONOGS_REFINE_ITERS=1 and the *_local.yaml configs; parse into results/monogs_hybrid/monogs_baseline.json" ;;
   countcap)   # TT+VGG vs size-matched hard count caps (needs results/vgg_test)
     $PY experiments/run_count_cap.py --scenes tum_fr2_xyz tum_fr1_xyz tum_fr1_rpy tum_fr1_room tum_fr3_sitting_static replica_office0 replica_office1 replica_office3 replica_office4 replica_room0 replica_room2 --seeds 42 43
     $PY experiments/analyze_count_cap.py ;;

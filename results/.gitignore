@@ -300,3 +300,5 @@ results/*.DONE
 engine_v1_prebetas/
 !monogs_check/
 !monogs_check/*
+!monogs_hybrid/
+!monogs_hybrid/*.json
