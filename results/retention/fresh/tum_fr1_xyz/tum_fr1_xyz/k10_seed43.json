@@ -1,0 +1,12 @@
+{
+ "scene": "tum_fr1_xyz",
+ "cond": "k10",
+ "seed": 43,
+ "n_frames": 151,
+ "n_heldout": 30,
+ "heldout_causal": 24.751945368448894,
+ "heldout_final": 18.21459827423096,
+ "mapped_early_final": 18.681244237082346,
+ "mapped_late_final": 18.481244904654368,
+ "N_final": 71677
+}

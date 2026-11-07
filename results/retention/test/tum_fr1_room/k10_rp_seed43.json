@@ -1,0 +1,12 @@
+{
+ "scene": "tum_fr1_room",
+ "cond": "k10_rp",
+ "seed": 43,
+ "n_frames": 100,
+ "n_heldout": 19,
+ "heldout_causal": 18.410165887129935,
+ "heldout_final": 17.49815559387207,
+ "mapped_early_final": 16.914823532104492,
+ "mapped_late_final": 18.497141944037544,
+ "N_final": 92253
+}

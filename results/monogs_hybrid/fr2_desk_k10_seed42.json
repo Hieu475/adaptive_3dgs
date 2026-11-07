@@ -1,0 +1,16 @@
+{
+ "scene": "fr2_desk",
+ "cond": "k10",
+ "seed": 42,
+ "n_frames": 150,
+ "track_iters": 100,
+ "ate_all_m": 0.02336534658428104,
+ "ate_every5_m": 0.023532722807531856,
+ "mapped_psnr": 34.99757566452026,
+ "heldout_psnr": 28.277660830267543,
+ "heldout_final_psnr": 11.64558584936734,
+ "track_ms": 789.8079454838282,
+ "map_ms": 123.0565198390876,
+ "N_final": 123141,
+ "n_heldout": 29
+}

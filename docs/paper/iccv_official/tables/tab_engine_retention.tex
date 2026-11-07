@@ -1,0 +1,21 @@
+\begin{table}[t]
+\centering
+\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lrrrrrr}
+\toprule
+& \multicolumn{3}{c}{11 test scenes} & \multicolumn{3}{c}{5 fresh windows} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+\textbf{Method} & next & final & early & next & final & early \\
+\midrule
+original system & 21.8 & 23.2 & 22.8 & 20.9 & 18.5 & 17.5 \\
+\midrule
+$K{=}3$ steps & 24.8 & 24.0 & 23.1 & 23.4 & 18.0 & 16.9 \\
+$K{=}3$ + replay & 24.3 & 25.3 & 24.6 & 22.7 & 19.8 & 19.3 \\
+\midrule
+$K{=}10$ steps & 25.4 & 22.9 & 22.0 & 24.5 & 17.3 & 15.9 \\
+$K{=}10$ + replay & 25.4 & 25.5 & 24.8 & 24.1 & 20.3 & 20.3 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Keeping earlier views.} Mean PSNR (dB) with ground-truth poses; frames with index divisible by 5 are never mapped. next: those frames when they arrive; final: the final map on those frames; early: the final map on mapped frames of the first third of the sequence. Two seeds. Keyframe replay (every third step uses a stored past frame) is the last-listed addition.}
+\label{tab:keep}
+\end{table}

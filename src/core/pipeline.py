@@ -554,6 +554,10 @@ class OnlineReconstructionPipeline:
             raise RuntimeError("Pipeline not initialized. Call initialize() first.")
 
         frame_start = time.time()
+        if not hasattr(self, '_replay_buf'):
+            import numpy as _np
+            self._replay_buf, self._replay_seen = [], 0
+            self._replay_rng = _np.random.default_rng(int(self.config.get('seed', 0)))
         if self._repro_trace_enabled:
             self._repro_trace = []
         rgb = rgb.to(self.device)
@@ -1635,28 +1639,44 @@ class OnlineReconstructionPipeline:
                 if sync_stage_timing and str(self.device).startswith('cuda') and torch.cuda.is_available():
                     forward_event_start = torch.cuda.Event(enable_timing=True)
                     forward_event_start.record()
-                active_subset = self.gaussian_model.get_optimization_subset(step_mask, extrinsics=self.current_pose)
+                # Keyframe replay (optional): every `every`-th step optimizes a frame drawn from a reservoir of
+                # past mapped frames instead of the current one, to keep earlier views fitted. Only used when
+                # every Gaussian is active, so no cached background is involved.
+                rp = self.config.get('training', {}).get('replay')
+                replay_kf = None
+                if (rp and step_i > 0 and (step_i + 1) % int(rp.get('every', 3)) == 0 and self._replay_buf
+                        and bool(step_mask[:n_gaussians].all())):
+                    replay_kf = self._replay_buf[int(self._replay_rng.integers(len(self._replay_buf)))]
+                tgt_rgb, tgt_depth, tgt_pose = (replay_kf if replay_kf is not None else (rgb, depth, self.current_pose))
+                active_subset = self.gaussian_model.get_optimization_subset(step_mask, extrinsics=tgt_pose)
                 
-                composite_opt = self.bg_cache.composite_with_active(
-                    active_subset=active_subset,
-                    extrinsics=self.current_pose,
-                    intrinsics=self.intrinsics,
-                    image_width=W,
-                    image_height=H,
-                    tile_size=self.config['rendering']['tile_size'],
-                    backend=renderer_backend,
-                )
+                if replay_kf is not None:
+                    composite_opt = rasterize_scene(
+                        means3D=active_subset['means3D'], cov3D=active_subset['cov3D'],
+                        colors=active_subset['colors'], opacities=active_subset['opacities'],
+                        extrinsics=tgt_pose, intrinsics=self.intrinsics, image_width=W, image_height=H,
+                        tile_size=self.config['rendering']['tile_size'], backend=renderer_backend)
+                else:
+                    composite_opt = self.bg_cache.composite_with_active(
+                        active_subset=active_subset,
+                        extrinsics=self.current_pose,
+                        intrinsics=self.intrinsics,
+                        image_width=W,
+                        image_height=H,
+                        tile_size=self.config['rendering']['tile_size'],
+                        backend=renderer_backend,
+                    )
                 
                 rendered_opt_color = composite_opt['color']
                 rendered_opt_depth = composite_opt['depth']
                 depth_valid_mask = (
                     (composite_opt['alpha'] >= alpha_threshold)
-                    & torch.isfinite(depth) & (depth > 0)
+                    & torch.isfinite(tgt_depth) & (tgt_depth > 0)
                 )
                 
                 losses = total_loss(
-                    rendered_opt_color, rgb,
-                    rendered_opt_depth, depth,
+                    rendered_opt_color, tgt_rgb,
+                    rendered_opt_depth, tgt_depth,
                     weights,
                     depth_valid_mask=depth_valid_mask,
                 )
@@ -1704,6 +1724,17 @@ class OnlineReconstructionPipeline:
                     
             self.optimizer.lr_scale = 1.0
             opt_loss_val = losses['total'].item()
+            rp_cfg = self.config.get('training', {}).get('replay')
+            if rp_cfg and self.frame_count % int(rp_cfg.get('stride', 2)) == 0:
+                item = (rgb.detach(), depth.detach(), self.current_pose.detach().clone())
+                self._replay_seen += 1
+                size = int(rp_cfg.get('size', 32))
+                if len(self._replay_buf) < size:
+                    self._replay_buf.append(item)
+                else:  # reservoir sampling keeps a uniform sample of the whole history
+                    j = int(self._replay_rng.integers(self._replay_seen))
+                    if j < size:
+                        self._replay_buf[j] = item
             opt_time = time.time() - opt_start
 
         self._trace_stage('post_optimization', {

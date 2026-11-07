@@ -1,0 +1,12 @@
+{
+ "scene": "tum_fr3_sitting_static",
+ "cond": "orig",
+ "seed": 43,
+ "n_frames": 100,
+ "n_heldout": 19,
+ "heldout_causal": 24.653743191769248,
+ "heldout_final": 22.614209526463558,
+ "mapped_early_final": 18.22961351606581,
+ "mapped_late_final": 24.929074181450737,
+ "N_final": 16113
+}

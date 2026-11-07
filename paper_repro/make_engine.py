@@ -129,8 +129,9 @@ def main():
     mean = lambda c, s, i: float(np.mean([x[i] for x in h[c][s]]))
     L = [r"\begin{table}[t]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{3pt}", r"\begin{tabular}{llrrrr}", r"\toprule",
          r"& & " + " & ".join({"tum_fr2_xyz": "fr2", "tum_fr1_xyz": "fr1", "replica_office0": "off0", "replica_office1": "off1"}[s] for s in SCEN4) + r" \\", r"\midrule",
-         "original & mapped / held-out & " + " & ".join(f"{mean('error_off', s, 0):.1f} / {mean('error_off', s, 1):.1f}" for s in SCEN4) + r" \\", r"\midrule"]
-    for lab, c in (("$K{=}3$", "fixK3"), ("$K{=}10$", "fixK10"), ("TT-S+VGG, $T{=}75$", "tts_vgg_T75")):
+         "original & mapped & " + " & ".join(f"{mean('error_off', s, 0):.1f}" for s in SCEN4) + r" \\",
+         " & held-out & " + " & ".join(f"{mean('error_off', s, 1):.1f}" for s in SCEN4) + r" \\", r"\midrule"]
+    for lab, c in (("$K{=}3$", "fixK3"), ("$K{=}10$", "fixK10"), ("TTS, $T{=}75$", "tts_vgg_T75")):
         L.append(f"{lab} & $\\Delta$ mapped & " + " & ".join(sgn(mean(c, s, 0) - mean('error_off', s, 0), 1) for s in SCEN4) + r" \\")
         L.append(" & $\\Delta$ held-out & " + " & ".join(sgn(mean(c, s, 1) - mean('error_off', s, 1), 1) for s in SCEN4) + r" \\")
         for s in SCEN4:
@@ -244,33 +245,86 @@ def main():
     setm("engClosedDAteMin", min(d_a), "{:.1f}"); setm("engClosedDAteMax", max(d_a), "{:.1f}")
     setm("engClosedAteWorse", int(sum(x > 0 for x in d_a)), "{:d}")
 
-    # ---- MonoGS tracker + our mapper (hybrid) versus original MonoGS
+    # ---- retention: final-map PSNR on frames that were never mapped (and early mapped frames)
+    def load_ret(split):
+        u = {}
+        for f in (R / "retention" / split).glob("**/*_seed*.json"):
+            j = json.loads(f.read_text()); u.setdefault(j["scene"] + ("@" + str(f.parent.parent.name) if split == "fresh" else ""), {}).setdefault(j["cond"], []).append(j)
+        return u
+    RC = ["orig", "k3", "k3_rp", "k10", "k10_rp"]
+    RL = {"orig": "original system", "k3": "$K{=}3$ steps", "k3_rp": "$K{=}3$ + replay", "k10": "$K{=}10$ steps", "k10_rp": "$K{=}10$ + replay"}
+    L = [r"\begin{table}[t]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{3pt}", r"\begin{tabular}{lrrrrrr}", r"\toprule",
+         r"& \multicolumn{3}{c}{11 test scenes} & \multicolumn{3}{c}{5 fresh windows} \\", r"\cmidrule(lr){2-4}\cmidrule(lr){5-7}",
+         r"\textbf{Method} & next & final & early & next & final & early \\", r"\midrule"]
+    RET = {}
+    for split in ("test", "fresh"):
+        U = {k: v for k, v in load_ret(split).items() if all(c in v for c in RC)}
+        RET[split] = U
+    for c in RC:
+        cells = []
+        for split in ("test", "fresh"):
+            U = RET[split]
+            for m in ("heldout_causal", "heldout_final", "mapped_early_final"):
+                v = float(np.mean([np.mean([x[m] for x in u[c]]) for u in U.values()]))
+                cells.append(f"{v:.1f}")
+                setm(f"engKeep{split.title()}{cname(c)}{cname(m)}", v, "{:.2f}")
+        L.append(RL[c] + " & " + " & ".join(cells) + r" \\")
+        if c in ("orig", "k3_rp"):
+            L.append(r"\midrule")
+    L += [r"\bottomrule", r"\end{tabular}",
+          r"\caption{\textbf{Keeping earlier views.} Mean PSNR (dB) with ground-truth poses; frames with index divisible by 5 are never mapped. next: those frames when they arrive; final: the final map on those frames; early: the final map on mapped frames of the first third of the sequence. Two seeds. Keyframe replay (every third step uses a stored past frame) is the last-listed addition.}",
+          r"\label{tab:keep}", r"\end{table}"]
+    (OUT / "tab_engine_retention.tex").write_text("\n".join(L) + "\n")
+    for split in ("test", "fresh"):
+        U = RET[split]
+        for a_, b_ in (("k3_rp", "k3"), ("k3_rp", "orig"), ("k10_rp", "k10"), ("k10_rp", "orig"), ("k3", "orig"), ("k10", "orig")):
+            d = np.array([np.mean([x["heldout_final"] for x in u[a_]]) - np.mean([x["heldout_final"] for x in u[b_]]) for u in U.values()])
+            base = f"engKeepD{split.title()}{cname(a_)}Minus{cname(b_)}"
+            setm(base + "Mean", float(d.mean()), "{:.2f}"); setm(base + "Worst", float(d.min()), "{:.2f}"); setm(base + "Pos", int((d > 0).sum()), "{:d}")
+        setm(f"engKeep{split.title()}N", len(U), "{:d}")
+    tm = {}
+    for f in (R / "retention_time").glob("*/*.json"):
+        j = json.loads(f.read_text()); tm.setdefault(j["cond"], []).append(j["mean_frame_ms"])
+    setm("engReplayTimeOverheadKThree", float(100 * (np.mean(tm["k3_rp"]) / np.mean(tm["k3"]) - 1)), "{:.0f}")
+    setm("engReplayTimeOverheadKTen", float(100 * (np.mean(tm["k10_rp"]) / np.mean(tm["k10"]) - 1)), "{:.0f}")
+
+    # ---- MonoGS tracker + our mapper (hybrid) versus original MonoGS, MonoGS' own protocol
     hy = {}
     for f in (R / "monogs_hybrid").glob("*_seed*.json"):
         j = json.loads(f.read_text()); hy.setdefault(j["scene"], {})[j["cond"]] = j
-    mb = json.loads((R / "monogs_hybrid/monogs_baseline.json").read_text())["runs"]
-    L = [r"\begin{table}[t]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{3pt}", r"\begin{tabular}{llrrr}", r"\toprule",
-         r"\textbf{Scene} & \textbf{System} & PSNR & ATE & ms/frame \\", r"\midrule"]
-    dps, dat, spd = [], [], []
-    for sc in ("fr1_desk", "fr2_xyz", "fr1_xyz"):
-        m = mb[sc]; mms = 1000 * m["total_s"] / m["n_frames"]
-        L.append("\\texttt{" + sc.replace("_", "\\_") + f"}} & MonoGS & {m['psnr']:.1f} & {m['ate_cm']:.2f} cm & {mms:.0f} \\\\")
-        for c, lab in (("orig", "MonoGS tracker + original mapper"), ("k3", "MonoGS tracker + ours, $K{=}3$"), ("k10", "MonoGS tracker + ours, $K{=}10$")):
-            j = hy[sc][c]; ms = j["track_ms"] + j["map_ms"]
-            L.append(f" & {lab} & {j['heldout_psnr']:.1f} & {100 * j['ate_every5_m']:.2f} cm & {ms:.0f} \\\\")
-            if c == "k3":
-                dps.append(j["heldout_psnr"] - m["psnr"]); dat.append(100 * j["ate_every5_m"] - m["ate_cm"]); spd.append(mms / ms)
-        L.append(r"\midrule")
-    L[-1] = r"\bottomrule"
-    L += [r"\end{tabular}", r"\caption{\textbf{MonoGS tracking with our mapper.} Original MonoGS (RGB-D, single thread) versus MonoGS's tracker run against the map built by our mapper, first 150 frames of each sequence at $640{\times}480$, one run each. PSNR: MonoGS on non-keyframes, ours on every eighth frame, which is tracked but never mapped (both rendered at the estimated pose). ATE: Umeyama-aligned RMSE, MonoGS on its keyframes, ours on every fifth frame. Time: MonoGS total per frame; ours tracking plus mapping.}",
-          r"\label{tab:hybrid}", r"\end{table}"]
+    mb = json.loads((R / "monogs_hybrid/monogs_baseline.json").read_text())
+    SC = ["fr1_desk", "fr2_xyz", "fr1_xyz", "fr1_rpy", "fr2_desk", "fr3_sitting_static"]
+    L = [r"\begin{table*}[t]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{3.5pt}", r"\begin{tabular}{lrrrrrrrrrr}", r"\toprule",
+         r"& \multicolumn{2}{c}{MonoGS} & \multicolumn{2}{c}{+ original mapper} & \multicolumn{2}{c}{+ ours $K{=}3$} & \multicolumn{2}{c}{+ ours $K{=}3$, replay} & \multicolumn{2}{c}{+ ours $K{=}10$, replay} \\",
+         r"\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}\cmidrule(lr){10-11}",
+         r"\textbf{Sequence} & dB & cm & dB & cm & dB & cm & dB & cm & dB & cm \\", r"\midrule"]
+    cols = ("orig", "k3", "k3_rp", "k10_rp")
+    acc = {c: [] for c in ("mono",) + cols}
+    for sc in SC:
+        m = mb[sc]; row = [f"{m['psnr']:.1f} & {m['ate5']:.2f}"]; acc["mono"].append((m["psnr"], m["ate5"], m["ms"]))
+        for c in cols:
+            j = hy[sc][c]; row.append(f"{j['heldout_final_psnr']:.1f} & {100 * j['ate_every5_m']:.2f}")
+            acc[c].append((j["heldout_final_psnr"], 100 * j["ate_every5_m"], j["track_ms"] + j["map_ms"]))
+        L.append("\\texttt{" + sc.replace("_", "\\_") + "} & " + " & ".join(row) + r" \\")
+    L.append(r"\midrule")
+    L.append("mean & " + " & ".join(f"{np.mean([x[0] for x in acc[k]]):.1f} & {np.mean([x[1] for x in acc[k]]):.2f}" for k in ("mono",) + cols) + r" \\")
+    L.append("ms/frame & \\multicolumn{2}{c}{" + f"{np.mean([x[2] for x in acc['mono']]):.0f}" + "} & " + " & ".join("\\multicolumn{2}{c}{" + f"{np.mean([x[2] for x in acc[k]]):.0f}" + "}" for k in cols) + r" \\")
+    L += [r"\bottomrule", r"\end{tabular}",
+          r"\caption{\textbf{MonoGS's tracker with our mapper, under MonoGS's own evaluation.} First 150 frames of six TUM sequences at $640{\times}480$, one run per entry. dB: PSNR of the final map on every fifth frame (MonoGS: those that are not keyframes; ours: all of them, none was mapped), rendered at the estimated pose. cm: Umeyama-aligned ATE RMSE over every fifth tracked frame. Per-frame time is MonoGS's total, or tracking plus mapping.}",
+          r"\label{tab:hybrid}", r"\end{table*}"]
     (OUT / "tab_engine_hybrid.tex").write_text("\n".join(L) + "\n")
-    setm("engHybPsnrGainMin", min(dps), "{:.1f}"); setm("engHybPsnrGainMax", max(dps), "{:.1f}")
-    setm("engHybAteMin", min(dat), "{:.2f}"); setm("engHybAteMax", max(dat), "{:.2f}")
-    setm("engHybSpeedMin", min(spd), "{:.1f}"); setm("engHybSpeedMax", max(spd), "{:.1f}")
-    setm("engHybTrackShare", float(np.mean([hy[sc][c]["track_ms"] / (hy[sc][c]["track_ms"] + hy[sc][c]["map_ms"]) for sc in hy for c in ("k3", "k10")]) * 100), "{:.0f}")
-    setm("engHybOrigPsnrMin", min(hy[sc]["orig"]["heldout_psnr"] - mb[sc]["psnr"] for sc in hy), "{:.1f}")
-    setm("engHybOrigPsnrMax", max(hy[sc]["orig"]["heldout_psnr"] - mb[sc]["psnr"] for sc in hy), "{:.1f}")
+    mean = lambda k, i: float(np.mean([x[i] for x in acc[k]]))
+    setm("engHybMonoPsnr", mean("mono", 0)); setm("engHybMonoAte", mean("mono", 1)); setm("engHybMonoMs", mean("mono", 2), "{:.0f}")
+    for c in cols:
+        setm(f"engHyb{cname(c)}Psnr", mean(c, 0)); setm(f"engHyb{cname(c)}Ate", mean(c, 1)); setm(f"engHyb{cname(c)}Ms", mean(c, 2), "{:.0f}")
+    setm("engHybSpeedup", mean("mono", 2) / mean("k3_rp", 2), "{:.1f}")
+    setm("engHybGapKThreeRp", mean("k3_rp", 0) - mean("mono", 0), "{:.1f}")
+    setm("engHybGapAbs", abs(mean("k3_rp", 0) - mean("mono", 0)), "{:.1f}")
+    d = [acc["k3_rp"][i][0] - acc["mono"][i][0] for i in range(len(SC))]
+    setm("engHybWorstScenes", int(sum(x < 0 for x in d)), "{:d}")
+    setm("engHybBetterScenes", int(sum(x > 0 for x in d)), "{:d}"); setm("engHybScenes", len(SC), "{:d}")
+    setm("engHybWorstGap", min(d), "{:.1f}"); setm("engHybBestGap", max(d), "{:.1f}")
+    setm("engHybReplayGain", mean("k3_rp", 0) - mean("k3", 0), "{:.1f}")
 
     # ---- Pareto figure
     import matplotlib

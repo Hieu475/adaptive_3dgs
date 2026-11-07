@@ -1,0 +1,16 @@
+{
+ "scene": "fr3_sitting_static",
+ "cond": "orig",
+ "seed": 42,
+ "n_frames": 150,
+ "track_iters": 100,
+ "ate_all_m": 0.005831675760673838,
+ "ate_every5_m": 0.006293297751166011,
+ "mapped_psnr": 22.87230304082235,
+ "heldout_psnr": 22.400074333980164,
+ "heldout_final_psnr": 11.271847889341156,
+ "track_ms": 445.9822553496311,
+ "map_ms": 63.482856550628966,
+ "N_final": 76980,
+ "n_heldout": 29
+}

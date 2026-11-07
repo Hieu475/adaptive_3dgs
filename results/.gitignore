@@ -302,3 +302,15 @@ engine_v1_prebetas/
 !monogs_check/*
 !monogs_hybrid/
 !monogs_hybrid/*.json
+!retention/
+!retention/**/
+!retention/**/*.json
+!retention_dev/
+!retention_dev/**/
+!retention_dev/**/*.json
+!retention_test/
+!retention_test/**/
+!retention_test/**/*.json
+!retention_time/
+!retention_time/**/
+!retention_time/**/*.json

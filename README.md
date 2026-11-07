@@ -16,7 +16,9 @@ With a fast GPU rasterizer a frame costs about 16 ms plus 5.2 ms per optimizatio
 | Optimizer ablation at K=10 (all three parts removed) | −6.98 dB | `results/engine_ablation/` |
 | Time target met | within 3.7% (45–90 ms) | `results/engine/` |
 
-MonoGS integration (`results/monogs_hybrid/`, `experiments/run_monogs_hybrid.py`): MonoGS's own tracker run against our map on three TUM sequences gives held-out PSNR +3.0 to +10.9 dB over original MonoGS at 1.1–1.4× speed, ATE change −0.27 to +0.46 cm (one run each, protocols differ, see the paper).
+Retention (`results/retention/`, `experiments/run_retention.py`): the final map on never-mapped frames improves by only 0.83 dB at K=3 and -0.33 dB at K=10 over the original system (11 test scenes), because one-frame-at-a-time mapping forgets earlier views. Keyframe replay (every third step, 32-frame reservoir) gives 2.09 / 2.33 dB for about 3% more time.
+
+MonoGS integration (`results/monogs_hybrid/`, `experiments/run_monogs_hybrid.py`): MonoGS's tracker against our map, MonoGS's own evaluation (final map, every 5th frame), six TUM sequences, one run each: PSNR 18.9 dB with K=3 + replay against 19.7 dB for original MonoGS, 1.8x faster per frame, ATE 1.29 against 1.16 cm. Quality comparable, not better.
 
 Negative results (do not beat uniform steps at equal time): value-gated growth, early stopping, error-proportional step allocation, keyframe replay (`results/engine_dev/`, `results/holdout_dev/`). Commands: `bash paper_repro/reproduce.sh engine`. Older analysis of the original budgeted system (compute dilution, throttling, earlier controllers) is kept below and in the supplement.
 

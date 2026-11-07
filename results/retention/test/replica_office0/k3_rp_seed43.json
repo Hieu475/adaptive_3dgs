@@ -1,0 +1,12 @@
+{
+ "scene": "replica_office0",
+ "cond": "k3_rp",
+ "seed": 43,
+ "n_frames": 100,
+ "n_heldout": 19,
+ "heldout_causal": 29.194471409446315,
+ "heldout_final": 31.87911625912315,
+ "mapped_early_final": 32.737317403157554,
+ "mapped_late_final": 33.26885202195909,
+ "N_final": 90836
+}

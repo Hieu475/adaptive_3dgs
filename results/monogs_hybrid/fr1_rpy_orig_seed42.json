@@ -1,0 +1,16 @@
+{
+ "scene": "fr1_rpy",
+ "cond": "orig",
+ "seed": 42,
+ "n_frames": 150,
+ "track_iters": 100,
+ "ate_all_m": 0.03372936875751286,
+ "ate_every5_m": 0.03391904765099266,
+ "mapped_psnr": 16.921836026509602,
+ "heldout_psnr": 16.103029316869275,
+ "heldout_final_psnr": 14.807165688481824,
+ "track_ms": 588.0480888504737,
+ "map_ms": 63.83202630958533,
+ "N_final": 138580,
+ "n_heldout": 29
+}

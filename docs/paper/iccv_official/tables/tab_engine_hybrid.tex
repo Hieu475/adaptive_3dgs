@@ -1,26 +1,23 @@
-\begin{table}[t]
+\begin{table*}[t]
 \centering
-\footnotesize\setlength{\tabcolsep}{3pt}
-\begin{tabular}{llrrr}
+\footnotesize\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{lrrrrrrrrrr}
 \toprule
-\textbf{Scene} & \textbf{System} & PSNR & ATE & ms/frame \\
+& \multicolumn{2}{c}{MonoGS} & \multicolumn{2}{c}{+ original mapper} & \multicolumn{2}{c}{+ ours $K{=}3$} & \multicolumn{2}{c}{+ ours $K{=}3$, replay} & \multicolumn{2}{c}{+ ours $K{=}10$, replay} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}\cmidrule(lr){10-11}
+\textbf{Sequence} & dB & cm & dB & cm & dB & cm & dB & cm & dB & cm \\
 \midrule
-\texttt{fr1\_desk} & MonoGS & 18.9 & 1.57 cm & 905 \\
- & MonoGS tracker + original mapper & 17.6 & 1.58 cm & 577 \\
- & MonoGS tracker + ours, $K{=}3$ & 22.7 & 1.37 cm & 636 \\
- & MonoGS tracker + ours, $K{=}10$ & 23.4 & 1.33 cm & 787 \\
+\texttt{fr1\_desk} & 18.7 & 1.35 & 13.9 & 1.57 & 12.5 & 1.30 & 16.3 & 1.38 & 17.4 & 1.40 \\
+\texttt{fr2\_xyz} & 20.4 & 0.70 & 15.6 & 0.59 & 12.2 & 0.38 & 19.7 & 0.51 & 19.8 & 0.46 \\
+\texttt{fr1\_xyz} & 20.6 & 1.06 & 19.9 & 1.08 & 16.3 & 1.44 & 20.5 & 1.02 & 19.8 & 1.10 \\
+\texttt{fr1\_rpy} & 12.6 & 2.56 & 14.8 & 3.39 & 13.3 & 3.49 & 16.0 & 3.24 & 15.3 & 3.81 \\
+\texttt{fr2\_desk} & 24.0 & 0.69 & 18.8 & 0.97 & 14.2 & 1.03 & 20.1 & 0.91 & 20.7 & 1.11 \\
+\texttt{fr3\_sitting\_static} & 22.0 & 0.62 & 11.3 & 0.63 & 18.6 & 0.86 & 20.9 & 0.67 & 21.3 & 0.75 \\
 \midrule
-\texttt{fr2\_xyz} & MonoGS & 20.3 & 0.59 cm & 592 \\
- & MonoGS tracker + original mapper & 24.2 & 0.60 cm & 420 \\
- & MonoGS tracker + ours, $K{=}3$ & 31.3 & 0.32 cm & 529 \\
- & MonoGS tracker + ours, $K{=}10$ & 31.5 & 0.35 cm & 718 \\
-\midrule
-\texttt{fr1\_xyz} & MonoGS & 20.3 & 1.07 cm & 928 \\
- & MonoGS tracker + original mapper & 19.9 & 1.06 cm & 609 \\
- & MonoGS tracker + ours, $K{=}3$ & 23.3 & 1.53 cm & 698 \\
- & MonoGS tracker + ours, $K{=}10$ & 23.5 & 2.10 cm & 853 \\
+mean & 19.7 & 1.16 & 15.7 & 1.37 & 14.5 & 1.41 & 18.9 & 1.29 & 19.0 & 1.44 \\
+ms/frame & \multicolumn{2}{c}{1176} & \multicolumn{2}{c}{593} & \multicolumn{2}{c}{674} & \multicolumn{2}{c}{661} & \multicolumn{2}{c}{861} \\
 \bottomrule
 \end{tabular}
-\caption{\textbf{MonoGS tracking with our mapper.} Original MonoGS (RGB-D, single thread) versus MonoGS's tracker run against the map built by our mapper, first 150 frames of each sequence at $640{\times}480$, one run each. PSNR: MonoGS on non-keyframes, ours on every eighth frame, which is tracked but never mapped (both rendered at the estimated pose). ATE: Umeyama-aligned RMSE, MonoGS on its keyframes, ours on every fifth frame. Time: MonoGS total per frame; ours tracking plus mapping.}
+\caption{\textbf{MonoGS's tracker with our mapper, under MonoGS's own evaluation.} First 150 frames of six TUM sequences at $640{\times}480$, one run per entry. dB: PSNR of the final map on every fifth frame (MonoGS: those that are not keyframes; ours: all of them, none was mapped), rendered at the estimated pose. cm: Umeyama-aligned ATE RMSE over every fifth tracked frame. Per-frame time is MonoGS's total, or tracking plus mapping.}
 \label{tab:hybrid}
-\end{table}
+\end{table*}

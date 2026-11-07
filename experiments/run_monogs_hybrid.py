@@ -8,8 +8,8 @@ environment, and the TUM data linked at <MonoGS>/datasets/tum. Per frame:
      are handed over through a thin adapter that exposes the attributes MonoGS' renderer reads.
   2. Our mapper (src.core.pipeline) maps the frame at the estimated pose (original budgeted system, K uniform
      steps, or time-targeted steps).
-Frames with index % 8 == 7 are tracked but never mapped; their PSNR (rendered from the estimated pose) is the
-held-out quality. ATE is the Umeyama-aligned RMSE of the estimated against ground-truth camera centers.
+Frames with index % 5 == 0 (index > 0), the grid on which MonoGS evaluates, are tracked but never mapped; their PSNR
+(final map, rendered from the estimated pose, MonoGS' own psnr function) is the held-out quality, as in MonoGS' eval. ATE is the Umeyama-aligned RMSE of the estimated against ground-truth camera centers.
 
 usage (MonoGS env): python experiments/run_monogs_hybrid.py --monogs <path> --config <yaml> --cond k3 --n_frames 150
 """
@@ -31,9 +31,9 @@ def parse():
     ap = argparse.ArgumentParser()
     ap.add_argument("--monogs", type=Path, required=True)
     ap.add_argument("--config", required=True, help="MonoGS yaml, relative to the MonoGS checkout")
-    ap.add_argument("--conds", nargs="+", default=["orig", "k3"], choices=["orig", "k3", "k6", "k10", "tts60"])
+    ap.add_argument("--conds", nargs="+", default=["orig", "k3"], choices=["orig", "k3", "k6", "k10", "tts60", "k3_rp", "k10_rp"])
     ap.add_argument("--n_frames", type=int, default=150)
-    ap.add_argument("--holdout_every", type=int, default=8)
+    ap.add_argument("--holdout_every", type=int, default=5, help="frames with index %% holdout_every == 0 (index > 0) are tracked but never mapped")
     ap.add_argument("--track_iters", type=int, default=None)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--out_dir", type=Path, default=ROOT / "results" / "monogs_hybrid")
@@ -53,6 +53,7 @@ def main():
     from utils.config_utils import load_config
     from utils.dataset import load_dataset
     from utils.eval_utils import evaluate_evo
+    from gaussian_splatting.utils.image_utils import psnr as monogs_psnr
     from utils.pose_utils import update_pose
     from utils.slam_utils import get_loss_tracking
 
@@ -112,7 +113,8 @@ def main():
 
     spec = {"orig": ("error_off", {}), "k3": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}),
             "k6": ("tts", {"T_ms": 1.0, "n_min": 6, "n_max": 6, "n_init": 6}),
-            "k10": ("tts", {"T_ms": 1.0, "n_min": 10, "n_max": 10, "n_init": 10}), "tts60": ("tts", {"T_ms": 60.0})}
+            "k10": ("tts", {"T_ms": 1.0, "n_min": 10, "n_max": 10, "n_init": 10}), "tts60": ("tts", {"T_ms": 60.0}),
+            "k3_rp": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}), "k10_rp": ("tts", {"T_ms": 1.0, "n_min": 10, "n_max": 10, "n_init": 10})}
     a.out_dir.mkdir(parents=True, exist_ok=True)
     scene = Path(cfg["Dataset"]["dataset_path"]).name.replace("rgbd_dataset_freiburg", "fr")
     for name in a.conds:
@@ -122,9 +124,11 @@ def main():
         set_seed(a.seed)
         cond, tt = spec[name]
         _, pcfg = vgg.config_for(cond, a.seed, 15.0, "cuda", {}, tt)
+        if name.endswith("_rp"):  # keyframe replay, constants chosen on the development scenes
+            pcfg["training"]["replay"] = {"every": 3, "size": 32, "stride": 2}
         pipe = OnlineReconstructionPipeline(config=pcfg, device="cuda")
         vgg.STATES.clear(); vgg.TT_STATES.clear()
-        cams, est, gt, held, mapped_psnr, held_psnr, t_trk, t_map = [], [], [], [], [], [], [], []
+        cams, est, gt, held, mapped_psnr, held_psnr, t_trk, t_map, held_idx = [], [], [], [], [], [], [], [], []
         for i in range(n):
             vp = Camera.init_from_dataset(dataset, i, proj)
             vp.compute_grad_mask(cfg)
@@ -138,7 +142,8 @@ def main():
                 track(pipe, vp, cams[-1])
                 torch.cuda.synchronize(); t1 = time.perf_counter()
                 pose = w2c(vp).detach()
-                if i % a.holdout_every == a.holdout_every - 1:
+                if i % a.holdout_every == 0:
+                    held_idx.append((i, pose.clone()))
                     held_psnr.append(float(pipe.eval_frame(rgb=rgb, depth=depth, pose=pose)["psnr"]))
                 else:
                     m = pipe.process_frame(rgb=rgb, depth=depth, gt_pose=pose)
@@ -150,12 +155,22 @@ def main():
             gt_pose = np.eye(4); gt_pose[:3, :3] = vp.R_gt.cpu().numpy(); gt_pose[:3, 3] = vp.T_gt.cpu().numpy()
             gt.append(np.linalg.inv(gt_pose))
             vp.clean()
+        final_psnr = []
+        for i, pose in held_idx:  # final map on the held-out frames, MonoGS' psnr with its pixel mask
+            gt_img, _, _ = dataset[i]
+            gt_img = gt_img.cuda()
+            gt_depth = torch.from_numpy(dataset[i][1]).float().cuda()
+            out = pipe.eval_frame(rgb=gt_img.permute(1, 2, 0).contiguous(), depth=gt_depth, pose=pose, return_images=True)
+            img = torch.clamp(out["images"]["rgb_prediction"].permute(2, 0, 1).cuda(), 0.0, 1.0)
+            mask = gt_img > 0
+            final_psnr.append(float(monogs_psnr(img[mask].unsqueeze(0), gt_img[mask].unsqueeze(0))))
         plot_dir = a.out_dir / "plots"; plot_dir.mkdir(exist_ok=True)
         ate_all = evaluate_evo(gt, est, str(plot_dir), f"{scene}_{name}_all")
         ate_5 = evaluate_evo(gt[::5], est[::5], str(plot_dir), f"{scene}_{name}_every5")
         res = {"scene": scene, "cond": name, "seed": a.seed, "n_frames": n, "track_iters": track_iters,
                "ate_all_m": float(ate_all), "ate_every5_m": float(ate_5),
                "mapped_psnr": float(np.mean(mapped_psnr)), "heldout_psnr": float(np.mean(held_psnr)),
+               "heldout_final_psnr": float(np.mean(final_psnr)),
                "track_ms": 1000 * float(np.mean(t_trk)), "map_ms": 1000 * float(np.mean(t_map)),
                "N_final": int(pipe.gaussian_model.num_gaussians), "n_heldout": len(held_psnr)}
         target.write_text(json.dumps(res, indent=1))
