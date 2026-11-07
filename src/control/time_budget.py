@@ -70,3 +70,20 @@ def after(pipe, p: TTParams, st: TTState) -> None:
             st.n_steps = min(p.n_max, max(p.n_min, st.n_steps * (p.T_ms / st.ema_ms) ** p.gamma))
     elif st.n >= p.warmup_frames:
         st.m = min(p.m_max, max(1.0, st.m * (p.T_ms / st.ema_ms) ** p.gamma))
+
+
+# Optimizer settings for the steps regime, chosen on the four development scenes only
+# (fr1_desk, fr3_structure_texture_near, replica_room1, replica_office2): learning rates x6
+# (scale x12) with a within-frame decay from 1.4x to 0.6x of the base rate, Adam betas (0.5, 0.8).
+STEPS_REGIME_LR = {"position": 4.0e-4 * 6, "scale": 5e-3 * 12, "rotation": 1e-3 * 6, "opacity": 5e-2 * 6, "sh": 1.0e-2 * 6}
+STEPS_REGIME_LR_IN_FRAME = [1.4, 0.6]
+STEPS_REGIME_ADAM_BETAS = [0.5, 0.8]  # short memory: stale Adam statistics from earlier frames throttle the steps
+
+
+def apply_steps_regime(cfg: dict) -> dict:
+    """Install the steps-regime optimizer settings into a pipeline config (in place)."""
+    tr = cfg.setdefault("training", {})
+    tr["learning_rate"] = dict(STEPS_REGIME_LR)
+    tr["lr_in_frame"] = list(STEPS_REGIME_LR_IN_FRAME)
+    tr["adam_betas"] = list(STEPS_REGIME_ADAM_BETAS)
+    return cfg

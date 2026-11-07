@@ -1,0 +1,30 @@
+\begin{table}[t]
+\centering
+\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llrr}
+\toprule
+\textbf{Setting} & \textbf{value} & PSNR & ms \\
+\midrule
+Adam betas $(\beta_1,\beta_2)$ & (0.9, 0.999) default & 31.77 & 60 \\
+ & (0.95, 0.999) & 29.24 & 59 \\
+ & (0.9, 0.99) & 31.78 & 60 \\
+ & (0.8, 0.99) & 34.01 & 61 \\
+ & (0.5, 0.99) & 34.81 & 65 \\
+ & (0.0, 0.99) & 32.06 & 66 \\
+ & (0.5, 0.9) & 36.02 & 63 \\
+ & (0.5, 0.8) chosen & 36.07 & 63 \\
+ & (0.5, 0.7) & 36.03 & 63 \\
+ & (0.3, 0.8) & 35.56 & 64 \\
+ & (0.5, 0.5) & 35.74 & 63 \\
+\midrule
+learning-rate multiplier (betas 0.5, 0.8) & 0.3 & 33.81 & 64 \\
+ & 0.5 & 35.26 & 64 \\
+ & 0.7 & 35.96 & 62 \\
+ & 1.0 chosen & 36.07 & 63 \\
+ & 1.4 & 35.62 & 63 \\
+ & 2.0 & 34.17 & 62 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Development-scene sweeps} behind the optimizer constants: mean PSNR (dB) and frame time over the four development scenes at uniform $K{=}8$ steps, one seed. The learning-rate sweep multiplies all rates of the preset.}
+\label{tab:enginedev}
+\end{table}

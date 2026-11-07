@@ -1,0 +1,17 @@
+\begin{table}[t]
+\centering
+\footnotesize\setlength{\tabcolsep}{2.5pt}
+\begin{tabular}{lrrrrrr}
+\toprule
+\textbf{Optimizer} & fr2 & fr1 & off0 & off1 & mean & $\Delta$ \\
+\midrule
+full & 37.61 & 35.28 & 41.97 & 43.76 & 39.65 & 0.00 \\
+default betas & 32.59 & 30.58 & 38.81 & 40.52 & 35.62 & $-$4.03 \\
+default lr & 34.22 & 31.21 & 36.76 & 38.32 & 35.13 & $-$4.53 \\
+no lr decay & 35.14 & 32.64 & 40.85 & 42.42 & 37.76 & $-$1.89 \\
+none of three & 30.24 & 27.26 & 35.93 & 37.26 & 32.68 & $-$6.98 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Optimizer ablation} at uniform $K{=}10$ steps (about 68\,ms), mean PSNR (dB) on mapped frames, two seeds, four test scenes (fr2, fr1: TUM xyz sequences; off0, off1: Replica).}
+\label{tab:engineabl}
+\end{table}

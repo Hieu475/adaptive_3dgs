@@ -329,7 +329,7 @@ class OnlineReconstructionPipeline:
             {'params': [self.gaussian_model._features_rest], 'lr': lr.get('sh', 2.5e-3)},
             {'params': [self.gaussian_model._normals], 'lr': lr.get('position', 1.6e-4)},
         ]
-        self.optimizer = SelectiveAdam(params, fused=bool(self.config.get('training', {}).get('fused_adam', False)))
+        self.optimizer = SelectiveAdam(params, betas=tuple(self.config.get('training', {}).get('adam_betas', (0.9, 0.999))), fused=bool(self.config.get('training', {}).get('fused_adam', False)))
     
     def _reregister_optimizer_params(self):
         """Re-register model parameters with the optimizer after compaction.
@@ -1625,6 +1625,10 @@ class OnlineReconstructionPipeline:
                     cache_time += (time.time() - rb_start)
                     n_cache_rebuilds += 1
 
+                lr_in_frame = self.config.get('training', {}).get('lr_in_frame')
+                if lr_in_frame:  # [first-step scale, last-step scale], linear within the frame
+                    frac = step_i / max(1, n_micro_steps - 1)
+                    self.optimizer.lr_scale = float(lr_in_frame[0] + (lr_in_frame[1] - lr_in_frame[0]) * frac)
                 self.optimizer.zero_grad()
                 # Active subset contains strictly {i | K_i > step_i} (O(M_k) backward compute)
                 forward_event_start = None
@@ -1698,6 +1702,7 @@ class OnlineReconstructionPipeline:
                     optimizer_backward_cuda_event_pairs.append(
                         (backward_event_start, backward_event_end))
                     
+            self.optimizer.lr_scale = 1.0
             opt_loss_val = losses['total'].item()
             opt_time = time.time() - opt_start
 

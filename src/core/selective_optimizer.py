@@ -55,6 +55,7 @@ class SelectiveAdam:
         eps: float = 1e-8,
         fused: bool = False,
     ):
+        self.lr_scale = 1.0  # multiplies every group's lr (set per micro-step by the caller)
         self.fused = fused  # torch.compile the elementwise update (fewer kernel launches)
         self.param_groups = param_groups
         self.betas = betas
@@ -97,7 +98,7 @@ class SelectiveAdam:
         beta1, beta2 = self.betas
         
         for group in self.param_groups:
-            lr = group.get('lr', 1e-3)
+            lr = group.get('lr', 1e-3) * self.lr_scale
             
             for p in group['params']:
                 if p.grad is None or p.numel() == 0:

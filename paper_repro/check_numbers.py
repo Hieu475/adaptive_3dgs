@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TABLES = ROOT / "docs/paper/iccv_official/tables"
 MAIN_TEX = ROOT / "docs/paper/iccv_official/main.tex"
 SUPP_TEX = ROOT / "docs/paper/iccv_official/supp.tex"
+OLD_TEX = ROOT / "docs/paper/iccv_official/old_analysis.tex"   # earlier analysis (moved from the main paper)
 README = ROOT / "README.md"
 # Values from superseded bundles / evaluators that must not reappear.
 STALE = ["27.64", "27.67", "98.0\\%", "98.0%", "93.6", "12.34", "7005", "97.6\\%", "92.5\\%", "3.8\\times", "$4.48$"]
@@ -32,7 +33,7 @@ def fail(msg):
 def main():
     # (1) regenerate and compare with the committed outputs
     before = {p.name: p.read_text() for p in TABLES.glob("*") if p.suffix in (".tex", ".json")}
-    for script in ("make_main_tables.py", "make_tables.py"):
+    for script in ("make_main_tables.py", "make_tables.py", "make_engine.py"):
         subprocess.run([sys.executable, str(ROOT / "paper_repro" / script)], check=True,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     for name, text in before.items():
@@ -42,15 +43,25 @@ def main():
     nums = json.loads((TABLES / "numbers.json").read_text())
 
     # (2) the paper uses generated content
-    main_only = MAIN_TEX.read_text()
+    main_only = MAIN_TEX.read_text() + "\n" + OLD_TEX.read_text()   # earlier analysis now lives in old_analysis.tex
     main = main_only + "\n" + SUPP_TEX.read_text()   # moved diagnostics live in the supplement
     for token in ("tables/macros.tex", "tables/tab_main.tex", "tables/tab_factorial.tex", "tables/par_core.tex",
                   "tables/tab_replica.tex", "tables/tab_dose.tex"):
         if token not in main_only and token not in ("tables/tab_dose.tex", "tables/tab_replica.tex") :
             fail(f"main.tex does not input {token}")
-    for key in ("covErrA", "covErrB"):
-        if f"\\{key}" not in main_only:
-            fail(f"main.tex does not use macro \\{key}")
+    import re
+    eng_defined = set(re.findall(r"\\newcommand\{\\(eng\w+)\}", (TABLES / "engine_macros.tex").read_text()))
+    eng_used = set(re.findall(r"\\(eng[A-Za-z]+)", MAIN_TEX.read_text() + SUPP_TEX.read_text()))
+    for k in sorted(eng_used - eng_defined):
+        fail(f"text uses undefined engine macro \\{k}")
+    if not eng_used:
+        fail("paper does not use the generated engine macros")
+    en = json.loads((TABLES / "engine_numbers.json").read_text())
+    readme = README.read_text()
+    for key, fmt in (("engTestTtsVggTFourFiveGainMean", "{:.2f}"), ("engFreshTtsVggTFourFiveGainMean", "{:.2f}"), ("engAblNooptDeltaAbs", "{:.2f}"),
+                     ("engHitMaxPct", "{:.1f}"), ("engCostSlope", "{:.1f}")):
+        if fmt.format(en[key]) not in readme:
+            fail(f"README missing engine number {key} = {fmt.format(en[key])}")
     for sc in ("replica_office0", "replica_office1"):
         for key in ("coverage on error", "error budget x4", "error budget proportional to map",
                     "selector without throttle"):

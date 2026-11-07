@@ -1,0 +1,30 @@
+\begin{table*}[t]
+\centering
+\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lrrrrrrr}
+\toprule
+& \multicolumn{4}{c}{11 test scenes} & \multicolumn{2}{c}{5 fresh windows} & \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-7}
+\textbf{Method} & ms & $\Delta$PSNR mean & median & worst & ms & $\Delta$PSNR mean & vs.\ uniform $K$ at equal time (test) \\
+\midrule
+Original budgeted system & 44 & 0.00 & 0.00 & 0.00 & 42 & 0.00 & $-$10.27 \\
++ steps-regime optimizer & 44 & +3.44 & +3.43 & +1.81 & 42 & +3.50 & $-$6.78 \\
+\midrule
+Prior TT+VGG controllers & 43 & +2.59 & +2.91 & +0.01 & 38 & +1.19 & $-$7.36 \\
+Prior TT+VGG + optimizer & 43 & +10.13 & +10.39 & +7.42 & 39 & +9.07 & +0.13 \\
+\midrule
+Uniform $K{=}3$ steps & 32 & +7.83 & +8.03 & +5.54 & 29 & +6.48 & --- \\
+Uniform $K{=}6$ steps & 47 & +10.88 & +10.92 & +8.07 & 43 & +9.92 & --- \\
+Uniform $K{=}10$ steps & 68 & +12.70 & +12.94 & +9.86 & 62 & +11.75 & --- \\
+Uniform $K{=}15$ steps & 94 & +13.89 & +14.16 & +11.17 & 85 & +12.50 & --- \\
+\midrule
+Time-targeted steps, $T{=}60$ & 60 & +12.11 & +12.38 & +9.04 & 60 & +11.38 & +0.08 \\
+\quad + VGG, $T{=}45$ & 46 & +10.53 & +10.69 & +7.41 & 45 & +9.90 & +0.03 \\
+\quad + VGG, $T{=}60$ & 60 & +12.01 & +12.33 & +8.91 & 60 & +11.29 & $-$0.02 \\
+\quad + VGG, $T{=}75$ & 74 & +12.83 & +13.44 & +9.90 & 74 & +11.89 & $-$0.17 \\
+\quad + VGG, $T{=}90$ & 89 & +13.44 & +13.87 & +10.69 & 89 & +12.32 & $-$0.11 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Steps regime versus the original budgeted system.} PSNR change in dB on the mapped frames relative to the original system (unthrottled raw-error selection, 5 steps, modeled 15\,ms budget) on the same code; mean measured end-to-end frame time in ms. The last column is the mean PSNR difference to the uniform-$K$ curve (linear interpolation in measured time) at the method's own mean time; the original system lies far below that curve. Two seeds per scene; ``test'' are the 11 scenes of the earlier protocol, ``fresh'' are five later windows of long TUM sequences. All optimizer constants were set on four development scenes.}
+\label{tab:engine}
+\end{table*}

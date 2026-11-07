@@ -8,7 +8,7 @@ export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 cmd="${1:-list}"
 case "$cmd" in
   list)
-    sed -n '2,3p' "$0"; echo "targets: check main factorial depth adaptive scenes counterfactual extension dose scenes_budget long ablation holdout_ext compute tracked closedloop countcap controllers tables holdout tracking figs" ;;
+    sed -n '2,3p' "$0"; echo "targets: check main factorial depth adaptive scenes counterfactual extension dose scenes_budget long ablation holdout_ext engine compute tracked closedloop countcap controllers tables holdout tracking figs" ;;
   check)
     $PY paper_repro/check_numbers.py ;;
   main)   # Tab. 1 + Tab. 2 + Fig. 1: traceable rerun from a tagged commit (writes results/rerun_paper1/).
@@ -82,6 +82,20 @@ case "$cmd" in
   closedloop) # map-based tracking in the loop (TUM, 5 test scenes, 3 seeds)
     $PY experiments/run_closed_loop.py --scenes tum_fr2_xyz tum_fr1_xyz tum_fr1_rpy tum_fr1_room tum_fr3_sitting_static --seeds 42 43 44
     $PY experiments/analyze_closed_loop.py ;;
+  engine)     # steps regime: frozen evaluation, ablation, held-out, core speed, closed loop, figures (about 3 h on a laptop GPU)
+    bash experiments/engine_eval.sh results/engine
+    $PY experiments/analyze_engine.py
+    bash experiments/engine_ablation.sh results/engine_ablation
+    $PY experiments/run_holdout_engine.py --out_dir results/holdout_engine2
+    git worktree add /tmp/a3dgs_before 3b133ba && cp experiments/bench_core_speed.py /tmp/a3dgs_before/experiments/ \
+      && ln -s "$PWD/datasets/TUM" /tmp/a3dgs_before/datasets/TUM && ln -s "$PWD/datasets/Replica" /tmp/a3dgs_before/datasets/Replica \
+      && (cd /tmp/a3dgs_before && $PY experiments/bench_core_speed.py --tag before --out "$OLDPWD/results/core_speed")
+    $PY experiments/bench_core_speed.py --tag after
+    $PY experiments/run_closed_loop.py --scenes tum_fr2_xyz tum_fr1_xyz tum_fr1_rpy tum_fr1_room tum_fr3_sitting_static --seeds 42 43 44 \
+        --conditions error_off tts --T_ms 60 --out_dir results/closed_loop_steps
+    $PY experiments/render_qualitative_engine.py --scenes tum_fr1_xyz --out docs/paper/iccv_official/figs/fig_engine_qualitative.pdf
+    $PY experiments/render_qualitative_engine.py --scenes tum_fr3_sitting_static --out docs/paper/iccv_official/figs/fig_engine_qualitative2.pdf
+    $PY paper_repro/make_engine.py ;;
   countcap)   # TT+VGG vs size-matched hard count caps (needs results/vgg_test)
     $PY experiments/run_count_cap.py --scenes tum_fr2_xyz tum_fr1_xyz tum_fr1_rpy tum_fr1_room tum_fr3_sitting_static replica_office0 replica_office1 replica_office3 replica_office4 replica_room0 replica_room2 --seeds 42 43
     $PY experiments/analyze_count_cap.py ;;

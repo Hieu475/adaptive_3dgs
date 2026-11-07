@@ -1,0 +1,17 @@
+\begin{table}[t]
+\centering
+\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Scene} & orig.\ dB & ours dB & orig.\ ATE & ours ATE \\
+\midrule
+\texttt{fr2\_xyz} & 27.4 & 37.6 & 7.3 cm & 14.0 cm \\
+\texttt{fr1\_xyz} & 23.6 & 35.3 & 6.4 cm & 5.3 cm \\
+\texttt{fr1\_rpy} & 21.6 & 35.5 & 12.9 cm & 11.6 cm \\
+\texttt{fr3\_sitting\_static} & 29.6 & 37.9 & 13.8 cm & 19.4 cm \\
+\texttt{fr1\_room}$^\dagger$ & 14.9 & 24.7 & 154.8 cm & 166.6 cm \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Closed-loop map-based tracking in the steps regime}, three seeds, TUM, ``ours'' = time-targeted steps at 60\,ms. PSNR is measured at the tracked pose. $^\dagger$Tracking fails for both (excluded from the summary).}
+\label{tab:engineclosed}
+\end{table}

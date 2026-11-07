@@ -1,0 +1,18 @@
+{
+ "train_psnr": 41.58858397911335,
+ "holdout_psnr": 30.31042941411336,
+ "gen_gap_db": 11.27815456499999,
+ "n_train": 87,
+ "n_holdout": 12,
+ "holdout_ssim": 0.8992489278316498,
+ "ate_rmse_m": 0.1381576143453586,
+ "ate_max_m": 1.0173211097717285,
+ "n_poses": 100,
+ "policy": "error_only",
+ "seed": 42,
+ "N_final": 99076,
+ "scene": "replica_office0",
+ "condition": "fixK10",
+ "n_frames_loaded": 100,
+ "holdout_every": 8
+}

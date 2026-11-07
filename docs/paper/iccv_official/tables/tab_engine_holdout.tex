@@ -1,0 +1,20 @@
+\begin{table}[t]
+\centering
+\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{llrrrr}
+\toprule
+& & fr2 & fr1 & off0 & off1 \\
+\midrule
+original & mapped / held-out & 24.8 / 24.0 & 21.5 / 20.5 & 30.2 / 26.9 & 33.7 / 30.9 \\
+\midrule
+$K{=}3$ & $\Delta$ mapped & +7.8 & +8.1 & +7.2 & +5.5 \\
+ & $\Delta$ held-out & +2.9 & +3.3 & +2.9 & +1.9 \\
+$K{=}10$ & $\Delta$ mapped & +12.5 & +13.5 & +11.3 & +9.8 \\
+ & $\Delta$ held-out & +3.5 & +3.6 & +3.3 & +2.3 \\
+TT-S+VGG, $T{=}75$ & $\Delta$ mapped & +12.9 & +13.7 & +11.5 & +10.0 \\
+ & $\Delta$ held-out & +3.4 & +3.5 & +3.2 & +2.4 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Held-out views.} Every eighth frame is rendered but never mapped. PSNR (dB) of the original system and the change for three configurations; two seeds. Gains on held-out frames are positive on every scene but a fraction of the gain on mapped frames.}
+\label{tab:engineheld}
+\end{table}

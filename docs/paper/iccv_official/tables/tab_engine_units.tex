@@ -1,0 +1,29 @@
+\begin{table*}[t]
+\centering
+\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lrrrrrrrrrr}
+\toprule
+Scene / window & \multicolumn{2}{c}{orig.} & \multicolumn{2}{c}{$K{=}3$} & \multicolumn{2}{c}{$K{=}10$} & \multicolumn{2}{c}{T45} & \multicolumn{2}{c}{T75} \\
+& dB & ms & dB & ms & dB & ms & dB & ms & dB & ms \\
+\midrule
+\texttt{test/replica\_office0} & 30.59 & 47 & 37.99 & 34 & 41.96 & 70 & 40.09 & 46 & 42.02 & 74 \\
+\texttt{test/replica\_office1} & 33.87 & 45 & 39.41 & 34 & 43.73 & 71 & 41.28 & 46 & 43.76 & 74 \\
+\texttt{test/replica\_office3} & 24.35 & 47 & 33.51 & 36 & 37.89 & 77 & 35.21 & 46 & 37.80 & 75 \\
+\texttt{test/replica\_office4} & 25.45 & 47 & 35.05 & 35 & 39.65 & 71 & 37.36 & 46 & 39.62 & 75 \\
+\texttt{test/replica\_room0} & 22.58 & 48 & 29.89 & 35 & 34.61 & 72 & 32.03 & 46 & 34.63 & 75 \\
+\texttt{test/replica\_room2} & 25.57 & 46 & 33.33 & 36 & 38.27 & 75 & 35.19 & 46 & 38.18 & 75 \\
+\texttt{test/tum\_fr1\_room} & 16.73 & 43 & 24.76 & 31 & 29.67 & 67 & 27.42 & 46 & 30.17 & 75 \\
+\texttt{test/tum\_fr1\_rpy} & 21.11 & 39 & 29.70 & 27 & 36.33 & 57 & 34.85 & 45 & 36.60 & 74 \\
+\texttt{test/tum\_fr1\_xyz} & 21.61 & 46 & 30.00 & 32 & 35.31 & 68 & 32.82 & 45 & 35.35 & 75 \\
+\texttt{test/tum\_fr2\_xyz} & 24.23 & 44 & 32.94 & 30 & 37.54 & 64 & 35.90 & 45 & 37.79 & 74 \\
+\texttt{test/tum\_fr3\_sitting\_static} & 26.44 & 33 & 32.10 & 25 & 37.30 & 53 & 36.21 & 45 & 37.73 & 74 \\
+\texttt{fresh/tum\_fr1\_desk} & 23.06 & 42 & 29.27 & 31 & 35.14 & 66 & 32.61 & 45 & 35.12 & 75 \\
+\texttt{fresh/tum\_fr1\_room} & 16.83 & 45 & 22.96 & 30 & 29.56 & 61 & 27.23 & 45 & 29.33 & 73 \\
+\texttt{fresh/tum\_fr1\_xyz} & 22.86 & 46 & 29.73 & 31 & 34.81 & 67 & 32.53 & 45 & 34.84 & 75 \\
+\texttt{fresh/tum\_fr2\_xyz} & 24.62 & 39 & 31.86 & 28 & 36.65 & 58 & 35.42 & 45 & 37.25 & 74 \\
+\texttt{fresh/tum\_fr3\_sitting\_static} & 28.36 & 39 & 34.28 & 27 & 38.34 & 57 & 37.46 & 45 & 38.64 & 74 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Per-scene results of the steps regime.} Mean PSNR (dB) and measured frame time (ms) per test scene and fresh window (``fresh/'' rows), two seeds. T45 and T75 are time-targeted steps with value-gated growth at 45 and 75\,ms targets.}
+\label{tab:engineunits}
+\end{table*}

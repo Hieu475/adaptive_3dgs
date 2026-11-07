@@ -21,7 +21,7 @@ from src.control.growth_controller import VGGParams, VGGState, step  # noqa: E40
 from src.core.pipeline import OnlineReconstructionPipeline  # noqa: E402
 from src.control import time_budget as tb  # noqa: E402
 
-CONDITIONS = ("error_off", "spawn_cap_always20", "error_budget_prop", "vgg", "vgg_prop", "tt", "tt_vgg", "tt_cap", "tts", "tts_vgg")
+CONDITIONS = ("error_off", "spawn_cap_always20", "error_budget_prop", "vgg", "vgg_prop", "tt", "tt_vgg", "tt_cap", "tts", "tts_vgg", "error_off_opt", "tt_vgg_opt")
 STATES = []
 TT_STATES = []
 _prev = OnlineReconstructionPipeline.process_frame
@@ -52,12 +52,17 @@ OnlineReconstructionPipeline.process_frame = _process
 
 
 def config_for(cond, seed, budget_ms, device, vgg_overrides=None, tt_overrides=None):
+    if cond in ("error_off_opt", "tt_vgg_opt"):  # original budgeted controllers with the steps-regime optimizer
+        policy, cfg = config_for(cond[:-4], seed, budget_ms, device, vgg_overrides, tt_overrides)
+        tb.apply_steps_regime(cfg)
+        return policy, cfg
     if cond in ("error_off", "spawn_cap_always20", "error_budget_prop"):
         return abl.config_for(cond, seed, budget_ms, device)
     if cond in ("tts", "tts_vgg"):
         policy, cfg = config_for("vgg" if cond == "tts_vgg" else "error_off", seed, budget_ms, device, vgg_overrides)
         cfg["scheduler"]["densify_budget_override_ms"] = budget_ms
         cfg["time_target"] = {**(tt_overrides or {}), "mode": "steps"}
+        tb.apply_steps_regime(cfg)
         return policy, cfg
     if cond in ("tt", "tt_cap"):
         policy, cfg = abl.config_for("error_off" if cond == "tt" else "spawn_cap_always20", seed, budget_ms, device)
@@ -105,6 +110,7 @@ def main():
     ap.add_argument("--lr_groups", default="", help="per-group multipliers on top of --lr_mult, e.g. position:2,sh:0.5")
     ap.add_argument("--loss_w", default="", help="loss weight overrides, e.g. ssim:0.4,depth:1")
     ap.add_argument("--set", nargs="*", default=[], help="config overrides, e.g. densification.max_new_per_frame=1000")
+    ap.add_argument("--preset_off", nargs="*", default=[], choices=["lr", "betas", "decay"], help="ablate parts of the steps-regime optimizer preset")
     ap.add_argument("--offset", type=int, default=0, help="start the sequence at this frame (fresh window)")
     ap.add_argument("--tag", default="")
     ap.add_argument("--out_dir", type=Path, default=ROOT / "results" / "vgg")
@@ -135,13 +141,24 @@ def main():
                     for kv in a.loss_w.split(","):
                         g, v = kv.split(":")
                         cfg["losses"]["weight_" + g] = float(v)
+                for part in a.preset_off:
+                    tr = cfg["training"]
+                    if part == "lr":
+                        tr["learning_rate"] = {"position": 4.0e-4, "scale": 5e-3, "rotation": 1e-3, "opacity": 5e-2, "sh": 1.0e-2}
+                    elif part == "betas":
+                        tr.pop("adam_betas", None)
+                    elif part == "decay":
+                        tr.pop("lr_in_frame", None)
                 for kv in a.set:
                     path, val = kv.split("=")
                     node = cfg
                     keys = path.split(".")
                     for k in keys[:-1]:
                         node = node.setdefault(k, {})
-                    node[keys[-1]] = type(node.get(keys[-1], 0.0))(float(val)) if not isinstance(node.get(keys[-1]), bool) else bool(float(val))
+                    if "," in val:
+                        node[keys[-1]] = [float(x) for x in val.split(",")]
+                    else:
+                        node[keys[-1]] = type(node.get(keys[-1], 0.0))(float(val)) if not isinstance(node.get(keys[-1]), bool) else bool(float(val))
                 if a.n_micro is not None:
                     cfg["training"]["n_micro_steps"] = a.n_micro
                 abl.ext.BUDGET_SCALES.clear()

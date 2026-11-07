@@ -1,13 +1,28 @@
-# Map Growth and Policy Routing in Budgeted Online RGB-D 3D Gaussian Splatting
+# Spend Steps, Not Subsets: Time-Targeted Optimization for Online RGB-D Gaussian Splatting Mapping
 
-Research code and frozen result bundles for a controlled study of online RGB-D 3DGS under a **modeled 15 ms per-frame optimization budget**.
-The paper is organized around one claim (compute dilution); auxiliary analyses live in the supplement. Source is in [`docs/paper/iccv_official/`](docs/paper/iccv_official/) (`main.tex`, `supp.tex`, `refs.bib`).
+Research code and frozen result bundles for online RGB-D 3DGS mapping. Source of the paper: [`docs/paper/iccv_official/`](docs/paper/iccv_official/) (`main.tex`, `supp.tex`, `refs.bib`).
 
-> **Scope.** This is a mapping study with ground-truth poses (tracking decoupled), horizons of up to 150 frames at 320×240 (TUM: 150; local Replica copies: 99–119 frames), on TUM RGB-D and Replica.
-> The 15 ms figure is *modeled optimization time*, not end-to-end latency; measured throughput is about 10 FPS on an RTX 4050 Laptop GPU.
-> Seeds measure repeatability on fixed trajectories, not generalization across scenes.
+> **Scope.** Mapping with ground-truth poses at 320×240, up to 150 frames per run, TUM RGB-D and Replica, on a laptop GPU (RTX 4050, 6 GB). Frame time is the CUDA-synchronized latency of one `process_frame` call including per-frame evaluation. Seeds measure repeatability, not scene variance. A closed-loop check with a simple map-based tracker covers TUM only.
 
-## 1. What the evidence supports
+## Headline result (current paper)
+
+With a fast GPU rasterizer a frame costs about 16 ms plus 5.2 ms per optimization step, almost independent of how many Gaussians a step updates. The paper therefore (1) removes the main pipeline overheads (2.0–2.4× faster at unchanged output), (2) updates all Gaussians at every step and controls the *number of steps* from measured frame time, and (3) uses a short-memory optimizer (Adam betas 0.5/0.8, learning rates ×6, in-frame decay).
+
+| Claim | Number | Bundle |
+|---|---|---|
+| Mapped-frame PSNR gain over the original budgeted system at about its frame time (time-targeted steps, 45 ms), 11 test scenes | +10.53 dB mean, worst scene +7.41 dB | `results/engine/` |
+| Same on five fresh windows | +9.90 dB | `results/engine/` |
+| Held-out frames (every 8th, never mapped), 3 uniform steps | +1.9 to +3.3 dB | `results/holdout_engine2/` |
+| Optimizer ablation at K=10 (all three parts removed) | −6.98 dB | `results/engine_ablation/` |
+| Time target met | within 3.7% (45–90 ms) | `results/engine/` |
+
+Negative results (do not beat uniform steps at equal time): value-gated growth, early stopping, error-proportional step allocation, keyframe replay (`results/engine_dev/`, `results/holdout_dev/`). Commands: `bash paper_repro/reproduce.sh engine`. Older analysis of the original budgeted system (compute dilution, throttling, earlier controllers) is kept below and in the supplement.
+
+---
+
+# Earlier analysis of the original budgeted system
+
+## 1. What the earlier evidence supports
 
 | # | Claim | Evidence (frozen artifact) |
 |---|---|---|

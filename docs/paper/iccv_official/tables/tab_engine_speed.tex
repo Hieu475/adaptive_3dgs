@@ -1,0 +1,15 @@
+\begin{table}[t]
+\centering
+\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Scene} & ms before & ms after & speed-up & PSNR before & PSNR after \\
+\midrule
+\texttt{fr2\_xyz} & 86 & 41 & 2.1$\times$ & 26.00 & 26.08 \\
+\texttt{fr1\_xyz} & 105 & 44 & 2.4$\times$ & 22.02 & 22.01 \\
+\texttt{office0} & 90 & 45 & 2.0$\times$ & 30.61 & 30.59 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Core speed-ups at unchanged output.} Original budgeted configuration on the code revision before and after the changes of Sec.~\ref{sec:core}; end-to-end frame time in ms (including per-frame evaluation), mean PSNR (dB), two seeds, 100 frames.}
+\label{tab:enginespeed}
+\end{table}
