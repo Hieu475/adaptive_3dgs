@@ -4,10 +4,10 @@
  "seed": 42,
  "n_frames": 100,
  "n_heldout": 19,
- "heldout_causal": 29.506922571282637,
- "heldout_final": 31.19360381678531,
- "mapped_early_final": 32.133896085951065,
- "mapped_late_final": 34.767029444376625,
- "N_final": 92288,
- "mean_frame_ms": 55.57806985491576
+ "heldout_causal": 29.50327551992316,
+ "heldout_final": 31.26955855520148,
+ "mapped_early_final": 32.330265045166016,
+ "mapped_late_final": 34.826179928249786,
+ "N_final": 91982,
+ "mean_frame_ms": 33.91307290527038
 }

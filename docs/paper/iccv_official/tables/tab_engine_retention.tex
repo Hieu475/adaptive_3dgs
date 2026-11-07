@@ -12,10 +12,11 @@ original system & 21.8 & 23.2 & 22.8 & 20.9 & 18.5 & 17.5 \\
 $K{=}3$ steps & 24.8 & 24.0 & 23.1 & 23.4 & 18.0 & 16.9 \\
 $K{=}3$ + replay & 24.3 & 25.3 & 24.6 & 22.7 & 19.8 & 19.3 \\
 \midrule
+$K{=}3$ + joint replay & 24.3 & 26.9 & 26.9 & 22.4 & 21.0 & 21.0 \\
 $K{=}10$ steps & 25.4 & 22.9 & 22.0 & 24.5 & 17.3 & 15.9 \\
 $K{=}10$ + replay & 25.4 & 25.5 & 24.8 & 24.1 & 20.3 & 20.3 \\
 \bottomrule
 \end{tabular}
-\caption{\textbf{Keeping earlier views.} Mean PSNR (dB) with ground-truth poses; frames with index divisible by 5 are never mapped. next: those frames when they arrive; final: the final map on those frames; early: the final map on mapped frames of the first third of the sequence. Two seeds. Keyframe replay (every third step uses a stored past frame) is the last-listed addition.}
+\caption{\textbf{Keeping earlier views.} Mean PSNR (dB) with ground-truth poses; frames with index divisible by 5 are never mapped. next: those frames when they arrive; final: the final map on those frames; early: the final map on mapped frames of the first third of the sequence. Two seeds. Replay: every third step uses a stored past frame. Joint replay: steps 2 and 3 optimize the current frame together with two stored past frames.}
 \label{tab:keep}
 \end{table}

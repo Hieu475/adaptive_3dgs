@@ -1,0 +1,13 @@
+{
+ "scene": "tum_fr1_desk",
+ "cond": "k3_jr",
+ "seed": 43,
+ "n_frames": 151,
+ "n_heldout": 30,
+ "heldout_causal": 22.116045888264974,
+ "heldout_final": 19.563439750671385,
+ "mapped_early_final": 18.592758314950125,
+ "mapped_late_final": 19.152085304260254,
+ "N_final": 57974,
+ "mean_frame_ms": 49.03732960709654
+}

@@ -1,0 +1,13 @@
+{
+ "scene": "tum_fr3_structure_texture_near",
+ "cond": "k2_jt_e1",
+ "seed": 42,
+ "n_frames": 100,
+ "n_heldout": 19,
+ "heldout_causal": 28.971294503462943,
+ "heldout_final": 28.405243421855726,
+ "mapped_early_final": 26.883649402194553,
+ "mapped_late_final": 26.65327305263943,
+ "N_final": 87474,
+ "mean_frame_ms": 40.09889238746837
+}

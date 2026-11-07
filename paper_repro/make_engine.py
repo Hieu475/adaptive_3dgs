@@ -251,8 +251,8 @@ def main():
         for f in (R / "retention" / split).glob("**/*_seed*.json"):
             j = json.loads(f.read_text()); u.setdefault(j["scene"] + ("@" + str(f.parent.parent.name) if split == "fresh" else ""), {}).setdefault(j["cond"], []).append(j)
         return u
-    RC = ["orig", "k3", "k3_rp", "k10", "k10_rp"]
-    RL = {"orig": "original system", "k3": "$K{=}3$ steps", "k3_rp": "$K{=}3$ + replay", "k10": "$K{=}10$ steps", "k10_rp": "$K{=}10$ + replay"}
+    RC = ["orig", "k3", "k3_rp", "k3_jr", "k10", "k10_rp"]
+    RL = {"orig": "original system", "k3": "$K{=}3$ steps", "k3_rp": "$K{=}3$ + replay", "k3_jr": "$K{=}3$ + joint replay", "k10": "$K{=}10$ steps", "k10_rp": "$K{=}10$ + replay"}
     L = [r"\begin{table}[t]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{3pt}", r"\begin{tabular}{lrrrrrr}", r"\toprule",
          r"& \multicolumn{3}{c}{11 test scenes} & \multicolumn{3}{c}{5 fresh windows} \\", r"\cmidrule(lr){2-4}\cmidrule(lr){5-7}",
          r"\textbf{Method} & next & final & early & next & final & early \\", r"\midrule"]
@@ -272,12 +272,12 @@ def main():
         if c in ("orig", "k3_rp"):
             L.append(r"\midrule")
     L += [r"\bottomrule", r"\end{tabular}",
-          r"\caption{\textbf{Keeping earlier views.} Mean PSNR (dB) with ground-truth poses; frames with index divisible by 5 are never mapped. next: those frames when they arrive; final: the final map on those frames; early: the final map on mapped frames of the first third of the sequence. Two seeds. Keyframe replay (every third step uses a stored past frame) is the last-listed addition.}",
+          r"\caption{\textbf{Keeping earlier views.} Mean PSNR (dB) with ground-truth poses; frames with index divisible by 5 are never mapped. next: those frames when they arrive; final: the final map on those frames; early: the final map on mapped frames of the first third of the sequence. Two seeds. Replay: every third step uses a stored past frame. Joint replay: steps 2 and 3 optimize the current frame together with two stored past frames.}",
           r"\label{tab:keep}", r"\end{table}"]
     (OUT / "tab_engine_retention.tex").write_text("\n".join(L) + "\n")
     for split in ("test", "fresh"):
         U = RET[split]
-        for a_, b_ in (("k3_rp", "k3"), ("k3_rp", "orig"), ("k10_rp", "k10"), ("k10_rp", "orig"), ("k3", "orig"), ("k10", "orig")):
+        for a_, b_ in (("k3_rp", "k3"), ("k3_rp", "orig"), ("k10_rp", "k10"), ("k10_rp", "orig"), ("k3", "orig"), ("k10", "orig"), ("k3_jr", "orig"), ("k3_jr", "k3_rp"), ("k3_jr", "k3")):
             d = np.array([np.mean([x["heldout_final"] for x in u[a_]]) - np.mean([x["heldout_final"] for x in u[b_]]) for u in U.values()])
             base = f"engKeepD{split.title()}{cname(a_)}Minus{cname(b_)}"
             setm(base + "Mean", float(d.mean()), "{:.2f}"); setm(base + "Worst", float(d.min()), "{:.2f}"); setm(base + "Pos", int((d > 0).sum()), "{:d}")
@@ -285,6 +285,8 @@ def main():
     tm = {}
     for f in (R / "retention_time").glob("*/*.json"):
         j = json.loads(f.read_text()); tm.setdefault(j["cond"], []).append(j["mean_frame_ms"])
+    for c_ in ("orig", "k3", "k3_rp", "k3_jr", "k10", "k10_rp"):
+        setm("engMs" + cname(c_), float(np.mean(tm[c_])), "{:.0f}")
     setm("engReplayTimeOverheadKThree", float(100 * (np.mean(tm["k3_rp"]) / np.mean(tm["k3"]) - 1)), "{:.0f}")
     setm("engReplayTimeOverheadKTen", float(100 * (np.mean(tm["k10_rp"]) / np.mean(tm["k10"]) - 1)), "{:.0f}")
 
@@ -299,6 +301,16 @@ def main():
             setm("engDevRet" + cname(c) + "Final", float(np.mean([dr[c][s_]["heldout_final"] for s_ in DEVR])), "{:.2f}")
             setm("engDevRet" + cname(c) + "Next", float(np.mean([dr[c][s_]["heldout_causal"] for s_ in DEVR])), "{:.2f}")
 
+    # ---- joint-replay design curve on the development scenes (equal measured time)
+    d2 = {}
+    for f in (R / "retention_dev2").glob("*/*_seed42.json"):
+        j = json.loads(f.read_text()); d2.setdefault(j["cond"], {})[j["scene"]] = j
+    for alias, c in (("SeqThree", "k3_rp"), ("SeqFive", "k5_rp"), ("SeqSix", "k6_rp"), ("SeqEight", "k8_rp"), ("JointTwoThree", "k2_jt_e1j3"),
+                     ("JointThreeTwo", "k3_jt_e1j2"), ("JointThreeFive", "k3_jt_e1j5")):
+        if c in d2 and all(s_ in d2[c] for s_ in DEVR):
+            setm(f"engJr{alias}Final", float(np.mean([d2[c][s_]["heldout_final"] for s_ in DEVR])), "{:.1f}")
+            setm(f"engJr{alias}Ms", float(np.mean([d2[c][s_]["mean_frame_ms"] for s_ in DEVR])), "{:.0f}")
+
     # ---- MonoGS tracker + our mapper (hybrid) versus original MonoGS, MonoGS' own protocol
     hy = {}
     for f in (R / "monogs_hybrid").glob("*_seed*.json"):
@@ -309,7 +321,7 @@ def main():
          r"& \multicolumn{2}{c}{MonoGS} & \multicolumn{2}{c}{+ original mapper} & \multicolumn{2}{c}{+ ours $K{=}3$} & \multicolumn{2}{c}{+ ours $K{=}3$, replay} & \multicolumn{2}{c}{+ ours $K{=}10$, replay} \\",
          r"\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}\cmidrule(lr){10-11}",
          r"\textbf{Sequence} & dB & cm & dB & cm & dB & cm & dB & cm & dB & cm \\", r"\midrule"]
-    cols = ("orig", "k3", "k3_rp", "k10_rp")
+    cols = ("orig", "k3", "k3_rp", "k3_jr")
     acc = {c: [] for c in ("mono",) + cols}
     for sc in SC:
         m = mb[sc]; row = [f"{m['psnr']:.1f} & {m['ate5']:.2f}"]; acc["mono"].append((m["psnr"], m["ate5"], m["ms"]))
@@ -328,14 +340,15 @@ def main():
     setm("engHybMonoPsnr", mean("mono", 0)); setm("engHybMonoAte", mean("mono", 1)); setm("engHybMonoMs", mean("mono", 2), "{:.0f}")
     for c in cols:
         setm(f"engHyb{cname(c)}Psnr", mean(c, 0)); setm(f"engHyb{cname(c)}Ate", mean(c, 1)); setm(f"engHyb{cname(c)}Ms", mean(c, 2), "{:.0f}")
-    setm("engHybSpeedup", mean("mono", 2) / mean("k3_rp", 2), "{:.1f}")
-    setm("engHybGapKThreeRp", mean("k3_rp", 0) - mean("mono", 0), "{:.1f}")
-    setm("engHybGapAbs", abs(mean("k3_rp", 0) - mean("mono", 0)), "{:.1f}")
-    d = [acc["k3_rp"][i][0] - acc["mono"][i][0] for i in range(len(SC))]
-    setm("engHybWorstScenes", int(sum(x < 0 for x in d)), "{:d}")
-    setm("engHybBetterScenes", int(sum(x > 0 for x in d)), "{:d}"); setm("engHybScenes", len(SC), "{:d}")
-    setm("engHybWorstGap", min(d), "{:.1f}"); setm("engHybBestGap", max(d), "{:.1f}")
-    setm("engHybReplayGain", mean("k3_rp", 0) - mean("k3", 0), "{:.1f}")
+    setm("engHybSpeedup", mean("mono", 2) / mean("k3_jr", 2), "{:.1f}")
+    setm("engHybGapKThreeJr", mean("k3_jr", 0) - mean("mono", 0), "{:.1f}")
+    setm("engHybGapAbs", abs(mean("k3_jr", 0) - mean("mono", 0)), "{:.1f}")
+    d = [acc["k3_jr"][i][0] - acc["mono"][i][0] for i in range(len(SC))]
+    setm("engHybBetterScenes", int(sum(x > 0.5 for x in d)), "{:d}"); setm("engHybWorstScenes", int(sum(x < -0.5 for x in d)), "{:d}")
+    setm("engHybEqualScenes", int(sum(abs(x) <= 0.5 for x in d)), "{:d}"); setm("engHybScenes", len(SC), "{:d}")
+    setm("engHybWorstGap", min(d), "{:.1f}"); setm("engHybBestGap", max(d), "{:.1f}"); setm("engHybMedianGap", float(np.median(d)), "{:.1f}")
+    setm("engHybAteDiff", mean("k3_jr", 1) - mean("mono", 1), "{:.2f}")
+    setm("engHybReplayGain", mean("k3_jr", 0) - mean("k3", 0), "{:.1f}")
 
     # ---- Pareto figure
     import matplotlib

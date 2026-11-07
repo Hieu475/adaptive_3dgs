@@ -1,0 +1,13 @@
+{
+ "scene": "replica_room2",
+ "cond": "k3_jr",
+ "seed": 42,
+ "n_frames": 100,
+ "n_heldout": 19,
+ "heldout_causal": 24.62627747184352,
+ "heldout_final": 30.389123916625977,
+ "mapped_early_final": 30.522512435913086,
+ "mapped_late_final": 31.421033011542427,
+ "N_final": 107423,
+ "mean_frame_ms": 55.20341930716919
+}

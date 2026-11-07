@@ -59,7 +59,8 @@ def main():
     en = json.loads((TABLES / "engine_numbers.json").read_text())
     readme = README.read_text()
     for key, fmt in (("engTestTtsVggTFourFiveGainMean", "{:.2f}"), ("engFreshTtsVggTFourFiveGainMean", "{:.2f}"), ("engAblNooptDeltaAbs", "{:.2f}"),
-                     ("engHitMaxPct", "{:.1f}"), ("engCostSlope", "{:.1f}")):
+                     ("engHitMaxPct", "{:.1f}"), ("engCostSlope", "{:.1f}"), ("engKeepDTestKThreeJrMinusOrigMean", "{:.2f}"),
+                     ("engHybKThreeJrPsnr", "{:.1f}"), ("engHybMonoPsnr", "{:.1f}")):
         if fmt.format(en[key]) not in readme:
             fail(f"README missing engine number {key} = {fmt.format(en[key])}")
     for sc in ("replica_office0", "replica_office1"):

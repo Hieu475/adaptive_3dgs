@@ -1647,6 +1647,12 @@ class OnlineReconstructionPipeline:
                 if (rp and step_i > 0 and (step_i + 1) % int(rp.get('every', 3)) == 0 and self._replay_buf
                         and bool(step_mask[:n_gaussians].all())):
                     replay_kf = self._replay_buf[int(self._replay_rng.integers(len(self._replay_buf)))]
+                joint_kf = None
+                if replay_kf is not None and rp.get('joint'):
+                    # joint multi-view step: the current frame and `joint` replayed frames share one loss and one update
+                    joint_kf = [replay_kf] + [self._replay_buf[int(self._replay_rng.integers(len(self._replay_buf)))]
+                                              for _ in range(int(rp.get('joint', 1)) - 1)]
+                    replay_kf = None
                 tgt_rgb, tgt_depth, tgt_pose = (replay_kf if replay_kf is not None else (rgb, depth, self.current_pose))
                 active_subset = self.gaussian_model.get_optimization_subset(step_mask, extrinsics=tgt_pose)
                 
@@ -1680,6 +1686,16 @@ class OnlineReconstructionPipeline:
                     weights,
                     depth_valid_mask=depth_valid_mask,
                 )
+                if joint_kf is not None:
+                    for kf in joint_kf:
+                        sub2 = self.gaussian_model.get_optimization_subset(step_mask, extrinsics=kf[2])
+                        r2 = rasterize_scene(
+                            means3D=sub2['means3D'], cov3D=sub2['cov3D'], colors=sub2['colors'], opacities=sub2['opacities'],
+                            extrinsics=kf[2], intrinsics=self.intrinsics, image_width=W, image_height=H,
+                            tile_size=self.config['rendering']['tile_size'], backend=renderer_backend)
+                        l2 = total_loss(r2['color'], kf[0], r2['depth'], kf[1], weights,
+                                        depth_valid_mask=(r2['alpha'] >= alpha_threshold) & torch.isfinite(kf[1]) & (kf[1] > 0))
+                        losses['total'] = losses['total'] + l2['total']
                 if forward_event_start is not None:
                     forward_event_end = torch.cuda.Event(enable_timing=True)
                     forward_event_end.record()

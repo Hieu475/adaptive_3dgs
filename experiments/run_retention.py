@@ -31,8 +31,24 @@ CONDS = {
     "k10": ("tts", {"T_ms": 1.0, "n_min": 10, "n_max": 10, "n_init": 10}, {}),
     # replay constants chosen on the four development scenes: every 3rd step, 32-frame reservoir, every 2nd mapped frame
     "k3_rp": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}, {"replay": {"every": 3, "size": 32, "stride": 2}}),
+    # joint replay (chosen on the four development scenes): steps 2..K optimize the current frame jointly with 2 replayed frames
+    "k3_jr": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}, {"replay": {"every": 1, "size": 32, "stride": 2, "joint": 2}}),
     "k10_rp": ("tts", {"T_ms": 1.0, "n_min": 10, "n_max": 10, "n_init": 10}, {"replay": {"every": 3, "size": 32, "stride": 2}}),
 }
+
+
+def parse_cond(name):
+    """kN (N uniform steps), kN_rp (plus keyframe replay), kN_jt (plus joint two-view steps; set replay.every)."""
+    import re
+    m = re.fullmatch(r"k(\d+)(_rp|_jt)?", name)
+    n = int(m.group(1))
+    tt = {"T_ms": 1.0, "n_min": n, "n_max": n, "n_init": n}
+    tr = {}
+    if m.group(2) == "_rp":
+        tr = {"replay": {"every": 3, "size": 32, "stride": 2}}
+    elif m.group(2) == "_jt":
+        tr = {"replay": {"every": 3, "size": 32, "stride": 2, "joint": 1}}
+    return "tts", tt, tr
 
 
 def main():
@@ -59,7 +75,7 @@ def main():
                     continue
                 target.parent.mkdir(parents=True, exist_ok=True)
                 set_seed(seed)
-                cond, tt, tr = CONDS[name]
+                cond, tt, tr = CONDS[name] if name in CONDS else parse_cond(name)
                 _, cfg = vgg.config_for(cond, seed, 15.0, "cuda", {}, tt)
                 cfg["training"].update(copy.deepcopy(tr))
                 for kv in a.set:
