@@ -1,0 +1,15 @@
+{
+ "scene": "tum_fr2_xyz",
+ "seed": 42,
+ "condition": "error_budget_prop",
+ "offset": 0,
+ "ate_rmse_m": 0.043977273152092385,
+ "ate_max_m": 0.07386141270399094,
+ "psnr_tracked": 31.50108964284261,
+ "psnr_final_map_at_gt_last10": 16.73260440826416,
+ "track_ms": 136.97301228841147,
+ "map_ms": 92.84772237141927,
+ "N_final": 58328,
+ "tt_m_final": null,
+ "n_frames": 151
+}

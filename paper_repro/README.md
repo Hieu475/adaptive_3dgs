@@ -35,3 +35,5 @@ Scripts moved out of `experiments/` into `research_archive/` during the cleanup 
 None of these exist in this repository's history (the runs were made from a clean checkout under `/tmp`), and `research/pipeline.py` differs from the hash in the manifest
 (the other seven recorded source files match the current tree byte-for-byte). The paper therefore cites source-file hashes and worktree status rather than a commit hash.
 Before submission, either recover that checkout's commit and import it, or re-run `reproduce.sh main` from a tagged commit and re-freeze the bundle.
+
+- `closedloop` target: map-based tracking in the loop (`experiments/run_closed_loop.py`, `research/map_tracker.py`); table S15 (`tab_closedloop.tex`) from `results/closed_loop/`. TUM only (tracking fails on the local Replica sequences); tracker constants were set on fr2_xyz/fr1_xyz, which are also test scenes.

@@ -252,6 +252,10 @@ demo_output/
 !compute_matched/**/*.md
 !tracked_poses/**/*.json
 !tracked_poses/**/*.md
+!closed_loop/
+!closed_loop/**/
+!closed_loop/**/*.json
+!closed_loop/**/*.md
 
 # Controller (TT / VGG) development, evaluation and diagnostics.
 !vgg_dev/**/*.json

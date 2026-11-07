@@ -1,0 +1,17 @@
+\begin{table}[tbp]
+\centering
+\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Scene} & \textbf{Base ATE} & \textbf{TT+VGG $\Delta$PSNR} & \textbf{TT+VGG $\Delta$ATE} & \textbf{Prop. $\Delta$PSNR} \\
+\midrule
+\texttt{fr2\_xyz} & 4.4 cm & +3.20 & +0.14 cm & +4.00 \\
+\texttt{fr1\_xyz} & 4.8 cm & +1.80 & $-$0.63 cm & +3.43 \\
+\texttt{fr1\_rpy} & 14.9 cm & +1.40 & $-$0.59 cm & +3.17 \\
+\texttt{fr3\_sitting\_static} & 17.3 cm & +0.18 & +0.18 cm & +0.20 \\
+\texttt{fr1\_room}$^\dagger$ & 411.5 cm & +0.10 & $-$91.16 cm & +0.79 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Closed-loop mapping with map-based tracking, two seeds.} Poses come from aligning each frame to the current map (Supp.\ text); the same controllers then map with the estimated poses. $\Delta$PSNR (dB) is measured at the tracked pose, $\Delta$ATE is TT+VGG minus the unthrottled baseline. $^\dagger$Tracking diverged for every condition and the scene is excluded from the summary: over the four converged scenes TT+VGG changes PSNR by +1.65 dB on average and ATE by a median of $-$0.22 cm (largest $|\Delta|$ 0.63 cm).}
+\label{tab:closedloop}
+\end{table}

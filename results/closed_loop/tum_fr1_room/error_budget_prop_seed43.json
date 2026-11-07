@@ -1,0 +1,15 @@
+{
+ "scene": "tum_fr1_room",
+ "seed": 43,
+ "condition": "error_budget_prop",
+ "offset": 0,
+ "ate_rmse_m": 4.083969562579535,
+ "ate_max_m": 6.108044147491455,
+ "psnr_tracked": 13.906160036722818,
+ "psnr_final_map_at_gt_last10": 3.2385833263397217,
+ "track_ms": 113.85849952697754,
+ "map_ms": 176.19828859965006,
+ "N_final": 142967,
+ "tt_m_final": null,
+ "n_frames": 151
+}
