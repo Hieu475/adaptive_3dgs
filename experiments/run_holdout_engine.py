@@ -36,6 +36,7 @@ def main():
     ap.add_argument("--holdout_every", type=int, default=8)
     ap.add_argument("--set", nargs="*", default=[], help="config overrides, e.g. losses.weight_depth=1.0")
     ap.add_argument("--tag", default="")
+    ap.add_argument("--lr_mult", type=float, default=1.0)
     ap.add_argument("--out_dir", type=Path, default=ROOT / "results" / "holdout_engine")
     a = ap.parse_args()
     torch.cuda.set_per_process_memory_fraction(0.70, 0)
@@ -54,7 +55,9 @@ def main():
                     node, keys = cfg, path.split(".")
                     for k in keys[:-1]:
                         node = node.setdefault(k, {})
-                    node[keys[-1]] = float(val)
+                    node[keys[-1]] = [float(x) for x in val.split(",")] if "," in val else float(val)
+                if a.lr_mult != 1.0:
+                    cfg["training"]["learning_rate"] = {k: v * a.lr_mult for k, v in cfg["training"]["learning_rate"].items()}
                 print(f"RUN {scene} {name} seed={seed}", flush=True)
                 s = run_holdout_trajectory(policy, seed, frames, intr, 15.0, "cuda", 320, 240, a.holdout_every, cfg)
                 s.update({"scene": scene, "condition": name + a.tag, "n_frames_loaded": len(frames), "holdout_every": a.holdout_every})
