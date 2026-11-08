@@ -1,21 +1,21 @@
 \begin{table*}[t]
 \centering
 \scriptsize\setlength{\tabcolsep}{2.5pt}
-\begin{tabular}{lrrrrrrrrrrrr}
+\begin{tabular}{lrrrrrrrrrrrrrr}
 \toprule
-& \multicolumn{2}{c}{MonoGS} & \multicolumn{2}{c}{+ original mapper} & \multicolumn{2}{c}{+ ours $K{=}3$} & \multicolumn{2}{c}{+ ours $K{=}3$, replay} & \multicolumn{2}{c}{+ ours $K{=}3$, joint replay} & \multicolumn{2}{c}{+ joint replay, 3 batched views} \\
-\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}\cmidrule(lr){10-11}\cmidrule(lr){12-13}
-\textbf{Sequence} & dB & cm & dB & cm & dB & cm & dB & cm & dB & cm & dB & cm \\
+& \multicolumn{2}{c}{SplaTAM} & \multicolumn{2}{c}{MonoGS} & \multicolumn{2}{c}{+ original mapper} & \multicolumn{2}{c}{+ ours $K{=}3$} & \multicolumn{2}{c}{+ ours $K{=}3$, replay} & \multicolumn{2}{c}{+ ours $K{=}3$, joint replay} & \multicolumn{2}{c}{+ joint replay, 3 batched views} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}\cmidrule(lr){10-11}\cmidrule(lr){12-13}\cmidrule(lr){14-15}
+\textbf{Sequence} & dB & cm & dB & cm & dB & cm & dB & cm & dB & cm & dB & cm & dB & cm \\
 \midrule
-\texttt{fr1\_desk} & 18.7 & 1.38 & 13.9 & 1.57 & 12.5 & 1.30 & 16.3 & 1.38 & 18.4 & 1.35 & 19.1 & 1.32 \\
-\texttt{fr2\_xyz} & 20.3 & 0.57 & 15.6 & 0.59 & 12.2 & 0.38 & 19.7 & 0.51 & 22.3 & 0.48 & 22.9 & 0.49 \\
-\texttt{fr1\_xyz} & 19.8 & 1.05 & 19.9 & 1.08 & 16.3 & 1.44 & 20.5 & 1.02 & 22.3 & 1.05 & 22.9 & 1.04 \\
-\texttt{fr1\_rpy} & 13.1 & 2.60 & 14.8 & 3.39 & 13.3 & 3.49 & 16.0 & 3.24 & 17.4 & 3.39 & 17.9 & 3.26 \\
-\texttt{fr2\_desk} & 23.8 & 0.74 & 18.8 & 0.97 & 14.2 & 1.03 & 20.1 & 0.91 & 22.6 & 1.00 & 23.1 & 0.98 \\
-\texttt{fr3\_sitting\_static} & 22.0 & 0.62 & 11.3 & 0.63 & 18.6 & 0.86 & 20.9 & 0.67 & 21.8 & 0.63 & 22.0 & 0.63 \\
+\texttt{fr1\_desk} & 21.6 & 1.36 & 18.7 & 1.38 & 13.9 & 1.57 & 12.5 & 1.30 & 16.3 & 1.38 & 18.4 & 1.35 & 19.1 & 1.32 \\
+\texttt{fr2\_xyz} & 21.5 & 0.41 & 20.3 & 0.57 & 15.6 & 0.59 & 12.2 & 0.38 & 19.7 & 0.51 & 22.3 & 0.48 & 22.9 & 0.49 \\
+\texttt{fr1\_xyz} & 24.4 & 1.01 & 19.8 & 1.05 & 19.9 & 1.08 & 16.3 & 1.44 & 20.5 & 1.02 & 22.3 & 1.05 & 22.9 & 1.04 \\
+\texttt{fr1\_rpy} & 19.1 & 2.28 & 13.1 & 2.60 & 14.8 & 3.39 & 13.3 & 3.49 & 16.0 & 3.24 & 17.4 & 3.39 & 17.9 & 3.26 \\
+\texttt{fr2\_desk} & 23.8 & 1.02 & 23.8 & 0.74 & 18.8 & 0.97 & 14.2 & 1.03 & 20.1 & 0.91 & 22.6 & 1.00 & 23.1 & 0.98 \\
+\texttt{fr3\_sitting\_static} & 19.4 & 0.67 & 22.0 & 0.62 & 11.3 & 0.63 & 18.6 & 0.86 & 20.9 & 0.67 & 21.8 & 0.63 & 22.0 & 0.63 \\
 \midrule
-mean & 19.6 & 1.16 & 15.7 & 1.37 & 14.5 & 1.41 & 18.9 & 1.29 & 20.8 & 1.32 & 21.3 & 1.29 \\
-ms/frame & \multicolumn{2}{c}{925} & \multicolumn{2}{c}{593} & \multicolumn{2}{c}{674} & \multicolumn{2}{c}{661} & \multicolumn{2}{c}{666} & \multicolumn{2}{c}{682} \\
+mean & 21.6 & 1.13 & 19.6 & 1.16 & 15.7 & 1.37 & 14.5 & 1.41 & 18.9 & 1.29 & 20.8 & 1.32 & 21.3 & 1.29 \\
+ms/frame & \multicolumn{2}{c}{6205} & \multicolumn{2}{c}{925} & \multicolumn{2}{c}{593} & \multicolumn{2}{c}{674} & \multicolumn{2}{c}{661} & \multicolumn{2}{c}{666} & \multicolumn{2}{c}{682} \\
 \bottomrule
 \end{tabular}
 \caption{\textbf{MonoGS's tracker with our mapper, under MonoGS's own evaluation.} First 150 frames of six TUM sequences at $640{\times}480$. MonoGS: mean of three runs (one run for \texttt{fr3\_sitting\_static}, where the repeats crashed); joint replay: mean of three seeds; other columns: one run. dB: PSNR of the final map on every fifth frame (MonoGS: those that are not keyframes; ours: all of them, none was mapped), rendered at the estimated pose. cm: Umeyama-aligned ATE RMSE over every fifth tracked frame. Per-frame time is MonoGS's total, or tracking plus mapping.}
