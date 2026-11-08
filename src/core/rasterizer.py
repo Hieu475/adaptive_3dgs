@@ -447,6 +447,27 @@ def render(
     }
 
 
+def render_multi(
+    means3D: torch.Tensor, cov3D: torch.Tensor, colors: torch.Tensor, opacities: torch.Tensor,
+    extrinsics: torch.Tensor, intrinsics: torch.Tensor, image_width: int, image_height: int,
+) -> list:
+    """Render the same Gaussians from V cameras in one gsplat call (extrinsics: (V,4,4)); returns V dicts like render()."""
+    import gsplat
+    renders, alphas, _ = gsplat.rasterization(
+        means=means3D, quats=None, scales=None, covars=cov3D,
+        opacities=opacities.squeeze(-1) if opacities.ndim > 1 else opacities, colors=colors,
+        viewmats=extrinsics, Ks=intrinsics.unsqueeze(0).expand(extrinsics.shape[0], 3, 3),
+        width=image_width, height=image_height, near_plane=0.1, backgrounds=None, render_mode='RGB+D')
+    out = []
+    for v in range(extrinsics.shape[0]):
+        acc = renders[v, :, :, 3]
+        trans = (1.0 - alphas[v, :, :, 0]).clamp(min=0.0, max=1.0)
+        alpha = 1.0 - trans
+        depth = torch.where(alpha > 1e-10, acc / alpha.clamp_min(1e-10), torch.zeros_like(acc))
+        out.append({'color': renders[v, :, :, :3], 'depth': depth, 'depth_accumulated': acc, 'alpha': alpha, 'transmission': trans})
+    return out
+
+
 def render_full(
     model,
     extrinsics: torch.Tensor,

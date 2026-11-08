@@ -1701,7 +1701,14 @@ class OnlineReconstructionPipeline:
                 tgt_rgb, tgt_depth, tgt_pose = (replay_kf if replay_kf is not None else (rgb, depth, self.current_pose))
                 active_subset = self.gaussian_model.get_optimization_subset(step_mask, extrinsics=tgt_pose)
                 
-                if replay_kf is not None:
+                multi_out = None
+                if joint_kf is not None and rp.get('batched') and bool(active_subset.get('dense', False)):
+                    from src.core.rasterizer import render_multi
+                    multi_out = render_multi(
+                        active_subset['means3D'], active_subset['cov3D'], active_subset['colors'], active_subset['opacities'],
+                        torch.stack([self.current_pose] + [kf[2] for kf in joint_kf]), self.intrinsics, W, H)
+                    composite_opt = multi_out[0]
+                elif replay_kf is not None:
                     composite_opt = rasterize_scene(
                         means3D=active_subset['means3D'], cov3D=active_subset['cov3D'],
                         colors=active_subset['colors'], opacities=active_subset['opacities'],
@@ -1732,12 +1739,15 @@ class OnlineReconstructionPipeline:
                     depth_valid_mask=depth_valid_mask,
                 )
                 if joint_kf is not None:
-                    for kf in joint_kf:
-                        sub2 = self.gaussian_model.get_optimization_subset(step_mask, extrinsics=kf[2])
-                        r2 = rasterize_scene(
-                            means3D=sub2['means3D'], cov3D=sub2['cov3D'], colors=sub2['colors'], opacities=sub2['opacities'],
-                            extrinsics=kf[2], intrinsics=self.intrinsics, image_width=W, image_height=H,
-                            tile_size=self.config['rendering']['tile_size'], backend=renderer_backend)
+                    for vi, kf in enumerate(joint_kf):
+                        if multi_out is not None:
+                            r2 = multi_out[vi + 1]
+                        else:
+                            sub2 = self.gaussian_model.get_optimization_subset(step_mask, extrinsics=kf[2])
+                            r2 = rasterize_scene(
+                                means3D=sub2['means3D'], cov3D=sub2['cov3D'], colors=sub2['colors'], opacities=sub2['opacities'],
+                                extrinsics=kf[2], intrinsics=self.intrinsics, image_width=W, image_height=H,
+                                tile_size=self.config['rendering']['tile_size'], backend=renderer_backend)
                         l2 = total_loss(r2['color'], kf[0], r2['depth'], kf[1], weights,
                                         depth_valid_mask=(r2['alpha'] >= alpha_threshold) & torch.isfinite(kf[1]) & (kf[1] > 0))
                         losses['total'] = losses['total'] + l2['total']
