@@ -539,8 +539,31 @@ class OnlineReconstructionPipeline:
             d = torch.stack([torch.linalg.norm(k[2][:3, 3] - c[:3, 3]) + 0.5 * torch.linalg.norm(k[2][:3, :3] - c[:3, :3])
                              for k in buf])
             idx = torch.topk(d, m, largest=False).indices
-            return buf[int(idx[int(self._replay_rng.integers(m))])]
-        return buf[int(self._replay_rng.integers(len(buf)))]
+            return self._decompress_replay(buf[int(idx[int(self._replay_rng.integers(m))])])
+        return self._decompress_replay(buf[int(self._replay_rng.integers(len(buf)))])
+
+    def _compress_replay(self, rgb, depth, pose, rp):
+        """Store a replay frame at reduced size: rgb as uint8 and depth as fp16 at `scale` of the resolution."""
+        sc = float(rp.get('scale', 1.0))
+        if sc >= 1.0 and not rp.get('uint8'):
+            return (rgb, depth, pose)
+        H, W = depth.shape
+        h, w = max(1, int(round(H * sc))), max(1, int(round(W * sc)))
+        if (h, w) != (H, W):
+            rgb = torch.nn.functional.interpolate(rgb.permute(2, 0, 1)[None], size=(h, w), mode='area')[0].permute(1, 2, 0)
+            depth = depth[::max(1, H // h), ::max(1, W // w)][:h, :w]
+        return ((rgb.clamp(0, 1) * 255).round().to(torch.uint8), depth.half(), pose, (H, W))
+
+    def _decompress_replay(self, item):
+        if len(item) == 3:
+            return item
+        rgb, depth, pose, (H, W) = item
+        rgb = rgb.float() / 255.0
+        depth = depth.float()
+        if depth.shape != (H, W):
+            rgb = torch.nn.functional.interpolate(rgb.permute(2, 0, 1)[None], size=(H, W), mode='bilinear', align_corners=False)[0].permute(1, 2, 0)
+            depth = torch.nn.functional.interpolate(depth[None, None], size=(H, W), mode='nearest')[0, 0]
+        return (rgb, depth, pose)
 
     def process_frame(
         self,
@@ -1758,7 +1781,7 @@ class OnlineReconstructionPipeline:
             opt_loss_val = losses['total'].item()
             rp_cfg = self.config.get('training', {}).get('replay')
             if rp_cfg and self.frame_count % int(rp_cfg.get('stride', 2)) == 0:
-                item = (rgb.detach(), depth.detach(), self.current_pose.detach().clone())
+                item = self._compress_replay(rgb.detach(), depth.detach(), self.current_pose.detach().clone(), rp_cfg)
                 self._replay_seen += 1
                 size = int(rp_cfg.get('size', 32))
                 if len(self._replay_buf) < size:
