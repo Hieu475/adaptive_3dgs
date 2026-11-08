@@ -410,6 +410,19 @@ def main():
     setm("engHybBetterThreeB", int(sum(x > 0.5 for x in d3)), "{:d}"); setm("engHybEqualThreeB", int(sum(abs(x) <= 0.5 for x in d3)), "{:d}")
     setm("engHybWorseThreeB", int(sum(x < -0.5 for x in d3)), "{:d}"); setm("engHybWorstGapThreeB", float(min(d3)), "{:.1f}")
     setm("engHybReplayGain", mean("k3_jr", 0) - mean("k3", 0), "{:.1f}")
+    # ---- 600-frame prefixes (results/monogs_full): original mapper vs three-view batched joint replay, MonoGS tracker
+    fl = {}
+    for f in (R / "monogs_full").glob("*_seed*.json"):
+        j = json.loads(f.read_text()); fl.setdefault(j["scene"], {})[j["cond"]] = j
+    if fl:
+        fs = sorted(fl); g = [fl[x]["k3_jr3b"]["heldout_final_psnr"] - fl[x]["orig"]["heldout_final_psnr"] for x in fs]
+        setm("engFullScenes", len(fs), "{:d}"); setm("engFullFrames", float(np.mean([fl[x]["orig"]["n_frames"] for x in fs])), "{:.0f}")
+        setm("engFullOrigPsnr", float(np.mean([fl[x]["orig"]["heldout_final_psnr"] for x in fs]))); setm("engFullJrPsnr", float(np.mean([fl[x]["k3_jr3b"]["heldout_final_psnr"] for x in fs])))
+        setm("engFullGainMean", float(np.mean(g)), "{:.1f}"); setm("engFullGainMin", float(min(g)), "{:.1f}"); setm("engFullGainMax", float(max(g)), "{:.1f}")
+        setm("engFullOrigAte", 100 * float(np.mean([fl[x]["orig"]["ate_every5_m"] for x in fs]))); setm("engFullJrAte", 100 * float(np.mean([fl[x]["k3_jr3b"]["ate_every5_m"] for x in fs])))
+        setm("engFullOrigMs", float(np.mean([fl[x]["orig"]["track_ms"] + fl[x]["orig"]["map_ms"] for x in fs])), "{:.0f}")
+        setm("engFullJrMs", float(np.mean([fl[x]["k3_jr3b"]["track_ms"] + fl[x]["k3_jr3b"]["map_ms"] for x in fs])), "{:.0f}")
+        setm("engFullNMax", float(max(fl[x][c]["N_final"] for x in fs for c in fl[x])) / 1000, "{:.0f}")
 
     # ---- Pareto figure
     import matplotlib

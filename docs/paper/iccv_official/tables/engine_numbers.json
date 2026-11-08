@@ -593,5 +593,17 @@
  "engHybEqualThreeB": 2,
  "engHybWorseThreeB": 1,
  "engHybWorstGapThreeB": -0.7034529780396177,
- "engHybReplayGain": 6.272836593832546
+ "engHybReplayGain": 6.272836593832546,
+ "engFullScenes": 3,
+ "engFullFrames": 597.3333333333334,
+ "engFullOrigPsnr": 13.175093177263312,
+ "engFullJrPsnr": 19.813252819380754,
+ "engFullGainMean": 6.638159642117444,
+ "engFullGainMin": 3.626906815697163,
+ "engFullGainMax": 10.110782438967409,
+ "engFullOrigAte": 2.5051946595034607,
+ "engFullJrAte": 1.717302327881878,
+ "engFullOrigMs": 633.6808135592087,
+ "engFullJrMs": 846.7611680761966,
+ "engFullNMax": 150.0
 }
