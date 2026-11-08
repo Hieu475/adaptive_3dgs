@@ -309,6 +309,18 @@ def main():
             setm(f"engHiRes{cname(c)}Pos", int((dd > 0).sum()), "{:d}")
             setm(f"engHiRes{cname(c)}Ms", float(np.mean([x["mean_frame_ms"] for v in hr[c].values() for x in v])), "{:.0f}")
         setm("engHiResN", len(hb), "{:d}")
+    hf = {}
+    for f in (R / "retention_640" / "fresh").glob("*/*/*_seed*.json"):
+        j = json.loads(f.read_text()); hf.setdefault(j["cond"], {}).setdefault(f.parent.name, []).append(j)
+    if hf and all(c in hf for c in ("orig", "k3", "k2_jr2b", "k3_jr3b")):
+        fb = {sc: np.mean([x["heldout_final"] for x in v]) for sc, v in hf["orig"].items()}
+        for c in ("orig", "k3", "k2_jr2b", "k3_jr3b"):
+            fin = {sc: np.mean([x["heldout_final"] for x in v]) for sc, v in hf[c].items()}
+            dd = np.array([fin[sc] - fb[sc] for sc in fin])
+            setm(f"engHiResFresh{cname(c)}Gain", float(dd.mean()), "{:.2f}"); setm(f"engHiResFresh{cname(c)}Worst", float(dd.min()), "{:.2f}")
+            setm(f"engHiResFresh{cname(c)}Pos", int((dd > 0).sum()), "{:d}")
+            setm(f"engHiResFresh{cname(c)}Ms", float(np.mean([x["mean_frame_ms"] for v in hf[c].values() for x in v])), "{:.0f}")
+        setm("engHiResFreshN", len(fb), "{:d}")
     tm = {}
     for f in (R / "retention_time").glob("*/*.json"):
         j = json.loads(f.read_text()); tm.setdefault(j["cond"], []).append(j["mean_frame_ms"])
