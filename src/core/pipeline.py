@@ -526,6 +526,19 @@ class OnlineReconstructionPipeline:
         
         print(f"[Init] Created {self.gaussian_model.num_gaussians} Gaussians from first frame (refine_steps={init_refine_steps})")
     
+    def _draw_replay(self, rp):
+        """Draw one stored frame. Default: uniform over the reservoir. With rp['near'] = m: uniformly among the m
+        stored frames whose camera is closest to the current one (a keyframe window by pose proximity)."""
+        buf = self._replay_buf
+        m = int(rp.get('near', 0))
+        if m and len(buf) > m:
+            c = self.current_pose.detach()
+            d = torch.stack([torch.linalg.norm(k[2][:3, 3] - c[:3, 3]) + 0.5 * torch.linalg.norm(k[2][:3, :3] - c[:3, :3])
+                             for k in buf])
+            idx = torch.topk(d, m, largest=False).indices
+            return buf[int(idx[int(self._replay_rng.integers(m))])]
+        return buf[int(self._replay_rng.integers(len(buf)))]
+
     def process_frame(
         self,
         rgb: torch.Tensor,
@@ -1646,12 +1659,11 @@ class OnlineReconstructionPipeline:
                 replay_kf = None
                 if (rp and step_i > 0 and (step_i + 1) % int(rp.get('every', 3)) == 0 and self._replay_buf
                         and bool(step_mask[:n_gaussians].all())):
-                    replay_kf = self._replay_buf[int(self._replay_rng.integers(len(self._replay_buf)))]
+                    replay_kf = self._draw_replay(rp)
                 joint_kf = None
                 if replay_kf is not None and rp.get('joint'):
                     # joint multi-view step: the current frame and `joint` replayed frames share one loss and one update
-                    joint_kf = [replay_kf] + [self._replay_buf[int(self._replay_rng.integers(len(self._replay_buf)))]
-                                              for _ in range(int(rp.get('joint', 1)) - 1)]
+                    joint_kf = [replay_kf] + [self._draw_replay(rp) for _ in range(int(rp.get('joint', 1)) - 1)]
                     replay_kf = None
                 tgt_rgb, tgt_depth, tgt_pose = (replay_kf if replay_kf is not None else (rgb, depth, self.current_pose))
                 active_subset = self.gaussian_model.get_optimization_subset(step_mask, extrinsics=tgt_pose)

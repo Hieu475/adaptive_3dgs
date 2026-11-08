@@ -33,6 +33,9 @@ CONDS = {
     "k3_rp": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}, {"replay": {"every": 3, "size": 32, "stride": 2}}),
     # joint replay (chosen on the four development scenes): steps 2..K optimize the current frame jointly with 2 replayed frames
     "k3_jr": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}, {"replay": {"every": 1, "size": 32, "stride": 2, "joint": 2}}),
+    # joint replay drawing the replayed frames from the m stored frames closest in pose (keyframe window)
+    "k3_jn4": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}, {"replay": {"every": 1, "size": 32, "stride": 2, "joint": 2, "near": 4}}),
+    "k3_jn8": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}, {"replay": {"every": 1, "size": 32, "stride": 2, "joint": 2, "near": 8}}),
     "k10_rp": ("tts", {"T_ms": 1.0, "n_min": 10, "n_max": 10, "n_init": 10}, {"replay": {"every": 3, "size": 32, "stride": 2}}),
 }
 
