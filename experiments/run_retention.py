@@ -80,11 +80,13 @@ def main():
     ap.add_argument("--set", nargs="*", default=[], help="training overrides, e.g. replay.every=3 replay.size=8")
     ap.add_argument("--cfg", nargs="*", default=[], help="overrides relative to the whole config, e.g. densification.disable_pruning=1")
     ap.add_argument("--tag", default="")
+    ap.add_argument("--H", type=int, default=240)
+    ap.add_argument("--W", type=int, default=320)
     ap.add_argument("--out_dir", type=Path, default=ROOT / "results" / "retention")
     a = ap.parse_args()
     torch.cuda.set_per_process_memory_fraction(0.70, 0)
     for sc in a.scenes:
-        frames, intr = load_benchmark_sequence(scene_name=sc, n_frames=a.offset + a.n_frames + 1, H=240, W=320, device="cuda")
+        frames, intr = load_benchmark_sequence(scene_name=sc, n_frames=a.offset + a.n_frames + 1, H=a.H, W=a.W, device="cuda")
         frames = frames[a.offset:]
         n = len(frames)
         for seed in a.seeds:

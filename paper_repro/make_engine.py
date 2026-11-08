@@ -295,6 +295,20 @@ def main():
             ms = [x["mean_frame_ms"] for u in U.values() for x in u[c_] if "mean_frame_ms" in x]
             if ms:
                 setm(f"engMs{split.title()}{cname(c_)}", float(np.mean(ms)), "{:.0f}")
+    # full resolution (640x480) on the same test scenes
+    hr = {}
+    for f in (R / "retention_640" / "test").glob("*/*_seed*.json"):
+        j = json.loads(f.read_text()); hr.setdefault(j["cond"], {}).setdefault(j["scene"], []).append(j)
+    if hr and all(c in hr for c in ("orig", "k3", "k3_jr", "k3_jr3b")):
+        hb = {sc: np.mean([x["heldout_final"] for x in v]) for sc, v in hr["orig"].items()}
+        for c in ("orig", "k3", "k3_jr", "k3_jr3b"):
+            fin = {sc: np.mean([x["heldout_final"] for x in v]) for sc, v in hr[c].items()}
+            dd = np.array([fin[sc] - hb[sc] for sc in fin])
+            setm(f"engHiRes{cname(c)}Final", float(np.mean(list(fin.values()))), "{:.1f}")
+            setm(f"engHiRes{cname(c)}Gain", float(dd.mean()), "{:.2f}"); setm(f"engHiRes{cname(c)}Worst", float(dd.min()), "{:.2f}")
+            setm(f"engHiRes{cname(c)}Pos", int((dd > 0).sum()), "{:d}")
+            setm(f"engHiRes{cname(c)}Ms", float(np.mean([x["mean_frame_ms"] for v in hr[c].values() for x in v])), "{:.0f}")
+        setm("engHiResN", len(hb), "{:d}")
     tm = {}
     for f in (R / "retention_time").glob("*/*.json"):
         j = json.loads(f.read_text()); tm.setdefault(j["cond"], []).append(j["mean_frame_ms"])
