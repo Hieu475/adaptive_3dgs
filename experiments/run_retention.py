@@ -44,6 +44,9 @@ CONDS = {
     "k3_jr_s4": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}, {"replay": {"every": 1, "size": 32, "stride": 2, "joint": 2, "scale": 0.25}}),
     "k3_jr_s4x4": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}, {"replay": {"every": 1, "size": 128, "stride": 2, "joint": 2, "scale": 0.25}}),
     "k3_jr_s8x16": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}, {"replay": {"every": 1, "size": 256, "stride": 2, "joint": 2, "scale": 0.125}}),
+    "k3_jr_div": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}, {"replay": {"every": 1, "size": 32, "stride": 2, "joint": 2, "evict": "diverse"}}),
+    "k3_jr_far8": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}, {"replay": {"every": 1, "size": 32, "stride": 2, "joint": 2, "far": 8}}),
+    "k3_jr_far16": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}, {"replay": {"every": 1, "size": 32, "stride": 2, "joint": 2, "far": 16}}),
     "k10_rp": ("tts", {"T_ms": 1.0, "n_min": 10, "n_max": 10, "n_init": 10}, {"replay": {"every": 3, "size": 32, "stride": 2}}),
 }
 

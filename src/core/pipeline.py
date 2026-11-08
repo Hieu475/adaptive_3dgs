@@ -533,6 +533,13 @@ class OnlineReconstructionPipeline:
         """Draw one stored frame. Default: uniform over the reservoir. With rp['near'] = m: uniformly among the m
         stored frames whose camera is closest to the current one (a keyframe window by pose proximity)."""
         buf = self._replay_buf
+        fm = int(rp.get('far', 0))
+        if fm and len(buf) > fm:
+            c = self.current_pose.detach()
+            d = torch.stack([torch.linalg.norm(k[2][:3, 3] - c[:3, 3]) + 0.5 * torch.linalg.norm(k[2][:3, :3] - c[:3, :3])
+                             for k in buf])
+            idx = torch.topk(d, fm, largest=True).indices
+            return self._decompress_replay(buf[int(idx[int(self._replay_rng.integers(fm))])])
         m = int(rp.get('near', 0))
         if m and len(buf) > m:
             c = self.current_pose.detach()
@@ -1786,6 +1793,14 @@ class OnlineReconstructionPipeline:
                 size = int(rp_cfg.get('size', 32))
                 if len(self._replay_buf) < size:
                     self._replay_buf.append(item)
+                elif rp_cfg.get('evict') == 'diverse':
+                    # coreset-style buffer: drop the stored frame whose camera is closest to another stored one
+                    allp = self._replay_buf + [item]
+                    P = torch.stack([torch.cat([k[2][:3, 3], 0.5 * k[2][:3, :3].reshape(-1)]) for k in allp])
+                    D = torch.cdist(P, P) + torch.eye(len(allp), device=P.device) * 1e9
+                    j = int(D.min(dim=1).values.argmin())
+                    if j < size:  # j == size means the new frame itself is the most redundant: do not store it
+                        self._replay_buf[j] = item
                 else:  # reservoir sampling keeps a uniform sample of the whole history
                     j = int(self._replay_rng.integers(self._replay_seen))
                     if j < size:
