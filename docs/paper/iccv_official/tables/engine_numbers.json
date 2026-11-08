@@ -515,6 +515,9 @@
  "engHybKThreeJrPsnr": 20.777947230357316,
  "engHybKThreeJrAte": 1.3172019489534363,
  "engHybKThreeJrMs": 665.5708323063219,
+ "engHybKThreeJrThreeBPsnr": 21.3221744997748,
+ "engHybKThreeJrThreeBAte": 1.2876406145251253,
+ "engHybKThreeJrThreeBMs": 681.980964531493,
  "engHybSpeedup": 1.3904790613004585,
  "engHybGapKThreeJr": 1.1442384365536924,
  "engHybGapAbs": 1.1442384365536924,
@@ -530,5 +533,13 @@
  "engHybMonoRangeMax": 1.598419189453125,
  "engHybOursRangeMax": 0.9495376060748946,
  "engHybClearScenes": 4,
+ "engHybGapThreeB": 1.6884657059711756,
+ "engHybMedianGapThreeB": 1.5234506897615194,
+ "engHybSpeedupThreeB": 1.3570207297061923,
+ "engHybAteDiffThreeB": 0.1279193656166866,
+ "engHybBetterThreeB": 3,
+ "engHybEqualThreeB": 2,
+ "engHybWorseThreeB": 1,
+ "engHybWorstGapThreeB": -0.7034529780396177,
  "engHybReplayGain": 6.272836593832546
 }

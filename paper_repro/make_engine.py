@@ -335,11 +335,11 @@ def main():
         rs = list(hy[sc][c].values())
         return {"heldout_final_psnr": float(np.mean([r["heldout_final_psnr"] for r in rs])), "ate_every5_m": float(np.mean([r["ate_every5_m"] for r in rs])),
                 "track_ms": float(np.mean([r["track_ms"] for r in rs])), "map_ms": float(np.mean([r["map_ms"] for r in rs])), "n": len(rs)}
-    L = [r"\begin{table*}[t]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{3.5pt}", r"\begin{tabular}{lrrrrrrrrrr}", r"\toprule",
-         r"& \multicolumn{2}{c}{MonoGS} & \multicolumn{2}{c}{+ original mapper} & \multicolumn{2}{c}{+ ours $K{=}3$} & \multicolumn{2}{c}{+ ours $K{=}3$, replay} & \multicolumn{2}{c}{+ ours $K{=}3$, joint replay} \\",
-         r"\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}\cmidrule(lr){10-11}",
-         r"\textbf{Sequence} & dB & cm & dB & cm & dB & cm & dB & cm & dB & cm \\", r"\midrule"]
-    cols = ("orig", "k3", "k3_rp", "k3_jr")
+    L = [r"\begin{table*}[t]", r"\centering", r"\scriptsize\setlength{\tabcolsep}{2.5pt}", r"\begin{tabular}{lrrrrrrrrrrrr}", r"\toprule",
+         r"& \multicolumn{2}{c}{MonoGS} & \multicolumn{2}{c}{+ original mapper} & \multicolumn{2}{c}{+ ours $K{=}3$} & \multicolumn{2}{c}{+ ours $K{=}3$, replay} & \multicolumn{2}{c}{+ ours $K{=}3$, joint replay} & \multicolumn{2}{c}{+ joint replay, 3 batched views} \\",
+         r"\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}\cmidrule(lr){10-11}\cmidrule(lr){12-13}",
+         r"\textbf{Sequence} & dB & cm & dB & cm & dB & cm & dB & cm & dB & cm & dB & cm \\", r"\midrule"]
+    cols = ("orig", "k3", "k3_rp", "k3_jr", "k3_jr3b")
     acc = {c: [] for c in ("mono",) + cols}
     for sc in SC:
         m = mb[sc]; row = [f"{m['psnr']:.1f} & {m['ate5']:.2f}"]; acc["mono"].append((m["psnr"], m["ate5"], m["ms"]))
@@ -370,6 +370,11 @@ def main():
     setm("engHybMonoRangeMax", max(max(r["psnr"] for r in rs) - min(r["psnr"] for r in rs) for rs in runs.values()), "{:.1f}")
     setm("engHybOursRangeMax", max(max(r["heldout_final_psnr"] for r in hy[sc]["k3_jr"].values()) - min(r["heldout_final_psnr"] for r in hy[sc]["k3_jr"].values()) for sc in SC), "{:.1f}")
     setm("engHybClearScenes", int(sum(abs(acc["k3_jr"][i][0] - acc["mono"][i][0]) > max(max(r["psnr"] for r in runs[SC[i]]) - min(r["psnr"] for r in runs[SC[i]]), max(r["heldout_final_psnr"] for r in hy[SC[i]]["k3_jr"].values()) - min(r["heldout_final_psnr"] for r in hy[SC[i]]["k3_jr"].values())) for i in range(len(SC)))), "{:d}")
+    d3 = [acc["k3_jr3b"][i][0] - acc["mono"][i][0] for i in range(len(SC))]
+    setm("engHybGapThreeB", mean("k3_jr3b", 0) - mean("mono", 0), "{:.1f}"); setm("engHybMedianGapThreeB", float(np.median(d3)), "{:.1f}")
+    setm("engHybSpeedupThreeB", mean("mono", 2) / mean("k3_jr3b", 2), "{:.1f}"); setm("engHybAteDiffThreeB", mean("k3_jr3b", 1) - mean("mono", 1), "{:.2f}")
+    setm("engHybBetterThreeB", int(sum(x > 0.5 for x in d3)), "{:d}"); setm("engHybEqualThreeB", int(sum(abs(x) <= 0.5 for x in d3)), "{:d}")
+    setm("engHybWorseThreeB", int(sum(x < -0.5 for x in d3)), "{:d}"); setm("engHybWorstGapThreeB", float(min(d3)), "{:.1f}")
     setm("engHybReplayGain", mean("k3_jr", 0) - mean("k3", 0), "{:.1f}")
 
     # ---- Pareto figure

@@ -31,7 +31,7 @@ def parse():
     ap = argparse.ArgumentParser()
     ap.add_argument("--monogs", type=Path, required=True)
     ap.add_argument("--config", required=True, help="MonoGS yaml, relative to the MonoGS checkout")
-    ap.add_argument("--conds", nargs="+", default=["orig", "k3"], choices=["orig", "k3", "k6", "k10", "tts60", "k3_rp", "k10_rp", "k3_jr", "k3_jn", "k3_jn8"])
+    ap.add_argument("--conds", nargs="+", default=["orig", "k3"], choices=["orig", "k3", "k6", "k10", "tts60", "k3_rp", "k10_rp", "k3_jr", "k3_jn", "k3_jn8", "k3_jr3b"])
     ap.add_argument("--n_frames", type=int, default=150)
     ap.add_argument("--holdout_every", type=int, default=5, help="frames with index %% holdout_every == 0 (index > 0) are tracked but never mapped")
     ap.add_argument("--track_iters", type=int, default=None)
@@ -116,7 +116,8 @@ def main():
             "k10": ("tts", {"T_ms": 1.0, "n_min": 10, "n_max": 10, "n_init": 10}), "tts60": ("tts", {"T_ms": 60.0}),
             "k3_rp": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}), "k10_rp": ("tts", {"T_ms": 1.0, "n_min": 10, "n_max": 10, "n_init": 10}),
             "k3_jr": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}),
-            "k3_jn": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}), "k3_jn8": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3})}
+            "k3_jn": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}), "k3_jn8": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}),
+            "k3_jr3b": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3})}
     a.out_dir.mkdir(parents=True, exist_ok=True)
     scene = Path(cfg["Dataset"]["dataset_path"]).name.replace("rgbd_dataset_freiburg", "fr")
     for name in a.conds:
@@ -128,6 +129,8 @@ def main():
         _, pcfg = vgg.config_for(cond, a.seed, 15.0, "cuda", {}, tt)
         if name == "k3_jr":  # joint replay: steps 2..K optimize the current frame with 2 replayed frames
             pcfg["training"]["replay"] = {"every": 1, "size": 32, "stride": 2, "joint": 2}
+        if name == "k3_jr3b":  # joint replay with three replayed views, rendered with the current view in one call
+            pcfg["training"]["replay"] = {"every": 1, "size": 32, "stride": 2, "joint": 3, "batched": True}
         if name in ("k3_jn", "k3_jn8"):  # joint replay over a pose-proximity keyframe window
             pcfg["training"]["replay"] = {"every": 1, "size": 32, "stride": 2, "joint": 2, "near": 4 if name == "k3_jn" else 8}
         if name.endswith("_rp"):  # keyframe replay, constants chosen on the development scenes
