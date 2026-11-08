@@ -314,11 +314,16 @@ def main():
     # ---- MonoGS tracker + our mapper (hybrid) versus original MonoGS, MonoGS' own protocol
     hy = {}
     for f in (R / "monogs_hybrid").glob("*_seed*.json"):
-        j = json.loads(f.read_text()); hy.setdefault(j["scene"], {})[j["cond"]] = j
-    mb = json.loads((R / "monogs_hybrid/monogs_baseline.json").read_text())
+        j = json.loads(f.read_text()); hy.setdefault(j["scene"], {}).setdefault(j["cond"], {})[j["seed"]] = j
+    runs = json.loads((R / "monogs_hybrid/monogs_baseline_runs.json").read_text())
+    mb = {sc: {k: float(np.mean([r[k] for r in rs])) for k in ("psnr", "ate5", "ms")} | {"n": len(rs)} for sc, rs in runs.items()}
     SC = ["fr1_desk", "fr2_xyz", "fr1_xyz", "fr1_rpy", "fr2_desk", "fr3_sitting_static"]
+    def hyb(sc, c):  # mean over seeds (joint replay has three seeds, the others one)
+        rs = list(hy[sc][c].values())
+        return {"heldout_final_psnr": float(np.mean([r["heldout_final_psnr"] for r in rs])), "ate_every5_m": float(np.mean([r["ate_every5_m"] for r in rs])),
+                "track_ms": float(np.mean([r["track_ms"] for r in rs])), "map_ms": float(np.mean([r["map_ms"] for r in rs])), "n": len(rs)}
     L = [r"\begin{table*}[t]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{3.5pt}", r"\begin{tabular}{lrrrrrrrrrr}", r"\toprule",
-         r"& \multicolumn{2}{c}{MonoGS} & \multicolumn{2}{c}{+ original mapper} & \multicolumn{2}{c}{+ ours $K{=}3$} & \multicolumn{2}{c}{+ ours $K{=}3$, replay} & \multicolumn{2}{c}{+ ours $K{=}10$, replay} \\",
+         r"& \multicolumn{2}{c}{MonoGS} & \multicolumn{2}{c}{+ original mapper} & \multicolumn{2}{c}{+ ours $K{=}3$} & \multicolumn{2}{c}{+ ours $K{=}3$, replay} & \multicolumn{2}{c}{+ ours $K{=}3$, joint replay} \\",
          r"\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}\cmidrule(lr){10-11}",
          r"\textbf{Sequence} & dB & cm & dB & cm & dB & cm & dB & cm & dB & cm \\", r"\midrule"]
     cols = ("orig", "k3", "k3_rp", "k3_jr")
@@ -326,14 +331,14 @@ def main():
     for sc in SC:
         m = mb[sc]; row = [f"{m['psnr']:.1f} & {m['ate5']:.2f}"]; acc["mono"].append((m["psnr"], m["ate5"], m["ms"]))
         for c in cols:
-            j = hy[sc][c]; row.append(f"{j['heldout_final_psnr']:.1f} & {100 * j['ate_every5_m']:.2f}")
+            j = hyb(sc, c); row.append(f"{j['heldout_final_psnr']:.1f} & {100 * j['ate_every5_m']:.2f}")
             acc[c].append((j["heldout_final_psnr"], 100 * j["ate_every5_m"], j["track_ms"] + j["map_ms"]))
         L.append("\\texttt{" + sc.replace("_", "\\_") + "} & " + " & ".join(row) + r" \\")
     L.append(r"\midrule")
     L.append("mean & " + " & ".join(f"{np.mean([x[0] for x in acc[k]]):.1f} & {np.mean([x[1] for x in acc[k]]):.2f}" for k in ("mono",) + cols) + r" \\")
     L.append("ms/frame & \\multicolumn{2}{c}{" + f"{np.mean([x[2] for x in acc['mono']]):.0f}" + "} & " + " & ".join("\\multicolumn{2}{c}{" + f"{np.mean([x[2] for x in acc[k]]):.0f}" + "}" for k in cols) + r" \\")
     L += [r"\bottomrule", r"\end{tabular}",
-          r"\caption{\textbf{MonoGS's tracker with our mapper, under MonoGS's own evaluation.} First 150 frames of six TUM sequences at $640{\times}480$, one run per entry. dB: PSNR of the final map on every fifth frame (MonoGS: those that are not keyframes; ours: all of them, none was mapped), rendered at the estimated pose. cm: Umeyama-aligned ATE RMSE over every fifth tracked frame. Per-frame time is MonoGS's total, or tracking plus mapping.}",
+          r"\caption{\textbf{MonoGS's tracker with our mapper, under MonoGS's own evaluation.} First 150 frames of six TUM sequences at $640{\times}480$. MonoGS: mean of three runs (one run for \texttt{fr3\_sitting\_static}, where the repeats crashed); joint replay: mean of three seeds; other columns: one run. dB: PSNR of the final map on every fifth frame (MonoGS: those that are not keyframes; ours: all of them, none was mapped), rendered at the estimated pose. cm: Umeyama-aligned ATE RMSE over every fifth tracked frame. Per-frame time is MonoGS's total, or tracking plus mapping.}",
           r"\label{tab:hybrid}", r"\end{table*}"]
     (OUT / "tab_engine_hybrid.tex").write_text("\n".join(L) + "\n")
     mean = lambda k, i: float(np.mean([x[i] for x in acc[k]]))
@@ -348,6 +353,10 @@ def main():
     setm("engHybEqualScenes", int(sum(abs(x) <= 0.5 for x in d)), "{:d}"); setm("engHybScenes", len(SC), "{:d}")
     setm("engHybWorstGap", min(d), "{:.1f}"); setm("engHybBestGap", max(d), "{:.1f}"); setm("engHybMedianGap", float(np.median(d)), "{:.1f}")
     setm("engHybAteDiff", mean("k3_jr", 1) - mean("mono", 1), "{:.2f}")
+    setm("engHybMonoRpyPsnr", mb["fr1_rpy"]["psnr"], "{:.1f}")
+    setm("engHybMonoRangeMax", max(max(r["psnr"] for r in rs) - min(r["psnr"] for r in rs) for rs in runs.values()), "{:.1f}")
+    setm("engHybOursRangeMax", max(max(r["heldout_final_psnr"] for r in hy[sc]["k3_jr"].values()) - min(r["heldout_final_psnr"] for r in hy[sc]["k3_jr"].values()) for sc in SC), "{:.1f}")
+    setm("engHybClearScenes", int(sum(abs(acc["k3_jr"][i][0] - acc["mono"][i][0]) > max(max(r["psnr"] for r in runs[SC[i]]) - min(r["psnr"] for r in runs[SC[i]]), max(r["heldout_final_psnr"] for r in hy[SC[i]]["k3_jr"].values()) - min(r["heldout_final_psnr"] for r in hy[SC[i]]["k3_jr"].values())) for i in range(len(SC)))), "{:d}")
     setm("engHybReplayGain", mean("k3_jr", 0) - mean("k3", 0), "{:.1f}")
 
     # ---- Pareto figure
