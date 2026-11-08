@@ -55,6 +55,8 @@ class SelectiveAdam:
         eps: float = 1e-8,
         fused: bool = False,
     ):
+        self.cons_beta = 0.0   # consolidation strength: lr_i /= 1 + beta * importance_i (dense path only)
+        self.cons_decay = 1.0  # per-frame decay of accumulated importance
         self.lr_scale = 1.0  # multiplies every group's lr (set per micro-step by the caller)
         self.fused = fused  # torch.compile the elementwise update (fewer kernel launches)
         self.param_groups = param_groups
@@ -76,6 +78,9 @@ class SelectiveAdam:
                 'step': torch.zeros(N, dtype=torch.long, device=dev),
                 'exp_avg': torch.zeros_like(p.data),
                 'exp_avg_sq': torch.zeros_like(p.data),
+                'omega': torch.zeros_like(p.data),   # accumulated squared gradient (importance for earlier views)
+                'facc': torch.zeros_like(p.data),    # squared-gradient sum within the current frame
+                'fn': 0,
             }
 
     def zero_grad(self):
@@ -122,7 +127,13 @@ class SelectiveAdam:
                         step_f = step_f.unsqueeze(-1)
                     bc1 = 1.0 - beta1 ** step_f
                     bc2 = 1.0 - beta2 ** step_f
-                    p.data.sub_((lr / bc1) * (m / (torch.sqrt(v) / torch.sqrt(bc2) + self.eps)))
+                    upd = (1.0 / bc1) * (m / (torch.sqrt(v) / torch.sqrt(bc2) + self.eps))
+                    if self.cons_beta > 0.0:
+                        om = state['omega']
+                        upd = upd / (1.0 + self.cons_beta * om / (om.mean() + 1e-30))
+                        state['facc'].addcmul_(g, g)
+                        state['fn'] += 1
+                    p.data.sub_(lr * upd)
                     continue
                 
                 # Resolve active indices
@@ -149,6 +160,21 @@ class SelectiveAdam:
                 state['exp_avg'][indices] = m_new
                 state['exp_avg_sq'][indices] = v_new
                 p.data[indices] -= delta
+
+    @torch.no_grad()
+    def end_frame(self):
+        """Fold the squared gradients of the frame just optimized into the importance of every Gaussian."""
+        if self.cons_beta <= 0.0:
+            return
+        for group in self.param_groups:
+            for p in group['params']:
+                st = self.state.get(p)
+                if st is None or st['fn'] == 0 or st['facc'].shape != st['omega'].shape:
+                    if st is not None:
+                        st['facc'] = torch.zeros_like(st['omega']); st['fn'] = 0
+                    continue
+                st['omega'].mul_(self.cons_decay).add_(st['facc'] / st['fn'])
+                st['facc'].zero_(); st['fn'] = 0
 
     def extend_state(self, n_new: int, device: Optional[torch.device] = None):
         """Extend optimizer momentum and variance state for n_new added Gaussians without reset."""
@@ -187,6 +213,8 @@ class SelectiveAdam:
                         state['exp_avg_sq'],
                         torch.zeros(extra_shape, dtype=p.dtype, device=dev)
                     ], dim=0)
+                    for k in ('omega', 'facc'):
+                        state[k] = torch.cat([state[k], torch.zeros(extra_shape, dtype=p.dtype, device=dev)], dim=0)
 
     def prune_state(self, keep_mask: torch.Tensor):
         """Prune state buffers to match pruned parameter tensors."""
@@ -198,6 +226,8 @@ class SelectiveAdam:
                     state['step'] = state['step'][k_mask]
                     state['exp_avg'] = state['exp_avg'][k_mask]
                     state['exp_avg_sq'] = state['exp_avg_sq'][k_mask]
+                    state['omega'] = state['omega'][k_mask]
+                    state['facc'] = state['facc'][k_mask]
 
     def state_dict(self) -> Dict[str, Any]:
         """Return state dictionary of the optimizer."""

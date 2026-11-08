@@ -330,6 +330,9 @@ class OnlineReconstructionPipeline:
             {'params': [self.gaussian_model._normals], 'lr': lr.get('position', 1.6e-4)},
         ]
         self.optimizer = SelectiveAdam(params, betas=tuple(self.config.get('training', {}).get('adam_betas', (0.9, 0.999))), fused=bool(self.config.get('training', {}).get('fused_adam', False)))
+        _c = self.config.get('training', {}).get('consolidation')
+        if _c:
+            self.optimizer.cons_beta = float(_c.get('beta', 0.0)); self.optimizer.cons_decay = float(_c.get('decay', 1.0))
     
     def _reregister_optimizer_params(self):
         """Re-register model parameters with the optimizer after compaction.
@@ -1751,6 +1754,7 @@ class OnlineReconstructionPipeline:
                         (backward_event_start, backward_event_end))
                     
             self.optimizer.lr_scale = 1.0
+            self.optimizer.end_frame()
             opt_loss_val = losses['total'].item()
             rp_cfg = self.config.get('training', {}).get('replay')
             if rp_cfg and self.frame_count % int(rp_cfg.get('stride', 2)) == 0:
