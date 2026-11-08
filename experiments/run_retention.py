@@ -52,6 +52,11 @@ CONDS = {
     "k3_jr3": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}, {"replay": {"every": 1, "size": 32, "stride": 2, "joint": 3}}),
     "k3_jr4b": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}, {"replay": {"every": 1, "size": 32, "stride": 2, "joint": 4, "batched": True}}),
     "k3_jr6b": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}, {"replay": {"every": 1, "size": 32, "stride": 2, "joint": 6, "batched": True}}),
+    "k2_jr1b": ("tts", {"T_ms": 1.0, "n_min": 2, "n_max": 2, "n_init": 2}, {"replay": {"every": 1, "size": 32, "stride": 2, "joint": 1, "batched": True}}),
+    "k2_jr2b": ("tts", {"T_ms": 1.0, "n_min": 2, "n_max": 2, "n_init": 2}, {"replay": {"every": 1, "size": 32, "stride": 2, "joint": 2, "batched": True}}),
+    "k2_jr3b": ("tts", {"T_ms": 1.0, "n_min": 2, "n_max": 2, "n_init": 2}, {"replay": {"every": 1, "size": 32, "stride": 2, "joint": 3, "batched": True}}),
+    "k3_jr1b": ("tts", {"T_ms": 1.0, "n_min": 3, "n_max": 3, "n_init": 3}, {"replay": {"every": 1, "size": 32, "stride": 2, "joint": 1, "batched": True}}),
+    "k2": ("tts", {"T_ms": 1.0, "n_min": 2, "n_max": 2, "n_init": 2}, {}),
     "k10_rp": ("tts", {"T_ms": 1.0, "n_min": 10, "n_max": 10, "n_init": 10}, {"replay": {"every": 3, "size": 32, "stride": 2}}),
 }
 

@@ -299,9 +299,9 @@ def main():
     hr = {}
     for f in (R / "retention_640" / "test").glob("*/*_seed*.json"):
         j = json.loads(f.read_text()); hr.setdefault(j["cond"], {}).setdefault(j["scene"], []).append(j)
-    if hr and all(c in hr for c in ("orig", "k3", "k3_jr", "k3_jr3b")):
+    if hr and all(c in hr for c in ("orig", "k3", "k3_jr", "k3_jr3b", "k2_jr2b")):
         hb = {sc: np.mean([x["heldout_final"] for x in v]) for sc, v in hr["orig"].items()}
-        for c in ("orig", "k3", "k3_jr", "k3_jr3b"):
+        for c in ("orig", "k3", "k3_jr", "k3_jr3b", "k2_jr2b"):
             fin = {sc: np.mean([x["heldout_final"] for x in v]) for sc, v in hr[c].items()}
             dd = np.array([fin[sc] - hb[sc] for sc in fin])
             setm(f"engHiRes{cname(c)}Final", float(np.mean(list(fin.values()))), "{:.1f}")
