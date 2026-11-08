@@ -282,6 +282,19 @@ def main():
             base = f"engKeepD{split.title()}{cname(a_)}Minus{cname(b_)}"
             setm(base + "Mean", float(d.mean()), "{:.2f}"); setm(base + "Worst", float(d.min()), "{:.2f}"); setm(base + "Pos", int((d > 0).sum()), "{:d}")
         setm(f"engKeep{split.title()}N", len(U), "{:d}")
+    # batched multi-view joint steps (one rasterizer call for the current and the replayed cameras)
+    for split in ("test", "fresh"):
+        U = RET[split]
+        for a_, b_ in (("k3_jrb", "orig"), ("k3_jr3b", "orig"), ("k3_jr3b", "k3_jr"), ("k3_jrb", "k3_jr")):
+            if not all(a_ in u and b_ in u for u in U.values()):
+                continue
+            d = np.array([np.mean([x["heldout_final"] for x in u[a_]]) - np.mean([x["heldout_final"] for x in u[b_]]) for u in U.values()])
+            base = f"engKeepD{split.title()}{cname(a_)}Minus{cname(b_)}"
+            setm(base + "Mean", float(d.mean()), "{:.2f}"); setm(base + "Worst", float(d.min()), "{:.2f}"); setm(base + "Pos", int((d > 0).sum()), "{:d}")
+        for c_ in ("k3_jr", "k3_jrb", "k3_jr3b"):
+            ms = [x["mean_frame_ms"] for u in U.values() for x in u[c_] if "mean_frame_ms" in x]
+            if ms:
+                setm(f"engMs{split.title()}{cname(c_)}", float(np.mean(ms)), "{:.0f}")
     tm = {}
     for f in (R / "retention_time").glob("*/*.json"):
         j = json.loads(f.read_text()); tm.setdefault(j["cond"], []).append(j["mean_frame_ms"])
