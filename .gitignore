@@ -46,3 +46,6 @@ bao_cao/
 # Per-run completion sentinels
 results/*.DONE
 results/logs/*.DONE
+
+# Local monitoring dashboard (not part of the paper repo)
+viewer/dashboard/
