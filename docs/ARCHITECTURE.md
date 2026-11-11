@@ -40,7 +40,7 @@ This document details the end-to-end architecture of the **Adaptive 3D Gaussian 
 ## 2. Decoupling: Advanced ML vs AI Systems
 
 ### 2.1. Advanced Machine Learning Layer
-- **Authoritative contribution (Phase-14 corrected substrate, supersedes Phase 13):** Pure Dual Map-Growth Throttling (Coverage κ≥0.90 + Backlog, No Warmup, Fixed K=5): keeps map at 23K vs 88K primitives, +2.63 dB vs strongest selective / +4.62 dB vs RTG-SLAM-policy (`results/phase14_corrected/`), 98.0% headroom (0.18 dB gap to FULL). Prior 39K/19.24 dB numbers were pose-bugged (`results/final_confirmation/DEPRECATED.md`). This is the ONLY closed-loop mechanism that survives ablation.
+- **Authoritative contribution (Phase-14 corrected substrate, supersedes Phase 13):** Pure Dual Map-Growth Throttling (Coverage κ≥0.90 + Backlog, No Warmup, Fixed K=5): keeps map at 23K vs 88K primitives, +2.63 dB vs strongest selective / +4.62 dB vs RTG-SLAM-policy (`results/frozen/phase14_corrected/`), 98.0% headroom (0.18 dB gap to FULL). Prior 39K/19.24 dB numbers were pose-bugged (`results/frozen/final_confirmation/DEPRECATED.md`). This is the ONLY closed-loop mechanism that survives ablation.
 - **Causal Counterfactual Oracle ($U_i^\star = \Delta Q_i / C_i$)**: Evaluates ground-truth marginal utility via isolated trial interventions, proving that **$20.5\%$** of unconstrained gradient updates degrade reconstruction quality ($U_i^\star < 0$).
 - **State Representation ($s_i \in \mathbb{R}^{11}$)**: Pre-fusion feature extraction with train-only normalization anchoring.
 - **Two-Head Decoupled Architecture (DOCUMENTED NEGATIVE RESULT)**: Offline rank signal exists (ρ≈0.20) but closed-loop degrades PSNR (-2.51 dB, -1.54 dB in A4 ablation) due to offline→online shift + gradient coupling. Retained for analysis only; NOT part of OURS.
@@ -72,8 +72,8 @@ This document details the end-to-end architecture of the **Adaptive 3D Gaussian 
 ## 3. Single Source of Truth & Provenance
 
 All quantitative statements in this repository are verified by our 417-test regression suite (`pytest -q`) and anchored to:
-- `results/phase6_context_utility/manifest.json` (Phase 6 Single Source of Truth)
-- `results/phase6_context_utility/rank_stability_analysis.json` (Rank Stability & Coverage)
-- `results/phase6_context_utility/ablation/ablation_summary.json` (8-Variant Architecture Ladder)
-- `results/phase6_context_utility/runtime_breakdown.json` (Per-Stage Runtime Breakdown)
+- `results/legacy/phase6_context_utility/manifest.json` (Phase 6 Single Source of Truth)
+- `results/legacy/phase6_context_utility/rank_stability_analysis.json` (Rank Stability & Coverage)
+- `results/legacy/phase6_context_utility/ablation/ablation_summary.json` (8-Variant Architecture Ladder)
+- `results/legacy/phase6_context_utility/runtime_breakdown.json` (Per-Stage Runtime Breakdown)
 

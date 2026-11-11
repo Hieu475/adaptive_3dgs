@@ -13,7 +13,7 @@ Protocol:
   limitation disclosed. Do NOT present as SLAM tracking result.
 
 No pipeline imports here (keeps src/ dependency-clean); the loop lives in
-``experiments/run_holdout_benchmark.py``.
+``experiments/run/run_holdout_benchmark.py``.
 """
 from __future__ import annotations
 from typing import Dict, List

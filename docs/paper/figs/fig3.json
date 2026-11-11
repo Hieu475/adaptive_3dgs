@@ -1,5 +1,5 @@
 {
- "source": "results/phase14_multiscene/replica_kappa_ablation.json",
+ "source": "results/legacy/phase14_multiscene/replica_kappa_ablation.json",
  "conditions": [
   "k0.80",
   "k0.90",

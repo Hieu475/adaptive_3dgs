@@ -15,9 +15,9 @@ Computes:
   - Utility vs Error Distinction (Spearman ρ(U, E)): verifies that U_i is distinct from E_i
 
 Outputs:
-  - results/policies/policy_jaccard_matrix.json
-  - results/policies/policy_separation_report.md
-  - results/raw/policy_separation_raw.json
+  - results/controllers/policies/policy_jaccard_matrix.json
+  - results/controllers/policies/policy_separation_report.md
+  - results/legacy/raw/policy_separation_raw.json
 """
 import os
 import sys
@@ -180,8 +180,8 @@ def run_policy_separation_benchmark(device: str = 'cpu'):
     print("-" * 85 + "\n")
     
     # Save artifacts
-    proc_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'policies')
-    raw_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'raw')
+    proc_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'controllers', 'policies')
+    raw_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'legacy', 'raw')
     os.makedirs(proc_dir, exist_ok=True)
     os.makedirs(raw_dir, exist_ok=True)
     

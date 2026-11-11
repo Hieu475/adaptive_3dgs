@@ -135,7 +135,7 @@ def analyze_error_vs_utility(
     )
 
     # 5. Load Oracle Gap and Regret Data
-    regret_file = REPO_ROOT / "results" / "phase6_context_utility" / "oracle_gap_and_regret.json"
+    regret_file = REPO_ROOT / "results" / "legacy" / "phase6_context_utility" / "oracle_gap_and_regret.json"
     oracle_decomp_data = {}
     if regret_file.exists():
         with open(regret_file, "r") as f:
@@ -356,13 +356,13 @@ def main():
     parser.add_argument(
         "--oracle_csv",
         type=Path,
-        default=REPO_ROOT / "results" / "oracle_dataset" / "oracle_dataset.csv",
+        default=REPO_ROOT / "results" / "legacy" / "oracle_dataset" / "oracle_dataset.csv",
         help="Path to audited oracle dataset CSV",
     )
     parser.add_argument(
         "--phase10_dir",
         type=Path,
-        default=REPO_ROOT / "results" / "phase10_e2e",
+        default=REPO_ROOT / "results" / "tracking" / "phase10_e2e",
         help="Path to Phase 10 E2E results directory",
     )
     parser.add_argument(

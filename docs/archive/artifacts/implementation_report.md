@@ -84,7 +84,7 @@ $$\max \sum_{i \in S} I_i \quad \text{s.t.} \quad \sum_{i \in S} \text{Cost}_i \
 - Triển khai bộ nạp dữ liệu hoàn chỉnh:
   - [`datasets/tum_dataset.py`](file:///home/nguyen_quoc_hieu/Documents/adaptive_3dgs/datasets/tum_dataset.py): TUM parser với timestamp association tự động.
   - [`datasets/replica_dataset.py`](file:///home/nguyen_quoc_hieu/Documents/adaptive_3dgs/datasets/replica_dataset.py): Replica parser (iMAP/NICE-SLAM format).
-  - [`scripts/download_replica.sh`](file:///home/nguyen_quoc_hieu/Documents/adaptive_3dgs/scripts/download_replica.sh) & [`scripts/download_tum.sh`](file:///home/nguyen_quoc_hieu/Documents/adaptive_3dgs/scripts/download_tum.sh).
+  - [`scripts/fetch/download_replica.sh`](file:///home/nguyen_quoc_hieu/Documents/adaptive_3dgs/scripts/download_replica.sh) & [`scripts/fetch/download_tum.sh`](file:///home/nguyen_quoc_hieu/Documents/adaptive_3dgs/scripts/download_tum.sh).
 
 ### 2. Tối ưu hóa Vectorized Rasterization
 - Chuyển đổi cơ chế `tile_gaussians` và `rasterize_pixels` trong [`research/rasterizer.py`](file:///home/nguyen_quoc_hieu/Documents/adaptive_3dgs/research/rasterizer.py) sang dạng hoàn toàn vectorized trên tensor batching, tăng tốc độ render trên CPU/GPU gấp **15x-30x** và cho phép gradient backward chuẩn xác.

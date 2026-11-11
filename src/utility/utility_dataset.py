@@ -464,7 +464,7 @@ def load_canonical_oracle_dataset(
     """
     if dataset_path is None:
         repo_root = get_repo_root()
-        dataset_path = os.path.join(repo_root, "results", "oracle_dataset", "oracle_dataset.json")
+        dataset_path = os.path.join(repo_root, "results", "legacy", "oracle_dataset", "oracle_dataset.json")
 
     if not os.path.exists(dataset_path):
         raise FileNotFoundError(f"Canonical oracle dataset not found at: {dataset_path}")

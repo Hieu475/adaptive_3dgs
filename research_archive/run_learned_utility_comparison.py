@@ -4,7 +4,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from experiments.evaluate_utility_model import main
+from experiments.models.evaluate_utility_model import main
 
 if __name__ == "__main__":
     main()

@@ -13,8 +13,8 @@ Computes the selection-to-quality correlation:
 to prove that selection quality directly drives reconstruction performance.
 
 Outputs:
-    - results/master/end_to_end_chain_summary.json
-    - results/master/end_to_end_chain_report.md
+    - results/legacy/master/end_to_end_chain_summary.json
+    - results/legacy/master/end_to_end_chain_report.md
 """
 import os
 import sys
@@ -35,8 +35,8 @@ def main():
     print("=" * 85)
     
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    matched_budget_path = os.path.join(project_root, 'results', 'matched_budget', 'benchmark_results.json')
-    ranking_path = os.path.join(project_root, 'results', 'ranking_results.csv')
+    matched_budget_path = os.path.join(project_root, 'results', 'legacy', 'matched_budget', 'benchmark_results.json')
+    ranking_path = os.path.join(project_root, 'results', 'legacy', 'ranking_results.csv')
     
     if not os.path.exists(matched_budget_path):
         raise FileNotFoundError(f"Matched budget results missing at {matched_budget_path}")
@@ -98,7 +98,7 @@ def main():
     }
     
     # 3. Save Markdown Report
-    save_dir = os.path.join(project_root, 'results', 'master')
+    save_dir = os.path.join(project_root, 'results', 'legacy', 'master')
     os.makedirs(save_dir, exist_ok=True)
     report_file = os.path.join(save_dir, 'end_to_end_chain_report.md')
     json_file = os.path.join(save_dir, 'end_to_end_chain_summary.json')

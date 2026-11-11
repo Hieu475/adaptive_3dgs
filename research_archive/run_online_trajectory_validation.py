@@ -43,7 +43,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from scipy.stats import wilcoxon
 
-from experiments.export_online_trajectory_summary import write_summary_report
+from experiments.analyze.export_online_trajectory_summary import write_summary_report
 
 # Repository root
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -504,7 +504,7 @@ def generate_plots(
 ):
     """Generates the 4 required research figures for Phase 7."""
     os.makedirs(output_dir, exist_ok=True)
-    figures_dir = os.path.join(REPO_ROOT, 'results', 'figures')
+    figures_dir = os.path.join(REPO_ROOT, 'results', 'diagnostics', 'figures')
     os.makedirs(figures_dir, exist_ok=True)
 
     policies = ['full', 'ours', 'error_only', 'random']
@@ -726,13 +726,13 @@ def main():
     parser.add_argument("--n-frames", type=int, default=50, help="Trajectory evaluation frame count (default: 50)")
     parser.add_argument("--budget-ms", type=float, default=15.0, help="Per-frame scheduler budget in ms (default: 15.0)")
     parser.add_argument("--device", type=str, default=None, help="Compute device (default: cuda if available else cpu)")
-    parser.add_argument("--output-dir", type=str, default=None, help="Output directory (default: results/online_trajectory)")
+    parser.add_argument("--output-dir", type=str, default=None, help="Output directory (default: results/legacy/online_trajectory)")
     parser.add_argument("--force-rerun", action="store_true", help="Force rerun even if cached results exist")
     args = parser.parse_args()
 
     protocol = load_protocol()
     device = args.device or ('cuda' if torch.cuda.is_available() else 'cpu')
-    output_dir = args.output_dir or os.path.join(REPO_ROOT, 'results', 'online_trajectory')
+    output_dir = args.output_dir or os.path.join(REPO_ROOT, 'results', 'legacy', 'online_trajectory')
     os.makedirs(output_dir, exist_ok=True)
 
     dataset_cfg = get_dataset_config("tum_fr1_desk", protocol)

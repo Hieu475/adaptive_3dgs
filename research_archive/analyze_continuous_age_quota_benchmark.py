@@ -9,7 +9,7 @@ import random
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BASE = ROOT / "results/phase14_generalization_postfix/continuous_age_quota/confirmatory"
+BASE = ROOT / "results/legacy/phase14_generalization_postfix/continuous_age_quota/confirmatory"
 SCENES = ("replica_room2", "tum_fr1_desk")
 SEEDS = tuple(range(42, 50))
 ARMS = ("global_importance", "mature75")

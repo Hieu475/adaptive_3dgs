@@ -30,7 +30,7 @@ from src.core.attribution import render_with_attribution, compute_gaussian_stati
 from src.core.losses import total_loss
 from src.core.densification import compute_error_masks, sample_candidates, create_gaussians_from_candidates, prune_low_value
 from src.core.scheduler import estimate_gaussian_costs
-from experiments.run_importance_validation import generate_synthetic_benchmark_dataset
+from experiments.run.run_importance_validation import generate_synthetic_benchmark_dataset
 
 
 def run_pipeline_profiling(frames: List[Dict[str, torch.Tensor]], intrinsics: torch.Tensor, device: str = 'cpu') -> Dict[str, Any]:
@@ -260,11 +260,11 @@ def main():
     parser = argparse.ArgumentParser(description="R14 Pipeline Profiler")
     parser.add_argument('--device', type=str, default='cpu', help='Device (cpu or cuda)')
     parser.add_argument('--frames', type=int, default=5, help='Number of frames to profile')
-    parser.add_argument('--output-dir', type=str, default='results/profiling/', help='Output directory')
+    parser.add_argument('--output-dir', type=str, default='results/diagnostics/profiling/', help='Output directory')
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
-    os.makedirs('results/figures/', exist_ok=True)
+    os.makedirs('results/diagnostics/figures/', exist_ok=True)
 
     print(f"[R14] Profiling {args.frames} frames on {args.device}...")
     frames, intrinsics = generate_synthetic_benchmark_dataset(n_frames=args.frames, seed=42)
@@ -289,7 +289,7 @@ def main():
     print(f"Saved profile data to {out_path}")
 
     # Save F10: Pipeline Profile CSV
-    f10_path = 'results/figures/f10_pipeline_profile.csv'
+    f10_path = 'results/diagnostics/figures/f10_pipeline_profile.csv'
     with open(f10_path, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['stage', 'mean_ms', 'std_ms', 'pct_of_total'])

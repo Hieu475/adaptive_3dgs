@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from experiments.run_frozen_benchmark import build_pipeline_config, load_benchmark_sequence
+from experiments.run.run_frozen_benchmark import build_pipeline_config, load_benchmark_sequence
 from src.core.pipeline import OnlineReconstructionPipeline
 from src.evaluation.reproducibility import set_seed
 
@@ -105,7 +105,7 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--budget_ms", type=float, default=15.0)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
-    parser.add_argument("--out_dir", type=Path, default=ROOT / "results" / "qualitative_rgbd_gpu_frame149")
+    parser.add_argument("--out_dir", type=Path, default=ROOT / "results" / "renders" / "qualitative_rgbd_gpu_frame149")
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--render_saved_data", action="store_true",
                         help="Rebuild the panel from the saved NPZ without rerunning policies")

@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
-BASE = ROOT / "results/phase14_generalization_postfix"
+BASE = ROOT / "results/legacy/phase14_generalization_postfix"
 SCENES = {
     "replica_office1": "office1_mature_quota_replay",
     "tum_fr1_rpy": "tum_fr1_rpy_mature_quota_replay",

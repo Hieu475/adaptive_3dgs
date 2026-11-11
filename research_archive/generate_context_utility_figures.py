@@ -12,12 +12,12 @@ import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = PROJECT_ROOT / 'results'
-SAVE_DIR = RESULTS_DIR / 'figures'
+SAVE_DIR = RESULTS_DIR / 'diagnostics'/'figures'
 SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
 def plot_phase6_diagnostics():
-    rank_path = RESULTS_DIR / 'phase6_context_utility' / 'rank_stability_analysis.json'
-    runtime_path = RESULTS_DIR / 'phase6_context_utility' / 'runtime_breakdown.json'
+    rank_path = RESULTS_DIR / 'legacy'/'phase6_context_utility' / 'rank_stability_analysis.json'
+    runtime_path = RESULTS_DIR / 'legacy'/'phase6_context_utility' / 'runtime_breakdown.json'
     
     if not rank_path.exists():
         return

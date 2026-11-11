@@ -9,8 +9,8 @@ Verification Objectives:
        C = C_active + T_active * C_frozen
 
 Outputs:
-  - results/oracle/oracle_verification_gradient_report.json
-  - results/oracle/oracle_verification_gradient_report.md
+  - results/legacy/oracle/oracle_verification_gradient_report.json
+  - results/legacy/oracle/oracle_verification_gradient_report.md
 """
 import os
 import sys
@@ -31,7 +31,7 @@ from src.core.pipeline import OnlineReconstructionPipeline
 from src.core.background_cache import FrozenBackgroundCache
 from src.core.rasterizer import render as rasterize_scene
 from src.utility.closed_loop_runtime import load_benchmark_sequence
-from experiments.run_frozen_benchmark import build_pipeline_config
+from experiments.run.run_frozen_benchmark import build_pipeline_config
 
 
 def run_oracle_compositing_verification(
@@ -39,7 +39,7 @@ def run_oracle_compositing_verification(
     n_frames: int = 5,
     device: str = "cuda" if torch.cuda.is_available() else "cpu",
     active_ratio: float = 0.20,
-    out_dir: str = "results/oracle",
+    out_dir: str = "results/legacy/oracle",
 ) -> Dict[str, Any]:
     """Compare Full rendering vs Background Cache Compositing gradients on active Gaussians."""
     out_path = REPO_ROOT / out_dir
@@ -237,7 +237,7 @@ if __name__ == "__main__":
     parser.add_argument("--n_frames", type=int, default=5)
     parser.add_argument("--active_ratio", type=float, default=0.20)
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
-    parser.add_argument("--out_dir", type=str, default="results/oracle")
+    parser.add_argument("--out_dir", type=str, default="results/legacy/oracle")
     args = parser.parse_args()
 
     run_oracle_compositing_verification(

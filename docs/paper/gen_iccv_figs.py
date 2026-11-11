@@ -36,7 +36,7 @@ json.dump({"scenes": scenes, "v3": v3}, open(OUT / "fig1.json", "w"), indent=1)
 
 # ---- Fig2: paired differences vs OURS (Phase-14 main, 8 seeds) ----
 # Plot the frozen paired bootstrap intervals as a forest plot; positive means OURS wins.
-stats_path = Path(__file__).resolve().parents[2] / "results" / "rerun_paper1" / "main" / "final_confirmation_results.json"
+stats_path = Path(__file__).resolve().parents[2] / "results" / "dilution" / "rerun_paper1" / "main" / "final_confirmation_results.json"
 stats = json.load(open(stats_path))
 comparison_names = {
     "no_op": "No-op",
@@ -76,7 +76,7 @@ fig.tight_layout(pad=0.6)
 fig.savefig(OUT / "fig2_main_deltas.pdf")
 
 # ---- Fig3: separate coverage throttling from selector choice (office0 30f x3) ----
-kappa_path = Path(__file__).resolve().parents[2] / "results" / "phase14_multiscene" / "replica_kappa_ablation.json"
+kappa_path = Path(__file__).resolve().parents[2] / "results" / "legacy" / "phase14_multiscene" / "replica_kappa_ablation.json"
 kappa_data = json.load(open(kappa_path))
 conds = ["$\\kappa=.80$", "$\\kappa=.90$", "$\\kappa=.95$", "Throttle\noff", "Raw-error\nselection"]
 keys = ["k0.80", "k0.90", "k0.95", "off", "error_only_ref"]
@@ -109,7 +109,7 @@ json.dump({"source": str(kappa_path.relative_to(kappa_path.parents[2])), "condit
 
 # ---- Fig4: quality vs map size (Phase-14, 8 seeds) ----
 # Only OURS and FULL are nondominated; three growing heuristics exceed 65k splats.
-phase_path = Path(__file__).resolve().parents[2] / "results" / "rerun_paper1" / "main" / "final_confirmation_results.json"
+phase_path = Path(__file__).resolve().parents[2] / "results" / "dilution" / "rerun_paper1" / "main" / "final_confirmation_results.json"
 phase = json.load(open(phase_path))
 policy_stats = phase["policy_stats"]
 names = ["no_op", "ours", "rtg_slam_reimpl", "error_only", "full", "error_influence"]
@@ -159,7 +159,7 @@ json.dump({"source": str(phase_path.relative_to(phase_path.parents[2])), "points
           open(OUT / "fig4.json", "w"), indent=1)
 
 # ---- Fig6: budget curve (measured 30-frame runs, 3 seeds) ----
-budget_path = Path(__file__).resolve().parents[2] / "results" / "phase14_budget_curve" / "budget_curve.json"
+budget_path = Path(__file__).resolve().parents[2] / "results" / "legacy" / "phase14_budget_curve" / "budget_curve.json"
 budget = json.load(open(budget_path))
 budgets = budget["metadata"]["budgets"]
 rows = budget["rows"]

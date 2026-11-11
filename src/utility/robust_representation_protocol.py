@@ -179,7 +179,7 @@ GATE_CRITERIA: Dict[str, Dict[str, Any]] = {
 # Output Structure
 # ═══════════════════════════════════════════════════════════════════════
 
-OUTPUT_DIR: str = "results/phase9a_scale_invariant"
+OUTPUT_DIR: str = "results/legacy/phase9a_scale_invariant"
 
 OUTPUT_FILES: Dict[str, str] = {
     "protocol":               "protocol.json",

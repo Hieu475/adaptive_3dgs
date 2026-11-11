@@ -18,7 +18,7 @@ Evaluation Dimensions:
     6. Budget Efficiency: E_Q = \Delta Q / T_{opt} (gain per ms)
 
 Outputs:
-    results/phase12_paper_evidence/model_ablation/
+    results/legacy/phase12_paper_evidence/model_ablation/
     ├── model_ablation_results.json
     ├── checkpoints/
     │   ├── M2_seed_{seed}.pt
@@ -415,7 +415,7 @@ def main():
     parser.add_argument(
         "--oracle_csv",
         type=Path,
-        default=REPO_ROOT / "results" / "oracle_dataset" / "oracle_dataset.csv",
+        default=REPO_ROOT / "results" / "legacy" / "oracle_dataset" / "oracle_dataset.csv",
         help="Path to audited oracle dataset CSV",
     )
     parser.add_argument(

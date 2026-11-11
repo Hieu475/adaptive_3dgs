@@ -164,4 +164,4 @@ graph TB
 1. **Phase 1** — Implement `gaussian_repr.py` đầy đủ (đặc biệt `build_covariance()`) và `projection.py`, sau đó viết `rasterizer.py` để render được scene offline
 2. **Phase 2** — Implement `losses.py` (color + depth L1) và `depth_render.py` (ray-plane intersection)
 3. Chạy unit tests trong `tests/` để verify từng module
-4. Download dataset bằng `scripts/download_replica.sh` để có dữ liệu test
+4. Download dataset bằng `scripts/fetch/download_replica.sh` để có dữ liệu test

@@ -5,9 +5,9 @@ import statistics
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / "results/phase14_generalization_postfix/replica_office1_matched_time_repeatability_v2"
+OUT = ROOT / "results/legacy/phase14_generalization_postfix/replica_office1_matched_time_repeatability_v2"
 DATA = OUT / "replica_office1"
-SOURCE = ROOT / "results/phase14_generalization_postfix/matched_time_spawn128_cross_scene_replication_v1/replica_office1"
+SOURCE = ROOT / "results/legacy/phase14_generalization_postfix/matched_time_spawn128_cross_scene_replication_v1/replica_office1"
 TOL = 0.05
 
 

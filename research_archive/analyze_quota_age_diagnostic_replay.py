@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-RESULTS = ROOT / "results/phase14_generalization_postfix"
+RESULTS = ROOT / "results/legacy/phase14_generalization_postfix"
 RUN = RESULTS / "quota_age_diagnostic_seed42"
 PREVIOUS = {
     ("replica_office1", 70): "quota_response_frame70",

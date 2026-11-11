@@ -28,7 +28,7 @@ from src.utility.interaction_model import (
 try:
     from src.utility.evidence_protocol import PHASE12_OUTPUT_DIR, SEEDS
 except ImportError:
-    PHASE12_OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "results", "phase12_paper_evidence")
+    PHASE12_OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "results", "legacy", "phase12_paper_evidence")
     SEEDS = [42]
 
 
@@ -144,13 +144,13 @@ def evaluate_model(model, dataloader, device):
 
 def main():
     parser = argparse.ArgumentParser(description="Phase 12-K: Train Interaction-Aware Model")
-    parser.add_argument("--data-dir", type=str, default="results/phase12_paper_evidence/conditional_dataset",
+    parser.add_argument("--data-dir", type=str, default="results/legacy/phase12_paper_evidence/conditional_dataset",
                         help="Directory containing the dataset from Phase 12-J")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--epochs", type=int, default=50, help="Number of training epochs")
     parser.add_argument("--batch-size", type=int, default=64, help="Batch size")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
-    parser.add_argument("--output-dir", type=str, default="results/phase12_paper_evidence/conditional_model",
+    parser.add_argument("--output-dir", type=str, default="results/legacy/phase12_paper_evidence/conditional_model",
                         help="Output directory")
     parser.add_argument("--generate-synthetic", action="store_true", 
                         help="Generate synthetic data instead of loading")

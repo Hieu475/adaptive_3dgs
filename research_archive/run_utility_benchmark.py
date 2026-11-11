@@ -278,7 +278,7 @@ def run_benchmark(
     n_trials: int = 5,
     seed: int = 42,
     model_path: Optional[str] = None,
-    output_dir: str = "results/phase12_paper_evidence/scheduler_benchmark",
+    output_dir: str = "results/legacy/phase12_paper_evidence/scheduler_benchmark",
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """Run comprehensive benchmark across all policies and budgets."""
     os.makedirs(output_dir, exist_ok=True)
@@ -457,10 +457,10 @@ def main():
     parser.add_argument("--n-trials", type=int, default=5, help="Number of evaluation trials per budget")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--model-path", type=str,
-                        default="results/phase12_paper_evidence/conditional_model/interaction_model_seed_42.pt",
+                        default="results/legacy/phase12_paper_evidence/conditional_model/interaction_model_seed_42.pt",
                         help="Path to trained InteractionAwareModel checkpoint")
     parser.add_argument("--output-dir", type=str,
-                        default="results/phase12_paper_evidence/scheduler_benchmark",
+                        default="results/legacy/phase12_paper_evidence/scheduler_benchmark",
                         help="Output directory")
     parser.add_argument("--generate-synthetic", action="store_true", default=True,
                         help="Run in synthetic benchmark mode")

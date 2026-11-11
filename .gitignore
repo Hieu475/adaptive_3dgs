@@ -45,3 +45,4 @@ bao_cao/
 
 # Per-run completion sentinels
 results/*.DONE
+results/logs/*.DONE

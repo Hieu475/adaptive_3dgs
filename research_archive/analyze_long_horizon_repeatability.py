@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
-BASE = ROOT / "results/phase14_generalization_postfix/continuous_age_quota/long_horizon_tum_fr1_desk"
+BASE = ROOT / "results/legacy/phase14_generalization_postfix/continuous_age_quota/long_horizon_tum_fr1_desk"
 RUNS = {
     "plain_run_1": "run_seed42",
     "diagnostic_run": "diagnostics_seed42",

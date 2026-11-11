@@ -2,7 +2,7 @@
 r"""Phase 11: Scientific Reproducibility Audit & Artifact Generator.
 
 Executes the formal Phase 11 verification suite and generates dedicated
-Phase 11 artifacts in results/phase11_reproducibility/:
+Phase 11 artifacts in results/legacy/phase11_reproducibility/:
     - protocol.json
     - environment.json
     - dataset.json
@@ -73,7 +73,7 @@ def get_cmd_first_line(cmd: str) -> str:
         return f"Not available ({e})"
 
 
-def run_audit(output_dir: Path = REPO_ROOT / "results" / "phase11_reproducibility") -> bool:
+def run_audit(output_dir: Path = REPO_ROOT / "results" / "legacy" / "phase11_reproducibility") -> bool:
     output_dir.mkdir(parents=True, exist_ok=True)
     print("=" * 80)
     print("   ADAPTIVE 3DGS — PHASE 11 SCIENTIFIC REPRODUCIBILITY AUDIT")
@@ -322,7 +322,7 @@ def run_audit(output_dir: Path = REPO_ROOT / "results" / "phase11_reproducibilit
         log(f"   Seed {s}: CKPT={ckpt_path.name} ({h_ckpt[:12]}...) | NORM={norm_path.name}")
 
     # Verify Phase 10 manifest
-    manifest_p10_path = REPO_ROOT / "results" / "phase10_e2e" / "manifest.json"
+    manifest_p10_path = REPO_ROOT / "results" / "tracking" / "phase10_e2e" / "manifest.json"
     assert manifest_p10_path.exists(), "Phase 10 manifest not found"
     with open(manifest_p10_path) as f:
         m10 = json.load(f)
@@ -447,7 +447,7 @@ $$\\boxed{{\\text{{Pinned Environment + Fixed Protocol + Fixed Seeds}} \\implies
 
 1. **Tier 1 (Unit Tests)**: `pytest tests/ -q` $\\implies$ **456 passed in 8.8s** (100% pass rate).
 2. **Tier 2 (Phase 10 Tests)**: `pytest tests/test_closed_loop_runtime.py -v` $\\implies$ **8 passed in 1.7s**.
-3. **Tier 3 (Runtime Smoke Test)**: `python experiments/run_closed_loop_smoke.py` $\\implies$ **Passed in {smoke_wall_s:.2f}s**:
+3. **Tier 3 (Runtime Smoke Test)**: `python experiments/run/run_closed_loop_smoke.py` $\\implies$ **Passed in {smoke_wall_s:.2f}s**:
    - Initial primitives: $N = {n0}$ $\\to$ Final primitives: $N = {pipeline.gaussian_model.num_gaussians}$
    - Model parameter freeze verified: `requires_grad=False`
    - Strict weight immutability: $\\|\\theta_T - \\theta_0\\|_\\infty = 0.0$ (SHA-256: `{h0_hash[:16]}...`)
@@ -527,7 +527,7 @@ $$\\Delta Q_{{\\text{{OURS-ERROR}}}} = +0.0047\\text{{ dB}}, \\quad 95\\%\\text{
             "Gate_11F_documentation": "PASS",
         },
         "reference_phase10_manifest": {
-            "path": "results/phase10_e2e/manifest.json",
+            "path": "results/tracking/phase10_e2e/manifest.json",
             "sha256": compute_sha256(manifest_p10_path),
             "verified_artifacts_count": len(p10_artifacts),
         },

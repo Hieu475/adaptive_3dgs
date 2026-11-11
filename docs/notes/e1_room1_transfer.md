@@ -1,8 +1,8 @@
 # E1 selector transfer: Replica room1
 
 **Status:** two-seed exploratory transfer; not a generalization claim.
-**Runs:** `results/mechanism_v2/e1_room1_replication_v1/replica_room1/seed{57,58}_room1_e1_v1.json`.
-**Validation:** 2/2 pairs pass `results/mechanism_v2/e1_room1_replication_v1/validation.json`.
+**Runs:** `results/dilution/mechanism_v2/e1_room1_replication_v1/replica_room1/seed{57,58}_room1_e1_v1.json`.
+**Validation:** 2/2 pairs pass `results/dilution/mechanism_v2/e1_room1_replication_v1/validation.json`.
 
 Each seed crosses early insertion at frame 30 and late insertion at frame 90 with the six selector modes in the E1 pilot report. Every arm uses the same frozen 5,000-candidate batch within seed, and all arms account for exactly 425,000 logical micro-updates. Late arms share the same frame-89 global snapshot and 285,000-update common prefix. The experiment disables automatic spawning and evaluates a fixed candidate intervention on known poses.
 

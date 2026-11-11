@@ -352,7 +352,7 @@ def main():
     run_path = out_dir / OUTPUT_FILES_9C["runtime_metrics"]
 
     if not sens_path.exists():
-        raise FileNotFoundError(f"Missing {sens_path}. Run experiments/run_normalization_sensitivity.py first.")
+        raise FileNotFoundError(f"Missing {sens_path}. Run experiments/run/run_normalization_sensitivity.py first.")
 
     df_sens = pd.read_csv(sens_path)
     df_abl = pd.read_csv(abl_path)

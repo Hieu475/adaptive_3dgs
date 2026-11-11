@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from experiments.run_frozen_benchmark import load_benchmark_sequence
-from experiments.run_postfix_frame_diagnostics import scene_features
+from experiments.run.run_frozen_benchmark import load_benchmark_sequence
+from experiments.run.run_postfix_frame_diagnostics import scene_features
 
 def sha256(path: Path) -> str:
     h = hashlib.sha256()
@@ -31,7 +31,7 @@ def mean(xs):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--root", type=Path, default=ROOT / "results/phase14_generalization_postfix/office4_quota_dose_response_frame70_seeds291_293")
+    ap.add_argument("--root", type=Path, default=ROOT / "results/legacy/phase14_generalization_postfix/office4_quota_dose_response_frame70_seeds291_293")
     ap.add_argument("--device", default="cuda")
     args = ap.parse_args()
     out = args.root.resolve()

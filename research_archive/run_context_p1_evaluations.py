@@ -10,7 +10,7 @@ Implements:
   - P1.8: Context Perturbation Sensitivity (S -> S ∪ {j} directional concordance)
 
 Outputs:
-  results/phase6_context_utility/p1_evaluations_summary.json
+  results/legacy/phase6_context_utility/p1_evaluations_summary.json
 """
 import os
 import sys
@@ -57,9 +57,9 @@ def evaluate_p1_5_reduced_models(
         ("self_selected", "P6-Selected (Self + Selected, 19D)"),
     ]
 
-    p4_ckpt = os.path.join("results", "learned_utility", "checkpoints", f"two_head_mlp_seed_{seed}.pt")
+    p4_ckpt = os.path.join("results", "legacy", "learned_utility", "checkpoints", f"two_head_mlp_seed_{seed}.pt")
     if not os.path.exists(p4_ckpt):
-        p4_ckpt = os.path.join("results", "learned_utility", "checkpoints", "two_head_mlp_seed_42.pt")
+        p4_ckpt = os.path.join("results", "legacy", "learned_utility", "checkpoints", "two_head_mlp_seed_42.pt")
 
     results = {}
 
@@ -270,7 +270,7 @@ def evaluate_p1_8_context_perturbation(dataset_path: str) -> Dict[str, Any]:
 
 def main():
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    output_dir = os.path.join(repo_root, "results", "phase6_context_utility")
+    output_dir = os.path.join(repo_root, "results", "legacy", "phase6_context_utility")
     dataset_path = os.path.join(output_dir, "datasets", "conditional_oracle_seed_42.json")
     out_file = os.path.join(output_dir, "p1_evaluations_summary.json")
 

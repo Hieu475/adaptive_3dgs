@@ -58,7 +58,7 @@ def main():
     frame = args.frame
     scene = args.scene
     if args.input is None:
-        base = ROOT / f"results/phase14_generalization_postfix/quota_response_frame{frame}"
+        base = ROOT / f"results/legacy/phase14_generalization_postfix/quota_response_frame{frame}"
     else:
         base = args.input if args.input.is_absolute() else ROOT / args.input
     prereg_path = base / "preregistration.json"
@@ -150,7 +150,7 @@ def main():
         "seed_records": per_seed,
         "provenance": {"manifest_sha256": sha256(base/"manifest.json"),
             "preregistration_sha256": sha256(prereg_path),
-            "runner_sha256": sha256(ROOT/"experiments/run_joint_spawn_refine_replay.py"),
+            "runner_sha256": sha256(ROOT/"experiments/run/run_joint_spawn_refine_replay.py"),
             "analyzer_sha256": sha256(Path(__file__)), "record_sha256": hashes},
         "interpretation_limit": prereg["interpretation_limit"],
     }

@@ -462,7 +462,7 @@ class TestExactRankStability:
         """VIỆC 11: Verify exact context rank stability schema and semantic integrity."""
         artifact_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "results", "phase6_context_utility", "rank_stability_analysis.json"
+            "results", "legacy", "phase6_context_utility", "rank_stability_analysis.json"
         )
         if not os.path.exists(artifact_path):
             pytest.skip("rank_stability_analysis.json not yet generated")
@@ -519,7 +519,7 @@ class TestContextCentricDatasetIntegrity:
     def dataset_samples(self):
         ds_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "results", "phase6_context_utility", "datasets", "conditional_oracle_seed_42.json"
+            "results", "legacy", "phase6_context_utility", "datasets", "conditional_oracle_seed_42.json"
         )
         if not os.path.exists(ds_path):
             pytest.skip("Dataset file conditional_oracle_seed_42.json not yet generated")
@@ -584,7 +584,7 @@ class TestContextCentricDatasetIntegrity:
         """Verify rank stability artifact only evaluates groups with 100% coverage and exact pool."""
         artifact_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "results", "phase6_context_utility", "rank_stability_analysis.json"
+            "results", "legacy", "phase6_context_utility", "rank_stability_analysis.json"
         )
         if not os.path.exists(artifact_path):
             pytest.skip("rank_stability_analysis.json not found")

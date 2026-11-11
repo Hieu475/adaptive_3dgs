@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-RESULTS = ROOT / "results/phase14_generalization_postfix"
+RESULTS = ROOT / "results/legacy/phase14_generalization_postfix"
 STUDIES = [
     ("replica_office1", 70, "quota_response_frame70"),
     ("replica_office1", 90, "quota_response_frame90"),

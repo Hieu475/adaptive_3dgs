@@ -72,9 +72,9 @@ TOP_K_FRACTIONS: List[float] = [0.10, 0.20]  # for NDCG@k, OSE@k, Overlap@k
 # Checkpoint Configuration — Phase 4 frozen
 # ═══════════════════════════════════════════════════════════════════════
 
-CHECKPOINT_PATTERN: str = "results/learned_utility/checkpoints/two_head_mlp_seed_{seed}.pt"
+CHECKPOINT_PATTERN: str = "results/legacy/learned_utility/checkpoints/two_head_mlp_seed_{seed}.pt"
 
-NORMALIZER_SOURCE: str = "results/learned_utility/normalization.json"
+NORMALIZER_SOURCE: str = "results/legacy/learned_utility/normalization.json"
 
 # Phase 4 model architecture parameters (for verification)
 MODEL_IN_FEATURES: int = 11
@@ -218,7 +218,7 @@ GATE_CRITERIA: Dict[str, Dict[str, Any]] = {
 # Output Structure
 # ═══════════════════════════════════════════════════════════════════════
 
-OUTPUT_DIR: str = "results/phase8_generalization"
+OUTPUT_DIR: str = "results/legacy/phase8_generalization"
 
 OUTPUT_FILES: Dict[str, str] = {
     "manifest":             "manifest.json",

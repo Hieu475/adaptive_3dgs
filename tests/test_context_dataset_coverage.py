@@ -28,11 +28,11 @@ def dataset_path():
     if env_path and os.path.exists(env_path):
         return env_path
     path = os.path.join(
-        repo_root, "results", "phase6_context_utility", "datasets", "conditional_oracle_seed_42.json"
+        repo_root, "results", "legacy", "phase6_context_utility", "datasets", "conditional_oracle_seed_42.json"
     )
     if not os.path.exists(path):
         pilot_path = os.path.join(
-            repo_root, "results", "phase6_context_utility", "datasets", "pilot_verification.json"
+            repo_root, "results", "legacy", "phase6_context_utility", "datasets", "pilot_verification.json"
         )
         if os.path.exists(pilot_path):
             return pilot_path
@@ -158,7 +158,7 @@ def test_exact_group_split_integrity(dataset_path):
 
 def test_no_synthetic_filling_in_rank_stability(dataset_path, tmp_path):
     """Test 10: Rank stability evaluator operates with zero synthetic baseline filling."""
-    from experiments.run_rank_stability import run_rank_stability_analysis
+    from experiments.run.run_rank_stability import run_rank_stability_analysis
     out_file = os.path.join(tmp_path, "test_rank_stability.json")
     results = run_rank_stability_analysis(dataset_path, out_file)
     audit = results["candidate_coverage_audit"]

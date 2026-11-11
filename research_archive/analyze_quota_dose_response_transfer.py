@@ -47,7 +47,7 @@ def paired_stats(values):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--results-root", type=Path,
-                    default=ROOT / "results/phase14_generalization_postfix")
+                    default=ROOT / "results/legacy/phase14_generalization_postfix")
     ap.add_argument("--roots", nargs="+", default=DEFAULT_ROOTS,
                     help="Dose-response result subdirectories relative to --results-root")
     args = ap.parse_args()

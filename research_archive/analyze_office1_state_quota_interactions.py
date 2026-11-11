@@ -36,7 +36,7 @@ def main():
     ap.add_argument("--repo", type=Path, default=Path(__file__).resolve().parent.parent)
     args = ap.parse_args()
     repo = args.repo.resolve()
-    results = repo / "results/phase14_generalization_postfix"
+    results = repo / "results/legacy/phase14_generalization_postfix"
     feature_root = results / "frame_diagnostics"
     feature_manifest = json.loads((feature_root / "manifest.json").read_text())
     feature_path = feature_root / "replica_office1/ours/seed42.json"

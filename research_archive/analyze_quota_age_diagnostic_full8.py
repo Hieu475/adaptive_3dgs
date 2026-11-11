@@ -9,7 +9,7 @@ import random
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-RESULTS = ROOT / "results/phase14_generalization_postfix"
+RESULTS = ROOT / "results/legacy/phase14_generalization_postfix"
 RUN = RESULTS / "quota_response_age_diagnostics_full8"
 FROZEN_CHECKOUT = Path("/tmp/adaptive_3dgs_phase14_postfix_clean_20261017")
 CELLS = [
@@ -243,7 +243,7 @@ def main() -> None:
         "frozen_checkout": str(FROZEN_CHECKOUT),
         "frozen_checkout_clean_after_run": True,
         "source_manifest_sha256": sha256(RUN / "manifest.json"),
-        "runner_sha256": sha256(ROOT / "experiments/run_joint_spawn_refine_replay.py"),
+        "runner_sha256": sha256(ROOT / "experiments/run/run_joint_spawn_refine_replay.py"),
         "pipeline_sha256": sha256(ROOT / "src/core/pipeline.py"),
         "analysis_script_sha256": sha256(Path(__file__)),
         "preregistrations": preregistration_manifest,

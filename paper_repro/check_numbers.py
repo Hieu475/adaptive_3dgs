@@ -2,9 +2,9 @@
 """Check that paper, generated tables and README agree with the frozen result bundles.
 
 CPU-only. Exit code 1 on any mismatch. Source of truth:
-  results/rerun_paper1/            main benchmark + factorial (git tag paper-rerun-1)
-  results/dilution_extension/      Replica factorial, proportional budget
-  results/dilution_dose*/          dose-response
+  results/dilution/rerun_paper1/            main benchmark + factorial (git tag paper-rerun-1)
+  results/dilution/dilution_extension/      Replica factorial, proportional budget
+  results/dilution/dilution_dose*/          dose-response
 The paper takes its headline numbers from docs/paper/iccv_official/tables/macros.tex, which
 `make_main_tables.py` generates from the bundles; this script regenerates the expected values
 and verifies (1) the generated files are fresh, (2) the paper uses them, (3) no superseded
@@ -211,7 +211,7 @@ def main():
             if s in text:
                 fail(f"{name}: contains superseded value {s!r}")
 
-    print("Canonical bundles: results/rerun_paper1 (tag paper-rerun-1), dilution_extension, dilution_dose*")
+    print("Canonical bundles: results/dilution/rerun_paper1 (tag paper-rerun-1), dilution_extension, dilution_dose*")
     for k, v in macros.items():
         print(f"  {k:12s} {v}")
     if failures:

@@ -7,7 +7,7 @@ import random
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BASE = ROOT / "results/phase14_generalization_postfix/capacity_balanced_early_mid"
+BASE = ROOT / "results/legacy/phase14_generalization_postfix/capacity_balanced_early_mid"
 FRAMES = (45, 70)
 SEEDS = tuple(range(42, 50))
 
@@ -136,7 +136,7 @@ def main():
         "provenance": {
             "manifest_sha256": sha256(BASE / "manifest.json"),
             "preregistration_sha256": sha256(prereg_path),
-            "runner_sha256": sha256(ROOT / "experiments/run_joint_spawn_refine_replay.py"),
+            "runner_sha256": sha256(ROOT / "experiments/run/run_joint_spawn_refine_replay.py"),
             "analyzer_sha256": sha256(Path(__file__)),
             "record_sha256": hashes,
         },

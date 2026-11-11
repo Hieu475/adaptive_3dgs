@@ -29,7 +29,7 @@ from typing import Dict, List, Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Output Directory for Phase 12 Paper Evidence
-PHASE12_OUTPUT_DIR = REPO_ROOT / "results" / "phase12_paper_evidence"
+PHASE12_OUTPUT_DIR = REPO_ROOT / "results" / "legacy" / "phase12_paper_evidence"
 
 # Protocol Invariants & Experimental Setup
 SEEDS: List[int] = [42, 43, 44, 45, 46]

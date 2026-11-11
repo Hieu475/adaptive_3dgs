@@ -24,7 +24,7 @@ import matplotlib.patches as patches
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = PROJECT_ROOT / 'results'
-SAVE_DIR = RESULTS_DIR / 'figures'
+SAVE_DIR = RESULTS_DIR / 'diagnostics'/'figures'
 SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -69,7 +69,7 @@ def plot_fig1_architecture():
 
 def plot_fig2_oracle_distribution():
     """Fig 2: Empirical Distribution of Oracle Marginal Utility."""
-    dataset_path = RESULTS_DIR / 'oracle_dataset' / 'oracle_dataset.json'
+    dataset_path = RESULTS_DIR / 'legacy'/'oracle_dataset' / 'oracle_dataset.json'
     if not dataset_path.exists():
         return
     with open(dataset_path, 'r') as f:
@@ -102,7 +102,7 @@ def plot_fig2_oracle_distribution():
 
 def plot_fig3_scatter():
     """Fig 3: Predicted vs Oracle Utility Scatter."""
-    dataset_path = RESULTS_DIR / 'oracle_dataset' / 'oracle_dataset.json'
+    dataset_path = RESULTS_DIR / 'legacy'/'oracle_dataset' / 'oracle_dataset.json'
     if not dataset_path.exists():
         return
     with open(dataset_path, 'r') as f:
@@ -131,7 +131,7 @@ def plot_fig3_scatter():
 
 def plot_fig4_geometry_stratification():
     """Fig 4: Geometry Stratification Breakdown (Flat, Edge, Texture, Depth Discontinuity)."""
-    summary_path = RESULTS_DIR / 'learned_utility' / 'learned_utility_summary.json'
+    summary_path = RESULTS_DIR / 'legacy'/'learned_utility' / 'learned_utility_summary.json'
     if not summary_path.exists():
         return
     with open(summary_path, 'r') as f:
@@ -169,7 +169,7 @@ def plot_fig4_geometry_stratification():
 
 def plot_fig5_quality_at_budget():
     """Fig 5: Quality vs Budget Curves."""
-    sweep_path = RESULTS_DIR / 'budget_sweep' / 'phase6_budget_sweep.json'
+    sweep_path = RESULTS_DIR / 'legacy'/'budget_sweep' / 'phase6_budget_sweep.json'
     if not sweep_path.exists():
         return
     with open(sweep_path, 'r') as f:
@@ -211,7 +211,7 @@ def plot_fig5_quality_at_budget():
 
 def plot_fig6_pareto():
     """Fig 6: Latency vs Quality Pareto Frontier."""
-    pareto_path = RESULTS_DIR / 'budget_sweep' / 'pareto_frontier.csv'
+    pareto_path = RESULTS_DIR / 'legacy'/'budget_sweep' / 'pareto_frontier.csv'
     if not pareto_path.exists():
         return
     df = pd.read_csv(pareto_path)
@@ -248,7 +248,7 @@ def plot_fig6_pareto():
 
 def plot_fig7_online_trajectory():
     """Fig 7: Online Reconstruction Trajectory over 50 Frames."""
-    traj_path = RESULTS_DIR / 'online_trajectory' / 'per_frame_deltas.csv'
+    traj_path = RESULTS_DIR / 'legacy'/'online_trajectory' / 'per_frame_deltas.csv'
     if not traj_path.exists():
         return
     df = pd.read_csv(traj_path)
@@ -284,7 +284,7 @@ def plot_fig7_online_trajectory():
 
 def plot_fig8_failure_analysis():
     """Fig 8: Failure Mode and Physical Boundary Analysis."""
-    rep_path = RESULTS_DIR / 'master' / 'failure_analysis_summary.json'
+    rep_path = RESULTS_DIR / 'legacy'/'master' / 'failure_analysis_summary.json'
     if not rep_path.exists():
         # Fallback to local synthesis if summary not yet compiled
         regimes = ['Flat Low-Texture', 'Texture Edge', 'Depth Discontinuity', 'Specular Highlight', 'Dynamic Drift']

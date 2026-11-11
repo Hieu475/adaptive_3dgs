@@ -5,7 +5,7 @@
 **Hardware:** NVIDIA GeForce RTX 4050 Laptop GPU (6GB VRAM) / Intel Core i7  
 **Protocol:** Unified Experiment Protocol v1 (Seeds: `[42, 43, 44, 45, 46]`, Resolution: 320×240)  
 **Provenance & Single Source of Truth:**
-- Authoritative Artifact Report: `results/phase6_context_utility/phase6_report.md` (anchored to `results/phase6_context_utility/manifest.json`)
+- Authoritative Artifact Report: `results/legacy/phase6_context_utility/phase6_report.md` (anchored to `results/legacy/phase6_context_utility/manifest.json`)
 - Root File: `phase6_report.md` is maintained as a byte-for-byte exact synchronization and reference in repository root.
 
 ---
@@ -58,7 +58,7 @@ Following the **Phase 6 Scientific Reform & Engineering Hardening** (P0, P1, P2)
 
 ### 1.1 Authoritative Phase 6 Reference Table
 
-The following single authoritative table synthesizes all frozen Phase 6 empirical findings (anchored to [`results/phase6_context_utility/manifest.json`](file:///home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/phase6_context_utility/manifest.json)):
+The following single authoritative table synthesizes all frozen Phase 6 empirical findings (anchored to [`results/legacy/phase6_context_utility/manifest.json`](file:///home/nguyen_quoc_hieu/Documents/adaptive_3dgs/results/legacy/phase6_context_utility/manifest.json)):
 
 | Experiment / Dimension | Metric / Criterion | Authoritative Result | Scientific Interpretation |
 | :--- | :--- | :---: | :--- |
@@ -183,7 +183,7 @@ Evaluation of live GPU joint optimization across 26 candidate pairs stratified b
 ---
 
 ### D. Key Feature Subset Comparison (Ablation Preview)
-Evaluating reduced input spaces to establish whether full 32D context is required (evaluating zero-shot cross-scene test split `tum_fr2_xyz`, $N=240$, strictly adhering to Single Source of Truth `results/phase6_context_utility/ablation/ablation_summary.json`):
+Evaluating reduced input spaces to establish whether full 32D context is required (evaluating zero-shot cross-scene test split `tum_fr2_xyz`, $N=240$, strictly adhering to Single Source of Truth `results/legacy/phase6_context_utility/ablation/ablation_summary.json`):
 
 | Model Architecture | Name | Input Dim | Features Included | Test Spearman $\rho(U)$ | NDCG@5 | MAE ($U$) |
 | :--- | :---: | :---: | :--- | :---: | :---: | :---: |
@@ -193,7 +193,7 @@ Evaluating reduced input spaces to establish whether full 32D context is require
 
 > [!NOTE]
 > **Single Source of Truth & Legacy Provenance**:
-> - **Authoritative Main Ablation**: The comprehensive, authoritative 8-variant ladder (P6-A through P6-H) is detailed in [Section 3](#3-standardized-architecture-naming-ladder--8-variant-ablation-p21) and stored in `results/phase6_context_utility/ablation/ablation_summary.json`. All variants were trained with canonical context grouping ($g = (scene, frame, \text{sorted}(S_t))$), `GroupedBatchSampler`, and train-only normalization.
+> - **Authoritative Main Ablation**: The comprehensive, authoritative 8-variant ladder (P6-A through P6-H) is detailed in [Section 3](#3-standardized-architecture-naming-ladder--8-variant-ablation-p21) and stored in `results/legacy/phase6_context_utility/ablation/ablation_summary.json`. All variants were trained with canonical context grouping ($g = (scene, frame, \text{sorted}(S_t))$), `GroupedBatchSampler`, and train-only normalization.
 > - **Legacy Exploratory Prototype**: An earlier exploratory prototype tested prior to canonical grouping reported unanchored values ($0.3343, 0.2927, 0.4850$). Those unhardened numbers are formally **deprecated** and archived; they must not be compared against the authoritative 8-variant ladder.
 
 ---

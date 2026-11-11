@@ -39,7 +39,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from experiments.run_frozen_benchmark import (
+from experiments.run.run_frozen_benchmark import (
     load_benchmark_sequence,
     build_pipeline_config,
     run_policy_trajectory,
@@ -63,7 +63,7 @@ def run_factorial_experiment(
     seeds: List[int] = None,
     budget_ms: float = 15.0,
     device: str = "cuda",
-    out_dir: str = "results/factorial_ablation",
+    out_dir: str = "results/dilution/factorial_ablation",
     condition_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Execute factorial matrix across conditions and seeds."""
@@ -298,7 +298,7 @@ if __name__ == "__main__":
     parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44])
     parser.add_argument("--budget_ms", type=float, default=15.0)
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
-    parser.add_argument("--out_dir", type=str, default="results/factorial_ablation")
+    parser.add_argument("--out_dir", type=str, default="results/dilution/factorial_ablation")
     parser.add_argument("--conditions", type=str, nargs="+", default=None)
     args = parser.parse_args()
 

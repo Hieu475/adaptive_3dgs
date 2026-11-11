@@ -35,36 +35,36 @@ Every benchmark output has a deterministic Single Source of Truth under `results
 
 ```bash
 # 1. Gate 1: Measurability, Headroom, and Group Non-Additivity
-python3 experiments/run_gate1_headroom.py
+python3 experiments/run/run_gate1_headroom.py
 
 # 2. Phase 4: Two-Head Learned Utility Model (5 Seeds)
-python3 experiments/train_utility_model.py
-python3 experiments/eval_utility_model.py
-python3 experiments/eval_selection.py
+python3 experiments/models/train_utility_model.py
+python3 experiments/models/eval_utility_model.py
+python3 experiments/models/eval_selection.py
 
 # 3. Phase 5: Controlled Budget Benchmark & Online Trajectory
-python3 experiments/run_budget_sweep_benchmark.py --seeds 42 43 44 45 46
-python3 experiments/run_online_trajectory_benchmark.py --n-frames 25 --budget-ms 15.0
+python3 experiments/run/run_budget_sweep_benchmark.py --seeds 42 43 44 45 46
+python3 experiments/run/run_online_trajectory_benchmark.py --n-frames 25 --budget-ms 15.0
 
 # 4. Phase 6: Candidate Pool Coverage Audit & Rank Stability (Case B Proof)
-python3 experiments/run_rank_stability.py
+python3 experiments/run/run_rank_stability.py
 
 # 5. Phase 6: 8-Variant Architecture Ladder Ablation
-python3 experiments/run_context_ablation.py --seed 42
+python3 experiments/run/run_context_ablation.py --seed 42
 
 # 6. Phase 6: 5-Policy Oracle Decomposition & Normalized Regret
-python3 experiments/run_oracle_gap.py
+python3 experiments/run/run_oracle_gap.py
 
 # 7. Phase 6: Runtime Profiling Breakdown (T_P6 Pipeline Stages)
-python3 experiments/run_runtime_profile.py
+python3 experiments/run/run_runtime_profile.py
 ```
 
 ---
 
 ## 4. Single Source of Truth References
 
-- **Phase 6 Authoritative Manifest**: `results/phase6_context_utility/manifest.json`
-- **Rank Stability Analysis**: `results/phase6_context_utility/rank_stability_analysis.json`
-- **Ablation Ladder Summary**: `results/phase6_context_utility/ablation/ablation_summary.json`
-- **Runtime Breakdown**: `results/phase6_context_utility/runtime_breakdown.json`
+- **Phase 6 Authoritative Manifest**: `results/legacy/phase6_context_utility/manifest.json`
+- **Rank Stability Analysis**: `results/legacy/phase6_context_utility/rank_stability_analysis.json`
+- **Ablation Ladder Summary**: `results/legacy/phase6_context_utility/ablation/ablation_summary.json`
+- **Runtime Breakdown**: `results/legacy/phase6_context_utility/runtime_breakdown.json`
 

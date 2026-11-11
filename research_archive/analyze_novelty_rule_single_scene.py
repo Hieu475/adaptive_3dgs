@@ -39,7 +39,7 @@ def bootstrap_ci(values: list[float], draws: int, seed: int) -> list[float]:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--run_dir", default="results/phase14_generalization_postfix/continuous_age_quota/novelty_rule_transfer/fr3_structure_texture_near/confirmatory")
+    ap.add_argument("--run_dir", default="results/legacy/phase14_generalization_postfix/continuous_age_quota/novelty_rule_transfer/fr3_structure_texture_near/confirmatory")
     ap.add_argument("--scene", default="tum_fr3_structure_texture_near")
     ap.add_argument("--seeds", nargs="+", type=int, default=list(range(130, 138)))
     ap.add_argument("--expected_frames", type=int, default=500)

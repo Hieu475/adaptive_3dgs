@@ -5,7 +5,7 @@ import statistics
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BASE = ROOT / "results/phase14_generalization_postfix/matched_time_spawn128_cross_scene_replication_v1"
+BASE = ROOT / "results/legacy/phase14_generalization_postfix/matched_time_spawn128_cross_scene_replication_v1"
 SCENES = {
     "replica_office1": (BASE, (260, 261, 262, 263)),
     "tum_fr1_rpy": (BASE / "tum_seeds264_267", (264, 265, 266, 267)),

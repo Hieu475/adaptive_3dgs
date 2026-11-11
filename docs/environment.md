@@ -103,7 +103,7 @@ print('✓ Matplotlib:', matplotlib.__version__)
 pytest tests/test_closed_loop_runtime.py -v
 
 # Run the 30-second closed-loop smoke test
-python experiments/run_closed_loop_smoke.py
+python experiments/run/run_closed_loop_smoke.py
 ```
 
 ---

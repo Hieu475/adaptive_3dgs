@@ -13,7 +13,7 @@ Statistical Rigor:
   - Cohen's d effect sizes
   - 95% Bootstrap confidence intervals
   - Holm-Bonferroni family-wise error rate multiplicity correction
-  - Dedicated output folder: results/step1_ablation_5seeds/ (preserves phase13_frozen_benchmark)
+  - Dedicated output folder: results/dilution/step1_ablation_5seeds/ (preserves phase13_frozen_benchmark)
 """
 import os
 import sys
@@ -33,7 +33,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.core.pipeline import OnlineReconstructionPipeline
-from experiments.run_frozen_benchmark import (
+from experiments.run.run_frozen_benchmark import (
     load_benchmark_sequence,
     build_pipeline_config,
     run_policy_trajectory,
@@ -161,7 +161,7 @@ def main():
     parser.add_argument("--n_frames", type=int, default=150)
     parser.add_argument("--budget_ms", type=float, default=15.0)
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
-    parser.add_argument("--out_dir", type=str, default="results/step1_ablation_5seeds")
+    parser.add_argument("--out_dir", type=str, default="results/dilution/step1_ablation_5seeds")
     parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44, 45, 46])
     args = parser.parse_args()
 

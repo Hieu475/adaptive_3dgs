@@ -654,7 +654,7 @@ Dự án đã được thực thi và nghiệm thu thực nghiệm qua chuỗi n
   *Insight hệ thống: Model inference is cheap; state construction and selection orchestration dominate the adaptive overhead.*
 
 ### 19.2. Trạng thái đóng băng nghiên cứu (Research Freeze)
-- **Single Source of Truth**: Mọi số liệu được neo cố định tại `results/phase6_context_utility/manifest.json`.
+- **Single Source of Truth**: Mọi số liệu được neo cố định tại `results/legacy/phase6_context_utility/manifest.json`.
 - **Authoritative Metrics**:
   - Headroom tối ưu: $H = +0.000149 > 0$
   - Gate 4 Latency Reduction: $67.8\text{ ms}$ vs $138.3\text{ ms}$ (Full)

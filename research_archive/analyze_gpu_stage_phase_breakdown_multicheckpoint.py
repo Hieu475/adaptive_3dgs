@@ -6,9 +6,9 @@ import statistics
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BASE = ROOT / "results/phase14_generalization_postfix/gpu_stage_phase_breakdown_multicheckpoint"
+BASE = ROOT / "results/legacy/phase14_generalization_postfix/gpu_stage_phase_breakdown_multicheckpoint"
 PREREG = json.loads((BASE / "preregistration.json").read_text())
-SOURCE_ROOT = ROOT / "results/phase14_generalization_postfix/matched_time_spawn128_cross_scene_replication_v1"
+SOURCE_ROOT = ROOT / "results/legacy/phase14_generalization_postfix/matched_time_spawn128_cross_scene_replication_v1"
 STUDIES = {
     "replica_office1": (BASE / "replica_office1", SOURCE_ROOT,
                         [260, 261, 262, 263]),

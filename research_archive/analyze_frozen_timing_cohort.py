@@ -15,7 +15,7 @@ METRICS = {
     "mean_mature_update_coverage": "Mean mature update coverage",
     "mean_opt_stage_sync_ms": "Mean optimization-stage time (ms)",
 }
-ROOT = Path("results/matched_candidate_timing_replay_fixed_snapshot")
+ROOT = Path("results/legacy/matched_candidate_timing_replay_fixed_snapshot")
 SCENES = ("replica_room2", "replica_office3")
 SEEDS = (57, 58, 59, 60)
 RUN_IDS = ("repeat1", "repeat2", "repeat3")

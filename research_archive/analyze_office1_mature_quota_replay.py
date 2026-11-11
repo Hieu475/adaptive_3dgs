@@ -12,7 +12,7 @@ import argparse
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
-BASE = ROOT / "results/phase14_generalization_postfix/office1_mature_quota_replay"
+BASE = ROOT / "results/legacy/phase14_generalization_postfix/office1_mature_quota_replay"
 RUNS = BASE / "replica_office1"
 SEEDS = tuple(range(42, 50))
 ARMS = ("spawn0_mature25", "spawn0_mature75", "spawn128_mature25", "spawn128_mature75")
@@ -42,7 +42,7 @@ def main() -> None:
                         default="replica_office1")
     scene = parser.parse_args().scene
     folder = "office1_mature_quota_replay" if scene == "replica_office1" else "tum_fr1_rpy_mature_quota_replay"
-    BASE = ROOT / "results/phase14_generalization_postfix" / folder
+    BASE = ROOT / "results/legacy/phase14_generalization_postfix" / folder
     RUNS = BASE / scene
     records = {}
     effects = {"primary_spawn0_mature75_minus_mature25_db": [],
@@ -194,9 +194,9 @@ def main() -> None:
     (BASE / "analysis.json").write_text(json.dumps(analysis, indent=2) + "\n")
     (BASE / "report.md").write_text("\n".join(lines))
     source_paths = [
-        "experiments/run_joint_spawn_refine_replay.py",
-        "experiments/run_dilution_factorial.py",
-        "experiments/run_frozen_benchmark.py",
+        "experiments/run/run_joint_spawn_refine_replay.py",
+        "experiments/run/run_dilution_factorial.py",
+        "experiments/run/run_frozen_benchmark.py",
         "src/core/pipeline.py", "src/core/scheduler.py", "src/evaluation/reproducibility.py",
     ]
     source_hashes = {p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest()

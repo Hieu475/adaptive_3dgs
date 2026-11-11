@@ -511,7 +511,7 @@ Phase 6 đã cho thấy rank có thể khá ổn định trong một protocol. V
 Đề xuất:
 
 ```text
-results/phase12_paper_evidence/interaction_audit/
+results/legacy/phase12_paper_evidence/interaction_audit/
 
 ├── interaction_pairs.csv
 ├── interaction_contexts.csv

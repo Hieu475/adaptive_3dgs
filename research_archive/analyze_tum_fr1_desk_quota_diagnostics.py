@@ -6,7 +6,7 @@ import math
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BASE = ROOT / "results/phase14_generalization_postfix/continuous_age_quota/diagnostics_tum_fr1_desk/rerun"
+BASE = ROOT / "results/legacy/phase14_generalization_postfix/continuous_age_quota/diagnostics_tum_fr1_desk/rerun"
 SEEDS = tuple(range(42, 50))
 ARMS = ("global_importance", "mature75")
 WINDOWS = ((1, 30), (31, 60), (61, 90), (91, 119))

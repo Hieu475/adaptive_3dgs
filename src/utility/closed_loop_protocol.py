@@ -186,7 +186,7 @@ GATE_CRITERIA_10: Dict[str, Dict[str, Any]] = {
 # Paths & Output Specifications
 # ═══════════════════════════════════════════════════════════════════════
 
-OUTPUT_DIR_10: str = "results/phase10_e2e"
+OUTPUT_DIR_10: str = "results/tracking/phase10_e2e"
 
 OUTPUT_FILES_10: Dict[str, str] = {
     "protocol":             "protocol.json",
@@ -223,7 +223,7 @@ def get_output_dir_10() -> Path:
 def get_checkpoint_path_for_seed(seed: int) -> Path:
     """Return path to frozen Phase 9B / 9C checkpoint for a given seed."""
     repo = get_repo_root()
-    p = repo / "results" / "phase9b_robust_normalization" / "checkpoints" / f"A1_online_adaptive_seed_{seed}.pt"
+    p = repo / "results" / "legacy" / "phase9b_robust_normalization" / "checkpoints" / f"A1_online_adaptive_seed_{seed}.pt"
     if not p.exists():
         raise FileNotFoundError(f"Missing frozen checkpoint: {p}")
     return p
@@ -232,7 +232,7 @@ def get_checkpoint_path_for_seed(seed: int) -> Path:
 def get_normalizer_path_for_seed(seed: int) -> Path:
     """Return path to frozen Phase 9B / 9C normalizer JSON for a given seed."""
     repo = get_repo_root()
-    p = repo / "results" / "phase9b_robust_normalization" / "normalizers" / f"A1_online_adaptive_seed_{seed}.json"
+    p = repo / "results" / "legacy" / "phase9b_robust_normalization" / "normalizers" / f"A1_online_adaptive_seed_{seed}.json"
     if not p.exists():
         raise FileNotFoundError(f"Missing frozen normalizer: {p}")
     return p

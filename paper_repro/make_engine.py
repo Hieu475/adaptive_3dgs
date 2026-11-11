@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Tables, figure and number macros for the steps-regime paper, from the frozen bundles.
 
-Inputs:  results/engine/analysis.json (+ per-run JSON), results/engine_ablation, results/holdout_engine2,
-         results/core_speed/{before,after}.json
+Inputs:  results/controllers/engine/analysis.json (+ per-run JSON), results/controllers/engine_ablation, results/holdout/holdout_engine2,
+         results/diagnostics/core_speed/{before,after}.json
 Outputs: docs/paper/iccv_official/tables/{tab_engine_*.tex, engine_macros.tex, engine_numbers.json}
          docs/paper/iccv_official/figs/fig_engine_pareto.pdf
 """
@@ -44,7 +44,7 @@ def sgn(x, nd=2):
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    A = json.loads((R / "engine/analysis.json").read_text())
+    A = json.loads((R / "controllers/engine/analysis.json").read_text())
     S, U = A["summary"], A["units"]
     for split in ("test", "fresh"):
         for cond, v in ((k.split("/", 1)[1], v) for k, v in S.items() if k.startswith(split + "/")):
@@ -104,7 +104,7 @@ def main():
 
     # ---- ablation of the optimizer preset (K=10, 4 main scenes)
     ab = {}
-    for f in (R / "engine_ablation").glob("*/*_seed*.json"):
+    for f in (R / "controllers" / "engine_ablation").glob("*/*_seed*.json"):
         j = json.loads(f.read_text()); ab.setdefault(j["condition"], {}).setdefault(j["scene"], []).append((j["summary"]["mean_psnr"], j["summary"]["mean_frame_ms"]))
     full = {s: np.mean([x[0] for x in ab["tts_full"][s]]) for s in SCEN4}
     SHORT = {"tum_fr2_xyz": "fr2", "tum_fr1_xyz": "fr1", "replica_office0": "off0", "replica_office1": "off1"}
@@ -124,7 +124,7 @@ def main():
 
     # ---- held-out
     h = {}
-    for f in (R / "holdout_engine2").glob("*/*_seed*.json"):
+    for f in (R / "holdout" / "holdout_engine2").glob("*/*_seed*.json"):
         j = json.loads(f.read_text()); h.setdefault(j["condition"], {}).setdefault(j["scene"], []).append((j["train_psnr"], j["holdout_psnr"]))
     mean = lambda c, s, i: float(np.mean([x[i] for x in h[c][s]]))
     L = [r"\begin{table}[t]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{3pt}", r"\begin{tabular}{llrrrr}", r"\toprule",
@@ -148,7 +148,7 @@ def main():
         setm(f"engHold{cname(c)}Min", min(hv), "{:.1f}"); setm(f"engHold{cname(c)}Max", max(hv), "{:.1f}")
 
     # ---- core speed
-    bf, af = json.loads((R / "core_speed/before.json").read_text()), json.loads((R / "core_speed/after.json").read_text())
+    bf, af = json.loads((R / "diagnostics/core_speed/before.json").read_text()), json.loads((R / "diagnostics/core_speed/after.json").read_text())
     L = [r"\begin{table}[t]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{3pt}", r"\begin{tabular}{lrrrrr}", r"\toprule",
          r"\textbf{Scene} & ms before & ms after & speed-up & PSNR before & PSNR after \\", r"\midrule"]
     sp = []
@@ -183,7 +183,7 @@ def main():
     def dev(name):
         v = []
         for s_ in DEV:
-            j = json.loads((R / f"engine_dev/{s_}/{name}_seed42.json").read_text())["summary"]
+            j = json.loads((R / f"controllers/engine_dev/{s_}/{name}_seed42.json").read_text())["summary"]
             v.append((j["mean_psnr"], j["mean_frame_ms"]))
         return float(np.mean([x[0] for x in v])), float(np.mean([x[1] for x in v]))
     curve = sorted(dev(n) [::-1] for n in ("tts_e_fix3", "tts_e_fix5", "tts_h_base", "tts_e_fix11", "tts_e_fix15"))
@@ -198,7 +198,7 @@ def main():
         p_, t_ = dev(name)
         setm("engNegAlloc" + tag, p_ - (ref_p + slope * (t_ - ref_t)), "{:.2f}")
     hd = {}
-    for f in (R / "holdout_dev").glob("*/*_seed42.json"):
+    for f in (R / "holdout" / "holdout_dev").glob("*/*_seed42.json"):
         j = json.loads(f.read_text()); hd.setdefault(j["condition"], {})[j["scene"]] = (j["train_psnr"], j["holdout_psnr"])
     for c in ("fixK10_replay3", "fixK10_r2s8", "fixK10_r3s16"):
         setm("engNegReplay" + cname(c) + "Hold", float(np.mean([hd[c][s_][1] - hd["fixK10"][s_][1] for s_ in DEV])), "{:.2f}")
@@ -225,7 +225,7 @@ def main():
 
     # ---- closed-loop map-based tracking in the steps regime (TUM, three seeds)
     cl = {}
-    for f in (R / "closed_loop_steps").glob("*/*_seed*.json"):
+    for f in (R / "tracking" / "closed_loop_steps").glob("*/*_seed*.json"):
         j = json.loads(f.read_text()); cl.setdefault(j["scene"], {}).setdefault(j["condition"], []).append((j["psnr_tracked"], 100 * j["ate_rmse_m"]))
     L = [r"\begin{table}[t]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{3pt}", r"\begin{tabular}{lrrrr}", r"\toprule",
          r"\textbf{Scene} & orig.\ dB & ours dB & orig.\ ATE & ours ATE \\", r"\midrule"]
@@ -248,7 +248,7 @@ def main():
     # ---- retention: final-map PSNR on frames that were never mapped (and early mapped frames)
     def load_ret(split):
         u = {}
-        for f in (R / "retention" / split).glob("**/*_seed*.json"):
+        for f in (R / "controllers" / "retention" / split).glob("**/*_seed*.json"):
             j = json.loads(f.read_text()); u.setdefault(j["scene"] + ("@" + str(f.parent.parent.name) if split == "fresh" else ""), {}).setdefault(j["cond"], []).append(j)
         return u
     RC = ["orig", "k3", "k3_rp", "k3_jr", "k10", "k10_rp"]
@@ -297,7 +297,7 @@ def main():
                 setm(f"engMs{split.title()}{cname(c_)}", float(np.mean(ms)), "{:.0f}")
     # full resolution (640x480) on the same test scenes
     hr = {}
-    for f in (R / "retention_640" / "test").glob("*/*_seed*.json"):
+    for f in (R / "controllers" / "retention_640" / "test").glob("*/*_seed*.json"):
         j = json.loads(f.read_text()); hr.setdefault(j["cond"], {}).setdefault(j["scene"], []).append(j)
     if hr and all(c in hr for c in ("orig", "k3", "k3_jr", "k3_jr3b", "k2_jr2b")):
         hb = {sc: np.mean([x["heldout_final"] for x in v]) for sc, v in hr["orig"].items()}
@@ -310,7 +310,7 @@ def main():
             setm(f"engHiRes{cname(c)}Ms", float(np.mean([x["mean_frame_ms"] for v in hr[c].values() for x in v])), "{:.0f}")
         setm("engHiResN", len(hb), "{:d}")
     hf = {}
-    for f in (R / "retention_640" / "fresh").glob("*/*/*_seed*.json"):
+    for f in (R / "controllers" / "retention_640" / "fresh").glob("*/*/*_seed*.json"):
         j = json.loads(f.read_text()); hf.setdefault(j["cond"], {}).setdefault(f.parent.name, []).append(j)
     if hf and all(c in hf for c in ("orig", "k3", "k2_jr2b", "k3_jr3b")):
         fb = {sc: np.mean([x["heldout_final"] for x in v]) for sc, v in hf["orig"].items()}
@@ -322,7 +322,7 @@ def main():
             setm(f"engHiResFresh{cname(c)}Ms", float(np.mean([x["mean_frame_ms"] for v in hf[c].values() for x in v])), "{:.0f}")
         setm("engHiResFreshN", len(fb), "{:d}")
     tm = {}
-    for f in (R / "retention_time").glob("*/*.json"):
+    for f in (R / "controllers" / "retention_time").glob("*/*.json"):
         j = json.loads(f.read_text()); tm.setdefault(j["cond"], []).append(j["mean_frame_ms"])
     for c_ in ("orig", "k3", "k3_rp", "k3_jr", "k10", "k10_rp"):
         setm("engMs" + cname(c_), float(np.mean(tm[c_])), "{:.0f}")
@@ -332,7 +332,7 @@ def main():
     # ---- replay design on the development scenes (final-map retention, GT poses, one seed)
     DEVR = ["tum_fr1_desk", "tum_fr3_structure_texture_near", "replica_room1", "replica_office2"]
     dr = {}
-    for f in (R / "retention_dev").glob("*/*_seed42.json"):
+    for f in (R / "controllers" / "retention_dev").glob("*/*_seed42.json"):
         j = json.loads(f.read_text()); dr.setdefault(j["cond"], {})[j["scene"]] = j
     for c in ("orig", "k3", "k3_rp3", "k3_r2", "k3_r4", "k3_s16", "k3_s64", "k3_t1", "k3_t3", "k3_noprune", "k3_rp_noprune", "k3_pe",
               "k10", "k10_rp3", "k10_e2", "k10_e5", "k10_pe"):
@@ -342,7 +342,7 @@ def main():
 
     # ---- joint-replay design curve on the development scenes (equal measured time)
     d2 = {}
-    for f in (R / "retention_dev2").glob("*/*_seed42.json"):
+    for f in (R / "controllers" / "retention_dev2").glob("*/*_seed42.json"):
         j = json.loads(f.read_text()); d2.setdefault(j["cond"], {})[j["scene"]] = j
     for alias, c in (("SeqThree", "k3_rp"), ("SeqFive", "k5_rp"), ("SeqSix", "k6_rp"), ("SeqEight", "k8_rp"), ("JointTwoThree", "k2_jt_e1j3"),
                      ("JointThreeTwo", "k3_jt_e1j2"), ("JointThreeFive", "k3_jt_e1j5")):
@@ -352,12 +352,12 @@ def main():
 
     # ---- MonoGS tracker + our mapper (hybrid) versus original MonoGS, MonoGS' own protocol
     hy = {}
-    for f in (R / "monogs_hybrid").glob("*_seed*.json"):
+    for f in (R / "baselines" / "monogs_hybrid").glob("*_seed*.json"):
         j = json.loads(f.read_text()); hy.setdefault(j["scene"], {}).setdefault(j["cond"], {})[j["seed"]] = j
-    runs = json.loads((R / "monogs_hybrid/monogs_baseline_runs.json").read_text())
+    runs = json.loads((R / "baselines/monogs_hybrid/monogs_baseline_runs.json").read_text())
     mb = {sc: {k: float(np.mean([r[k] for r in rs])) for k in ("psnr", "ate5", "ms")} | {"n": len(rs)} for sc, rs in runs.items()}
     SC = ["fr1_desk", "fr2_xyz", "fr1_xyz", "fr1_rpy", "fr2_desk", "fr3_sitting_static"]
-    spl = {sc: json.loads((R / "splatam" / f"{sc}.json").read_text()) for sc in SC}  # SplaTAM, our protocol, one run
+    spl = {sc: json.loads((R / "baselines" / "splatam" / f"{sc}.json").read_text()) for sc in SC}  # SplaTAM, our protocol, one run
     def hyb(sc, c):  # mean over seeds (joint replay has three seeds, the others one)
         rs = list(hy[sc][c].values())
         return {"heldout_final_psnr": float(np.mean([r["heldout_final_psnr"] for r in rs])), "ate_every5_m": float(np.mean([r["ate_every5_m"] for r in rs])),
@@ -410,9 +410,9 @@ def main():
     setm("engHybBetterThreeB", int(sum(x > 0.5 for x in d3)), "{:d}"); setm("engHybEqualThreeB", int(sum(abs(x) <= 0.5 for x in d3)), "{:d}")
     setm("engHybWorseThreeB", int(sum(x < -0.5 for x in d3)), "{:d}"); setm("engHybWorstGapThreeB", float(min(d3)), "{:.1f}")
     setm("engHybReplayGain", mean("k3_jr", 0) - mean("k3", 0), "{:.1f}")
-    # ---- 600-frame prefixes (results/monogs_full): original mapper vs three-view batched joint replay, MonoGS tracker
+    # ---- 600-frame prefixes (results/baselines/monogs_full): original mapper vs three-view batched joint replay, MonoGS tracker
     fl = {}
-    for f in (R / "monogs_full").glob("*_seed*.json"):
+    for f in (R / "baselines" / "monogs_full").glob("*_seed*.json"):
         j = json.loads(f.read_text()); fl.setdefault(j["scene"], {})[j["cond"]] = j
     if fl:
         fs = sorted(fl); g = [fl[x]["k3_jr3b"]["heldout_final_psnr"] - fl[x]["orig"]["heldout_final_psnr"] for x in fs]

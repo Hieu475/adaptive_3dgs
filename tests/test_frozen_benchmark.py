@@ -7,7 +7,7 @@ import torch
 # Repository root setup
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from experiments.run_frozen_benchmark import (
+from experiments.run.run_frozen_benchmark import (
     build_pipeline_config,
     run_policy_trajectory,
     aggregate_policy_runs,

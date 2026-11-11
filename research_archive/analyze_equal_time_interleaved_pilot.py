@@ -5,8 +5,8 @@ import statistics
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-INPUT = ROOT / "results/phase14_generalization_postfix/matched_time_age_quota_pilot_replica_office1_interleaved5_matched/replica_office1/seed42_frame90.json"
-OUT = ROOT / "results/phase14_generalization_postfix/matched_time_age_quota_pilot_replica_office1"
+INPUT = ROOT / "results/legacy/phase14_generalization_postfix/matched_time_age_quota_pilot_replica_office1_interleaved5_matched/replica_office1/seed42_frame90.json"
+OUT = ROOT / "results/legacy/phase14_generalization_postfix/matched_time_age_quota_pilot_replica_office1"
 TOLERANCE = 0.05
 REPEATS = 5
 

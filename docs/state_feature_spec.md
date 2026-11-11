@@ -117,5 +117,5 @@ To strictly prevent future information leakage:
 
 Per `configs/protocol_v1.yaml` (`pre_fusion_normalization: true`):
 - Normalization statistics $(\mu_j, \sigma_j)$ are computed **strictly on the canonical training split (frames 0–40)**.
-- Parameters are persisted in `results/statistics/normalization.json`.
+- Parameters are persisted in `results/legacy/statistics/normalization.json`.
 - Validation (frames 41–60) and Test (`tum_fr2_xyz`) splits apply frozen training statistics without re-fitting.

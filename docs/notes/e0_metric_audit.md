@@ -2,8 +2,8 @@
 
 **Status:** metric and input-path audit implemented; one-seed replay is diagnostic only.
 
-**Protocol:** `rgbd-metrics-v2`, replay artifact `results/mechanism_v2/metric_v2_final_arrays/replica_room2/seed57_final_arrays.json`.
-**Validation:** `results/mechanism_v2/metric_v2_final_arrays/validation.json` validates 1/1 matched pair and confirms current source hashes.
+**Protocol:** `rgbd-metrics-v2`, replay artifact `results/dilution/mechanism_v2/metric_v2_final_arrays/replica_room2/seed57_final_arrays.json`.
+**Validation:** `results/dilution/mechanism_v2/metric_v2_final_arrays/validation.json` validates 1/1 matched pair and confirms current source hashes.
 
 ## Findings
 
@@ -19,7 +19,7 @@ The old `ssim` value used global image statistics and was not spatial-window SSI
 
 ### Replica pose and depth input path
 
-`scripts/download_replica_scene.py` converts 16-bit depth to meters by dividing by `6553.5`. It reads Replica `traj.txt` as camera-to-world and stores its inverse as `extrinsics.npy` (world-to-camera). On the local `room2` arrays, all 120 matrices have valid homogeneous bottom rows and rotation orthogonality error at most `1.2e-7`; `W2C × C2W` round-trip error is at most `2.4e-7`. The phase-10 sequence loader passes those W2C poses into mapping; the matched replay passes the same per-frame pose into held-out evaluation. Intrinsics are scaled independently in x and y to the working resolution.
+`scripts/fetch/download_replica_scene.py` converts 16-bit depth to meters by dividing by `6553.5`. It reads Replica `traj.txt` as camera-to-world and stores its inverse as `extrinsics.npy` (world-to-camera). On the local `room2` arrays, all 120 matrices have valid homogeneous bottom rows and rotation orthogonality error at most `1.2e-7`; `W2C × C2W` round-trip error is at most `2.4e-7`. The phase-10 sequence loader passes those W2C poses into mapping; the matched replay passes the same per-frame pose into held-out evaluation. Intrinsics are scaled independently in x and y to the working resolution.
 
 Replica's loader retains positive depth values without a 0.4–4.0 m clipping rule; it treats finite positive values as valid. The local room2 depth array spans 0–5.02 m, with positive-depth median 2.31 m. This differs from the TUM preprocessing path, which clips to 0.4–4.0 m, so cross-dataset depth metrics need dataset-specific validity rules stated explicitly.
 
@@ -49,15 +49,15 @@ Metric definitions and renderer behavior are in `src/mechanism/metrics.py`, `src
 Reproduce the audit from the repository root:
 
 ```bash
-python experiments/validate_matched_candidate_timing_replay.py \
-  --root results/mechanism_v2/metric_v2_final_arrays \
+python experiments/checks/validate_matched_candidate_timing_replay.py \
+  --root results/dilution/mechanism_v2/metric_v2_final_arrays \
   --scenes replica_room2 --seeds 57 --run_ids final_arrays \
-  --out results/mechanism_v2/metric_v2_final_arrays/validation.json
+  --out results/dilution/mechanism_v2/metric_v2_final_arrays/validation.json
 
 python experiments/mechanism/analyze_depth_metric_audit.py \
-  --run results/mechanism_v2/metric_v2_final_arrays/replica_room2/seed57_final_arrays.json \
-  --visualization-root results/mechanism_v2/metric_v2_final_figures \
-  --out-dir results/mechanism_v2/metric_v2_final_arrays
+  --run results/dilution/mechanism_v2/metric_v2_final_arrays/replica_room2/seed57_final_arrays.json \
+  --visualization-root results/dilution/mechanism_v2/metric_v2_final_figures \
+  --out-dir results/dilution/mechanism_v2/metric_v2_final_arrays
 ```
 
 This is a substrate correction and one-seed diagnostic. It is not confirmatory causal evidence, and its values must not be compared with legacy runs that used the former depth or SSIM definitions. The next scientific step is to review per-view depth visualizations and repeat the corrected audit across scenes/seeds before interpreting starvation interventions.

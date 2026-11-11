@@ -112,7 +112,7 @@ def main():
     
     dataset_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'results', 'oracle_dataset', 'oracle_dataset.json'
+        'results', 'legacy', 'oracle_dataset', 'oracle_dataset.json'
     )
     
     if not os.path.exists(dataset_path):

@@ -10,7 +10,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "results/rerun_paper1/dilution_factorial"
+SRC = ROOT / "results/dilution/rerun_paper1/dilution_factorial"
 OUT = ROOT / "docs/paper/figs"
 SCENES = [("tum_fr2_xyz", "TUM fr2_xyz"), ("tum_fr1_xyz", "TUM fr1_xyz")]
 CURVES = [("error_off", "error_only, no throttle", "tab:blue", "--"),
@@ -45,5 +45,5 @@ for ax in axes.ravel():
     ax.tick_params(labelsize=7)
 fig.tight_layout(pad=0.6)
 fig.savefig(OUT / "fig7_dilution.pdf")
-(OUT / "fig7.json").write_text(json.dumps({"source": "results/rerun_paper1/dilution_factorial", "curves": meta}, indent=1))
+(OUT / "fig7.json").write_text(json.dumps({"source": "results/dilution/rerun_paper1/dilution_factorial", "curves": meta}, indent=1))
 print("wrote", OUT / "fig7_dilution.pdf")

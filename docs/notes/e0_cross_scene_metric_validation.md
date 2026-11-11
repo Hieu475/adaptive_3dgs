@@ -10,7 +10,7 @@
 - Scenes and seeds: Replica office0 and room2, seeds 57 and 58 (four matched pairs).
 - 99 online frames; same candidate batch size (5,000), candidate observation at frame 30, insertion at frame 30 or 70, and 5,000 logical micro-updates per mapped frame.
 - Fixed evaluation frames: 20, 40, 60, 80, and 99.
-- All four pairs pass candidate, prefix, update-count, metric-v2, source-hash, and CUDA-timing validation in `results/mechanism_v2/metric_v2_cross_scene_n99/validation_against_e0_commit.json`.
+- All four pairs pass candidate, prefix, update-count, metric-v2, source-hash, and CUDA-timing validation in `results/dilution/mechanism_v2/metric_v2_cross_scene_n99/validation_against_e0_commit.json`.
 
 ## Held-out mean results
 

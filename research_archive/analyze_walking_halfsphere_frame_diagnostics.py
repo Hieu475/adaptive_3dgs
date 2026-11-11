@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
-RUN = ROOT / "results/phase14_generalization_postfix/continuous_age_quota/novelty_rule_transfer/fr3_walking_halfsphere/confirmatory"
+RUN = ROOT / "results/legacy/phase14_generalization_postfix/continuous_age_quota/novelty_rule_transfer/fr3_walking_halfsphere/confirmatory"
 SCENE = "tum_fr3_walking_halfsphere"
 SEEDS = tuple(range(140, 148))
 ARMS = ("global_importance", "mature75", "novelty_rule")

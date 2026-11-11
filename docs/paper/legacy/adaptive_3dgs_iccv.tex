@@ -149,8 +149,8 @@ A mixed-regime test injects 30\% holes mid-trajectory on Replica and the router 
 \section{Experiments}
 \label{sec:experiments}
 \textbf{Protocol.} $320 \times 240$, $B_t = 15\,\mathrm{ms}$, seeds $[42..49]$, two-sided Wilcoxon paired + Holm-Bonferroni + bootstrap CIs; production \texttt{gsplat} backend; GT poses with tracking decoupled (mapping benchmark, not SLAM ATE).
-Artifacts: \texttt{results/phase14\_projected\_area\_fix\_clean\_7policy\_8seeds/} (frozen source commit and manifest).
-\textbf{Holdout protocol.} Because online mapping optimizes on the evaluated trajectory, train-view PSNR overstates generalization. We hold out every 8th frame render-only (never mapped, never selected): the train--holdout gap is $+0.47\,\mathrm{dB}$ mean over 30f$\times$3 seeds for both OURS and \texttt{error\_only} (\texttt{results/phase14\_holdout/}) --- small under this same-trajectory proxy, which we explicitly do \textit{not} present as independent novel-trajectory generalization. A strict novel-trajectory split (withheld rooms) remains future work.
+Artifacts: \texttt{results/frozen/phase14\_projected\_area\_fix\_clean\_7policy\_8seeds/} (frozen source commit and manifest).
+\textbf{Holdout protocol.} Because online mapping optimizes on the evaluated trajectory, train-view PSNR overstates generalization. We hold out every 8th frame render-only (never mapped, never selected): the train--holdout gap is $+0.47\,\mathrm{dB}$ mean over 30f$\times$3 seeds for both OURS and \texttt{error\_only} (\texttt{results/holdout/phase14\_holdout/}) --- small under this same-trajectory proxy, which we explicitly do \textit{not} present as independent novel-trajectory generalization. A strict novel-trajectory split (withheld rooms) remains future work.
 
 \begin{table*}[t]
 \centering
@@ -192,7 +192,7 @@ Error, hard map cap 23k & 26.69 & .0215 & 23.0 & 22.30 & .1023 & 23.0 \\
 Error, hard map cap 39k & --- & --- & --- & 21.15 & .1046 & 39.0 \\
 \bottomrule
 \end{tabular}
-\caption{\textbf{Corrected-pose factorial and dilution controls, 150 frames $\times$ 8 seeds per scene.} All factorial cells use the same modeled $15\,\mathrm{ms}$ optimization budget. The $\times4$ control uses $60\,\mathrm{ms}$ for optimization while keeping the original $15\,\mathrm{ms}$ spawn allowance. Depth L1 is in meters. Hard caps harm depth on \texttt{fr1\_xyz}; the 39k cap matches the coverage map size there but gives no PSNR gain. Backlog is enabled independently of warmup only in the last throttle level. Per-run traces and paired intervals are in \texttt{results/dilution\_factorial/}.}
+\caption{\textbf{Corrected-pose factorial and dilution controls, 150 frames $\times$ 8 seeds per scene.} All factorial cells use the same modeled $15\,\mathrm{ms}$ optimization budget. The $\times4$ control uses $60\,\mathrm{ms}$ for optimization while keeping the original $15\,\mathrm{ms}$ spawn allowance. Depth L1 is in meters. Hard caps harm depth on \texttt{fr1\_xyz}; the 39k cap matches the coverage map size there but gives no PSNR gain. Backlog is enabled independently of warmup only in the last throttle level. Per-run traces and paired intervals are in \texttt{results/dilution/dilution\_factorial/}.}
 \label{tab:factorial}
 \end{table*}
 
@@ -203,7 +203,7 @@ OURS reaches $27.64 \pm 0.04\,\mathrm{dB}$: $+2.61$ over the strongest budgeted 
 
 \textbf{Dilution controls and direct allocation.} Holding the spawn allowance at its $15\,\mathrm{ms}$ value, giving raw-error selection $60\,\mathrm{ms}$ for optimization raises PSNR by $+3.29$ $[3.18,3.41]$ and $+3.07$ $[3.04,3.11]$ dB on \texttt{fr2\_xyz}/\texttt{fr1\_xyz}, despite maps of $94\mathrm{k}$/$79\mathrm{k}$. Capping the error-only map at 23k adds $+2.64$ $[2.53,2.76]$ and $+1.18$ $[1.15,1.22]$ dB, but doubles depth L1 on \texttt{fr1\_xyz}. A 39k cap matching that scene's coverage map adds only $+0.04$ $[-0.06,0.11]$ dB and also harms depth. Thus a static size limit does not reproduce coverage throttling's effect on \texttt{fr1\_xyz}. For raw-error selection on \texttt{fr2\_xyz}, coverage reduces the share of modeled update budget spent on Gaussians younger than ten frames from $22.5\%$ to $10.7\%$, while the per-frame selection rate among mature Gaussians rises from $35.8\%$ to $82.3\%$. The corresponding mature selection rate on \texttt{fr1\_xyz} rises from $28.6\%$ to $56.3\%$. Allocation shifts and the budget intervention support compute dilution under the tested protocol, but coverage also changes densification thresholds and the optimization trajectory. Map size alone is not identified as the unique cause.
 
-\textbf{Exploratory transfer to two more TUM scenes} (150f$\times$3 seeds, same six factorial cells): coverage adds $+0.34$/$+0.10\,\mathrm{dB}$ to error/temporal selection on \texttt{fr1\_desk}, but depth L1 worsens from $0.0481$/$0.0476$ to $0.0590$/$0.0595\,\mathrm{m}$. On \texttt{fr3\_static}, coverage adds $+0.77$/$+0.38\,\mathrm{dB}$ and slightly improves depth L1. Adding backlog to temporal selection on \texttt{fr1\_desk} loses $0.59\,\mathrm{dB}$. These scene-level differences limit any claim that one growth rule is optimal across sensor and motion conditions; the three-seed comparisons are descriptive (full traces in \texttt{results/dilution\_factorial/}).
+\textbf{Exploratory transfer to two more TUM scenes} (150f$\times$3 seeds, same six factorial cells): coverage adds $+0.34$/$+0.10\,\mathrm{dB}$ to error/temporal selection on \texttt{fr1\_desk}, but depth L1 worsens from $0.0481$/$0.0476$ to $0.0590$/$0.0595\,\mathrm{m}$. On \texttt{fr3\_static}, coverage adds $+0.77$/$+0.38\,\mathrm{dB}$ and slightly improves depth L1. Adding backlog to temporal selection on \texttt{fr1\_desk} loses $0.59\,\mathrm{dB}$. These scene-level differences limit any claim that one growth rule is optimal across sensor and motion conditions; the three-seed comparisons are descriptive (full traces in \texttt{results/dilution/dilution\_factorial/}).
 
 \begin{table}[tbp]
 \centering
@@ -238,7 +238,7 @@ TUM fr2\_xyz & 0 & 24.12 & 27.69 & $+3.57$ \\
  & 1.0 & 24.21 & 27.62 & $+3.41$ \\
 \bottomrule
 \end{tabular}
-\caption{\textbf{Within-scene depth interventions} (150 frames $\times$ 3 seeds). $\Delta$ is temporal$\times$influence with coverage minus unthrottled raw error, measured on identical perturbed frames. Replica also receives Gaussian depth noise with standard deviation $0.05$ times the hole fraction in meters. TUM smoothing acts only on valid depth after the standard hygiene stage; it does not remove remaining holes. No level reverses policy ordering. Full paired intervals: \texttt{results/depth\_intervention/analysis.json}.}
+\caption{\textbf{Within-scene depth interventions} (150 frames $\times$ 3 seeds). $\Delta$ is temporal$\times$influence with coverage minus unthrottled raw error, measured on identical perturbed frames. Replica also receives Gaussian depth noise with standard deviation $0.05$ times the hole fraction in meters. TUM smoothing acts only on valid depth after the standard hygiene stage; it does not remove remaining holes. No level reverses policy ordering. Full paired intervals: \texttt{results/dilution/depth\_intervention/analysis.json}.}
 \label{tab:depth_intervention}
 \end{table}
 
@@ -283,15 +283,15 @@ Around frame 65 in seed 42, both error-only variants encounter difficult views; 
 
 
 \textbf{Systems:} scheduler overhead $2.54\,\mathrm{ms}$; optimization-budgeted execution at $\sim 10\,\mathrm{FPS}$ measured --- \textit{not} end-to-end $15\,\mathrm{ms}$ real-time, reported as such.
-\textbf{Baseline tracking (Tab.~\ref{tab:ate}):} a dense frame-to-frame photometric+depth Gauss-Newton odometer (no keyframes/loop closure, GT-anchored first frame) reaches ATE $0.9\,\mathrm{cm}$ (fr2\_xyz) and $2.0\,\mathrm{cm}$ (fr1\_xyz) over 100 frames at 3 seeds (\texttt{results/phase14\_tracking100/}), stable vs 30f with no late blowup; mapping evaluated at tracked poses holds $31.3$/$26.6\,\mathrm{dB}$ (above GT-pose PSNR since renders align to the tracker's own photometric optimum --- not comparable across pose sources).
+\textbf{Baseline tracking (Tab.~\ref{tab:ate}):} a dense frame-to-frame photometric+depth Gauss-Newton odometer (no keyframes/loop closure, GT-anchored first frame) reaches ATE $0.9\,\mathrm{cm}$ (fr2\_xyz) and $2.0\,\mathrm{cm}$ (fr1\_xyz) over 100 frames at 3 seeds (\texttt{results/tracking/phase14\_tracking100/}), stable vs 30f with no late blowup; mapping evaluated at tracked poses holds $31.3$/$26.6\,\mathrm{dB}$ (above GT-pose PSNR since renders align to the tracker's own photometric optimum --- not comparable across pose sources).
 Published full-trajectory references (MonoGS $1.71$, SplaTAM $0.50$, Photo-SLAM $0.63\,\mathrm{cm}$ on fr2\_xyz) are shown for range only --- ours is a short-horizon sanity check, not a SLAM claim.
 
 
 
-\textbf{Reproducibility.} The headline table uses \texttt{results/phase14\_projected\_area\_fix\_clean\_7policy\_8seeds/}, audited as paper-ready with per-policy configs, source hashes, artifact hashes, pose protocol, and clean source commit \texttt{c4e8e3a}. The six-policy confirmation, separate RTG-SLAM run, and deterministic merge are reproduced with \texttt{experiments/run\_final\_confirmation.py}, \texttt{experiments/merge\_phase14\_clean\_rtg\_results.py}, and \texttt{experiments/write\_phase14\_fix\_sensitivity\_manifest.py}. The prior \texttt{results/phase14\_corrected/} bundle is retained as historical reference. The factorial, controls, and per-frame allocation logs remain separate under \texttt{results/dilution\_factorial/}. Prior pose-bugged numbers ($19.24\,\mathrm{dB}$) are quarantined in \texttt{results/final\_confirmation/DEPRECATED.md}, never compared.
+\textbf{Reproducibility.} The headline table uses \texttt{results/frozen/phase14\_projected\_area\_fix\_clean\_7policy\_8seeds/}, audited as paper-ready with per-policy configs, source hashes, artifact hashes, pose protocol, and clean source commit \texttt{c4e8e3a}. The six-policy confirmation, separate RTG-SLAM run, and deterministic merge are reproduced with \texttt{experiments/run\_final\_confirmation.py}, \texttt{experiments/merge\_phase14\_clean\_rtg\_results.py}, and \texttt{experiments/write\_phase14\_fix\_sensitivity\_manifest.py}. The prior \texttt{results/frozen/phase14\_corrected/} bundle is retained as historical reference. The factorial, controls, and per-frame allocation logs remain separate under \texttt{results/dilution/dilution\_factorial/}. Prior pose-bugged numbers ($19.24\,\mathrm{dB}$) are quarantined in \texttt{results/frozen/final\_confirmation/DEPRECATED.md}, never compared.
 Environment: RTX 4050 Laptop GPU (6\,GB, driver 595.84), PyTorch 2.11+cu128 (CUDA 12.8), \texttt{gsplat} 1.5.3 production backend, Python 3.12.
 The OS memory guard caps the process at 70\% VRAM, reserving $\sim$1.8\,GB for the desktop compositor; peak measured allocation stays under $3.5\,\mathrm{GB}$, so all benchmarks run on a laptop GPU with desktop usable throughout --- the intended deployment envelope for budgeted online mapping, not a datacenter A100 setup whose headroom would mask dilution.
-To reproduce Tab.~\ref{tab:main}, run the default six policies to \texttt{results/phase14\_projected\_area\_fix\_clean\_8seeds/}, run \texttt{--policies rtg\_slam\_reimpl} to \texttt{results/phase14\_projected\_area\_fix\_clean\_rtg8/}, then run the merge and manifest scripts named above.
+To reproduce Tab.~\ref{tab:main}, run the default six policies to \texttt{results/frozen/phase14\_projected\_area\_fix\_clean\_8seeds/}, run \texttt{--policies rtg\_slam\_reimpl} to \texttt{results/phase14\_projected\_area\_fix\_clean\_rtg8/}, then run the merge and manifest scripts named above.
 \textbf{Perceptual and geometric metrics:} AlexNet LPIPS on fr2\_xyz 150f$\times$3 is $0.211$ (OURS) vs $0.294$ (\texttt{error\_only}). The new eight-seed factorial reports rendered depth L1 in Tab.~\ref{tab:factorial}; it does not report surface reconstruction accuracy against a 3D mesh.
 \textbf{Second confirmatory scene (Tab.~\ref{tab:confirm2}):} fr1\_xyz 150f$\times$8 gives OURS $23.47$ vs \texttt{error\_only} $21.09$ ($+2.38\,\mathrm{dB}$, $p=0.0078$); office1 routing validated at 8 seeds (routed \texttt{error\_only} $33.46$ vs fixed OURS $29.25$, $p=0.0078$).
 
@@ -306,7 +306,7 @@ fr1\_xyz 150f$\times$8 & 23.47 & 21.09 & $+2.38$ $\checkmark$ \\
 office1 100f$\times$8 & 29.25 & 33.46 & $-4.21$ (routed) $\checkmark$ \\
 \bottomrule
 \end{tabular}
-\caption{\textbf{Confirmatory combined-policy comparisons.} The combined policy wins on TUM ($p=0.0078$); routing recovers the synthetic loss ($p=0.0078$). The separate factorial in Tab.~\ref{tab:factorial} isolates the coverage effect. \texttt{results/phase14\_multiscene150/}.}
+\caption{\textbf{Confirmatory combined-policy comparisons.} The combined policy wins on TUM ($p=0.0078$); routing recovers the synthetic loss ($p=0.0078$). The separate factorial in Tab.~\ref{tab:factorial} isolates the coverage effect. \texttt{results/legacy/phase14\_multiscene150/}.}
 \label{tab:confirm2}
 \end{table}
 
@@ -382,7 +382,7 @@ A3 + backlog & 17.15 & $+1.08$ & 43,824 & $+0.04$ vs A2 \\
 A4 + learned & 14.53 & $-1.54$ & 38,317 & harmful \\
 \bottomrule
 \end{tabular}
-\caption{\textbf{Historical component ablation on the pose-bugged substrate} (5 seeds). Values and tests are not evidence for effects on the corrected benchmark. \texttt{results/step1\_ablation\_5seeds/}.}
+\caption{\textbf{Historical component ablation on the pose-bugged substrate} (5 seeds). Values and tests are not evidence for effects on the corrected benchmark. \texttt{results/dilution/step1\_ablation\_5seeds/}.}
 \label{tab:ablation}
 \end{table}
 

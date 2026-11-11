@@ -15,11 +15,11 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from experiments.run_frozen_benchmark import load_benchmark_sequence
-from experiments.run_postfix_frame_diagnostics import scene_features
+from experiments.run.run_frozen_benchmark import load_benchmark_sequence
+from experiments.run.run_postfix_frame_diagnostics import scene_features
 
 
-RUN = ROOT / "results/phase14_generalization_postfix/room1_trajectory_age_quota_seeds270_272"
+RUN = ROOT / "results/legacy/phase14_generalization_postfix/room1_trajectory_age_quota_seeds270_272"
 SCENE = "replica_room1"
 SEEDS = (270, 271, 272)
 W, H = 320, 240
@@ -171,7 +171,7 @@ def main():
         "scene": SCENE,
         "seeds": list(SEEDS),
         "input_pose_convention": "Phase 10 Replica ground-truth extrinsics using the pipeline convention",
-        "scene_feature_source": "experiments/run_postfix_frame_diagnostics.py::scene_features",
+        "scene_feature_source": "experiments/run/run_postfix_frame_diagnostics.py::scene_features",
         "scene_features_are_policy_independent": True,
         "analysis_script_sha256": sha256(Path(__file__).resolve()),
         "run_manifest_sha256": sha256(RUN / "manifest.json"),

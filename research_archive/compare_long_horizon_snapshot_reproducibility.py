@@ -9,14 +9,14 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
-BASE = ROOT / "results/phase14_generalization_postfix/continuous_age_quota/long_horizon_tum_fr1_desk"
+BASE = ROOT / "results/legacy/phase14_generalization_postfix/continuous_age_quota/long_horizon_tum_fr1_desk"
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--scene", default="tum_fr1_desk")
     a = ap.parse_args()
-    base = ROOT / "results/phase14_generalization_postfix/continuous_age_quota" / f"long_horizon_{a.scene}"
+    base = ROOT / "results/legacy/phase14_generalization_postfix/continuous_age_quota" / f"long_horizon_{a.scene}"
     dirty_path = base / "multiseed/analysis.json"
     clean_path = base / "clean_snapshot_rerun/analysis.json"
     out_path = base / "snapshot_reproducibility.json"

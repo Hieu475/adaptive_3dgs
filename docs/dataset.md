@@ -69,7 +69,7 @@ data/
 
 Automated download and preparation script:
 ```bash
-bash scripts/download_tum.sh
+bash scripts/fetch/download_tum.sh
 ```
 
 ---

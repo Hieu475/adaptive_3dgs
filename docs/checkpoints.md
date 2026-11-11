@@ -16,8 +16,8 @@ All checkpoints were trained in Phase 9B / 9C and frozen unconditionally for Pha
 | **45** | `A1_online_adaptive_seed_45.pt` | `94155ec2f8d0e895c58ba985c39d43122c40da80ad94be3dac02c24dc3dc47d9` | `A1_online_adaptive_seed_45.json` | `7893010e29b5a2694160dbdf26cca08148cbafc0583fa2f322526120761a8458` |
 | **46** | `A1_online_adaptive_seed_46.pt` | `5d87caa388c6827d860f1afdd50046e65bdc07ca4a96b1d63e98ee5ef7108d7d` | `A1_online_adaptive_seed_46.json` | `7893010e29b5a2694160dbdf26cca08148cbafc0583fa2f322526120761a8458` |
 
-Deliverables copy location: `results/phase10_e2e/checkpoints/`  
-Source location: `results/phase9b_robust_normalization/checkpoints/`
+Deliverables copy location: `results/tracking/phase10_e2e/checkpoints/`  
+Source location: `results/legacy/phase9b_robust_normalization/checkpoints/`
 
 ---
 

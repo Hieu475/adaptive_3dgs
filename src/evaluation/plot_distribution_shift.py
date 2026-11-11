@@ -4,8 +4,8 @@ Quantifies and visualizes the distribution shift between tum_fr1_desk (train)
 and tum_fr2_xyz (test) before (raw) and after (relative) scale-invariant transformation.
 
 Generates:
-    - results/phase9a_scale_invariant/representation_metrics.csv
-    - results/phase9a_scale_invariant/figures/fig19_distribution_shift.png
+    - results/legacy/phase9a_scale_invariant/representation_metrics.csv
+    - results/legacy/phase9a_scale_invariant/figures/fig19_distribution_shift.png
 """
 import json
 
@@ -30,7 +30,7 @@ from src.utility.scale_invariant_features import (
 def analyze_feature_distributions() -> pd.DataFrame:
     """Compute statistical distribution metrics between fr1 and fr2 across representations."""
     repo_root = get_repo_root()
-    dataset_path = repo_root / "results" / "oracle_dataset" / "oracle_dataset.json"
+    dataset_path = repo_root / "results" / "legacy" / "oracle_dataset" / "oracle_dataset.json"
 
     with open(dataset_path) as f:
         data = json.load(f)

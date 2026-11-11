@@ -262,7 +262,7 @@ def main():
     parser.add_argument(
         "--phase10_dir",
         type=Path,
-        default=REPO_ROOT / "results" / "phase10_e2e",
+        default=REPO_ROOT / "results" / "tracking" / "phase10_e2e",
         help="Path to Phase 10 results directory",
     )
     parser.add_argument(

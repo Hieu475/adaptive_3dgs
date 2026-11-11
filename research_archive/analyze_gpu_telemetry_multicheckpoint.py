@@ -7,7 +7,7 @@ from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BASE = ROOT / "results/phase14_generalization_postfix/gpu_telemetry_observer_effect_multicheckpoint"
+BASE = ROOT / "results/legacy/phase14_generalization_postfix/gpu_telemetry_observer_effect_multicheckpoint"
 PREREG = json.loads((BASE / "preregistration.json").read_text())
 SCENES = {
     "replica_office1": (BASE / "replica_office1", [260, 261, 262, 263]),

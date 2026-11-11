@@ -10,8 +10,8 @@ from pathlib import Path
 
 
 ROOT = Path("results")
-PILOT = ROOT / "matched_candidate_timing_rescue_pilot"
-REPLICATION = ROOT / "matched_candidate_timing_rescue_replication"
+PILOT = ROOT / "legacy" / "matched_candidate_timing_rescue_pilot"
+REPLICATION = ROOT / "legacy" / "matched_candidate_timing_rescue_replication"
 SCENES = ("replica_room2", "replica_office3")
 METRICS = {
     "fixed_heldout_mean_psnr": "Held-out PSNR (dB)",

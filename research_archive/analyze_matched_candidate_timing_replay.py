@@ -29,17 +29,17 @@ def bootstrap_mean_ci(values, seed, samples=20000):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", type=Path,
-                    default=Path("results/matched_candidate_timing_replay_verified"))
+                    default=Path("results/legacy/matched_candidate_timing_replay_verified"))
     ap.add_argument("--scenes", nargs="+", default=["replica_room2", "replica_office3"])
     ap.add_argument("--seeds", nargs="+", type=int, default=[57, 58, 59, 60])
     ap.add_argument("--same_seed_repeat_roots", nargs="*", default=[
-        "results/matched_candidate_timing_replay_pilot",
-        "results/matched_candidate_timing_replay_full",
-        "results/matched_candidate_timing_replay_verified",
-        "results/matched_candidate_timing_replay_final_smoke",
+        "results/legacy/matched_candidate_timing_replay_pilot",
+        "results/legacy/matched_candidate_timing_replay_full",
+        "results/legacy/matched_candidate_timing_replay_verified",
+        "results/legacy/matched_candidate_timing_replay_final_smoke",
     ])
     ap.add_argument("--frozen_repeat_root", type=Path,
-                    default=Path("results/matched_candidate_timing_replay_fixed_snapshot"))
+                    default=Path("results/legacy/matched_candidate_timing_replay_fixed_snapshot"))
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
     root = args.root
@@ -167,7 +167,7 @@ def main():
     lines += ["",
               result["interpretation"], "",
               "The batch is generated once from the frame-30 RGB-D observation and the same batch object is passed to both replay arms. This controls candidate identity, but it does not model natural discovery of surfaces that only become visible later. The dose is 5k, not the 50k dose used in the prior E2 transfer. The result remains exploratory: two scenes and four frozen seed prefixes per scene. Each prefix has three technical replay repeats; those repeats do not count as independent seeds. The room2 contrast changed under earlier prefix regeneration, so future replications should preserve prefix checkpoints and report distinct prefix variation separately.",
-              "", "Artifacts: per-seed JSON files, `validation.json`, and source hashes under `matched_candidate_timing_replay_verified/`; protocol in `research/matched_candidate_timing_protocol.md`; runner in `experiments/run_matched_candidate_timing_replay.py`."]
+              "", "Artifacts: per-seed JSON files, `validation.json`, and source hashes under `matched_candidate_timing_replay_verified/`; protocol in `research/matched_candidate_timing_protocol.md`; runner in `experiments/run/run_matched_candidate_timing_replay.py`."]
     out = args.out or root / "analysis.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(lines) + "\n")

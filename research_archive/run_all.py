@@ -15,8 +15,8 @@ Executes the complete experimental suite:
     12. R20: Failure Mode Diagnostic Suite
 
 Generates:
-    - results/master/summary.json
-    - results/master/summary.md
+    - results/legacy/master/summary.json
+    - results/legacy/master/summary.md
 """
 import os
 import sys
@@ -26,18 +26,18 @@ import time
 import json
 
 EXPERIMENT_SCRIPTS = [
-    ('R8/R15 Importance Validation', 'experiments/run_importance_validation.py'),
-    ('R9 Component Independence', 'experiments/run_component_independence.py'),
-    ('R10 Normalization Ablation', 'experiments/run_normalization_ablation.py'),
-    ('R11 Policy Benchmark', 'experiments/run_policy_benchmark.py'),
-    ('R12 Densification Convergence', 'experiments/run_densification_convergence.py'),
-    ('R13 Budget Controller Sweep', 'experiments/run_budget_sweep.py'),
+    ('R8/R15 Importance Validation', 'experiments/run/run_importance_validation.py'),
+    ('R9 Component Independence', 'experiments/run/run_component_independence.py'),
+    ('R10 Normalization Ablation', 'experiments/run/run_normalization_ablation.py'),
+    ('R11 Policy Benchmark', 'experiments/run/run_policy_benchmark.py'),
+    ('R12 Densification Convergence', 'experiments/run/run_densification_convergence.py'),
+    ('R13 Budget Controller Sweep', 'experiments/run/run_budget_sweep.py'),
     ('R14 Pipeline Profiler', 'benchmarks/profile_pipeline.py'),
-    ('R16 Top-K Attribution Ablation', 'experiments/run_attribution_topk_ablation.py'),
-    ('R17 Oracle Utility Experiment', 'experiments/run_oracle_utility.py'),
-    ('R18 Importance Formulation Ablation', 'experiments/run_oracle_ablation.py'),
-    ('R19 Matched-Budget Benchmark', 'experiments/run_matched_budget.py'),
-    ('R20 Failure Case Diagnostics', 'experiments/run_failure_analysis.py'),
+    ('R16 Top-K Attribution Ablation', 'experiments/run/run_attribution_topk_ablation.py'),
+    ('R17 Oracle Utility Experiment', 'experiments/run/run_oracle_utility.py'),
+    ('R18 Importance Formulation Ablation', 'experiments/run/run_oracle_ablation.py'),
+    ('R19 Matched-Budget Benchmark', 'experiments/run/run_matched_budget.py'),
+    ('R20 Failure Case Diagnostics', 'experiments/run/run_failure_analysis.py'),
 ]
 
 
@@ -89,7 +89,7 @@ def main():
     print("=" * 80)
     
     # Save Master Summary
-    master_dir = os.path.join(project_root, 'results', 'master')
+    master_dir = os.path.join(project_root, 'results', 'legacy', 'master')
     os.makedirs(master_dir, exist_ok=True)
     
     summary_json_path = os.path.join(master_dir, 'summary.json')

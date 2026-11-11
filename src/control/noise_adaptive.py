@@ -43,7 +43,7 @@ def frame_noise_score_v3(raw_holes: float, raw_edge: float) -> Dict[str, float]:
     rate also varies with reflective/transparent surfaces, incidence
     angle, range, occlusion, and preprocessing. Validated scope: 5/5
     development scenes + 7/7 held-out scenes (thresholds frozen;
-    see results/phase14_corrected/router_heldout.json).
+    see results/frozen/phase14_corrected/router_heldout.json).
     Edge density is secondary (TUM ~0.06 vs Replica ~0.01-0.02).
     score = clip(2.5 * holes + 1.0 * edge, 0, 1):
       Replica -> ~0.02, TUM -> ~0.55-0.85.

@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 
 
-ROOT = Path("results/matched_candidate_timing_replay_fixed_snapshot")
+ROOT = Path("results/legacy/matched_candidate_timing_replay_fixed_snapshot")
 RUN_IDS = ("repeat1", "repeat2", "repeat3")
 SCENE = "replica_room2"
 SEED = 57

@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """Generate the main-benchmark and factorial tables, their prose, and number macros.
 
-Source of truth: results/rerun_paper1/ (commit tagged paper-rerun-1, see SOURCE.txt) plus
-results/dilution_extension/analysis.json for the proportional-budget range. Writes to
+Source of truth: results/dilution/rerun_paper1/ (commit tagged paper-rerun-1, see SOURCE.txt) plus
+results/dilution/dilution_extension/analysis.json for the proportional-budget range. Writes to
 docs/paper/iccv_official/tables/: tab_main.tex, tab_factorial.tex, par_core.tex, macros.tex.
 """
 import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-RERUN = ROOT / "results/rerun_paper1"
+RERUN = ROOT / "results/dilution/rerun_paper1"
 MAIN = json.loads((RERUN / "main/final_confirmation_results.json").read_text())
 FACT = json.loads((RERUN / "dilution_factorial/analysis.json").read_text())
-EXT = json.loads((ROOT / "results/dilution_extension/analysis.json").read_text())
+EXT = json.loads((ROOT / "results/dilution/dilution_extension/analysis.json").read_text())
 OUT = ROOT / "docs/paper/iccv_official/tables"
 OUT.mkdir(parents=True, exist_ok=True)
 
@@ -98,7 +98,7 @@ def tab_factorial():
             cells += [f2(c["mean_psnr"]), f"{c['mean_depth_l1']:.4f}".lstrip("0"), f"{c['N_final'] / 1000:.1f}"]
         L.append(r[0] + " & " + " & ".join(cells) + r" \\")
     L += [r"\bottomrule", r"\end{tabular}",
-          r"\caption{\textbf{Corrected-pose factorial and dilution controls, 150 frames $\times$ 8 seeds per scene.} All factorial cells use the same modeled $15\,\mathrm{ms}$ optimization budget. The $\times4$ control uses $60\,\mathrm{ms}$ for optimization while keeping the original $15\,\mathrm{ms}$ spawn allowance. Depth L1 is in meters. Backlog is enabled independently of warmup only in the last throttle level. Per-run traces and paired intervals are in \texttt{results/rerun\_paper1/dilution\_factorial/}.}",
+          r"\caption{\textbf{Corrected-pose factorial and dilution controls, 150 frames $\times$ 8 seeds per scene.} All factorial cells use the same modeled $15\,\mathrm{ms}$ optimization budget. The $\times4$ control uses $60\,\mathrm{ms}$ for optimization while keeping the original $15\,\mathrm{ms}$ spawn allowance. Depth L1 is in meters. Backlog is enabled independently of warmup only in the last throttle level. Per-run traces and paired intervals are in \texttt{results/dilution/rerun\_paper1/dilution\_factorial/}.}",
           r"\label{tab:factorial}", r"\end{table*}"]
     (OUT / "tab_factorial.tex").write_text("\n".join(L) + "\n")
 

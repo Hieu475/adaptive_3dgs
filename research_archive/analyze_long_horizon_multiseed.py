@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
-RUN = ROOT / "results/phase14_generalization_postfix/continuous_age_quota/long_horizon_tum_fr1_desk/multiseed"
+RUN = ROOT / "results/legacy/phase14_generalization_postfix/continuous_age_quota/long_horizon_tum_fr1_desk/multiseed"
 SCENE = "tum_fr1_desk"
 OUT = RUN / "analysis.json"
 REPORT = RUN / "report.md"

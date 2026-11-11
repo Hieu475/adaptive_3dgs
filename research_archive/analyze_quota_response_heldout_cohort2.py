@@ -9,7 +9,7 @@ import random
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BASE = ROOT / "results/phase14_generalization_postfix/quota_response_heldout_cohort2_full8"
+BASE = ROOT / "results/legacy/phase14_generalization_postfix/quota_response_heldout_cohort2_full8"
 SCENES = ("replica_office0", "tum_fr1_xyz")
 FRAMES = (70, 90)
 SEEDS = tuple(range(42, 50))
@@ -209,7 +209,7 @@ def main() -> None:
         "source_commit": manifest["git_sha"],
         "manifest_sha256": sha256(manifest_path),
         "preregistration_sha256": sha256(prereg_path),
-        "runner_sha256": sha256(ROOT / "experiments/run_joint_spawn_refine_replay.py"),
+        "runner_sha256": sha256(ROOT / "experiments/run/run_joint_spawn_refine_replay.py"),
         "pipeline_sha256": sha256(ROOT / "src/core/pipeline.py"),
         "analysis_script_sha256": sha256(Path(__file__)),
         "cells": cells,

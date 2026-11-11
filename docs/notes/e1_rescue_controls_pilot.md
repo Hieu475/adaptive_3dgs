@@ -2,8 +2,8 @@
 
 **Status:** one-seed matched pilot; not confirmatory.
 
-**Run:** `results/mechanism_v2/e1_rescue_controls_pilot_v4/replica_room2/seed57_e1_controls_v4.json`.
-**Validation:** 1/1 pair passes `results/mechanism_v2/e1_rescue_controls_pilot_v4/validation.json`.
+**Run:** `results/dilution/mechanism_v2/e1_rescue_controls_pilot_v4/replica_room2/seed57_e1_controls_v4.json`.
+**Validation:** 1/1 pair passes `results/dilution/mechanism_v2/e1_rescue_controls_pilot_v4/validation.json`.
 
 ## Protocol correction
 
@@ -36,6 +36,6 @@ The selector ranking is not stable across insertion timing in this one seed. Age
 
 Requested quotas also differ from realized dose. Age-only's mature-update share is 0.941 early and 0.821 late despite a requested 0.50, because the inserted cohort itself becomes mature and quota transfers when the young stratum has insufficient capacity. Stale rescue realizes 0.194 early but only 0.025 late; stale residual realizes 0.090 and 0.005. The late replay therefore has a weak stale-treatment first stage. Report requested and realized allocation separately.
 
-Corrected visualization at `results/mechanism_v2/chronological_metric_visuals/figures/replica_room2/seed57/` shows substantial unsupported regions at held-out views. This is expected in part because the experiment disables automatic spawning and adds only one fixed batch. Do not interpret these absolute quality values as normal online-mapping performance or infer a pose bug from coverage alone.
+Corrected visualization at `results/dilution/mechanism_v2/chronological_metric_visuals/figures/replica_room2/seed57/` shows substantial unsupported regions at held-out views. This is expected in part because the experiment disables automatic spawning and adds only one fixed batch. Do not interpret these absolute quality values as normal online-mapping performance or infer a pose bug from coverage alone.
 
 Next, repeat the same frozen-snapshot control on at least one additional scene and multiple seeds, retaining the same arm definitions and exact work budget. First improve the stale first stage in the late condition through a prespecified quota/dose design, then report the effect conditional on realized stale updates. Do not tune the selector from this one-seed result.

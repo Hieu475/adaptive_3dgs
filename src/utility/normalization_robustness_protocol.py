@@ -170,7 +170,7 @@ GATE_CRITERIA_9C: Dict[str, Dict[str, Any]] = {
 # Output Structure
 # ═══════════════════════════════════════════════════════════════════════
 
-OUTPUT_DIR_9C: str = "results/phase9c_b2_robustness"
+OUTPUT_DIR_9C: str = "results/legacy/phase9c_b2_robustness"
 
 OUTPUT_FILES_9C: Dict[str, str] = {
     "protocol":                 "protocol.json",

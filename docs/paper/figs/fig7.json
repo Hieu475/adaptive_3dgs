@@ -1,5 +1,5 @@
 {
- "source": "results/rerun_paper1/dilution_factorial",
+ "source": "results/dilution/rerun_paper1/dilution_factorial",
  "curves": {
   "tum_fr2_xyz/error_off": {
    "n_seeds": 8,

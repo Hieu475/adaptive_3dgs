@@ -71,9 +71,9 @@ def _randomization_test(units, outcomes, observed, n_perm=10000, seed=7321):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("input", type=Path, nargs="?", default=Path(
-        "results/phase14_generalization_postfix/mechanism_growth_starvation/randomized_local_trial/replicate0/tum_fr1_rpy/seed42_frame11.json"))
+        "results/legacy/phase14_generalization_postfix/mechanism_growth_starvation/randomized_local_trial/replicate0/tum_fr1_rpy/seed42_frame11.json"))
     ap.add_argument("--output-dir", type=Path, default=Path(
-        "results/phase14_generalization_postfix/mechanism_growth_starvation/randomized_local_trial/replicate0"))
+        "results/legacy/phase14_generalization_postfix/mechanism_growth_starvation/randomized_local_trial/replicate0"))
     args = ap.parse_args()
     data = json.loads(args.input.read_text())
     arm = data["arms"][0]

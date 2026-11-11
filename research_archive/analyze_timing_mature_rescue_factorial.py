@@ -5,7 +5,7 @@ import statistics
 from pathlib import Path
 
 
-ROOT = Path("results/matched_candidate_timing_rescue_pilot")
+ROOT = Path("results/legacy/matched_candidate_timing_rescue_pilot")
 SCENES = ("replica_room2", "replica_office3")
 SEED = 57
 RUN_IDS = ("repeat1", "repeat2", "repeat3")

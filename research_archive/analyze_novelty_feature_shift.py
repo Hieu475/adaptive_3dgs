@@ -6,8 +6,8 @@ import math
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CAL = ROOT / "results/phase14_generalization_postfix/continuous_age_quota/diagnostics_tum_fr1_desk/rerun"
-EVAL = ROOT / "results/phase14_generalization_postfix/continuous_age_quota/novelty_rule_transfer/confirmatory"
+CAL = ROOT / "results/legacy/phase14_generalization_postfix/continuous_age_quota/diagnostics_tum_fr1_desk/rerun"
+EVAL = ROOT / "results/legacy/phase14_generalization_postfix/continuous_age_quota/novelty_rule_transfer/confirmatory"
 SCENES = {
     "calibration: tum_fr1_desk": (CAL / "tum_fr1_desk" / "seed42_global_importance.json", True),
     "held-out: replica_room0": (EVAL / "replica_room0" / "seed42_novelty_rule.json", False),

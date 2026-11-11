@@ -6,7 +6,7 @@ import statistics
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / "results/phase14_generalization_postfix/gpu_telemetry_timing_diagnostic_seed263"
+OUT = ROOT / "results/legacy/phase14_generalization_postfix/gpu_telemetry_timing_diagnostic_seed263"
 RECORD = OUT / "replica_office1/seed263_frame90.json"
 
 

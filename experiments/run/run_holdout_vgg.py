@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+"""Held-out-view check of TT and TT+VGG (every 8th frame rendered, never mapped).
+
+Same protocol as run_holdout_extension; conditions come from run_vgg with the frozen controller
+parameters (T=100 ms, gamma=0.5, m_max=16; VGG theta 0.08/0.20, every 2, EMA 0.7, down 0.25, back-off 8).
+"""
+import argparse
+import json
+import sys
+from pathlib import Path
+
+import torch
+
+ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(ROOT))
+
+import experiments.run.run_throttle_ablation as abl  # noqa: E402
+import experiments.run.run_vgg as vgg  # noqa: E402  (installs the VGG and time-target wrappers)
+from experiments.run.run_holdout_benchmark import run_holdout_trajectory  # noqa: E402
+from experiments.run.run_frozen_benchmark import load_benchmark_sequence  # noqa: E402
+
+CONDITIONS = ("error_off", "tt", "tt_vgg")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--scenes", nargs="+", default=["tum_fr2_xyz", "tum_fr1_xyz", "replica_office0", "replica_office1"])
+    ap.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44, 45])
+    ap.add_argument("--conditions", nargs="+", choices=vgg.CONDITIONS, default=list(CONDITIONS))
+    ap.add_argument("--n_frames", type=int, default=150)
+    ap.add_argument("--holdout_every", type=int, default=8)
+    ap.add_argument("--budget_ms", type=float, default=15.0)
+    ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    ap.add_argument("--out_dir", type=Path, default=ROOT / "results" / "holdout" / "holdout_vgg")
+    args = ap.parse_args()
+    args.out_dir.mkdir(parents=True, exist_ok=True)
+    if args.device.startswith("cuda"):
+        torch.cuda.set_per_process_memory_fraction(0.70, 0)
+    for scene in args.scenes:
+        frames, intr = load_benchmark_sequence(scene_name=scene, n_frames=args.n_frames + 1, H=240, W=320, device=args.device)
+        for seed in args.seeds:
+            for cond in args.conditions:
+                target = args.out_dir / scene / f"{cond}_seed{seed}.json"
+                if target.exists():
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                policy, cfg = vgg.config_for(cond, seed, args.budget_ms, args.device, {}, {"T_ms": 100.0})
+                print(f"RUN {scene} {cond} seed={seed}", flush=True)
+                s = run_holdout_trajectory(policy, seed, frames, intr, args.budget_ms, args.device, 320, 240,
+                                           args.holdout_every, cfg)
+                s.update({"scene": scene, "condition": cond, "n_frames_loaded": len(frames),
+                          "holdout_every": args.holdout_every})
+                tmp = target.with_suffix(".tmp")
+                tmp.write_text(json.dumps(s, indent=1))
+                tmp.replace(target)
+                print(f"DONE {scene} {cond} seed={seed}: train={s['train_psnr']:.2f} holdout={s['holdout_psnr']:.2f} "
+                      f"gap={s['gen_gap_db']:+.2f} N={s['N_final']}", flush=True)
+
+
+if __name__ == "__main__":
+    main()

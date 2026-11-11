@@ -13,13 +13,13 @@ from scipy.stats import spearmanr
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from experiments.run_final_confirmation import bootstrap_ci_95  # noqa: E402
+from experiments.run.run_final_confirmation import bootstrap_ci_95  # noqa: E402
 
 OUT = ROOT / "docs/paper/iccv_official/tables"
-EXT = ROOT / "results/dilution_extension/analysis.json"
-DOSE_TUM = ROOT / "results/dilution_dose"
-DOSE_REP = {"replica_office0": ROOT / "results/dilution_dose_replica_cap/office0_cap60k",
-            "replica_office1": ROOT / "results/dilution_dose_replica_cap/office1_cap40k"}
+EXT = ROOT / "results/dilution/dilution_extension/analysis.json"
+DOSE_TUM = ROOT / "results/dilution/dilution_dose"
+DOSE_REP = {"replica_office0": ROOT / "results/dilution/dilution_dose_replica_cap/office0_cap60k",
+            "replica_office1": ROOT / "results/dilution/dilution_dose_replica_cap/office1_cap40k"}
 LABEL = {"tum_fr2_xyz": r"\texttt{fr2\_xyz}", "tum_fr1_xyz": r"\texttt{fr1\_xyz}",
          "replica_office0": r"\texttt{office0}", "replica_office1": r"\texttt{office1}"}
 CELLS = [f"{r}_x{m}" for r in ("free", "cap") for m in (1, 2, 4)]
@@ -103,7 +103,7 @@ def tab_dose(numbers):
 
 
 def tab_scenes(numbers):
-    path = ROOT / "results/dilution_scenes/analysis.json"
+    path = ROOT / "results/dilution/dilution_scenes/analysis.json"
     if not path.exists():
         return
     a = json.loads(path.read_text())
@@ -143,7 +143,7 @@ def tab_scenes(numbers):
 
 
 def tab_long(numbers):
-    path = ROOT / "results/dilution_long/analysis.json"
+    path = ROOT / "results/dilution/dilution_long/analysis.json"
     if not path.exists():
         return
     a = json.loads(path.read_text())
@@ -167,7 +167,7 @@ def tab_long(numbers):
 
 
 def tab_ablation(numbers):
-    path = ROOT / "results/throttle_ablation/analysis.json"
+    path = ROOT / "results/dilution/throttle_ablation/analysis.json"
     if not path.exists():
         return
     a = json.loads(path.read_text())
@@ -196,7 +196,7 @@ def tab_ablation(numbers):
 
 
 def tab_holdout(numbers):
-    path = ROOT / "results/holdout_extension/analysis.json"
+    path = ROOT / "results/holdout/holdout_extension/analysis.json"
     if not path.exists():
         return
     a = json.loads(path.read_text())
@@ -226,7 +226,7 @@ def tab_holdout(numbers):
 
 
 def tab_compute(numbers):
-    path = ROOT / "results/compute_matched/analysis.json"
+    path = ROOT / "results/dilution/compute_matched/analysis.json"
     if not path.exists():
         return
     a = json.loads(path.read_text())
@@ -256,7 +256,7 @@ def tab_compute(numbers):
 
 
 def tab_closedloop(numbers):
-    path = ROOT / "results/closed_loop/analysis.json"
+    path = ROOT / "results/tracking/closed_loop/analysis.json"
     if not path.exists():
         return
     a = json.loads(path.read_text())
@@ -283,7 +283,7 @@ def tab_closedloop(numbers):
 
 
 def tab_countcap(numbers):
-    path = ROOT / "results/count_cap/analysis.json"
+    path = ROOT / "results/dilution/count_cap/analysis.json"
     if not path.exists():
         return
     a = json.loads(path.read_text())
@@ -305,7 +305,7 @@ def tab_countcap(numbers):
 
 
 def tab_tracked(numbers):
-    path = ROOT / "results/tracked_poses/analysis.json"
+    path = ROOT / "results/tracking/tracked_poses/analysis.json"
     if not path.exists():
         return
     a = json.loads(path.read_text())
@@ -333,8 +333,8 @@ def tab_tracked(numbers):
 
 
 def tab_method(numbers):
-    t = ROOT / "results/vgg_test/analysis_tt.json"
-    f = ROOT / "results/vgg_fresh/analysis_tt.json"
+    t = ROOT / "results/controllers/vgg_test/analysis_tt.json"
+    f = ROOT / "results/controllers/vgg_fresh/analysis_tt.json"
     if not (t.exists() and f.exists()):
         return
     a, b = json.loads(t.read_text()), json.loads(f.read_text())
@@ -392,7 +392,7 @@ def tab_method(numbers):
               r"\label{tab:%s}" % fname.replace("tab_", ""), r"\end{table}"]
         (OUT / (fname + ".tex")).write_text("\n".join(L) + "\n")
     # Pareto table
-    pj = ROOT / "results/tt_pareto/analysis.json"
+    pj = ROOT / "results/controllers/tt_pareto/analysis.json"
     if pj.exists():
         pa = json.loads(pj.read_text())
         L = [r"\begin{table}[tbp]", r"\centering", r"\footnotesize\setlength{\tabcolsep}{2pt}", r"\begin{tabular}{lccccc}", r"\toprule",
@@ -411,7 +411,7 @@ def tab_method(numbers):
               r"\label{tab:pareto}", r"\end{table}"]
         (OUT / "tab_pareto.tex").write_text("\n".join(L) + "\n")
         numbers["pareto"] = pn
-    hv = ROOT / "results/holdout_vgg/analysis.json"
+    hv = ROOT / "results/holdout/holdout_vgg/analysis.json"
     if hv.exists():
         h = json.loads(hv.read_text())
         numbers["holdout_vgg"] = {sc: {k: round(v[k], 2) if v[k] is not None else None for k in ("train_delta", "holdout_delta", "retained")}

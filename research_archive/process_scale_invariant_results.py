@@ -62,7 +62,7 @@ def main():
 
     stage_file = out_dir / "stage_results.json"
     if not stage_file.exists():
-        raise FileNotFoundError(f"Missing {stage_file}. Run experiments/run_scale_invariant_features.py first.")
+        raise FileNotFoundError(f"Missing {stage_file}. Run experiments/run/run_scale_invariant_features.py first.")
 
     with open(stage_file) as f:
         stage_data = json.load(f)

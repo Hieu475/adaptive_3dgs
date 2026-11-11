@@ -9,8 +9,8 @@ A5: Ours minus Attribution -> Whole-image unweighted error
 A6: Ours minus Learned model -> Heuristic utility
 
 Outputs:
-    - results/ablations/core_ablations.json
-    - results/ablations/core_ablations_report.md
+    - results/legacy/ablations/core_ablations.json
+    - results/legacy/ablations/core_ablations_report.md
 """
 import os
 import sys
@@ -164,7 +164,7 @@ def main():
     print("\n>> Running A6: Learned Model vs Heuristic Utility...")
     learned_summary_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'results', 'learned_utility', 'two_head_comparison.json'
+        'results', 'legacy', 'learned_utility', 'two_head_comparison.json'
     )
     learned_data = {}
     if os.path.exists(learned_summary_path):
@@ -177,7 +177,7 @@ def main():
     }
     
     # Save Report
-    save_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'ablations')
+    save_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'legacy', 'ablations')
     os.makedirs(save_dir, exist_ok=True)
     report_file = os.path.join(save_dir, 'core_ablations_report.md')
     json_file = os.path.join(save_dir, 'core_ablations.json')

@@ -66,7 +66,7 @@ class Phase6FeatureNormalizer:
 
         if anchor_p4:
             repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            p4_norm_path = os.path.join(repo_root, "results", "learned_utility", "normalization.json")
+            p4_norm_path = os.path.join(repo_root, "results", "legacy", "learned_utility", "normalization.json")
             if os.path.exists(p4_norm_path):
                 import json
                 with open(p4_norm_path, "r") as f:

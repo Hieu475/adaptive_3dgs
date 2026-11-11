@@ -5,7 +5,7 @@ import statistics
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BASE = ROOT / "results/phase14_generalization_postfix"
+BASE = ROOT / "results/legacy/phase14_generalization_postfix"
 OUT = BASE / "matched_time_age_quota_pilot_replica_office1"
 RUNS = {
     17: BASE / "matched_time_age_quota_pilot_replica_office1_cudaevent_order17/replica_office1/seed42_frame90.json",

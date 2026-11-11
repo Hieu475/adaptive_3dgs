@@ -10,8 +10,8 @@ import numpy as np
 from scipy.stats import rankdata
 
 ROOT = Path(__file__).resolve().parent.parent
-BASE = ROOT / "results/phase14_generalization_postfix/frame_diagnostics"
-OUT = ROOT / "results/phase14_generalization_postfix"
+BASE = ROOT / "results/legacy/phase14_generalization_postfix/frame_diagnostics"
+OUT = ROOT / "results/legacy/phase14_generalization_postfix"
 SCENES = ("replica_office1", "tum_fr1_rpy")
 SEEDS = tuple(range(42, 50))
 FEATURES = (

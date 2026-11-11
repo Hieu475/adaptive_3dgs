@@ -21,7 +21,7 @@ if PROJECT_ROOT not in sys.path:
 try:
     from src.utility.evidence_protocol import PHASE12_OUTPUT_DIR, SEEDS, TRAIN_SCENE, ZERO_SHOT_SCENES
 except ImportError:
-    PHASE12_OUTPUT_DIR = os.path.join(PROJECT_ROOT, "results", "phase12_paper_evidence")
+    PHASE12_OUTPUT_DIR = os.path.join(PROJECT_ROOT, "results", "legacy", "phase12_paper_evidence")
     SEEDS = [42, 43, 44, 45, 46]
     TRAIN_SCENE = "train_scene"
     ZERO_SHOT_SCENES = ["test_scene1", "test_scene2"]

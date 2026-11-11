@@ -7,7 +7,7 @@ import random
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BASE = ROOT / "results/phase14_generalization_postfix/capacity_balanced_transition"
+BASE = ROOT / "results/legacy/phase14_generalization_postfix/capacity_balanced_transition"
 FRAMES, SEEDS = (90, 100), tuple(range(42, 50))
 
 
@@ -103,7 +103,7 @@ def main():
             "mean_quota_by_spawn_interaction_db": sum(it)/8, "interaction_seed_cluster_bootstrap_95_ci_db": bootstrap_ci(it,99103)},
         "seed_records": seeds,
         "provenance": {"manifest_sha256": sha256(BASE/"manifest.json"), "preregistration_sha256": sha256(prereg_path),
-            "runner_sha256": sha256(ROOT/"experiments/run_joint_spawn_refine_replay.py"),
+            "runner_sha256": sha256(ROOT/"experiments/run/run_joint_spawn_refine_replay.py"),
             "analyzer_sha256": sha256(Path(__file__)), "record_sha256": hashes},
         "interpretation_limit": prereg["interpretation_limit"]}
     (BASE/"analysis.json").write_text(json.dumps(result,indent=2)+"\n")

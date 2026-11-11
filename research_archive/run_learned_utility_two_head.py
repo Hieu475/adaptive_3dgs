@@ -60,7 +60,7 @@ def main():
     dataset = UtilityDataset.from_oracle(verify_identity=True)
     train_ds, val_ds, test_ds, normalizer = prepare_normalized_splits(
         dataset=dataset,
-        save_stats_path=os.path.join(repo_root, "results", "learned_utility", "normalization.json"),
+        save_stats_path=os.path.join(repo_root, "results", "legacy", "learned_utility", "normalization.json"),
     )
 
     # Assert strict protocol splits
@@ -103,16 +103,16 @@ def main():
     print("   PHASE 4: ALL STAGES COMPLETE — UTILITY ESTIMATOR SUCCESSFULLY FROZEN")
     print("=" * 100)
     print("Generated Artifacts:")
-    print("  - Checkpoints:      results/learned_utility/checkpoints/")
-    print("  - Models:           results/learned_utility/models/")
-    print("  - Normalization:    results/learned_utility/normalization.json")
-    print("  - RQ1 Summary:      results/learned_utility/rq1/summary.json")
-    print("  - RQ2 Budget Sweep: results/learned_utility/rq2/budget_sweep.json")
-    print("  - Baselines Table:  results/learned_utility/benchmark_table.json")
-    print("  - Failure Analysis: results/learned_utility/failure_analysis/failure_analysis.json")
-    print("  - Phase 5 Data:     results/learned_utility/phase5_interface/predictions_test.json")
-    print("  - Per-seed Gates:   results/seeds/seed_{42..46}/gate2.json")
-    print("  - Benchmark Report: results/learned_utility/benchmark_report.md")
+    print("  - Checkpoints:      results/legacy/learned_utility/checkpoints/")
+    print("  - Models:           results/legacy/learned_utility/models/")
+    print("  - Normalization:    results/legacy/learned_utility/normalization.json")
+    print("  - RQ1 Summary:      results/legacy/learned_utility/rq1/summary.json")
+    print("  - RQ2 Budget Sweep: results/legacy/learned_utility/rq2/budget_sweep.json")
+    print("  - Baselines Table:  results/legacy/learned_utility/benchmark_table.json")
+    print("  - Failure Analysis: results/legacy/learned_utility/failure_analysis/failure_analysis.json")
+    print("  - Phase 5 Data:     results/legacy/learned_utility/phase5_interface/predictions_test.json")
+    print("  - Per-seed Gates:   results/controllers/seeds/seed_{42..46}/gate2.json")
+    print("  - Benchmark Report: results/legacy/learned_utility/benchmark_report.md")
     print("=" * 100)
 
 

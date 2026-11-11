@@ -27,7 +27,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from experiments.run_closed_loop_e2e import run_trajectory_for_policy
+from experiments.run.run_closed_loop_e2e import run_trajectory_for_policy
 from src.utility.closed_loop_runtime import load_benchmark_sequence
 from src.utility.evidence_protocol import (
     DEFAULT_BUDGET_MS,
@@ -77,8 +77,8 @@ def run_budget_sweep(
     force_rerun: bool = False,
 ) -> Dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    p10_dir = REPO_ROOT / "results" / "phase10_e2e"
-    ext_dir = REPO_ROOT / "results" / "phase12_paper_evidence" / "external_baselines"
+    p10_dir = REPO_ROOT / "results" / "tracking" / "phase10_e2e"
+    ext_dir = REPO_ROOT / "results" / "legacy" / "phase12_paper_evidence" / "external_baselines"
 
     print("=" * 80)
     print("   ADAPTIVE 3DGS — PHASE 12 QUALITY VS. BUDGET SWEEP")

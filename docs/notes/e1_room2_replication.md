@@ -1,8 +1,8 @@
 # E1 room2 selector replication: seed 58
 
 **Status:** exploratory two-seed replication; not a generalization claim.
-**Raw runs:** `results/mechanism_v2/e1_rescue_controls_pilot_v4/replica_room2/seed57_e1_controls_v4.json` and `results/mechanism_v2/e1_room2_replication_v1/replica_room2/seed58_room2_e1_seed58.json`.
-**Validity:** both runs pass the matched-candidate validator; seed 58 is recorded in `results/mechanism_v2/e1_room2_replication_v1/validation.json`.
+**Raw runs:** `results/dilution/mechanism_v2/e1_rescue_controls_pilot_v4/replica_room2/seed57_e1_controls_v4.json` and `results/dilution/mechanism_v2/e1_room2_replication_v1/replica_room2/seed58_room2_e1_seed58.json`.
+**Validity:** both runs pass the matched-candidate validator; seed 58 is recorded in `results/dilution/mechanism_v2/e1_room2_replication_v1/validation.json`.
 
 ## Protocol
 

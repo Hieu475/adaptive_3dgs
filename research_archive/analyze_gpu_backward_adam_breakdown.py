@@ -6,7 +6,7 @@ import statistics
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BASE = ROOT / "results/phase14_generalization_postfix/gpu_backward_adam_breakdown_pilot"
+BASE = ROOT / "results/legacy/phase14_generalization_postfix/gpu_backward_adam_breakdown_pilot"
 PREREG = json.loads((BASE / "preregistration.json").read_text())
 STUDIES = {"replica_office1": (263, "b1d519e5461f8f02b6dede99875004158515d79bfcc358a60a5b1f06030560de"),
            "tum_fr1_rpy": (267, "4a43cc1b9793edca4052bc264885b353b8a8f8e4be461f8326443436259e9092")}

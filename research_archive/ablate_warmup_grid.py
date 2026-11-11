@@ -11,7 +11,7 @@ import torch
 import pandas as pd
 import numpy as np
 
-from experiments.run_frozen_benchmark import (
+from experiments.run.run_frozen_benchmark import (
     load_benchmark_sequence,
     build_pipeline_config,
     run_policy_trajectory,
@@ -150,7 +150,7 @@ def run_warmup_ablation(n_frames: int = 40, scene_name: str = "tum_fr2_xyz", see
 
     # Output summary table
     out_df = pd.DataFrame(results)
-    out_dir = Path("results/warmup_ablation")
+    out_dir = Path("results/dilution/warmup_ablation")
     out_dir.mkdir(parents=True, exist_ok=True)
     out_csv = out_dir / "warmup_grid_results.csv"
     out_df.to_csv(out_csv, index=False)

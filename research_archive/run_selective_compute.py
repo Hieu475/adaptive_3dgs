@@ -13,8 +13,8 @@ Evaluates:
   - Metrics: Tp50, Tp95, Tp99, frozen_cache_ms, active_render_ms, backward_ms, optimizer_ms, total_ms
 
 Outputs:
-  - results/selective_compute/selective_scaling.json
-  - results/selective_compute/selective_scaling.md
+  - results/dilution/selective_compute/selective_scaling.json
+  - results/dilution/selective_compute/selective_scaling.md
 """
 import os
 import sys
@@ -290,7 +290,7 @@ def benchmark_comprehensive(sizes=[10000, 25000, 50000], ratios=[1.0, 0.75, 0.50
             })
             
     # Save results
-    save_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'selective_compute')
+    save_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results', 'dilution', 'selective_compute')
     os.makedirs(save_dir, exist_ok=True)
     
     json_path = os.path.join(save_dir, 'selective_scaling.json')

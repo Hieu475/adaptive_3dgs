@@ -45,17 +45,17 @@ class FrozenUtilityPredictor:
         
         if checkpoint_path is None:
             ckpt_candidate = os.path.join(
-                repo_root, "results", "learned_utility", "checkpoints", f"two_head_mlp_seed_{seed}.pt"
+                repo_root, "results", "legacy", "learned_utility", "checkpoints", f"two_head_mlp_seed_{seed}.pt"
             )
             if os.path.exists(ckpt_candidate):
                 checkpoint_path = ckpt_candidate
             else:
                 checkpoint_path = os.path.join(
-                    repo_root, "results", "learned_utility", "models", f"seed_{seed}.pt"
+                    repo_root, "results", "legacy", "learned_utility", "models", f"seed_{seed}.pt"
                 )
         if normalizer_path is None:
             normalizer_path = os.path.join(
-                repo_root, "results", "learned_utility", "normalization.json"
+                repo_root, "results", "legacy", "learned_utility", "normalization.json"
             )
 
         if not os.path.exists(checkpoint_path):

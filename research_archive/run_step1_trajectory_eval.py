@@ -19,7 +19,7 @@ import torch
 import pandas as pd
 
 from src.core.pipeline import OnlineReconstructionPipeline
-from experiments.run_frozen_benchmark import (
+from experiments.run.run_frozen_benchmark import (
     load_benchmark_sequence,
     build_pipeline_config,
     run_policy_trajectory,
@@ -35,7 +35,7 @@ def main():
     parser.add_argument("--budget_ms", type=float, default=15.0)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
-    parser.add_argument("--output_dir", type=str, default="results/step1_warmup_throttling_eval")
+    parser.add_argument("--output_dir", type=str, default="results/dilution/step1_warmup_throttling_eval")
     args = parser.parse_args()
 
     device = args.device
